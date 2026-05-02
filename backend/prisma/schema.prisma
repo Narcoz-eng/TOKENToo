@@ -1,0 +1,411 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CollectionStatus {
+  ACTIVE
+  PAUSED
+  RISK_DISABLED
+  ARCHIVED
+}
+
+enum VaultStatus {
+  LOCKED
+  REDEEMABLE
+  REDEEMED
+  STAKED
+}
+
+enum StakingStatus {
+  ACTIVE
+  UNSTAKED
+  SLASHED
+}
+
+enum RaidMissionType {
+  SOCIAL
+  VOLUME
+  HOLDER
+  INVITE
+  STAKING
+  COLLECTION_LEVEL
+}
+
+enum RaidStatus {
+  DRAFT
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum XPSource {
+  BUY_NFT
+  HOLD_NFT
+  COMPLETE_RAID
+  INVITE_USER
+  STAKING
+  MARKETPLACE_VOLUME
+  UPGRADE_ACTIVITY
+  ADMIN_ADJUSTMENT
+}
+
+enum ListingStatus {
+  ACTIVE
+  FILLED
+  CANCELLED
+  EXPIRED
+}
+
+enum SaleType {
+  MARKETPLACE
+  INSTANT_SELL
+  BID_ACCEPTED
+}
+
+enum FeeType {
+  MARKETPLACE
+  MINT_VAULT
+  REDEEM
+  INSTANT_SELL
+  UPGRADE
+}
+
+enum FeeDestination {
+  RAID_REWARDS
+  BUYBACK_BACKING
+  PROTOCOL_TREASURY
+  CREATOR_COMMUNITY
+  SAFETY_RESERVE
+}
+
+model User {
+  id                 String              @id @default(uuid()) @db.Uuid
+  supabaseAuthId     String?             @unique @db.Uuid
+  walletAddress      String              @unique
+  username           String?
+  avatarUrl          String?
+  level              Int                 @default(1)
+  xp                 Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  createdCollections Collection[]        @relation("CollectionCreator")
+  vaultNfts          VaultNFT[]
+  raidParticipations RaidParticipation[]
+  xpLogs             XPLog[]
+  stakingPositions   StakingPosition[]
+  listings           Listing[]
+  purchases          Sale[]              @relation("BuyerSales")
+  sales              Sale[]              @relation("SellerSales")
+}
+
+model Token {
+  id                 String              @id @default(uuid()) @db.Uuid
+  mint               String              @unique
+  symbol             String
+  name               String
+  decimals           Int
+  metadataUri        String?
+  imageUri           String?
+  ageHours           Int                 @default(0)
+  liquidityUsd       Decimal             @default(0) @db.Decimal(20, 6)
+  marketCapUsd       Decimal             @default(0) @db.Decimal(20, 6)
+  holders            Int                 @default(0)
+  volume24hUsd       Decimal             @default(0) @db.Decimal(20, 6)
+  riskScore          Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  collection         Collection?
+  vaultNfts          VaultNFT[]
+  riskSnapshots      RiskScoreSnapshot[]
+
+  @@index([symbol])
+  @@index([riskScore])
+}
+
+model Collection {
+  id                    String              @id @default(uuid()) @db.Uuid
+  tokenId               String              @unique @db.Uuid
+  creatorUserId         String              @db.Uuid
+  onchainProfilePda     String?             @unique
+  feeVaultPda           String?             @unique
+  tokenVaultPda         String?             @unique
+  name                  String
+  slug                  String              @unique
+  logoUri               String?
+  bannerUri             String?
+  colorPalette          Json
+  mascot                String
+  theme                 String
+  vibe                  String
+  rarityTable           Json
+  communityXp           Int                 @default(0)
+  communityLevel        Int                 @default(1)
+  unlockedTraits        Json                @default("[]")
+  activeBoosts          Json                @default("[]")
+  status                CollectionStatus    @default(ACTIVE)
+  instantSellDisabled   Boolean             @default(false)
+  emergencyFlag         Boolean             @default(false)
+  floorPriceSol         Decimal             @default(0) @db.Decimal(20, 9)
+  volume24hSol          Decimal             @default(0) @db.Decimal(20, 9)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  token                 Token               @relation(fields: [tokenId], references: [id], onDelete: Restrict)
+  creator               User                @relation("CollectionCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  vaultNfts             VaultNFT[]
+  traitPacks            TraitPack[]
+  raidRooms             RaidRoom[]
+  stakingPositions      StakingPosition[]
+  listings              Listing[]
+  sales                 Sale[]
+  feeLedger             FeeLedger[]
+  buybackEvents         BuybackEvent[]
+
+  @@index([status])
+  @@index([communityLevel])
+}
+
+model VaultNFT {
+  id                String            @id @default(uuid()) @db.Uuid
+  collectionId      String            @db.Uuid
+  tokenId           String            @db.Uuid
+  ownerUserId       String?           @db.Uuid
+  mint              String            @unique
+  metadataUri       String
+  imageUri          String
+  positionPda       String            @unique
+  amount            Decimal           @db.Decimal(38, 0)
+  lockDurationDays  Int
+  lockedAt          DateTime          @default(now())
+  unlocksAt         DateTime
+  redeemedAt        DateTime?
+  tier              String
+  vaultType         String            @default("COMMUNITY")
+  redeemable        Boolean           @default(false)
+  status            VaultStatus       @default(LOCKED)
+  traits            Json
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  collection        Collection        @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  token             Token             @relation(fields: [tokenId], references: [id], onDelete: Restrict)
+  owner             User?             @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  stakingPositions  StakingPosition[]
+  listings          Listing[]
+  sales             Sale[]
+
+  @@index([collectionId, status])
+  @@index([ownerUserId])
+  @@index([unlocksAt])
+}
+
+model TraitPack {
+  id           String     @id @default(uuid()) @db.Uuid
+  collectionId String     @db.Uuid
+  name         String
+  level        Int
+  rarityTable  Json
+  isUnlocked   Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  traits       Trait[]
+
+  @@unique([collectionId, name])
+}
+
+model Trait {
+  id          String    @id @default(uuid()) @db.Uuid
+  traitPackId String    @db.Uuid
+  category    String
+  name        String
+  rarity      String
+  weightBps   Int
+  imageLayer  String?
+  animatedUri String?
+  traitPack   TraitPack @relation(fields: [traitPackId], references: [id], onDelete: Cascade)
+
+  @@unique([traitPackId, category, name])
+}
+
+model RaidRoom {
+  id             String              @id @default(uuid()) @db.Uuid
+  collectionId   String              @db.Uuid
+  creatorUserId  String?             @db.Uuid
+  name           String
+  bossName       String?
+  status         RaidStatus           @default(DRAFT)
+  startsAt       DateTime
+  endsAt         DateTime
+  rewardPoolSol  Decimal             @default(0) @db.Decimal(20, 9)
+  xpTarget       Int
+  currentXp      Int                  @default(0)
+  capacity       Int
+  antiAbuseRules Json
+  createdAt      DateTime             @default(now())
+  collection     Collection           @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  missions       RaidMission[]
+  participations RaidParticipation[]
+
+  @@index([collectionId, status])
+}
+
+model RaidMission {
+  id              String              @id @default(uuid()) @db.Uuid
+  raidRoomId      String              @db.Uuid
+  type            RaidMissionType
+  title           String
+  description     String
+  targetValue     Int
+  xpReward        Int
+  solReward       Decimal             @default(0) @db.Decimal(20, 9)
+  dailyXpCap      Int?
+  minWalletAgeHrs Int?
+  minHoldingHrs   Int?
+  noWashTrades    Boolean             @default(true)
+  startsAt        DateTime
+  endsAt          DateTime
+  raidRoom        RaidRoom             @relation(fields: [raidRoomId], references: [id], onDelete: Cascade)
+  participations  RaidParticipation[]
+}
+
+model RaidParticipation {
+  id              String      @id @default(uuid()) @db.Uuid
+  raidRoomId      String      @db.Uuid
+  raidMissionId   String?     @db.Uuid
+  userId          String      @db.Uuid
+  contribution    Int         @default(0)
+  xpEarned        Int         @default(0)
+  rewardSol       Decimal     @default(0) @db.Decimal(20, 9)
+  abuseScore      Int         @default(0)
+  completedAt     DateTime?
+  createdAt       DateTime    @default(now())
+  raidRoom        RaidRoom    @relation(fields: [raidRoomId], references: [id], onDelete: Cascade)
+  raidMission     RaidMission? @relation(fields: [raidMissionId], references: [id], onDelete: SetNull)
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raidRoomId, userId])
+  @@index([userId])
+}
+
+model XPLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @db.Uuid
+  collectionId String?  @db.Uuid
+  source       XPSource
+  amount       Int
+  reason       String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([collectionId, createdAt])
+}
+
+model StakingPosition {
+  id            String        @id @default(uuid()) @db.Uuid
+  vaultNftId    String        @db.Uuid
+  collectionId  String        @db.Uuid
+  userId        String        @db.Uuid
+  durationDays  Int
+  apyBps        Int
+  boostBps      Int           @default(0)
+  rewardsAccruedSol Decimal   @default(0) @db.Decimal(20, 9)
+  xpAccrued     Int           @default(0)
+  status        StakingStatus @default(ACTIVE)
+  stakedAt      DateTime      @default(now())
+  unstakedAt    DateTime?
+  vaultNft      VaultNFT      @relation(fields: [vaultNftId], references: [id], onDelete: Cascade)
+  collection    Collection    @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, status])
+  @@index([userId, status])
+}
+
+model Listing {
+  id            String        @id @default(uuid()) @db.Uuid
+  vaultNftId    String        @db.Uuid
+  collectionId  String        @db.Uuid
+  sellerUserId  String        @db.Uuid
+  priceSol      Decimal       @db.Decimal(20, 9)
+  status        ListingStatus @default(ACTIVE)
+  expiresAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  vaultNft      VaultNFT      @relation(fields: [vaultNftId], references: [id], onDelete: Cascade)
+  collection    Collection    @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  seller        User          @relation(fields: [sellerUserId], references: [id], onDelete: Cascade)
+  sale          Sale?
+
+  @@index([collectionId, status, priceSol])
+}
+
+model Sale {
+  id            String      @id @default(uuid()) @db.Uuid
+  listingId     String?     @unique @db.Uuid
+  vaultNftId    String      @db.Uuid
+  collectionId  String      @db.Uuid
+  buyerUserId   String?     @db.Uuid
+  sellerUserId  String?     @db.Uuid
+  saleType      SaleType
+  priceSol      Decimal     @db.Decimal(20, 9)
+  feeSol        Decimal     @db.Decimal(20, 9)
+  txSignature   String?
+  createdAt     DateTime    @default(now())
+  listing       Listing?    @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  vaultNft      VaultNFT    @relation(fields: [vaultNftId], references: [id], onDelete: Cascade)
+  collection    Collection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  buyer         User?       @relation("BuyerSales", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  seller        User?       @relation("SellerSales", fields: [sellerUserId], references: [id], onDelete: SetNull)
+
+  @@index([collectionId, createdAt])
+}
+
+model FeeLedger {
+  id            String          @id @default(uuid()) @db.Uuid
+  collectionId  String          @db.Uuid
+  sourceType    FeeType
+  destination   FeeDestination
+  grossSol      Decimal         @db.Decimal(20, 9)
+  allocatedSol  Decimal         @db.Decimal(20, 9)
+  txSignature   String?
+  metadata      Json?
+  createdAt     DateTime        @default(now())
+  collection    Collection      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, createdAt])
+  @@index([sourceType])
+}
+
+model BuybackEvent {
+  id            String      @id @default(uuid()) @db.Uuid
+  collectionId  String      @db.Uuid
+  tokenAmount   Decimal     @db.Decimal(38, 0)
+  spentSol      Decimal     @db.Decimal(20, 9)
+  txSignature   String?
+  createdAt     DateTime    @default(now())
+  collection    Collection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, createdAt])
+}
+
+model RiskScoreSnapshot {
+  id             String   @id @default(uuid()) @db.Uuid
+  tokenId        String   @db.Uuid
+  score          Int
+  liquidityUsd   Decimal  @db.Decimal(20, 6)
+  holders        Int
+  volume24hUsd   Decimal  @db.Decimal(20, 6)
+  ageHours       Int
+  activeVolume   Boolean
+  emergencyFlag  Boolean  @default(false)
+  reasons        Json
+  createdAt      DateTime @default(now())
+  token          Token    @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@index([tokenId, createdAt])
+  @@index([score])
+}

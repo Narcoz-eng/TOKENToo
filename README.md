@@ -52,3 +52,4 @@ npm run typecheck --workspace backend
 ## Program Notes
 
 The Anchor program uses PDAs for collection profiles, token vault custody, fee vaults, and staking positions. The skeleton intentionally leaves CPI calls for SPL transfers, Token Metadata/Core minting, and NFT burn/verification as explicit integration points.
+
