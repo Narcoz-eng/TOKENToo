@@ -28,6 +28,7 @@ export type VaultCollection = {
   online: number;
   riskScore: number;
   riskTier: "SAFE" | "MEDIUM" | "HIGH RISK";
+  qualityTier: "Basic" | "Premium" | "Legendary-ready";
   instantSellEnabled: boolean;
   palette: string[];
   mascotType: "frog" | "dog" | "cat" | "alien" | "samurai";
@@ -155,4 +156,52 @@ export type CollectionCompetition = {
   reward: string;
   penalty: string;
   endsIn: string;
+};
+
+export type GeneratorQualityTier = "Basic" | "Premium" | "Legendary-ready";
+
+export type CollectionGeneratorPreview = {
+  id: string;
+  collection: string;
+  preset: string;
+  theme: string;
+  mascot: string;
+  artStyle: string;
+  palette: string[];
+  backgroundWorld: string;
+  lore: string;
+  raidTheme: string;
+  roleNames: string[];
+  traitLanguage: string[];
+  traitCounts: Record<string, number>;
+  rarityWeights: Record<string, number>;
+  unlocks: Record<string, string[]>;
+  avatar: string;
+  banner: string;
+  samples: Array<{
+    id: string;
+    name: string;
+    image: string;
+    rarity: string;
+    role: string;
+    traits: string[];
+  }>;
+  quality: {
+    previewQualityScore: number;
+    uniquenessScore: number;
+    colorHarmonyScore: number;
+    duplicateRiskScore: number;
+    compatibilityScore: number;
+    tier: GeneratorQualityTier;
+    passed: boolean;
+  };
+  distinctiveness: {
+    silhouetteUniqueness: number;
+    paletteUniqueness: number;
+    mascotUniqueness: number;
+    backgroundWorldUniqueness: number;
+    traitLanguageUniqueness: number;
+    score: number;
+    passed: boolean;
+  };
 };

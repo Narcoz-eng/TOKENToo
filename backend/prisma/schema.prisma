@@ -82,6 +82,25 @@ enum FeeDestination {
   SAFETY_RESERVE
 }
 
+enum GeneratorRunStatus {
+  DRAFT
+  PREVIEWED
+  APPROVED
+  EXPIRED
+}
+
+enum OutputQualityTier {
+  BASIC
+  PREMIUM
+  LEGENDARY_READY
+}
+
+enum PreviewAssetType {
+  AVATAR
+  BANNER
+  SAMPLE_NFT
+}
+
 model User {
   id                 String              @id @default(uuid()) @db.Uuid
   supabaseAuthId     String?             @unique @db.Uuid
@@ -124,6 +143,190 @@ model Token {
 
   @@index([symbol])
   @@index([riskScore])
+}
+
+model GenerationRun {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  tokenName           String
+  tokenSymbol         String
+  tokenMint           String
+  logoUri             String?
+  logoData            String?
+  description         String
+  communityHints      Json                    @default("{}")
+  selectedPreset      String?
+  status              GeneratorRunStatus      @default(DRAFT)
+  approvedVersion     Int?
+  regenerationCount   Int                     @default(0)
+  seed                String
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  logoAnalysis        LogoAnalysis?
+  communityContext    CommunityContext?
+  styleProfiles       StyleProfile[]
+  previewAssets       PreviewAsset[]
+  qualityReports      QualityReport[]
+  distinctivenessReports DistinctivenessReport[]
+
+  @@index([tokenMint])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model LogoAnalysis {
+  id              String        @id @default(uuid()) @db.Uuid
+  generationRunId String        @unique @db.Uuid
+  palette         Json
+  mascot          String
+  style           String
+  mood            String
+  shapeLanguage   String
+  visualKeywords  Json
+  createdAt       DateTime      @default(now())
+  generationRun   GenerationRun @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+}
+
+model CommunityContext {
+  id                  String        @id @default(uuid()) @db.Uuid
+  generationRunId     String        @unique @db.Uuid
+  memes               Json          @default("[]")
+  slogans             Json          @default("[]")
+  phrases             Json          @default("[]")
+  lore                String?
+  extractedVocabulary Json
+  traitSeeds          Json
+  roleNames           Json
+  raidNames           Json
+  backgroundNames     Json
+  createdAt           DateTime      @default(now())
+  generationRun       GenerationRun @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+}
+
+model StyleProfile {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  generationRunId    String                 @db.Uuid
+  version            Int
+  collection         String
+  theme              String
+  mascot             String
+  artStyle           String
+  colors             Json
+  backgroundWorld    String
+  traitLanguage      Json
+  rarityStructure    Json
+  legendaryTheme     String
+  animationStyle     String
+  raidTheme          String
+  lore               String
+  roleNames          Json
+  isApproved         Boolean                @default(false)
+  createdAt          DateTime               @default(now())
+  generationRun      GenerationRun          @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+  traitPack          GeneratorTraitPack?
+  previewAssets      PreviewAsset[]
+  qualityReports     QualityReport[]
+  distinctivenessReports DistinctivenessReport[]
+
+  @@unique([generationRunId, version])
+  @@index([artStyle])
+}
+
+model GeneratorTraitPack {
+  id               String                    @id @default(uuid()) @db.Uuid
+  styleProfileId   String                    @unique @db.Uuid
+  collectionSize   Int                       @default(10000)
+  categories       Json
+  rarityWeights    Json
+  unlockSchedule   Json
+  uniquenessRules  Json
+  createdAt        DateTime                  @default(now())
+  styleProfile     StyleProfile              @relation(fields: [styleProfileId], references: [id], onDelete: Cascade)
+  traits           GeneratorTraitDefinition[]
+  compatibilityRules CompatibilityRule[]
+}
+
+model GeneratorTraitDefinition {
+  id                String              @id @default(uuid()) @db.Uuid
+  traitPackId       String              @db.Uuid
+  category          String
+  name              String
+  rarity            String
+  weightBps         Int
+  unlockLevel       Int                 @default(1)
+  compatibilityTags Json                @default("[]")
+  visualDescription String
+  traitPack         GeneratorTraitPack  @relation(fields: [traitPackId], references: [id], onDelete: Cascade)
+
+  @@unique([traitPackId, category, name])
+  @@index([category, rarity])
+}
+
+model CompatibilityRule {
+  id                String              @id @default(uuid()) @db.Uuid
+  traitPackId       String              @db.Uuid
+  trait             String
+  incompatibleWith  Json
+  reason            String
+  traitPack         GeneratorTraitPack  @relation(fields: [traitPackId], references: [id], onDelete: Cascade)
+
+  @@index([traitPackId])
+}
+
+model PreviewAsset {
+  id              String           @id @default(uuid()) @db.Uuid
+  generationRunId String           @db.Uuid
+  styleProfileId  String           @db.Uuid
+  type            PreviewAssetType
+  label           String
+  uri             String
+  metadata        Json
+  version         Int
+  createdAt       DateTime         @default(now())
+  generationRun   GenerationRun    @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+  styleProfile    StyleProfile     @relation(fields: [styleProfileId], references: [id], onDelete: Cascade)
+
+  @@index([generationRunId, type])
+}
+
+model QualityReport {
+  id                       String             @id @default(uuid()) @db.Uuid
+  generationRunId          String             @db.Uuid
+  styleProfileId           String             @db.Uuid
+  previewQualityScore      Int
+  uniquenessScore          Int
+  colorHarmonyScore        Int
+  rarityDistributionScore  Int
+  duplicateRiskScore       Int
+  compatibilityScore       Int
+  tier                     OutputQualityTier
+  passed                   Boolean
+  issues                   Json               @default("[]")
+  createdAt                DateTime           @default(now())
+  generationRun            GenerationRun      @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+  styleProfile             StyleProfile       @relation(fields: [styleProfileId], references: [id], onDelete: Cascade)
+
+  @@index([generationRunId])
+  @@index([tier])
+}
+
+model DistinctivenessReport {
+  id                         String        @id @default(uuid()) @db.Uuid
+  generationRunId            String        @db.Uuid
+  styleProfileId             String        @db.Uuid
+  silhouetteUniqueness       Int
+  paletteUniqueness          Int
+  mascotUniqueness           Int
+  backgroundWorldUniqueness  Int
+  traitLanguageUniqueness    Int
+  score                      Int
+  passed                     Boolean
+  nearestCollection          Json?
+  createdAt                  DateTime      @default(now())
+  generationRun              GenerationRun @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+  styleProfile               StyleProfile  @relation(fields: [styleProfileId], references: [id], onDelete: Cascade)
+
+  @@index([generationRunId])
+  @@index([score])
 }
 
 model Collection {

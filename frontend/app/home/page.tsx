@@ -12,6 +12,7 @@ import { collections, competitions, getCollection, leaderboard, raidRooms, socia
 
 export default function HomePage() {
   const featured = getCollection("frog-vaults");
+  const featuredCollections = collections.filter((collection) => collection.qualityTier !== "Basic");
 
   return (
     <AppShell active="home">
@@ -64,7 +65,7 @@ export default function HomePage() {
 
           <SectionCard title="Featured Factions" action={<Link href="/collections" className="text-sm font-semibold text-vault-purple">View All</Link>}>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              {collections.map((collection) => (
+              {featuredCollections.map((collection) => (
                 <CollectionCard key={collection.id} collection={collection} />
               ))}
             </div>

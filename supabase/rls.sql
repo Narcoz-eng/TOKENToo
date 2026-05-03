@@ -22,7 +22,17 @@ begin
     'Sale',
     'FeeLedger',
     'BuybackEvent',
-    'RiskScoreSnapshot'
+    'RiskScoreSnapshot',
+    'GenerationRun',
+    'LogoAnalysis',
+    'CommunityContext',
+    'StyleProfile',
+    'GeneratorTraitPack',
+    'GeneratorTraitDefinition',
+    'CompatibilityRule',
+    'PreviewAsset',
+    'QualityReport',
+    'DistinctivenessReport'
   ] loop
     if to_regclass(format('public.%I', table_name)) is not null then
       execute format('alter table public.%I enable row level security', table_name);
@@ -65,5 +75,25 @@ begin
   if to_regclass('public."Sale"') is not null then
     drop policy if exists "Public sale read" on public."Sale";
     create policy "Public sale read" on public."Sale" for select using (true);
+  end if;
+
+  if to_regclass('public."GenerationRun"') is not null then
+    drop policy if exists "Public approved generation read" on public."GenerationRun";
+    create policy "Public approved generation read" on public."GenerationRun" for select using (status = 'APPROVED');
+  end if;
+
+  if to_regclass('public."StyleProfile"') is not null then
+    drop policy if exists "Public approved style profile read" on public."StyleProfile";
+    create policy "Public approved style profile read" on public."StyleProfile" for select using (isApproved = true);
+  end if;
+
+  if to_regclass('public."PreviewAsset"') is not null then
+    drop policy if exists "Public approved preview asset read" on public."PreviewAsset";
+    create policy "Public approved preview asset read" on public."PreviewAsset" for select using (
+      exists (
+        select 1 from public."StyleProfile" sp
+        where sp.id = "PreviewAsset"."styleProfileId" and sp."isApproved" = true
+      )
+    );
   end if;
 end $$;

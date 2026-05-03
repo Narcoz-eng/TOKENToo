@@ -35,6 +35,7 @@ export function CollectionCard({ collection }: { collection: VaultCollection }) 
         </div>
         <div className="flex items-center justify-between text-sm">
           <StatusPill accent={collection.instantSellEnabled ? "green" : "red"}>{collection.instantSellEnabled ? "Instant Sell" : "Gated"}</StatusPill>
+          <StatusPill accent={collection.qualityTier === "Basic" ? "gold" : "purple"}>{collection.qualityTier}</StatusPill>
           <span className="flex items-center gap-1 text-slate-400"><Users className="size-4" /> {collection.holders.toLocaleString()}</span>
         </div>
         <ProgressBar value={collection.xp} max={collection.nextXp} />
