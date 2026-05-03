@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "@prisma/client";
+import { migrationDatabaseUrl } from "../db/database-url";
 
 const requiredTables = [
   "GenerationRun",
@@ -17,8 +18,8 @@ const requiredTables = [
 ];
 
 async function main() {
-  const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-  if (!connectionString) throw new Error("DIRECT_URL or DATABASE_URL is required");
+  const connectionString = migrationDatabaseUrl();
+  if (!connectionString) throw new Error("DIRECT_URL, POSTGRES_URL_NON_POOLING, DATABASE_URL, or POSTGRES_PRISMA_URL is required");
 
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
   const rows = await prisma.$queryRaw<Array<{ table_name: string }>>`
