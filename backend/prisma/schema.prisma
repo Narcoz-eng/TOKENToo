@@ -241,11 +241,11 @@ model GeneratorTraitPack {
   uniquenessRules  Json
   createdAt        DateTime                  @default(now())
   styleProfile     StyleProfile              @relation(fields: [styleProfileId], references: [id], onDelete: Cascade)
-  traits           GeneratorTraitDefinition[]
+  traits           TraitDefinition[]
   compatibilityRules CompatibilityRule[]
 }
 
-model GeneratorTraitDefinition {
+model TraitDefinition {
   id                String              @id @default(uuid()) @db.Uuid
   traitPackId       String              @db.Uuid
   category          String

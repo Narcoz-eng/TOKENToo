@@ -28,7 +28,7 @@ begin
     'CommunityContext',
     'StyleProfile',
     'GeneratorTraitPack',
-    'GeneratorTraitDefinition',
+    'TraitDefinition',
     'CompatibilityRule',
     'PreviewAsset',
     'QualityReport',

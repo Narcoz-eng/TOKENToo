@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { PrismaService } from "../db/prisma.service";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
+import { AssetStorageService } from "./asset-storage.service";
 import { CollectionDistinctivenessScorerService } from "./collection-distinctiveness-scorer.service";
 import { CommunityContextService } from "./community-context.service";
 import { CompatibilityEngineService } from "./compatibility-engine.service";
@@ -18,6 +19,7 @@ import { TraitPackGeneratorService } from "./trait-pack-generator.service";
   providers: [
     PrismaService,
     GeneratorService,
+    AssetStorageService,
     LogoAnalysisService,
     CommunityContextService,
     StyleProfileGeneratorService,
@@ -32,4 +34,3 @@ import { TraitPackGeneratorService } from "./trait-pack-generator.service";
   exports: [GeneratorService]
 })
 export class GeneratorModule {}
-

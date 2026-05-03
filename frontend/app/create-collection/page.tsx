@@ -1,105 +1,201 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, Palette, RefreshCcw, ShieldCheck, Sparkles, Upload, Wand2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Check, Loader2, Palette, RefreshCcw, ShieldCheck, Sparkles, Upload, Wand2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { CollectionPreview } from "@/components/CollectionPreview";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import type { CollectionGeneratorPreview } from "@/lib/types";
 
-const presets = [
-  "Mystic Pixel Cult",
-  "Cyber Alley Syndicate",
-  "Meme Kingdom",
-  "Neon Samurai",
-  "Dark Fantasy Raiders",
-  "Alien Casino",
-  "Robot Warband",
-  "Luxury Crown Club"
-];
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
-const presetImages: Record<string, string> = {
-  "Mystic Pixel Cult": "/art/frog-vault-v2.png",
-  "Cyber Alley Syndicate": "/art/cat-syndicate-v2.png",
-  "Meme Kingdom": "/art/doge-kingdom-v2.png",
-  "Neon Samurai": "/art/shiba-samurai-v2.png",
-  "Dark Fantasy Raiders": "/art/pepe-empire-v2.png",
-  "Alien Casino": "/art/pepe-empire-v2.png",
-  "Robot Warband": "/art/cat-syndicate-v2.png",
-  "Luxury Crown Club": "/art/doge-kingdom-v2.png"
+type Preset = { id: string; name: string; artStyle: string; mood: string };
+type GeneratorRun = {
+  id: string;
+  status: string;
+  tokenSymbol: string;
+  approvedVersion?: number | null;
+  styleProfiles: Array<{
+    id: string;
+    version: number;
+    collection: string;
+    theme: string;
+    mascot: string;
+    artStyle: string;
+    colors: unknown;
+    backgroundWorld: string;
+    traitLanguage: unknown;
+    rarityStructure: unknown;
+    legendaryTheme: string;
+    animationStyle: string;
+    raidTheme: string;
+    lore: string;
+    roleNames: unknown;
+    isApproved: boolean;
+    traitPack?: {
+      categories: unknown;
+      rarityWeights: unknown;
+      unlockSchedule: unknown;
+    } | null;
+    previewAssets: Array<{
+      type: "AVATAR" | "BANNER" | "SAMPLE_NFT";
+      label: string;
+      uri: string;
+      metadata: unknown;
+      version: number;
+    }>;
+    qualityReports: Array<{
+      previewQualityScore: number;
+      uniquenessScore: number;
+      colorHarmonyScore: number;
+      duplicateRiskScore: number;
+      compatibilityScore: number;
+      tier: "BASIC" | "PREMIUM" | "LEGENDARY_READY";
+      passed: boolean;
+    }>;
+    distinctivenessReports: Array<{
+      silhouetteUniqueness: number;
+      paletteUniqueness: number;
+      mascotUniqueness: number;
+      backgroundWorldUniqueness: number;
+      traitLanguageUniqueness: number;
+      score: number;
+      passed: boolean;
+    }>;
+  }>;
 };
 
 export default function CreateCollectionPage() {
-  const [step, setStep] = useState(1);
-  const [preset, setPreset] = useState(presets[0]);
-  const [regen, setRegen] = useState(0);
-  const [approved, setApproved] = useState(false);
-  const preview = useMemo(() => buildPreview(preset, regen), [preset, regen]);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [selectedPreset, setSelectedPreset] = useState("mystic-pixel-cult");
+  const [tokenName, setTokenName] = useState("Frog Vault Token");
+  const [tokenSymbol, setTokenSymbol] = useState("$FROG");
+  const [tokenMint, setTokenMint] = useState("Frg111111111111111111111111111111111111111");
+  const [logoUri, setLogoUri] = useState("https://example.com/frog-logo.png");
+  const [description, setDescription] = useState("A swamp cult meme community that locks together, raids together, and unlocks toxic legendary traits.");
+  const [memes, setMemes] = useState("lily hands, toxic bog, ribbit raid");
+  const [phrases, setPhrases] = useState("lock the swamp, summon the prophet");
+  const [mascotPreference, setMascotPreference] = useState("frog prophet");
+  const [mood, setMood] = useState("fantasy");
+  const [run, setRun] = useState<GeneratorRun | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const preview = useMemo(() => (run ? mapRunToPreview(run, selectedPresetName(presets, selectedPreset)) : null), [run, presets, selectedPreset]);
+
+  useEffect(() => {
+    fetchJson<Preset[]>("/generator/presets")
+      .then((data) => {
+        setPresets(data);
+        if (data[0] && !data.some((preset) => preset.id === selectedPreset)) setSelectedPreset(data[0].id);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, [selectedPreset]);
+
+  async function createRun() {
+    await action(async () => {
+      const data = await fetchJson<GeneratorRun>("/generator/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          tokenName,
+          tokenSymbol,
+          tokenMint,
+          logoUri,
+          description,
+          selectedPreset,
+          hints: {
+            memes: splitList(memes),
+            phrases: splitList(phrases),
+            slogans: ["join the faction"],
+            mascotPreference,
+            mood
+          }
+        })
+      });
+      setRun(data);
+    });
+  }
+
+  async function mutateRun(path: string) {
+    if (!run) return;
+    await action(async () => {
+      const data = await fetchJson<GeneratorRun>(`/generator/runs/${run.id}/${path}`, { method: "POST" });
+      setRun(data);
+    });
+  }
+
+  async function reloadRun() {
+    if (!run) return;
+    await action(async () => setRun(await fetchJson<GeneratorRun>(`/generator/runs/${run.id}`)));
+  }
+
+  async function action(fn: () => Promise<void>) {
+    setLoading(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Generator request failed");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <AppShell active="create">
       <div className="space-y-5">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div>
             <p className="text-sm font-bold uppercase text-vault-purple">Premium NFT Generator</p>
-            <h1 className="mt-2 max-w-4xl text-4xl font-black">Create a collection identity that feels art-directed, not templated.</h1>
+            <h1 className="mt-2 max-w-4xl text-4xl font-black">Create a persisted, art-directed collection identity.</h1>
             <p className="mt-3 max-w-3xl text-slate-400">
-              Upload token context, choose a premium direction, review avatar/banner/sample NFTs, and approve the generator run before the collection can launch.
+              This flow now calls the real generator API. Runs, regenerated versions, preview assets, scores, and approval state are stored in Supabase through Prisma.
             </p>
           </div>
-          <SectionCard title="Generator Status">
+          <SectionCard title="Persistence Status">
             <div className="space-y-3">
-              <StatusPill accent={approved ? "green" : "purple"}>{approved ? "Approved" : "Awaiting Approval"}</StatusPill>
-              <div className="rounded-lg border border-vault-line bg-black/25 p-3 text-sm text-slate-300">
-                Blockchain creation remains gated until the art direction, trait table, lore, raid theme, roles, quality score, and distinctiveness score are approved.
-              </div>
+              <StatusPill accent={run?.status === "APPROVED" ? "green" : run ? "purple" : "gold"}>{run?.status ?? "No Run Yet"}</StatusPill>
+              <p className="text-sm text-slate-400">{run ? `Run ID: ${run.id}` : "Create a run to persist generator state."}</p>
+              {run ? <button onClick={reloadRun} className="h-10 w-full rounded-lg border border-vault-line bg-black/25 text-sm font-bold">Reload Persisted Run</button> : null}
             </div>
           </SectionCard>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <aside className="space-y-5">
-            <SectionCard title="Workflow">
-              <div className="space-y-2">
-                {["Inputs", "Context", "Preset", "Preview", "Approve"].map((label, index) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setStep(index + 1)}
-                    className={`flex w-full items-center justify-between rounded-lg border p-3 text-left text-sm ${step === index + 1 ? "border-vault-purple bg-vault-purple/20" : "border-vault-line bg-black/25"}`}
-                  >
-                    <span>{index + 1}. {label}</span>
-                    {index + 1 < step || approved ? <Check className="size-4 text-vault-green" /> : null}
-                  </button>
-                ))}
-              </div>
-            </SectionCard>
+        {error ? <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-4 text-sm text-vault-red">{error}</div> : null}
 
+        <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+          <aside className="space-y-5">
             <SectionCard title="Token Inputs">
               <div className="space-y-3">
-                <Field label="Token name" value="Frog Vault Token" />
-                <Field label="Token symbol" value="$FROG" />
-                <Field label="Mint address" value="Frg111111111111111111111111111111111111111" />
-                <label className="block">
-                  <span className="text-sm text-slate-400">Token logo</span>
-                  <div className="mt-2 flex h-28 items-center justify-center rounded-lg border border-dashed border-vault-purple/50 bg-vault-purple/10 text-sm text-vault-purple">
-                    <Upload className="mr-2 size-4" /> Upload logo or paste URL
-                  </div>
-                </label>
+                <Field label="Token name" value={tokenName} onChange={setTokenName} />
+                <Field label="Token symbol" value={tokenSymbol} onChange={setTokenSymbol} />
+                <Field label="Mint address" value={tokenMint} onChange={setTokenMint} />
+                <Field label="Logo URL" value={logoUri} onChange={setLogoUri} icon={Upload} />
                 <label className="block">
                   <span className="text-sm text-slate-400">Short description / vibe</span>
-                  <textarea className="mt-2 min-h-24 w-full rounded-lg border border-vault-line bg-black/25 px-4 py-3 text-sm outline-none focus:border-vault-purple" defaultValue="A swamp cult meme community that locks together, raids together, and unlocks toxic legendary traits." />
+                  <textarea className="mt-2 min-h-24 w-full rounded-lg border border-vault-line bg-black/25 px-4 py-3 text-sm outline-none focus:border-vault-purple" value={description} onChange={(event) => setDescription(event.target.value)} />
                 </label>
               </div>
             </SectionCard>
 
             <SectionCard title="Community Context">
               <div className="space-y-3">
-                <Field label="Memes / inside jokes" value="lily hands, toxic bog, ribbit raid" />
-                <Field label="Telegram / X phrases" value="lock the swamp, summon the prophet" />
-                <Field label="Mascot preference" value="frog prophet" />
-                <Field label="Mood" value="dark, funny, fantasy" />
+                <Field label="Memes / inside jokes" value={memes} onChange={setMemes} />
+                <Field label="Telegram / X phrases" value={phrases} onChange={setPhrases} />
+                <Field label="Mascot preference" value={mascotPreference} onChange={setMascotPreference} />
+                <Field label="Mood" value={mood} onChange={setMood} />
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Lifecycle">
+              <div className="space-y-2 text-sm">
+                {["POST /generator/runs", "GET /generator/runs/:id", "POST regenerate-style", "POST regenerate-previews", "POST approve"].map((label, index) => (
+                  <div key={label} className="flex items-center gap-3 rounded-lg bg-black/25 p-3">
+                    <Check className={`size-4 ${run && (index === 0 || run.status === "APPROVED") ? "text-vault-green" : "text-slate-500"}`} />
+                    <span>{label}</span>
+                  </div>
+                ))}
               </div>
             </SectionCard>
           </aside>
@@ -107,63 +203,45 @@ export default function CreateCollectionPage() {
           <main className="space-y-5">
             <SectionCard title="Premium Art Presets">
               <div className="grid gap-3 md:grid-cols-4">
-                {presets.map((item) => (
+                {presets.map((preset) => (
                   <button
                     type="button"
-                    key={item}
-                    onClick={() => {
-                      setPreset(item);
-                      setApproved(false);
-                    }}
-                    className={`rounded-lg border p-3 text-left transition hover:border-vault-purple ${preset === item ? "border-vault-purple bg-vault-purple/20" : "border-vault-line bg-black/25"}`}
+                    key={preset.id}
+                    onClick={() => setSelectedPreset(preset.id)}
+                    className={`rounded-lg border p-4 text-left transition hover:border-vault-purple ${selectedPreset === preset.id ? "border-vault-purple bg-vault-purple/20" : "border-vault-line bg-black/25"}`}
                   >
-                    <img src={presetImages[item]} alt="" className="mb-3 aspect-square w-full rounded-lg object-cover" />
-                    <p className="font-bold">{item}</p>
-                    <p className="mt-1 text-xs text-slate-400">{presetCopy(item)}</p>
+                    <Palette className="mb-3 size-6 text-vault-purple" />
+                    <p className="font-bold">{preset.name}</p>
+                    <p className="mt-1 text-xs text-slate-400">{preset.artStyle}</p>
                   </button>
                 ))}
               </div>
             </SectionCard>
 
             <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setRegen((value) => value + 1);
-                  setApproved(false);
-                }}
-                className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-purple/50 bg-vault-purple/10 px-4 text-sm font-bold text-vault-purple"
-              >
+              <button type="button" onClick={createRun} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow disabled:opacity-60">
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Create Persisted Run
+              </button>
+              <button type="button" onClick={() => mutateRun("regenerate-style")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-purple/50 bg-vault-purple/10 px-4 text-sm font-bold text-vault-purple disabled:opacity-50">
                 <RefreshCcw className="size-4" /> Regenerate Style
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setRegen((value) => value + 7);
-                  setApproved(false);
-                }}
-                className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-line bg-black/25 px-4 text-sm font-bold"
-              >
+              <button type="button" onClick={() => mutateRun("regenerate-previews")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-line bg-black/25 px-4 text-sm font-bold disabled:opacity-50">
                 <Wand2 className="size-4 text-vault-green" /> Regenerate Previews
               </button>
-              <button
-                type="button"
-                onClick={() => setApproved(true)}
-                className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow"
-              >
-                <ShieldCheck className="size-4" /> Approve Generator Run
+              <button type="button" onClick={() => mutateRun("approve")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-green/50 bg-vault-green/10 px-4 text-sm font-bold text-vault-green disabled:opacity-50">
+                <ShieldCheck className="size-4" /> Approve Version
               </button>
             </div>
 
-            <CollectionPreview preview={preview} />
-
-            <SectionCard title="API Contract">
-              <div className="grid gap-3 md:grid-cols-3">
-                <ApiStep icon={Palette} label="POST /generator/runs" text="Capture token, logo, hints, preset, and create persisted preview state." />
-                <ApiStep icon={Sparkles} label="POST regenerate" text="Reroll style or samples while keeping every version auditable." />
-                <ApiStep icon={ShieldCheck} label="POST approve" text="Lock the approved trait pack and enable collection creation." />
-              </div>
-            </SectionCard>
+            {preview ? (
+              <CollectionPreview preview={preview} />
+            ) : (
+              <SectionCard title="No Preview Yet">
+                <div className="rounded-lg border border-dashed border-vault-purple/40 bg-vault-purple/10 p-8 text-center text-slate-300">
+                  Create a generator run to fetch the persisted avatar, banner, sample NFTs, trait table, lore, raid theme, quality report, and distinctiveness report.
+                </div>
+              </SectionCard>
+            )}
           </main>
         </div>
       </div>
@@ -171,115 +249,98 @@ export default function CreateCollectionPage() {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, onChange, icon: Icon }: { label: string; value: string; onChange: (value: string) => void; icon?: typeof Upload }) {
   return (
     <label className="block">
       <span className="text-sm text-slate-400">{label}</span>
-      <input className="mt-2 h-11 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" defaultValue={value} />
+      <div className="relative mt-2">
+        {Icon ? <Icon className="absolute left-3 top-3 size-4 text-vault-purple" /> : null}
+        <input className={`h-11 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple ${Icon ? "pl-10" : ""}`} value={value} onChange={(event) => onChange(event.target.value)} />
+      </div>
     </label>
   );
 }
 
-function ApiStep({ icon: Icon, label, text }: { icon: typeof Palette; label: string; text: string }) {
-  return (
-    <div className="rounded-lg border border-vault-line bg-black/25 p-4">
-      <Icon className="mb-3 size-6 text-vault-purple" />
-      <p className="font-bold">{label}</p>
-      <p className="mt-1 text-sm text-slate-400">{text}</p>
-    </div>
-  );
-}
-
-function buildPreview(preset: string, regen: number): CollectionGeneratorPreview {
-  const image = presetImages[preset] ?? "/art/frog-vault-v2.png";
-  const mascot = preset.includes("Cyber") ? "Neon Alley Oracle" : preset.includes("Kingdom") ? "Moon Kennel King" : preset.includes("Samurai") ? "Chrome Ronin Shiba" : preset.includes("Alien") ? "Nebula High Roller" : preset.includes("Robot") ? "Reactor War Marshal" : preset.includes("Luxury") ? "Diamond Crown Founder" : "Swamp Prophet";
-  const theme = preset.includes("Cyber") ? "neon alley syndicate" : preset.includes("Kingdom") ? "meme kingdom court" : preset.includes("Samurai") ? "neon dojo clan" : preset.includes("Alien") ? "orbital casino guild" : preset.includes("Robot") ? "machine warband foundry" : preset.includes("Luxury") ? "velvet crown club" : "mystic swamp raiders";
-  const palette = preset.includes("Cyber") ? ["#9a36ff", "#28d7ff", "#08091a"] : preset.includes("Kingdom") ? ["#f4c542", "#21f26b", "#1b1204"] : preset.includes("Samurai") ? ["#df8740", "#7a35ff", "#17070f"] : preset.includes("Luxury") ? ["#e6d28a", "#7a35ff", "#07050b"] : ["#21f26b", "#7a35ff", "#050712"];
-  const traitLanguage = [
-    "Toxic Bog Temple",
-    "Swamp Prophet Hood",
-    "Lily Staff",
-    "Raid Crown",
-    "Neon Mire Aura",
-    "Moon Vault Sigil",
-    "Ritual Lantern",
-    "Ancient Founder Mask",
-    "Guild War Banner",
-    "Legendary Oracle Pulse"
-  ].map((trait, index) => (regen % 2 && index % 2 ? trait.replace("Swamp", "Vault").replace("Bog", "Moon") : trait));
+function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGeneratorPreview {
+  const profile = run.styleProfiles[0];
+  const categories = asRecord<string[]>(profile.traitPack?.categories);
+  const previews = profile.previewAssets;
+  const samples = previews.filter((asset) => asset.type === "SAMPLE_NFT").slice(-5);
+  const quality = profile.qualityReports[0];
+  const distinctiveness = profile.distinctivenessReports[0];
 
   return {
-    id: `preview-${preset}-${regen}`,
-    collection: "$FROG Vaults",
+    id: run.id,
+    collection: profile.collection,
     preset,
-    theme,
-    mascot,
-    artStyle: preset.toLowerCase(),
-    palette,
-    backgroundWorld: preset.includes("Cyber") ? "wet neon backstreets and server shrines" : preset.includes("Kingdom") ? "moon castle courtyards and golden kennel vaults" : "haunted swamp temples and glowing bog gates",
-    lore: "Frog holders formed a faction around locked vaults, ritual raids, and toxic trait unlocks. Members earn status through mints, staking, raids, and collection wars.",
-    raidTheme: regen % 2 ? "Moon Bog Treasury Strike" : "Swamp Takeover",
-    roleNames: ["Swamp Founder", "Toxic Raider", "Lily Whale", "Bog Prophet", "Vault Marshal"],
-    traitLanguage,
-    traitCounts: {
-      baseCharacter: 42,
-      backgrounds: 60,
-      headgear: 60,
-      eyes: 44,
-      mouthExpression: 32,
-      outfitBody: 60,
-      accessories: 80,
-      auraEffect: 36,
-      borderFrame: 18,
-      legendaryOverlay: 12
-    },
-    rarityWeights: { Common: 55, Uncommon: 25, Rare: 12, Epic: 6, Legendary: 1.5, Mythic: 0.5 },
-    unlocks: {
-      level1: ["base traits"],
-      level2: ["10 new backgrounds"],
-      level3: ["10 new accessories"],
-      level4: ["rare aura pack"],
-      level5: ["legendary animated traits"]
-    },
-    avatar: image,
-    banner: preset === "Mystic Pixel Cult" ? "/art/hero-frog-v2.png" : image,
-    samples: Array.from({ length: 5 }, (_, index) => ({
-      id: `sample-${index}`,
-      name: ["Swamp Prophet", "Toxic Oracle", "Lily Marshal", "Bog Warden", "Ancient Frog King"][index],
-      image,
-      rarity: ["Rare", "Epic", "Rare", "Legendary", "Mythic"][index],
-      role: ["OG Raider", "Top Holder", "Raid Master", "Founder", "Legendary Raider"][index],
-      traits: [traitLanguage[index], traitLanguage[index + 4], `${index + 1} of 42 base variants`]
-    })),
+    theme: profile.theme,
+    mascot: profile.mascot,
+    artStyle: profile.artStyle,
+    palette: asArray(profile.colors),
+    backgroundWorld: profile.backgroundWorld,
+    lore: profile.lore,
+    raidTheme: profile.raidTheme,
+    roleNames: asArray(profile.roleNames),
+    traitLanguage: asArray(profile.traitLanguage),
+    traitCounts: Object.fromEntries(Object.entries(categories).map(([key, value]) => [key, value.length])),
+    rarityWeights: asRecord<number>(profile.traitPack?.rarityWeights ?? profile.rarityStructure),
+    unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
+    avatar: previews.find((asset) => asset.type === "AVATAR")?.uri ?? "",
+    banner: previews.find((asset) => asset.type === "BANNER")?.uri ?? "",
+    samples: samples.map((asset, index) => {
+      const metadata = asRecord<string>(asset.metadata);
+      return {
+        id: `${asset.version}-${index}`,
+        name: asset.label,
+        image: asset.uri,
+        rarity: metadata.rarity ?? "Rare",
+        role: asArray(profile.roleNames)[index] ?? "Raider",
+        traits: [metadata.headgear, metadata.aura, metadata.accessory].filter(Boolean)
+      };
+    }),
     quality: {
-      previewQualityScore: 91,
-      uniquenessScore: 96,
-      colorHarmonyScore: 89,
-      duplicateRiskScore: 98,
-      compatibilityScore: 92,
-      tier: preset.includes("Mystic") || preset.includes("Cyber") ? "Legendary-ready" : "Premium",
-      passed: true
+      previewQualityScore: quality.previewQualityScore,
+      uniquenessScore: quality.uniquenessScore,
+      colorHarmonyScore: quality.colorHarmonyScore,
+      duplicateRiskScore: quality.duplicateRiskScore,
+      compatibilityScore: quality.compatibilityScore,
+      tier: quality.tier === "LEGENDARY_READY" ? "Legendary-ready" : quality.tier === "PREMIUM" ? "Premium" : "Basic",
+      passed: quality.passed
     },
     distinctiveness: {
-      silhouetteUniqueness: 92,
-      paletteUniqueness: 88,
-      mascotUniqueness: 94,
-      backgroundWorldUniqueness: 90,
-      traitLanguageUniqueness: 96,
-      score: 92,
-      passed: true
+      silhouetteUniqueness: distinctiveness.silhouetteUniqueness,
+      paletteUniqueness: distinctiveness.paletteUniqueness,
+      mascotUniqueness: distinctiveness.mascotUniqueness,
+      backgroundWorldUniqueness: distinctiveness.backgroundWorldUniqueness,
+      traitLanguageUniqueness: distinctiveness.traitLanguageUniqueness,
+      score: distinctiveness.score,
+      passed: distinctiveness.passed
     }
   };
 }
 
-function presetCopy(preset: string) {
-  if (preset.includes("Cyber")) return "Sharp silhouettes, neon rain, glitch status.";
-  if (preset.includes("Kingdom")) return "Royal meme traits, crowns, banners, gold.";
-  if (preset.includes("Samurai")) return "Blade poses, shrine worlds, premium anime smoke.";
-  if (preset.includes("Alien")) return "Casino worlds, jackpot traits, cosmic effects.";
-  if (preset.includes("Robot")) return "Mech silhouettes, reactor glow, warband armor.";
-  if (preset.includes("Luxury")) return "Diamond frames, velvet vaults, founder status.";
-  if (preset.includes("Fantasy")) return "Cursed worlds, mythic raiders, boss energy.";
-  return "Ritual mascots, swamp lore, glowing pixel fantasy.";
+async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, init);
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+function splitList(value: string) {
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function selectedPresetName(presets: Preset[], id: string) {
+  return presets.find((preset) => preset.id === id)?.name ?? id;
+}
+
+function asArray(value: unknown) {
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
+function asRecord<T>(value: unknown) {
+  return (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, T>;
 }
 

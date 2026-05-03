@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
+import { AssetStorageService } from "./asset-storage.service";
 import { artPresets } from "./art-presets";
 import { CollectionDistinctivenessScorerService } from "./collection-distinctiveness-scorer.service";
 import { CommunityContextService } from "./community-context.service";
@@ -24,6 +25,7 @@ export class GeneratorService {
     private readonly traitPacks: TraitPackGeneratorService,
     private readonly compatibility: CompatibilityEngineService,
     private readonly previews: ArtPreviewGeneratorService,
+    private readonly assetStorage: AssetStorageService,
     private readonly distinctiveness: CollectionDistinctivenessScorerService,
     private readonly quality: QualityValidatorService,
     private readonly metadata: MetadataGeneratorService
@@ -35,7 +37,7 @@ export class GeneratorService {
 
   async createRun(input: CreateGenerationRunInput) {
     const normalized = this.normalize(input);
-    const seed = `${normalized.tokenMint}:${seedFrom(JSON.stringify(normalized))}`;
+    const seed = `${normalized.tokenMint}:${seedFrom(`${process.env.GENERATOR_SEED_SALT ?? "vaultx"}:${JSON.stringify(normalized)}`)}`;
     const run = await this.prisma.generationRun.create({
       data: {
         tokenName: normalized.tokenName,
@@ -218,7 +220,7 @@ export class GeneratorService {
       }
     });
 
-    await this.prisma.generatorTraitDefinition.createMany({
+    await this.prisma.traitDefinition.createMany({
       data: pack.traits.map((trait) => ({
         traitPackId: traitPack.id,
         category: trait.category,
@@ -273,8 +275,15 @@ export class GeneratorService {
   }
 
   private async persistPreviews(generationRunId: string, styleProfileId: string, version: number, previews: PreviewAssetPlan[]) {
+    const storedPreviews = await Promise.all(
+      previews.map(async (preview, index) => ({
+        ...preview,
+        uri: await this.assetStorage.storePreviewAsset(`${generationRunId}/v${version}/${index + 1}-${preview.type.toLowerCase()}.svg`, preview.uri)
+      }))
+    );
+
     await this.prisma.previewAsset.createMany({
-      data: previews.map((preview) => ({
+      data: storedPreviews.map((preview) => ({
         generationRunId,
         styleProfileId,
         type: preview.type,
@@ -296,7 +305,8 @@ export class GeneratorService {
       tokenName: input.tokenName.trim(),
       tokenSymbol: input.tokenSymbol.trim().startsWith("$") ? input.tokenSymbol.trim() : `$${input.tokenSymbol.trim()}`,
       tokenMint: input.tokenMint.trim(),
-      description: input.description.trim()
+      description: input.description.trim(),
+      selectedPreset: input.selectedPreset ?? process.env.GENERATOR_DEFAULT_PRESET ?? "mystic-pixel-cult"
     };
   }
 
