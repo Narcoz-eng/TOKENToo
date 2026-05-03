@@ -9,9 +9,11 @@ Set these values in `.env` locally and in Vercel Project Settings:
 ```env
 DATABASE_URL="postgresql://postgres.[PHEWRUN2_PROJECT_REF]:[DATABASE_PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
 DIRECT_URL="postgresql://postgres.[PHEWRUN2_PROJECT_REF]:[DATABASE_PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
-SUPABASE_URL="https://[PHEWRUN2_PROJECT_REF].supabase.co"
-SUPABASE_ANON_KEY="..."
+SUPABASE_URL="https://etmrgphkomagszfezsxf.supabase.co"
+SUPABASE_ANON_KEY="sb_publishable_CBv8Gmyx9g3Lrl9LLk_6vg_G6Qg6KPV"
 SUPABASE_SERVICE_ROLE_KEY="..."
+NEXT_PUBLIC_SUPABASE_URL="https://etmrgphkomagszfezsxf.supabase.co"
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sb_publishable_CBv8Gmyx9g3Lrl9LLk_6vg_G6Qg6KPV"
 ASSET_STORAGE_PROVIDER="supabase"
 ```
 
@@ -49,4 +51,3 @@ For local development with the standalone Nest server:
 NEXT_PUBLIC_API_BASE_URL="http://localhost:4000"
 FRONTEND_ORIGIN="http://localhost:3000"
 ```
-
