@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BadgeCheck, Coins, LockKeyhole, Swords, Trophy, WalletCards } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { BadgeCheck, Coins, Crown, Flame, Gem, LockKeyhole, Swords, Trophy, WalletCards } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Leaderboard } from "@/components/Leaderboard";
 import { NFTCard } from "@/components/NFTCard";
@@ -23,8 +24,13 @@ export default function ProfilePage() {
                   <h1 className="text-4xl font-black">FrogMaster</h1>
                   <BadgeCheck className="size-7 text-vault-purple" />
                 </div>
-                <p className="mt-2 text-vault-purple">Level 27 Raider</p>
-                <p className="mt-4 max-w-xl text-slate-300">Dashboard for your Vault NFTs, staking positions, raid progress, rewards, and listings.</p>
+                <p className="mt-2 text-vault-purple">Legendary Raider · Swamp Prophet · Founder</p>
+                <p className="mt-4 max-w-xl text-slate-300">Your faction identity, status badges, raid record, and Vault NFT roles across the VaultX ecosystem.</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge icon={Crown} label="Legendary Raider" />
+                  <Badge icon={Gem} label="Top Holder" />
+                  <Badge icon={Flame} label="Raid Master" />
+                </div>
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
                   <StatBox label="Vaults" value="12" />
                   <StatBox label="cNFTs" value="28" />
@@ -148,3 +154,11 @@ function StatBox({ label, value }: { label: string; value: string }) {
   );
 }
 
+function Badge({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-lg border border-vault-purple/40 bg-vault-purple/15 px-3 py-2 text-xs font-bold text-purple-100">
+      <Icon className="size-4 text-vault-gold" />
+      {label}
+    </span>
+  );
+}

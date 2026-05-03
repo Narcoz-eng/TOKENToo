@@ -1,4 +1,4 @@
-import type { ActivityItem, LeaderboardRow, RaidMission, RaidRoom, VaultCollection, VaultNft } from "./types";
+import type { ActivityItem, CollectionCompetition, CommunityMember, LeaderboardRow, RaidMission, RaidRoom, SocialActivity, VaultCollection, VaultNft } from "./types";
 
 export const collections: VaultCollection[] = [
   {
@@ -8,8 +8,8 @@ export const collections: VaultCollection[] = [
     subtitle: "Frog Nation",
     tokenMint: "Frg111111111111111111111111111111111111111",
     description: "A community-first vault collection backing $FROG token. Lock with the swamp, raid with the guild, and grow the collection together.",
-    image: "/art/frog-vault.png",
-    banner: "/art/hero-frog.png",
+    image: "/art/frog-vault-v2.png",
+    banner: "/art/hero-frog-v2.png",
     mascot: "Swamp Prophet",
     theme: "Arcane swamp citadel",
     vibe: "Ritual raids, green yield, hooded pixel frogs",
@@ -28,10 +28,32 @@ export const collections: VaultCollection[] = [
     apy: 38.7,
     online: 1234,
     riskScore: 82,
+    riskTier: "SAFE",
     instantSellEnabled: true,
     palette: ["#21f26b", "#7a35ff", "#052617"],
+    mascotType: "frog",
+    silhouette: "short hooded amphibian with oversized eyes and a ritual staff",
+    activeUsers24h: 1420,
+    raidSuccessRate: 86,
+    averageHoldDays: 74,
     communityTraits: ["Swamp Prophet", "Toxic Mist", "Lily Staff", "Bog Crown", "Neon Warts"],
-    legendaryTrait: "Ancient Lily Oracle"
+    legendaryTrait: "Ancient Lily Oracle",
+    traitLayers: {
+      base: ["Hooded Frog", "Bog Mystic", "Lily Guardian"],
+      headgear: ["Bog Crown", "Ritual Hood", "Moss Halo"],
+      eyes: ["Glow Eyes", "Oracle Lenses", "Toxic Pupils"],
+      aura: ["Toxic Mist", "Emerald Pulse", "Swamp Sparks"],
+      accessory: ["Lily Staff", "Vault Lantern", "Rune Satchel"],
+      background: ["Moonlit Marsh", "Vault Grove", "Sunken Citadel"]
+    },
+    styleProfile: {
+      artStyle: "pixel mystic",
+      shapeLanguage: "organic rounded",
+      visualFx: ["toxic particles", "emerald glow", "mist noise"],
+      baseVariantCount: 32,
+      microRandomization: "offset, scale, hue shift, and soft noise"
+    },
+    nextUnlocks: ["Moss Halo headgear", "Animated Toxic Mist", "OG Raider cNFT badge", "+5% raid XP boost"]
   },
   {
     id: "doge-kingdom",
@@ -40,8 +62,8 @@ export const collections: VaultCollection[] = [
     subtitle: "Doge Kingdom",
     tokenMint: "Doge11111111111111111111111111111111111111",
     description: "Royal vaults for meme lords who lock, stake, and defend the crown.",
-    image: "/art/doge-kingdom.png",
-    banner: "/art/doge-kingdom.png",
+    image: "/art/doge-kingdom-v2.png",
+    banner: "/art/doge-kingdom-v2.png",
     mascot: "Bone Raider",
     theme: "Gilded kennel citadel",
     vibe: "Gold armor, raid banners, moon bones",
@@ -60,10 +82,32 @@ export const collections: VaultCollection[] = [
     apy: 31.4,
     online: 987,
     riskScore: 76,
+    riskTier: "SAFE",
     instantSellEnabled: true,
     palette: ["#f4c542", "#21f26b", "#2b1905"],
+    mascotType: "dog",
+    silhouette: "upright royal hound with crown armor and broad shoulders",
+    activeUsers24h: 880,
+    raidSuccessRate: 78,
+    averageHoldDays: 61,
     communityTraits: ["Bone Raider", "Golden Bark", "Moon Kennel", "Royal Snout", "Castle Collar"],
-    legendaryTrait: "Solar Crown Howl"
+    legendaryTrait: "Solar Crown Howl",
+    traitLayers: {
+      base: ["Royal Hound", "Moon Guard", "Bone Knight"],
+      headgear: ["Solar Crown", "Kennel Helm", "Gold Visor"],
+      eyes: ["Moon Eyes", "Emerald Glare", "Battle Focus"],
+      aura: ["Golden Bark", "Castle Glow", "Lunar Flare"],
+      accessory: ["Bone Scepter", "War Banner", "Royal Collar"],
+      background: ["Moon Kennel", "Crown Hall", "Bone Yard"]
+    },
+    styleProfile: {
+      artStyle: "royal cartoon",
+      shapeLanguage: "bold armored",
+      visualFx: ["gold sparks", "banner shimmer", "moon glow"],
+      baseVariantCount: 28,
+      microRandomization: "pose lean, crown tilt, saturation shifts, grain"
+    },
+    nextUnlocks: ["Gold Visor", "Bone Yard raid room", "Royal Guard badge", "+3% marketplace XP"]
   },
   {
     id: "cat-syndicate",
@@ -72,8 +116,8 @@ export const collections: VaultCollection[] = [
     subtitle: "Cat Syndicate",
     tokenMint: "Cat111111111111111111111111111111111111111",
     description: "Cyber vault identities for stealth holders and market raiders.",
-    image: "/art/cat-syndicate.png",
-    banner: "/art/cat-syndicate.png",
+    image: "/art/cat-syndicate-v2.png",
+    banner: "/art/cat-syndicate-v2.png",
     mascot: "Cyber Shadow",
     theme: "Neon alley syndicate",
     vibe: "Glasses, plasma auras, black-market XP",
@@ -92,10 +136,32 @@ export const collections: VaultCollection[] = [
     apy: 42.2,
     online: 1876,
     riskScore: 68,
+    riskTier: "MEDIUM",
     instantSellEnabled: true,
     palette: ["#9a36ff", "#28d7ff", "#1b042c"],
+    mascotType: "cat",
+    silhouette: "sleek cyber cat with angular ears and a visor-heavy profile",
+    activeUsers24h: 1580,
+    raidSuccessRate: 72,
+    averageHoldDays: 49,
     communityTraits: ["Alley Oracle", "Static Whisker", "Midnight Visor", "Neon Claw", "Backdoor Halo"],
-    legendaryTrait: "Quantum Nine Lives"
+    legendaryTrait: "Quantum Nine Lives",
+    traitLayers: {
+      base: ["Cyber Cat", "Shadow Broker", "Alley Striker"],
+      headgear: ["Midnight Visor", "Backdoor Halo", "Signal Hood"],
+      eyes: ["Neon Scan", "Static Pupils", "Blue Firewall"],
+      aura: ["Static Whisker", "Purple Plasma", "Data Ghost"],
+      accessory: ["Neon Claw", "Signal Blade", "Code Charm"],
+      background: ["Neon Alley", "Server Shrine", "Black Market"]
+    },
+    styleProfile: {
+      artStyle: "cyberpunk glitch",
+      shapeLanguage: "sharp glitch",
+      visualFx: ["scanlines", "neon rim light", "data trails"],
+      baseVariantCount: 40,
+      microRandomization: "glitch offsets, visor angle, noise overlays"
+    },
+    nextUnlocks: ["Animated Data Ghost", "Signal Blade", "Syndicate cNFT badge", "+8% volume raid XP"]
   },
   {
     id: "pepe-empire",
@@ -104,8 +170,8 @@ export const collections: VaultCollection[] = [
     subtitle: "Pepe Empire",
     tokenMint: "Pepe11111111111111111111111111111111111111",
     description: "Vaults for builders expanding a pixel empire one lock at a time.",
-    image: "/art/pepe-empire.png",
-    banner: "/art/pepe-empire.png",
+    image: "/art/pepe-empire-v2.png",
+    banner: "/art/pepe-empire-v2.png",
     mascot: "Pepe Warlord",
     theme: "Marsh fortress",
     vibe: "Battle frogs, banners, glowing moats",
@@ -124,10 +190,32 @@ export const collections: VaultCollection[] = [
     apy: 29.8,
     online: 654,
     riskScore: 61,
+    riskTier: "MEDIUM",
     instantSellEnabled: true,
     palette: ["#21f26b", "#f4c542", "#103315"],
+    mascotType: "alien",
+    silhouette: "wide-eyed alien warlord with banner armor and sharp shoulders",
+    activeUsers24h: 620,
+    raidSuccessRate: 68,
+    averageHoldDays: 42,
     communityTraits: ["Mire General", "Bog Banner", "Citadel Moss", "War Glasses", "Vault Pike"],
-    legendaryTrait: "Emerald Empire Standard"
+    legendaryTrait: "Emerald Empire Standard",
+    traitLayers: {
+      base: ["Mire Alien", "Empire Scout", "Pepe Warlord"],
+      headgear: ["War Glasses", "Empire Crown", "Reed Helm"],
+      eyes: ["Moss Scan", "Citadel Focus", "Gold Pupils"],
+      aura: ["Citadel Moss", "Emerald Static", "Warlord Heat"],
+      accessory: ["Vault Pike", "Bog Banner", "Empire Key"],
+      background: ["Marsh Fortress", "Empire Gate", "Glowing Moat"]
+    },
+    styleProfile: {
+      artStyle: "meme war poster",
+      shapeLanguage: "wide alien",
+      visualFx: ["moss haze", "banner embers", "vault shine"],
+      baseVariantCount: 34,
+      microRandomization: "banner sway, scale jitter, palette drift"
+    },
+    nextUnlocks: ["Empire Key", "Animated Bog Banner", "Mire General badge", "+4% staking boost"]
   },
   {
     id: "shiba-samurai",
@@ -136,8 +224,8 @@ export const collections: VaultCollection[] = [
     subtitle: "Shiba Samurai",
     tokenMint: "Shib11111111111111111111111111111111111111",
     description: "Disciplined vault clans with isolated rewards and sharp marketplace rails.",
-    image: "/art/shiba-samurai.png",
-    banner: "/art/shiba-samurai.png",
+    image: "/art/shiba-samurai-v2.png",
+    banner: "/art/shiba-samurai-v2.png",
     mascot: "Shiba Ronin",
     theme: "Neon dojo market",
     vibe: "Ronin masks, purple steel, green lanterns",
@@ -156,22 +244,44 @@ export const collections: VaultCollection[] = [
     apy: 35.1,
     online: 1043,
     riskScore: 57,
+    riskTier: "HIGH RISK",
     instantSellEnabled: false,
     palette: ["#df8740", "#7a35ff", "#25110a"],
+    mascotType: "samurai",
+    silhouette: "compact shiba ronin with kabuto helmet and angled blade stance",
+    activeUsers24h: 410,
+    raidSuccessRate: 54,
+    averageHoldDays: 34,
     communityTraits: ["Katana Collar", "Moon Kennel", "Ronin Spark", "Lantern Fang", "Chrome Kabuto"],
-    legendaryTrait: "Silent Dojo Eclipse"
+    legendaryTrait: "Silent Dojo Eclipse",
+    traitLayers: {
+      base: ["Shiba Ronin", "Dojo Scout", "Lantern Guard"],
+      headgear: ["Chrome Kabuto", "Ronin Hood", "Moon Hat"],
+      eyes: ["Lantern Eyes", "Violet Focus", "Dojo Glare"],
+      aura: ["Ronin Spark", "Steel Pulse", "Eclipse Glow"],
+      accessory: ["Katana Collar", "Lantern Fang", "Vault Tanto"],
+      background: ["Neon Dojo", "Lantern Market", "Eclipse Bridge"]
+    },
+    styleProfile: {
+      artStyle: "anime samurai",
+      shapeLanguage: "angular blade",
+      visualFx: ["eclipse glow", "steel pulse", "violet sparks"],
+      baseVariantCount: 30,
+      microRandomization: "blade rotation, helmet tilt, contrast noise"
+    },
+    nextUnlocks: ["Vault Tanto", "Eclipse Glow", "Ronin cNFT badge", "Instant sell review"]
   }
 ];
 
 export const vaultNfts: VaultNft[] = [
-  { id: "8421", collectionId: "frog-vaults", name: "Swamp Watcher", number: 8421, image: "/art/frog-vault.png", priceSol: 12.5, backingUsd: 2145.25, lockedAmount: "50,000 $FROG", duration: "90 Days", tier: "Emerald", status: "Locked", rarity: "Rare", apy: 42.5, unlockDate: "21.08.2025" },
-  { id: "2177", collectionId: "doge-kingdom", name: "Golden Marshal", number: 2177, image: "/art/doge-kingdom.png", priceSol: 13.2, backingUsd: 2267.16, lockedAmount: "100,000 $DOGE", duration: "180 Days", tier: "Royal", status: "Locked", rarity: "Epic", apy: 48.3, unlockDate: "11.09.2025" },
-  { id: "3056", collectionId: "cat-syndicate", name: "Cyber Shadow", number: 3056, image: "/art/cat-syndicate.png", priceSol: 14.75, backingUsd: 2531.23, lockedAmount: "75,000 $CAT", duration: "90 Days", tier: "Neon", status: "Staked", rarity: "Rare", apy: 37.2, unlockDate: "90 Days" },
-  { id: "9931", collectionId: "pepe-empire", name: "Pepe Warlord", number: 9931, image: "/art/pepe-empire.png", priceSol: 14, backingUsd: 2373.1, lockedAmount: "25,000 $PEPE", duration: "Flexible", tier: "Mire", status: "Flexible", rarity: "Epic", apy: 15.2, unlockDate: "Anytime" },
-  { id: "6651", collectionId: "shiba-samurai", name: "Shiba Ronin", number: 6651, image: "/art/shiba-samurai.png", priceSol: 16.8, backingUsd: 2879.45, lockedAmount: "40,000 $SHIBA", duration: "30 Days", tier: "Ronin", status: "Staked", rarity: "Rare", apy: 28.1, unlockDate: "30 Days" },
-  { id: "1209", collectionId: "frog-vaults", name: "Toxic Sage", number: 1209, image: "/art/frog-vault.png", priceSol: 9.8, backingUsd: 1680.25, lockedAmount: "30,000 $FROG", duration: "30 Days", tier: "Toxic", status: "Redeemable", rarity: "Epic", apy: 18.7, unlockDate: "Anytime" },
-  { id: "7721", collectionId: "cat-syndicate", name: "Neon Hacker", number: 7721, image: "/art/cat-syndicate.png", priceSol: 17.25, backingUsd: 2953.66, lockedAmount: "120,000 $CAT", duration: "180 Days", tier: "Quantum", status: "Locked", rarity: "Epic", apy: 44.1, unlockDate: "180 Days" },
-  { id: "4200", collectionId: "pepe-empire", name: "King Pepe", number: 4200, image: "/art/pepe-empire.png", priceSol: 25, backingUsd: 4276.2, lockedAmount: "200,000 $PEPE", duration: "180 Days", tier: "Legend", status: "Locked", rarity: "Legendary", apy: 51.3, unlockDate: "180 Days" }
+  { id: "8421", collectionId: "frog-vaults", name: "Swamp Watcher", number: 8421, image: "/art/frog-vault-v2.png", priceSol: 12.5, backingUsd: 2145.25, backingSol: 10.4, lockedAmount: "50,000 $FROG", duration: "90 Days", tier: "Emerald", status: "Locked", rarity: "Rare", apy: 42.5, unlockDate: "21.08.2025", role: "Swamp Prophet", rank: "Bronze Raider", aura: "Toxic Mist", background: "Moonlit Marsh", badges: ["OG", "Raider"] },
+  { id: "2177", collectionId: "doge-kingdom", name: "Golden Marshal", number: 2177, image: "/art/doge-kingdom-v2.png", priceSol: 13.2, backingUsd: 2267.16, backingSol: 11.8, lockedAmount: "100,000 $DOGE", duration: "180 Days", tier: "Royal", status: "Locked", rarity: "Epic", apy: 48.3, unlockDate: "11.09.2025", role: "Bone Raider", rank: "Gold Raider", aura: "Golden Bark", background: "Crown Hall", badges: ["Whale", "Royal"] },
+  { id: "3056", collectionId: "cat-syndicate", name: "Cyber Shadow", number: 3056, image: "/art/cat-syndicate-v2.png", priceSol: 14.75, backingUsd: 2531.23, backingSol: 12.9, lockedAmount: "75,000 $CAT", duration: "90 Days", tier: "Neon", status: "Staked", rarity: "Rare", apy: 37.2, unlockDate: "90 Days", role: "Alley Oracle", rank: "Silver Raider", aura: "Static Whisker", background: "Neon Alley", badges: ["Raider"] },
+  { id: "9931", collectionId: "pepe-empire", name: "Pepe Warlord", number: 9931, image: "/art/pepe-empire-v2.png", priceSol: 14, backingUsd: 2373.1, backingSol: 13.2, lockedAmount: "25,000 $PEPE", duration: "Flexible", tier: "Mire", status: "Flexible", rarity: "Epic", apy: 15.2, unlockDate: "Anytime", role: "Mire General", rank: "Bronze Raider", aura: "Citadel Moss", background: "Marsh Fortress", badges: ["Founder"] },
+  { id: "6651", collectionId: "shiba-samurai", name: "Shiba Ronin", number: 6651, image: "/art/shiba-samurai-v2.png", priceSol: 16.8, backingUsd: 2879.45, backingSol: 12.1, lockedAmount: "40,000 $SHIBA", duration: "30 Days", tier: "Ronin", status: "Staked", rarity: "Rare", apy: 28.1, unlockDate: "30 Days", role: "Lantern Guard", rank: "Bronze Raider", aura: "Ronin Spark", background: "Neon Dojo", badges: ["Risk Watch"] },
+  { id: "1209", collectionId: "frog-vaults", name: "Toxic Sage", number: 1209, image: "/art/frog-vault-v2.png", priceSol: 9.8, backingUsd: 1680.25, backingSol: 9.1, lockedAmount: "30,000 $FROG", duration: "30 Days", tier: "Toxic", status: "Redeemable", rarity: "Epic", apy: 18.7, unlockDate: "Anytime", role: "Lily Staff Keeper", rank: "Silver Raider", aura: "Emerald Pulse", background: "Vault Grove", badges: ["OG"] },
+  { id: "7721", collectionId: "cat-syndicate", name: "Neon Hacker", number: 7721, image: "/art/cat-syndicate-v2.png", priceSol: 17.25, backingUsd: 2953.66, backingSol: 13.8, lockedAmount: "120,000 $CAT", duration: "180 Days", tier: "Quantum", status: "Locked", rarity: "Epic", apy: 44.1, unlockDate: "180 Days", role: "Backdoor Halo", rank: "Gold Raider", aura: "Purple Plasma", background: "Server Shrine", badges: ["Whale"] },
+  { id: "4200", collectionId: "pepe-empire", name: "King Pepe", number: 4200, image: "/art/pepe-empire-v2.png", priceSol: 25, backingUsd: 4276.2, backingSol: 18.5, lockedAmount: "200,000 $PEPE", duration: "180 Days", tier: "Legend", status: "Locked", rarity: "Legendary", apy: 51.3, unlockDate: "180 Days", role: "Emerald Standard", rank: "Diamond Raider", aura: "Warlord Heat", background: "Empire Gate", badges: ["Legendary", "Whale"] }
 ];
 
 export const raidMissions: RaidMission[] = [
@@ -190,19 +300,60 @@ export const raidRooms: RaidRoom[] = [
 ];
 
 export const leaderboard: LeaderboardRow[] = [
-  { rank: 1, name: "SwampKing", score: "12,450 XP", image: "/art/frog-vault.png" },
-  { rank: 2, name: "FrogLord", score: "9,850 XP", image: "/art/frog-vault.png" },
-  { rank: 3, name: "LilypadOG", score: "8,150 XP", image: "/art/doge-kingdom.png" },
-  { rank: 4, name: "ToxicToad", score: "7,240 XP", image: "/art/pepe-empire.png" },
-  { rank: 5, name: "MemeFrog", score: "6,420 XP", image: "/art/frog-vault.png" },
-  { rank: 23, name: "FrogMaster", score: "2,850 XP", image: "/art/frog-vault.png", highlight: true }
+  { rank: 1, name: "SwampKing", score: "12,450 XP", image: "/art/frog-vault-v2.png", role: "Whale", badge: "Crown" },
+  { rank: 2, name: "FrogLord", score: "9,850 XP", image: "/art/frog-vault-v2.png", role: "OG", badge: "Founder" },
+  { rank: 3, name: "LilypadOG", score: "8,150 XP", image: "/art/doge-kingdom-v2.png", role: "Raider", badge: "Gold" },
+  { rank: 4, name: "ToxicToad", score: "7,240 XP", image: "/art/pepe-empire-v2.png", role: "Raider", badge: "Mire" },
+  { rank: 5, name: "MemeFrog", score: "6,420 XP", image: "/art/frog-vault-v2.png", role: "OG", badge: "Swamp" },
+  { rank: 23, name: "FrogMaster", score: "2,850 XP", image: "/art/frog-vault-v2.png", highlight: true, role: "OG Raider", badge: "You" }
 ];
 
 export const activity: ActivityItem[] = [
-  { actor: "FrogMaster", action: "staked a vault", amount: "+200 XP", time: "2m ago", image: "/art/frog-vault.png" },
-  { actor: "LilypadOG", action: "completed a raid", amount: "+150 XP", time: "5m ago", image: "/art/doge-kingdom.png" },
-  { actor: "SwampKing", action: "unlocked Toxic Aura", amount: "+100 XP", time: "12m ago", image: "/art/cat-syndicate.png" },
-  { actor: "ToxicToad", action: "minted a vault", amount: "+12.5 SOL", time: "18m ago", image: "/art/pepe-empire.png" }
+  { actor: "FrogMaster", action: "staked a vault", amount: "+200 XP", time: "2m ago", image: "/art/frog-vault-v2.png" },
+  { actor: "LilypadOG", action: "completed a raid", amount: "+150 XP", time: "5m ago", image: "/art/doge-kingdom-v2.png" },
+  { actor: "SwampKing", action: "unlocked Toxic Aura", amount: "+100 XP", time: "12m ago", image: "/art/cat-syndicate-v2.png" },
+  { actor: "ToxicToad", action: "minted a vault", amount: "+12.5 SOL", time: "18m ago", image: "/art/pepe-empire-v2.png" }
+];
+
+export const communityMembers: CommunityMember[] = [
+  { id: "swampking", name: "SwampKing", avatar: "/art/frog-vault-v2.png", role: "Whale", xp: 12450, vaults: 18, rank: "Diamond Raider", followed: true },
+  { id: "froglord", name: "FrogLord", avatar: "/art/frog-vault-v2.png", role: "OG", xp: 9850, vaults: 12, rank: "Gold Raider" },
+  { id: "lilypadog", name: "LilypadOG", avatar: "/art/doge-kingdom-v2.png", role: "Raider", xp: 8150, vaults: 9, rank: "Silver Raider" },
+  { id: "toxictoad", name: "ToxicToad", avatar: "/art/pepe-empire-v2.png", role: "Raider", xp: 7240, vaults: 7, rank: "Silver Raider" },
+  { id: "frogmaster", name: "FrogMaster", avatar: "/art/frog-vault-v2.png", role: "Founder", xp: 2850, vaults: 12, rank: "Bronze Raider", followed: true }
+];
+
+export const socialActivity: SocialActivity[] = [
+  { id: "a1", collectionId: "frog-vaults", actor: "SwampKing", avatar: "/art/frog-vault-v2.png", role: "Whale", action: "joined Swamp Takeover and pushed boss HP down", xp: 450, nft: "Swamp Watcher #8421", time: "now", reaction: "fire" },
+  { id: "a2", collectionId: "frog-vaults", actor: "FrogMaster", avatar: "/art/frog-vault-v2.png", role: "OG Raider", action: "minted a new Vault NFT and unlocked Toxic Mist", xp: 220, nft: "Toxic Sage #1209", time: "2m", reaction: "rocket" },
+  { id: "a3", collectionId: "doge-kingdom", actor: "LilypadOG", avatar: "/art/doge-kingdom-v2.png", role: "Raider", action: "staked a 180 day royal vault", xp: 180, nft: "Golden Marshal #2177", time: "5m", reaction: "fire" },
+  { id: "a4", collectionId: "cat-syndicate", actor: "NeonMancer", avatar: "/art/cat-syndicate-v2.png", role: "Raider", action: "reacted to Cataclysm Strike and completed mission 2", xp: 160, nft: "Neon Hacker #7721", time: "9m", reaction: "skull" },
+  { id: "a5", collectionId: "frog-vaults", actor: "ToxicToad", avatar: "/art/pepe-empire-v2.png", role: "Raider", action: "followed the collection and unlocked starter missions", xp: 75, time: "12m", reaction: "rocket" }
+];
+
+export const competitions: CollectionCompetition[] = [
+  {
+    id: "frog-vs-doge",
+    title: "Frog vs Dog: Vault War",
+    leftCollectionId: "frog-vaults",
+    rightCollectionId: "doge-kingdom",
+    leftScore: 85420,
+    rightScore: 60230,
+    reward: "Winner gets +10% raid XP and unlocks one trait pack early",
+    penalty: "Loser receives -5% raid rewards for the next 24h",
+    endsIn: "02:14:37"
+  },
+  {
+    id: "cat-vs-pepe",
+    title: "Syndicate vs Empire",
+    leftCollectionId: "cat-syndicate",
+    rightCollectionId: "pepe-empire",
+    leftScore: 120450,
+    rightScore: 42150,
+    reward: "Winner gets a featured marketplace lane and badge drop",
+    penalty: "Loser must complete a recovery raid to restore boosts",
+    endsIn: "12:45:33"
+  }
 ];
 
 export const feeSplit = [
@@ -217,3 +368,12 @@ export function getCollection(id = "frog-vaults") {
   return collections.find((collection) => collection.id === id) ?? collections[0];
 }
 
+export function getRaid(collectionId: string, raidId: string) {
+  return raidRooms.find((raid) => raid.collectionId === collectionId && raid.id === raidId) ?? raidRooms.find((raid) => raid.collectionId === collectionId) ?? raidRooms[0];
+}
+
+export function riskAccent(riskTier: VaultCollection["riskTier"]) {
+  if (riskTier === "SAFE") return "green";
+  if (riskTier === "MEDIUM") return "gold";
+  return "red";
+}

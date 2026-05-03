@@ -28,12 +28,52 @@ export type CommunityProfile = {
     legendaryTrait: string;
   };
   rarityTable: Record<string, number>;
+  traitLayers: {
+    base: string[];
+    headgear: string[];
+    eyes: string[];
+    aura: string[];
+    accessory: string[];
+    background: string[];
+  };
+  styleProfile: StyleProfile;
 };
 
 export type GeneratedArt = {
   imageUri: string;
   metadataUri: string;
   layers: string[];
+  baseVariant: BaseCharacterVariant;
+  microRandomization: MicroRandomization;
+  uniquenessHash: string;
+  animated: boolean;
+};
+
+export type StyleProfile = {
+  artStyle: "pixel" | "cartoon" | "cyberpunk" | "abstract" | "meme" | "anime" | "low-poly";
+  colorPalette: string[];
+  shapeLanguage: "rounded" | "sharp" | "glitch" | "organic" | "geometric";
+  mascotType: "frog" | "dog" | "cat" | "alien" | "robot" | "samurai" | "spirit";
+  visualFx: string[];
+  texture: "clean" | "grain" | "scanlines" | "painted" | "posterized";
+  silhouetteRules: string[];
+};
+
+export type BaseCharacterVariant = {
+  id: string;
+  name: string;
+  silhouette: string;
+  pose: string;
+  rarityBias: "common" | "uncommon" | "rare" | "epic" | "legendary";
+};
+
+export type MicroRandomization = {
+  offsetX: number;
+  offsetY: number;
+  rotationDeg: number;
+  scale: number;
+  hueShiftDeg: number;
+  noiseOpacity: number;
 };
 
 export type RaidScoreInput = {
@@ -62,4 +102,3 @@ export type InstantSellQuote = {
   quoteSol: number;
   reason?: string;
 };
-

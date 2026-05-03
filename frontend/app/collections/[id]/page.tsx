@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { BadgeCheck, Globe, LockKeyhole, Send, Share2, Swords, Users } from "lucide-react";
+import { BadgeCheck, Flame, Globe, Send, Share2, Swords, Users } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Leaderboard } from "@/components/Leaderboard";
 import { NFTCard } from "@/components/NFTCard";
 import { ProgressBar } from "@/components/ProgressBar";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
-import { collections, getCollection, leaderboard, raidRooms, vaultNfts } from "@/lib/mock-data";
+import { collections, getCollection, leaderboard, raidRooms, riskAccent, vaultNfts } from "@/lib/mock-data";
 
 export function generateStaticParams() {
   return collections.map((collection) => ({ id: collection.id }));
@@ -38,11 +38,14 @@ export default function CollectionDetailPage({ params }: { params: { id: string 
                     <StatusPill accent="purple">{collection.chain}</StatusPill>
                     <StatusPill accent="green">{collection.category}</StatusPill>
                     <StatusPill accent="cyan">Community Driven</StatusPill>
+                    <StatusPill accent={riskAccent(collection.riskTier)}>{collection.riskTier}</StatusPill>
+                    <StatusPill accent="gold">{collection.mascot}</StatusPill>
                   </div>
                   <p className="mt-4 max-w-2xl text-slate-300">{collection.description}</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <button className="h-11 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow">Follow</button>
+                  <button className="h-11 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow">Join Collection</button>
+                  <button className="h-11 rounded-lg border border-vault-line bg-black/25 px-5 text-sm font-bold">Follow</button>
                   {[Globe, Send, Users, Share2].map((Icon, index) => (
                     <button key={index} className="flex size-11 items-center justify-center rounded-lg border border-vault-line bg-black/25 text-slate-300" aria-label="Social link">
                       <Icon className="size-4" />
@@ -57,9 +60,27 @@ export default function CollectionDetailPage({ params }: { params: { id: string 
                 <Metric label="Total Supply" value={collection.supply.toLocaleString()} />
                 <Metric label="Minted" value={`${collection.minted.toLocaleString()} (${Math.round((collection.minted / collection.supply) * 100)}%)`} />
                 <Metric label="Unique Holders" value={collection.holders.toLocaleString()} />
+                <Metric label="Total XP" value={collection.xp.toLocaleString()} />
+                <Metric label="Active 24h" value={collection.activeUsers24h.toLocaleString()} />
+                <Metric label="Raid Success" value={`${collection.raidSuccessRate}%`} />
+                <Metric label="Avg Hold" value={`${collection.averageHoldDays}d`} />
               </div>
             </div>
           </SectionCard>
+
+          <nav className="glass flex flex-wrap gap-2 rounded-lg p-2">
+            {[
+              ["Overview", `/collections/${collection.id}`],
+              ["NFTs", "#vaults"],
+              ["Community", `/collections/${collection.id}/community`],
+              ["Raids", `/collections/${collection.id}/raids`],
+              ["Activity", "#activity"]
+            ].map(([label, href], index) => (
+              <Link key={label} href={href} className={index === 0 ? "rounded-lg bg-vault-purple px-4 py-2 text-sm font-bold" : "rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/5"}>
+                {label}
+              </Link>
+            ))}
+          </nav>
 
           <div className="grid gap-5 lg:grid-cols-2">
             <SectionCard title="Collection Level">
@@ -109,6 +130,7 @@ export default function CollectionDetailPage({ params }: { params: { id: string 
           </div>
 
           <SectionCard
+            id="vaults"
             title="Vaults"
             action={<Link href="/marketplace" className="text-sm font-semibold text-vault-purple">Open Marketplace</Link>}
           >
@@ -127,11 +149,30 @@ export default function CollectionDetailPage({ params }: { params: { id: string 
 
           <SectionCard title="Trait Breakdown">
             <div className="grid gap-3 md:grid-cols-6">
-              {["Backgrounds", "Roles", "Auras", "Accessories", "Ranks", "Legendary"].map((trait, index) => (
+              {[
+                ["Base", collection.traitLayers.base[0]],
+                ["Headgear", collection.traitLayers.headgear[0]],
+                ["Eyes", collection.traitLayers.eyes[0]],
+                ["Aura", collection.traitLayers.aura[0]],
+                ["Accessory", collection.traitLayers.accessory[0]],
+                ["Background", collection.traitLayers.background[0]]
+              ].map(([trait, value], index) => (
                 <div key={trait} className="rounded-lg border border-vault-line bg-black/25 p-4">
                   <p className="text-sm font-semibold">{trait}</p>
-                  <p className="mt-1 text-xs text-slate-400">{collection.communityTraits[index] ?? collection.legendaryTrait}</p>
+                  <p className="mt-1 text-xs text-slate-400">{value}</p>
                   <ProgressBar value={48 - index * 4} />
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard id="activity" title="Collection Activity">
+            <div className="grid gap-3 md:grid-cols-3">
+              {["FrogMaster joined the faction", "SwampKing reacted to Swamp Takeover", "ToxicToad minted Toxic Sage"].map((item, index) => (
+                <div key={item} className="rounded-lg border border-vault-line bg-black/25 p-4">
+                  <Flame className="mb-3 size-5 text-vault-gold" />
+                  <p className="font-semibold">{item}</p>
+                  <p className="mt-1 text-sm text-vault-green">+{[75, 120, 220][index]} XP</p>
                 </div>
               ))}
             </div>
@@ -171,7 +212,7 @@ export default function CollectionDetailPage({ params }: { params: { id: string 
           <SectionCard title="Active Raids">
             <div className="space-y-3">
               {raidRooms.slice(0, 3).map((raid) => (
-                <Link href={`/collections/${collection.id}/raids`} key={raid.id} className="flex items-center gap-3 rounded-lg bg-black/20 p-3">
+                <Link href={`/collections/${collection.id}/raids/${raid.id}`} key={raid.id} className="flex items-center gap-3 rounded-lg bg-black/20 p-3">
                   <Swords className="size-4 text-vault-purple" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{raid.name}</p>

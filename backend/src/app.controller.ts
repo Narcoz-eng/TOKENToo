@@ -32,7 +32,8 @@ export class AppController {
     const scan = await this.scanner.scanToken(mint);
     const profile = this.identity.createCommunityProfile(scan);
     const art = await this.art.generateVaultArt(profile, "preview");
-    return { scan, profile, art };
+    const generationPlan = this.art.createGenerationPlan(profile);
+    return { scan, profile, art, generationPlan };
   }
 
   @Get("raids/:collectionId/preview")
@@ -51,4 +52,3 @@ export class AppController {
     return this.marketplace.instantSellQuote(scan, Number(backingValueSol));
   }
 }
-

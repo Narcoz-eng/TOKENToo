@@ -19,7 +19,10 @@ export function Leaderboard({ rows, title = "Raid Leaderboard" }: { rows: Leader
           >
             <span className="w-6 text-slate-400">{row.rank}</span>
             <img src={row.image} alt={row.name} className="size-8 rounded-full object-cover" />
-            <span className="flex-1 font-semibold text-white">{row.name}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold text-white">{row.name}</span>
+              {row.role ? <span className="text-xs text-vault-purple">{row.role} · {row.badge}</span> : null}
+            </span>
             <span className="text-slate-300">{row.score}</span>
           </div>
         ))}
@@ -27,4 +30,3 @@ export function Leaderboard({ rows, title = "Raid Leaderboard" }: { rows: Leader
     </div>
   );
 }
-

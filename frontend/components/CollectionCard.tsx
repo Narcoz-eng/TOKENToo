@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { BadgeCheck, Users } from "lucide-react";
 import type { VaultCollection } from "@/lib/types";
+import { riskAccent } from "@/lib/mock-data";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
 
 export function CollectionCard({ collection }: { collection: VaultCollection }) {
   return (
     <Link href={`/collections/${collection.id}`} className="group glass block overflow-hidden rounded-lg transition hover:-translate-y-0.5 hover:border-vault-purple/60">
-      <div className="aspect-square overflow-hidden">
+      <div className="relative aspect-square overflow-hidden">
         <img src={collection.image} alt={collection.name} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+        <div className="absolute left-3 top-3 flex gap-2">
+          <StatusPill accent={riskAccent(collection.riskTier)}>{collection.riskTier}</StatusPill>
+        </div>
       </div>
       <div className="space-y-3 p-4">
         <div>
@@ -17,6 +21,7 @@ export function CollectionCard({ collection }: { collection: VaultCollection }) 
             <BadgeCheck className="size-4 text-vault-purple" />
           </div>
           <p className="text-sm text-slate-400">{collection.subtitle}</p>
+          <p className="mt-2 text-xs text-vault-green">{collection.mascot} · {collection.mascotType}</p>
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
@@ -41,4 +46,3 @@ export function CollectionCard({ collection }: { collection: VaultCollection }) 
     </Link>
   );
 }
-

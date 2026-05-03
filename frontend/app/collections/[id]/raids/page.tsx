@@ -99,7 +99,11 @@ export default function CollectionRaidsPage({ params }: { params: { id: string }
                       <td className="px-3 py-4">{raid.participants.toLocaleString()} / {raid.capacity.toLocaleString()}</td>
                       <td className="px-3 py-4"><ProgressBar value={raid.progress} /></td>
                       <td className="px-3 py-4">{raid.endsIn}</td>
-                      <td className="px-3 py-4"><button className="h-9 rounded-lg bg-vault-purple px-4 font-bold">Enter Room</button></td>
+                      <td className="px-3 py-4">
+                        <Link href={`/collections/${collection.id}/raids/${raid.id}`} className="inline-flex h-9 items-center rounded-lg bg-vault-purple px-4 font-bold">
+                          Enter Room
+                        </Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
