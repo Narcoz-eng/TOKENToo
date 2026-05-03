@@ -7,8 +7,8 @@ Project name: `phewrun2`
 Set these values in `.env` locally and in Vercel Project Settings:
 
 ```env
-DATABASE_URL="postgresql://postgres.[PHEWRUN2_PROJECT_REF]:[DATABASE_PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
-DIRECT_URL="postgresql://postgres.[PHEWRUN2_PROJECT_REF]:[DATABASE_PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
+DATABASE_URL="postgresql://postgres.etmrgphkomagszfezsxf:[YOUR-PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+DIRECT_URL="postgresql://postgres.etmrgphkomagszfezsxf:[YOUR-PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
 SUPABASE_URL="https://etmrgphkomagszfezsxf.supabase.co"
 SUPABASE_ANON_KEY="sb_publishable_CBv8Gmyx9g3Lrl9LLk_6vg_G6Qg6KPV"
 SUPABASE_SERVICE_ROLE_KEY="..."
@@ -17,7 +17,9 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sb_publishable_CBv8Gmyx9g3Lrl9LLk_6vg_G6Qg
 ASSET_STORAGE_PROVIDER="supabase"
 ```
 
-`DATABASE_URL` is for runtime/serverless connection pooling. `DIRECT_URL` is for Prisma migration commands.
+`DATABASE_URL` is for runtime/serverless connection pooling. `DIRECT_URL` is for Prisma migration commands. Replace `[YOUR-PASSWORD]` with the database password from Supabase.
+
+This repo uses Prisma 7, so connection URLs live in `backend/prisma.config.ts` and environment variables. Do not add `url` or `directUrl` to `backend/prisma/schema.prisma`; Prisma 7 rejects those fields in schema files.
 
 ## Deploy schema
 
