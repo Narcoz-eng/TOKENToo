@@ -32,7 +32,15 @@ begin
     'CompatibilityRule',
     'PreviewAsset',
     'QualityReport',
-    'DistinctivenessReport'
+    'DistinctivenessReport',
+    'MintTransaction',
+    'RedeemTransaction',
+    'ListingTransaction',
+    'InstantSellQuote',
+    'RaidClaim',
+    'RaidAbuseSignal',
+    'WalletReputation',
+    'MissionCooldown'
   ] loop
     if to_regclass(format('public.%I', table_name)) is not null then
       execute format('alter table public.%I enable row level security', table_name);

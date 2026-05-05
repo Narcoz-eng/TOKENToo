@@ -101,6 +101,32 @@ enum PreviewAssetType {
   SAMPLE_NFT
 }
 
+enum TransactionStatus {
+  PENDING
+  ASSET_GENERATED
+  ASSET_UPLOADED
+  TX_BUILT
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum InstantSellQuoteStatus {
+  QUOTED
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum RaidClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
 model User {
   id                 String              @id @default(uuid()) @db.Uuid
   supabaseAuthId     String?             @unique @db.Uuid
@@ -119,6 +145,8 @@ model User {
   listings           Listing[]
   purchases          Sale[]              @relation("BuyerSales")
   sales              Sale[]              @relation("SellerSales")
+  raidClaims         RaidClaim[]
+  missionCooldowns   MissionCooldown[]
 }
 
 model Token {
@@ -157,6 +185,9 @@ model GenerationRun {
   selectedPreset      String?
   status              GeneratorRunStatus      @default(DRAFT)
   approvedVersion     Int?
+  approvedByWallet    String?
+  approvedAt          DateTime?
+  approvalSnapshot    Json?
   regenerationCount   Int                     @default(0)
   seed                String
   createdAt           DateTime                @default(now())
@@ -336,6 +367,14 @@ model Collection {
   onchainProfilePda     String?             @unique
   feeVaultPda           String?             @unique
   tokenVaultPda         String?             @unique
+  approvedGenerationRunId String?           @db.Uuid
+  styleProfileVersion  Int?
+  traitPackVersion     Int?
+  metadataSchemaVersion String              @default("vaultx-v1")
+  collectionAssetAddress String?            @unique
+  metadataUri          String?
+  identityLockedAt     DateTime?
+  launchedAt           DateTime?
   name                  String
   slug                  String              @unique
   logoUri               String?
@@ -344,6 +383,9 @@ model Collection {
   mascot                String
   theme                 String
   vibe                  String
+  lore                  String?
+  roleNames             Json                @default("[]")
+  raidTheme             String?
   rarityTable           Json
   communityXp           Int                 @default(0)
   communityLevel        Int                 @default(1)
@@ -366,9 +408,12 @@ model Collection {
   sales                 Sale[]
   feeLedger             FeeLedger[]
   buybackEvents         BuybackEvent[]
+  mintTransactions      MintTransaction[]
+  instantSellQuotes     InstantSellQuote[]
 
   @@index([status])
   @@index([communityLevel])
+  @@index([approvedGenerationRunId])
 }
 
 model VaultNFT {
@@ -380,6 +425,7 @@ model VaultNFT {
   metadataUri       String
   imageUri          String
   positionPda       String            @unique
+  mintTransactionId String?            @unique @db.Uuid
   amount            Decimal           @db.Decimal(38, 0)
   lockDurationDays  Int
   lockedAt          DateTime          @default(now())
@@ -398,6 +444,10 @@ model VaultNFT {
   stakingPositions  StakingPosition[]
   listings          Listing[]
   sales             Sale[]
+  mintTransaction   MintTransaction?  @relation(fields: [mintTransactionId], references: [id], onDelete: SetNull)
+  redeemTransactions RedeemTransaction[]
+  listingTransactions ListingTransaction[]
+  instantSellQuotes InstantSellQuote[]
 
   @@index([collectionId, status])
   @@index([ownerUserId])
@@ -450,6 +500,8 @@ model RaidRoom {
   collection     Collection           @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   missions       RaidMission[]
   participations RaidParticipation[]
+  claims         RaidClaim[]
+  abuseSignals   RaidAbuseSignal[]
 
   @@index([collectionId, status])
 }
@@ -471,6 +523,8 @@ model RaidMission {
   endsAt          DateTime
   raidRoom        RaidRoom             @relation(fields: [raidRoomId], references: [id], onDelete: Cascade)
   participations  RaidParticipation[]
+  claims          RaidClaim[]
+  cooldowns       MissionCooldown[]
 }
 
 model RaidParticipation {
@@ -490,6 +544,79 @@ model RaidParticipation {
 
   @@unique([raidRoomId, userId])
   @@index([userId])
+}
+
+model RaidClaim {
+  id              String          @id @default(uuid()) @db.Uuid
+  raidRoomId      String          @db.Uuid
+  raidMissionId   String?         @db.Uuid
+  userId          String          @db.Uuid
+  walletAddress   String
+  status          RaidClaimStatus @default(PENDING)
+  proof           Json            @default("{}")
+  xpRequested     Int             @default(0)
+  xpApproved      Int             @default(0)
+  rewardSol       Decimal         @default(0) @db.Decimal(20, 9)
+  abuseScore      Int             @default(0)
+  rejectionReason String?
+  txSignature     String?
+  reviewedAt      DateTime?
+  paidAt          DateTime?
+  createdAt       DateTime        @default(now())
+  raidRoom        RaidRoom        @relation(fields: [raidRoomId], references: [id], onDelete: Cascade)
+  raidMission     RaidMission?    @relation(fields: [raidMissionId], references: [id], onDelete: SetNull)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([raidRoomId, status])
+  @@index([walletAddress, createdAt])
+}
+
+model RaidAbuseSignal {
+  id             String    @id @default(uuid()) @db.Uuid
+  raidRoomId     String?   @db.Uuid
+  walletAddress  String
+  signalType     String
+  severity       Int
+  reason         String
+  evidence       Json      @default("{}")
+  createdAt      DateTime  @default(now())
+  raidRoom       RaidRoom? @relation(fields: [raidRoomId], references: [id], onDelete: SetNull)
+
+  @@index([walletAddress, createdAt])
+  @@index([raidRoomId, severity])
+}
+
+model WalletReputation {
+  id                  String   @id @default(uuid()) @db.Uuid
+  walletAddress       String   @unique
+  walletAgeHours      Int      @default(0)
+  trustScore          Int      @default(50)
+  abuseScore          Int      @default(0)
+  completedRaids      Int      @default(0)
+  rejectedClaims      Int      @default(0)
+  washTradeSignals    Int      @default(0)
+  lastActivityAt      DateTime?
+  metadata            Json     @default("{}")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model MissionCooldown {
+  id             String      @id @default(uuid()) @db.Uuid
+  raidMissionId  String      @db.Uuid
+  userId         String      @db.Uuid
+  walletAddress  String
+  windowKey      String
+  xpEarned       Int         @default(0)
+  attempts       Int         @default(0)
+  resetsAt       DateTime
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  raidMission    RaidMission @relation(fields: [raidMissionId], references: [id], onDelete: Cascade)
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raidMissionId, walletAddress, windowKey])
+  @@index([userId, resetsAt])
 }
 
 model XPLog {
@@ -534,6 +661,10 @@ model Listing {
   collectionId  String        @db.Uuid
   sellerUserId  String        @db.Uuid
   priceSol      Decimal       @db.Decimal(20, 9)
+  backingValueSol Decimal     @default(0) @db.Decimal(20, 9)
+  premiumBps    Int           @default(0)
+  riskTier      String        @default("MEDIUM")
+  unlocksAtSnapshot DateTime?
   status        ListingStatus @default(ACTIVE)
   expiresAt     DateTime?
   createdAt     DateTime      @default(now())
@@ -542,8 +673,10 @@ model Listing {
   collection    Collection    @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   seller        User          @relation(fields: [sellerUserId], references: [id], onDelete: Cascade)
   sale          Sale?
+  transactions  ListingTransaction[]
 
   @@index([collectionId, status, priceSol])
+  @@index([premiumBps])
 }
 
 model Sale {
@@ -555,6 +688,8 @@ model Sale {
   sellerUserId  String?     @db.Uuid
   saleType      SaleType
   priceSol      Decimal     @db.Decimal(20, 9)
+  backingValueSol Decimal   @default(0) @db.Decimal(20, 9)
+  premiumBps    Int         @default(0)
   feeSol        Decimal     @db.Decimal(20, 9)
   txSignature   String?
   createdAt     DateTime    @default(now())
@@ -565,6 +700,103 @@ model Sale {
   seller        User?       @relation("SellerSales", fields: [sellerUserId], references: [id], onDelete: SetNull)
 
   @@index([collectionId, createdAt])
+}
+
+model InstantSellQuote {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  collectionId       String                 @db.Uuid
+  vaultNftId         String                 @db.Uuid
+  walletAddress      String
+  backingValueSol    Decimal                @db.Decimal(20, 9)
+  discountBps        Int
+  quoteSol           Decimal                @db.Decimal(20, 9)
+  riskScore          Int
+  riskTier           String
+  status             InstantSellQuoteStatus @default(QUOTED)
+  expiresAt          DateTime
+  acceptedTxSignature String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  collection         Collection             @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  vaultNft           VaultNFT               @relation(fields: [vaultNftId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, status])
+  @@index([walletAddress, createdAt])
+}
+
+model MintTransaction {
+  id               String            @id @default(uuid()) @db.Uuid
+  idempotencyKey   String            @unique
+  requestHash      String
+  walletAddress    String
+  collectionId     String            @db.Uuid
+  tokenMint        String
+  amount           Decimal           @db.Decimal(38, 0)
+  lockDuration     Int
+  status           TransactionStatus @default(PENDING)
+  txSignature      String?           @unique
+  assetUri         String?
+  metadataUri      String?
+  nftMint          String?           @unique
+  vaultPositionPda String?
+  unsignedTransaction Json?
+  retries          Int               @default(0)
+  errorCode        String?
+  errorMessage     String?
+  confirmedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  collection       Collection        @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  vaultNft         VaultNFT?
+
+  @@index([collectionId, status])
+  @@index([walletAddress, createdAt])
+}
+
+model RedeemTransaction {
+  id               String            @id @default(uuid()) @db.Uuid
+  idempotencyKey   String            @unique
+  requestHash      String
+  walletAddress    String
+  vaultNftId       String            @db.Uuid
+  vaultPositionId  String
+  status           TransactionStatus @default(PENDING)
+  txSignature      String?           @unique
+  unsignedTransaction Json?
+  retries          Int               @default(0)
+  errorCode        String?
+  errorMessage     String?
+  confirmedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  vaultNft         VaultNFT          @relation(fields: [vaultNftId], references: [id], onDelete: Cascade)
+
+  @@index([vaultNftId, status])
+  @@index([walletAddress, createdAt])
+}
+
+model ListingTransaction {
+  id               String            @id @default(uuid()) @db.Uuid
+  idempotencyKey   String            @unique
+  requestHash      String
+  walletAddress    String
+  listingId        String?           @db.Uuid
+  vaultNftId       String            @db.Uuid
+  status           TransactionStatus @default(PENDING)
+  txSignature      String?           @unique
+  unsignedTransaction Json?
+  retries          Int               @default(0)
+  errorCode        String?
+  errorMessage     String?
+  confirmedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  listing          Listing?          @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  vaultNft         VaultNFT          @relation(fields: [vaultNftId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, status])
+  @@index([vaultNftId, status])
+  @@index([walletAddress, createdAt])
 }
 
 model FeeLedger {

@@ -81,7 +81,14 @@ export default function CreateCollectionPage() {
   const [run, setRun] = useState<GeneratorRun | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [approvalConfirmed, setApprovalConfirmed] = useState(false);
+  const [creatorWallet, setCreatorWallet] = useState("9x...7Q3e");
+  const [launchResult, setLaunchResult] = useState<string | null>(null);
   const preview = useMemo(() => (run ? mapRunToPreview(run, selectedPresetName(presets, selectedPreset)) : null), [run, presets, selectedPreset]);
+  const latestProfile = run?.styleProfiles[0];
+  const latestQuality = latestProfile?.qualityReports[0];
+  const latestDistinctiveness = latestProfile?.distinctivenessReports[0];
+  const canApprove = Boolean(run && approvalConfirmed && latestQuality?.passed && latestQuality.tier !== "BASIC" && latestDistinctiveness?.passed);
 
   useEffect(() => {
     fetchJson<Preset[]>("/generator/presets")
@@ -122,6 +129,34 @@ export default function CreateCollectionPage() {
     await action(async () => {
       const data = await fetchJson<GeneratorRun>(`/generator/runs/${run.id}/${path}`, { method: "POST" });
       setRun(data);
+    });
+  }
+
+  async function approveRun() {
+    if (!run) return;
+    await action(async () => {
+      const data = await fetchJson<GeneratorRun>(`/generator/runs/${run.id}/approve`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: creatorWallet,
+          explicitConfirmation: approvalConfirmed,
+          acceptedVersion: run.styleProfiles[0]?.version
+        })
+      });
+      setRun(data);
+    });
+  }
+
+  async function launchCollection() {
+    if (!run) return;
+    await action(async () => {
+      const data = await fetchJson<{ id: string; slug: string }>(`/generator/runs/${run.id}/launch-collection`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ walletAddress: creatorWallet })
+      });
+      setLaunchResult(`/collections/${data.slug}`);
     });
   }
 
@@ -166,6 +201,24 @@ export default function CreateCollectionPage() {
 
         <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
           <aside className="space-y-5">
+            <SectionCard title="Create Community Flow">
+              <div className="space-y-2 text-sm">
+                {[
+                  ["1", "Input token"],
+                  ["2", "Add memes and context"],
+                  ["3", "Generate identity"],
+                  ["4", "Review Premium+ quality"],
+                  ["5", "Approve immutable style"],
+                  ["6", "Launch collection"]
+                ].map(([step, label], index) => (
+                  <div key={label} className="flex items-center gap-3 rounded-lg border border-vault-line bg-black/25 p-3">
+                    <span className="flex size-7 items-center justify-center rounded-md bg-vault-purple/20 text-xs font-black text-vault-purple">{step}</span>
+                    <span className={run && (index < 3 || run.status === "APPROVED") ? "font-semibold text-white" : "text-slate-400"}>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+
             <SectionCard title="Token Inputs">
               <div className="space-y-3">
                 <Field label="Token name" value={tokenName} onChange={setTokenName} />
@@ -181,6 +234,7 @@ export default function CreateCollectionPage() {
 
             <SectionCard title="Community Context">
               <div className="space-y-3">
+                <Field label="Creator wallet" value={creatorWallet} onChange={setCreatorWallet} />
                 <Field label="Memes / inside jokes" value={memes} onChange={setMemes} />
                 <Field label="Telegram / X phrases" value={phrases} onChange={setPhrases} />
                 <Field label="Mascot preference" value={mascotPreference} onChange={setMascotPreference} />
@@ -228,10 +282,30 @@ export default function CreateCollectionPage() {
               <button type="button" onClick={() => mutateRun("regenerate-previews")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-line bg-black/25 px-4 text-sm font-bold disabled:opacity-50">
                 <Wand2 className="size-4 text-vault-green" /> Regenerate Previews
               </button>
-              <button type="button" onClick={() => mutateRun("approve")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-green/50 bg-vault-green/10 px-4 text-sm font-bold text-vault-green disabled:opacity-50">
+              <button type="button" onClick={approveRun} disabled={!canApprove || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-green/50 bg-vault-green/10 px-4 text-sm font-bold text-vault-green disabled:opacity-50">
                 <ShieldCheck className="size-4" /> Approve Version
               </button>
+              <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-green px-4 text-sm font-bold text-black disabled:opacity-50">
+                <Check className="size-4" /> Launch Collection
+              </button>
             </div>
+
+            <SectionCard title="Approval Gate">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="rounded-lg border border-vault-line bg-black/25 p-4 text-sm text-slate-300">
+                  Approval locks the style profile, trait pack version, lore, role language, rarity table, unlock schedule, and metadata schema. Future upgrades can add unlock packs, but they cannot mutate this approved identity.
+                </div>
+                <label className="flex items-start gap-3 rounded-lg border border-vault-purple/40 bg-vault-purple/10 p-4 text-sm">
+                  <input className="mt-1" type="checkbox" checked={approvalConfirmed} onChange={(event) => setApprovalConfirmed(event.target.checked)} />
+                  <span>I confirm this Premium+ identity is final and ready to become the immutable collection profile.</span>
+                </label>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <Gate label="Quality" value={latestQuality ? `${latestQuality.tier} / ${latestQuality.previewQualityScore}` : "Not generated"} passed={Boolean(latestQuality?.passed && latestQuality.tier !== "BASIC")} />
+                <Gate label="Distinctiveness" value={latestDistinctiveness ? `${latestDistinctiveness.score}` : "Not generated"} passed={Boolean(latestDistinctiveness?.passed)} />
+                <Gate label="Launch route" value={launchResult ?? "Pending"} passed={Boolean(launchResult)} />
+              </div>
+            </SectionCard>
 
             {preview ? (
               <CollectionPreview preview={preview} />
@@ -258,6 +332,18 @@ function Field({ label, value, onChange, icon: Icon }: { label: string; value: s
         <input className={`h-11 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple ${Icon ? "pl-10" : ""}`} value={value} onChange={(event) => onChange(event.target.value)} />
       </div>
     </label>
+  );
+}
+
+function Gate({ label, value, passed }: { label: string; value: string; passed: boolean }) {
+  return (
+    <div className="rounded-lg border border-vault-line bg-black/25 p-3 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-slate-400">{label}</span>
+        <StatusPill accent={passed ? "green" : "gold"}>{passed ? "Pass" : "Blocked"}</StatusPill>
+      </div>
+      <p className="mt-2 font-bold">{value}</p>
+    </div>
   );
 }
 
@@ -343,4 +429,3 @@ function asArray(value: unknown) {
 function asRecord<T>(value: unknown) {
   return (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, T>;
 }
-

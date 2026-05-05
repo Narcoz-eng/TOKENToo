@@ -1,13 +1,51 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
+import { AlertTriangle, ArrowRight, Loader2, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ProgressBar } from "@/components/ProgressBar";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { collections, getCollection } from "@/lib/mock-data";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
+
 export default function MintPage() {
-  const collection = getCollection();
+  const defaultCollection = getCollection();
+  const [amount, setAmount] = useState("50000");
+  const [lockDurationDays, setLockDurationDays] = useState(90);
+  const [walletAddress, setWalletAddress] = useState("9x...7Q3e");
+  const [collectionId, setCollectionId] = useState(defaultCollection.id);
+  const [mintState, setMintState] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const collection = collections.find((item) => item.id === collectionId) ?? defaultCollection;
+
+  async function createIntent() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/vault/mint/intents`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          idempotencyKey: `${walletAddress}:${collectionId}:${amount}:${lockDurationDays}`,
+          walletAddress,
+          collectionId,
+          tokenMint: collection.tokenMint,
+          amount,
+          lockDurationDays
+        })
+      });
+      if (!response.ok) throw new Error(await response.text());
+      setMintState(await response.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Mint intent failed");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <AppShell active="mint">
@@ -22,7 +60,7 @@ export default function MintPage() {
           <SectionCard title="Token Select">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               {collections.map((item) => (
-                <button key={item.id} className={item.id === collection.id ? "rounded-lg border border-vault-purple bg-vault-purple/15 p-4 text-left" : "rounded-lg border border-vault-line bg-black/25 p-4 text-left"}>
+                <button key={item.id} onClick={() => setCollectionId(item.id)} className={item.id === collectionId ? "rounded-lg border border-vault-purple bg-vault-purple/15 p-4 text-left" : "rounded-lg border border-vault-line bg-black/25 p-4 text-left"}>
                   <img src={item.image} alt="" className="mb-3 aspect-square w-full rounded-lg object-cover" />
                   <p className="font-bold">{item.name}</p>
                   <p className="text-sm text-slate-400">{item.mascot}</p>
@@ -35,25 +73,36 @@ export default function MintPage() {
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
               <form className="space-y-5">
                 <label className="block">
+                  <span className="text-sm text-slate-400">Wallet address</span>
+                  <input className="mt-2 h-12 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" value={walletAddress} onChange={(event) => setWalletAddress(event.target.value)} />
+                </label>
+                <label className="block">
                   <span className="text-sm text-slate-400">SPL Token Mint</span>
                   <input className="mt-2 h-12 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" defaultValue={collection.tokenMint} />
                 </label>
                 <label className="block">
                   <span className="text-sm text-slate-400">Amount to lock</span>
-                  <input className="mt-2 h-12 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" defaultValue="50,000" />
+                  <input className="mt-2 h-12 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" value={amount} onChange={(event) => setAmount(event.target.value)} />
                 </label>
                 <div>
                   <p className="mb-3 text-sm text-slate-400">Lock duration</p>
                   <div className="grid grid-cols-4 gap-2">
-                    {["Flexible", "30 Days", "90 Days", "180 Days"].map((duration, index) => (
-                      <button type="button" key={duration} className={index === 2 ? "rounded-lg border border-vault-green bg-vault-green/10 p-3 text-vault-green" : "rounded-lg border border-vault-line bg-black/25 p-3 text-slate-300"}>
+                    {[["Flexible", 0], ["30 Days", 30], ["90 Days", 90], ["180 Days", 180]].map(([duration, days]) => (
+                      <button type="button" key={duration} onClick={() => setLockDurationDays(Number(days))} className={lockDurationDays === Number(days) ? "rounded-lg border border-vault-green bg-vault-green/10 p-3 text-vault-green" : "rounded-lg border border-vault-line bg-black/25 p-3 text-slate-300"}>
                         {duration}
                       </button>
                     ))}
                   </div>
                 </div>
-                <button className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-vault-purple font-bold shadow-glow">
-                  Mint Vault NFT <ArrowRight className="size-4" />
+                <div className="rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-4 text-sm text-slate-200">
+                  <div className="flex gap-3">
+                    <AlertTriangle className="size-5 text-vault-gold" />
+                    <p>You are creating a lock intent. On production Solana, wallet signing transfers these tokens into a PDA vault. Buyer inherits the unlock date.</p>
+                  </div>
+                </div>
+                {error ? <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</div> : null}
+                <button type="button" onClick={createIntent} disabled={loading} className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-vault-purple font-bold shadow-glow disabled:opacity-60">
+                  {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />} Create Mint Intent
                 </button>
               </form>
               <div className="rounded-lg border border-vault-line bg-black/25 p-4">
@@ -63,10 +112,25 @@ export default function MintPage() {
                   <PreviewRow label="NFT Standard" value="Standard NFT" />
                   <PreviewRow label="Vault PDA" value="Derived on mint" />
                   <PreviewRow label="Redeem" value="Full position only" />
+                  <PreviewRow label="Intent status" value={mintState?.status ?? "Not created"} />
                   <StatusPill accent="green">Verified collection required</StatusPill>
                 </div>
               </div>
             </div>
+          </SectionCard>
+
+          <SectionCard title="Transaction State">
+            <div className="grid gap-3 md:grid-cols-4">
+              {["PENDING", "ASSET_UPLOADED", "TX_BUILT", "CONFIRMED"].map((status) => (
+                <div key={status} className="rounded-lg border border-vault-line bg-black/25 p-4">
+                  <StatusPill accent={mintState?.status === status ? "green" : "purple"}>{status}</StatusPill>
+                  <p className="mt-2 text-sm text-slate-400">{stateCopy(status)}</p>
+                </div>
+              ))}
+            </div>
+            {mintState?.unsignedTransaction ? (
+              <pre className="mt-4 max-h-56 overflow-auto rounded-lg border border-vault-line bg-black/40 p-4 text-xs text-slate-300">{JSON.stringify(mintState.unsignedTransaction, null, 2)}</pre>
+            ) : null}
           </SectionCard>
 
           <SectionCard title="Mint Safety Rules">
@@ -123,4 +187,14 @@ function PreviewRow({ label, value }: { label: string; value: string }) {
       <span className="font-semibold">{value}</span>
     </div>
   );
+}
+
+function stateCopy(status: string) {
+  const copy: Record<string, string> = {
+    PENDING: "Intent exists and can be safely retried with the same idempotency key.",
+    ASSET_UPLOADED: "Final image and metadata have immutable storage URIs.",
+    TX_BUILT: "Wallet can sign the generated VaultX + Metaplex transaction plan.",
+    CONFIRMED: "A Vault NFT row is created only after confirmed chain state."
+  };
+  return copy[status] ?? status;
 }

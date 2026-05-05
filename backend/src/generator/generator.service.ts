@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
@@ -7,7 +7,7 @@ import { artPresets } from "./art-presets";
 import { CollectionDistinctivenessScorerService } from "./collection-distinctiveness-scorer.service";
 import { CommunityContextService } from "./community-context.service";
 import { CompatibilityEngineService } from "./compatibility-engine.service";
-import type { CreateGenerationRunInput, GeneratedStyleProfile, PreviewAssetPlan, TraitPackPlan } from "./generator.types";
+import type { ApproveGenerationRunInput, CreateGenerationRunInput, GeneratedStyleProfile, LaunchCollectionInput, PreviewAssetPlan, TraitPackPlan } from "./generator.types";
 import { seedFrom } from "./generator.util";
 import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
@@ -116,6 +116,7 @@ export class GeneratorService {
 
   async regenerateStyle(id: string) {
     const run = await this.getRun(id);
+    if (run.status === "APPROVED") throw new ConflictException("Approved generator runs are immutable. Regenerate before approval or create a new run.");
     if (!run.logoAnalysis || !run.communityContext) throw new NotFoundException("Generation run is missing analysis data");
     const version = (run.styleProfiles[0]?.version ?? 0) + 1;
     const input = this.inputFromRun(run);
@@ -131,29 +132,143 @@ export class GeneratorService {
 
   async regeneratePreviews(id: string) {
     const run = await this.getRun(id);
+    if (run.status === "APPROVED") throw new ConflictException("Approved generator runs are immutable. Regenerate previews before approval or create a new run.");
     const latest = run.styleProfiles[0];
     if (!latest?.traitPack) throw new NotFoundException("Generation run has no style profile to preview");
     const style = this.styleFromRecord(latest);
     const pack = this.packFromRecord(latest.traitPack);
     const version = Math.max(1, ...latest.previewAssets.map((asset) => asset.version)) + 1;
     const previews = this.previews.generate(style, pack, run.seed, version);
-    await this.persistPreviews(id, latest.id, latest.version, previews);
+    await this.persistPreviews(id, latest.id, version, previews);
     return this.getRun(id);
   }
 
-  async approve(id: string) {
+  async approve(id: string, input: ApproveGenerationRunInput = {}) {
     const run = await this.getRun(id);
     const latest = run.styleProfiles[0];
     const report = latest?.qualityReports[0];
+    const distinctiveness = latest?.distinctivenessReports[0];
     if (!latest || !report) throw new NotFoundException("Generation run has no preview to approve");
+    if (input.acceptedVersion && input.acceptedVersion !== latest.version) throw new ConflictException("The accepted version is no longer the latest generated version.");
+    if (!input.explicitConfirmation) throw new BadRequestException("Explicit creator confirmation is required before approval.");
+    if (!report.passed || report.tier === "BASIC") throw new BadRequestException("Only Premium or Legendary-ready generator outputs can be approved.");
+    if (!distinctiveness?.passed || distinctiveness.score < 72) throw new BadRequestException("Collection distinctiveness score is below the approval threshold.");
 
     await this.prisma.styleProfile.updateMany({ where: { generationRunId: id }, data: { isApproved: false } });
     await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { isApproved: true } });
     await this.prisma.generationRun.update({
       where: { id },
-      data: { status: "APPROVED", approvedVersion: latest.version }
+      data: {
+        status: "APPROVED",
+        approvedVersion: latest.version,
+        approvedByWallet: input.walletAddress?.trim(),
+        approvedAt: new Date(),
+        approvalSnapshot: this.json({
+          styleProfileId: latest.id,
+          styleProfileVersion: latest.version,
+          qualityTier: report.tier,
+          qualityScore: report.previewQualityScore,
+          distinctivenessScore: distinctiveness.score,
+          collection: latest.collection,
+          mascot: latest.mascot,
+          raidTheme: latest.raidTheme
+        })
+      }
     });
     return this.getRun(id);
+  }
+
+  async launchCollection(id: string, input: LaunchCollectionInput) {
+    const walletAddress = input.walletAddress?.trim();
+    if (!walletAddress) throw new BadRequestException("walletAddress is required to launch a collection");
+
+    const run = await this.getRun(id);
+    if (run.status !== "APPROVED" || !run.approvedVersion) throw new BadRequestException("Approve a Premium+ generator run before launch.");
+    const profile = run.styleProfiles.find((item) => item.version === run.approvedVersion && item.isApproved);
+    const report = profile?.qualityReports[0];
+    const distinctiveness = profile?.distinctivenessReports[0];
+    if (!profile?.traitPack || !report?.passed || report.tier === "BASIC" || !distinctiveness?.passed) {
+      throw new BadRequestException("Approved run no longer satisfies launch quality gates.");
+    }
+
+    const slug = this.slug(input.slug ?? profile.collection);
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.upsert({
+        where: { walletAddress },
+        update: {},
+        create: { walletAddress, username: walletAddress.slice(0, 6) }
+      });
+      const token = await tx.token.upsert({
+        where: { mint: run.tokenMint },
+        update: {
+          symbol: run.tokenSymbol,
+          name: run.tokenName,
+          metadataUri: input.metadataUri ?? undefined,
+          imageUri: profile.previewAssets.find((asset) => asset.type === "AVATAR")?.uri
+        },
+        create: {
+          mint: run.tokenMint,
+          symbol: run.tokenSymbol,
+          name: run.tokenName,
+          decimals: 0,
+          metadataUri: input.metadataUri,
+          imageUri: profile.previewAssets.find((asset) => asset.type === "AVATAR")?.uri
+        }
+      });
+      const existing = await tx.collection.findUnique({ where: { tokenId: token.id } });
+      if (existing?.identityLockedAt) throw new ConflictException("This token already has a launched immutable collection profile.");
+
+      return tx.collection.upsert({
+        where: { tokenId: token.id },
+        update: {
+          creatorUserId: user.id,
+          approvedGenerationRunId: run.id,
+          styleProfileVersion: profile.version,
+          traitPackVersion: profile.version,
+          metadataSchemaVersion: "vaultx-v1",
+          collectionAssetAddress: input.collectionAssetAddress,
+          metadataUri: input.metadataUri,
+          identityLockedAt: new Date(),
+          launchedAt: new Date(),
+          name: profile.collection,
+          slug,
+          logoUri: profile.previewAssets.find((asset) => asset.type === "AVATAR")?.uri,
+          bannerUri: profile.previewAssets.find((asset) => asset.type === "BANNER")?.uri,
+          colorPalette: this.json(profile.colors ?? []),
+          mascot: profile.mascot,
+          theme: profile.theme,
+          vibe: profile.artStyle,
+          lore: profile.lore,
+          roleNames: this.json(profile.roleNames ?? []),
+          raidTheme: profile.raidTheme,
+          rarityTable: this.json(profile.rarityStructure ?? {})
+        },
+        create: {
+          tokenId: token.id,
+          creatorUserId: user.id,
+          approvedGenerationRunId: run.id,
+          styleProfileVersion: profile.version,
+          traitPackVersion: profile.version,
+          metadataSchemaVersion: "vaultx-v1",
+          collectionAssetAddress: input.collectionAssetAddress,
+          metadataUri: input.metadataUri,
+          identityLockedAt: new Date(),
+          launchedAt: new Date(),
+          name: profile.collection,
+          slug,
+          logoUri: profile.previewAssets.find((asset) => asset.type === "AVATAR")?.uri,
+          bannerUri: profile.previewAssets.find((asset) => asset.type === "BANNER")?.uri,
+          colorPalette: this.json(profile.colors ?? []),
+          mascot: profile.mascot,
+          theme: profile.theme,
+          vibe: profile.artStyle,
+          lore: profile.lore,
+          roleNames: this.json(profile.roleNames ?? []),
+          raidTheme: profile.raidTheme,
+          rarityTable: this.json(profile.rarityStructure ?? {})
+        }
+      });
+    });
   }
 
   async sampleMetadata(id: string) {
@@ -395,5 +510,13 @@ export class GeneratorService {
 
   private record(value: unknown) {
     return (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
+  }
+
+  private slug(value: string) {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 72);
   }
 }

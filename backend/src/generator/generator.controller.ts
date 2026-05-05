@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import type { CreateGenerationRunInput } from "./generator.types";
+import type { ApproveGenerationRunInput, CreateGenerationRunInput, LaunchCollectionInput } from "./generator.types";
 import { GeneratorService } from "./generator.service";
 
 @Controller("generator")
@@ -32,8 +32,13 @@ export class GeneratorController {
   }
 
   @Post("runs/:id/approve")
-  approve(@Param("id") id: string) {
-    return this.generator.approve(id);
+  approve(@Param("id") id: string, @Body() body: ApproveGenerationRunInput) {
+    return this.generator.approve(id, body);
+  }
+
+  @Post("runs/:id/launch-collection")
+  launchCollection(@Param("id") id: string, @Body() body: LaunchCollectionInput) {
+    return this.generator.launchCollection(id, body);
   }
 
   @Post("runs/:id/sample-metadata")
@@ -41,4 +46,3 @@ export class GeneratorController {
     return this.generator.sampleMetadata(id);
   }
 }
-

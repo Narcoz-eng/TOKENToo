@@ -11,6 +11,19 @@ export type CreateGenerationRunInput = {
   hints?: CommunityHints;
 };
 
+export type ApproveGenerationRunInput = {
+  walletAddress?: string;
+  explicitConfirmation?: boolean;
+  acceptedVersion?: number;
+};
+
+export type LaunchCollectionInput = {
+  walletAddress: string;
+  slug?: string;
+  collectionAssetAddress?: string;
+  metadataUri?: string;
+};
+
 export type CommunityHints = {
   memes?: string[];
   slogans?: string[];
@@ -133,4 +146,3 @@ export type QualityReportPlan = {
   passed: boolean;
   issues: string[];
 };
-
