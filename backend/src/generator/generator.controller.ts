@@ -1,6 +1,31 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { z } from "zod";
+import { WalletAddress } from "../auth/wallet-address.decorator";
+import { WalletAuthGuard } from "../auth/wallet-auth.guard";
 import type { ApproveGenerationRunInput, CreateGenerationRunInput, LaunchCollectionInput } from "./generator.types";
 import { GeneratorService } from "./generator.service";
+
+const runSchema = z.object({
+  tokenName: z.string().min(1),
+  tokenSymbol: z.string().min(1),
+  tokenMint: z.string().min(20),
+  logoUri: z.string().optional(),
+  logoData: z.string().optional(),
+  description: z.string().min(1),
+  selectedPreset: z.string().optional(),
+  hints: z.record(z.string(), z.unknown()).optional()
+});
+
+const approveSchema = z.object({
+  explicitConfirmation: z.boolean(),
+  acceptedVersion: z.number().int().positive().optional()
+});
+
+const launchSchema = z.object({
+  slug: z.string().optional(),
+  collectionAssetAddress: z.string().optional(),
+  metadataUri: z.string().optional()
+});
 
 @Controller("generator")
 export class GeneratorController {
@@ -12,37 +37,44 @@ export class GeneratorController {
   }
 
   @Post("runs")
-  createRun(@Body() body: CreateGenerationRunInput) {
-    return this.generator.createRun(body);
+  @UseGuards(WalletAuthGuard)
+  createRun(@Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.generator.createRun(runSchema.parse(body) as CreateGenerationRunInput, walletAddress);
   }
 
   @Get("runs/:id")
-  getRun(@Param("id") id: string) {
-    return this.generator.getRun(id);
+  @UseGuards(WalletAuthGuard)
+  getRun(@Param("id") id: string, @WalletAddress() walletAddress: string) {
+    return this.generator.getRunForWallet(id, walletAddress);
   }
 
   @Post("runs/:id/regenerate-style")
-  regenerateStyle(@Param("id") id: string) {
-    return this.generator.regenerateStyle(id);
+  @UseGuards(WalletAuthGuard)
+  regenerateStyle(@Param("id") id: string, @WalletAddress() walletAddress: string) {
+    return this.generator.regenerateStyle(id, walletAddress);
   }
 
   @Post("runs/:id/regenerate-previews")
-  regeneratePreviews(@Param("id") id: string) {
-    return this.generator.regeneratePreviews(id);
+  @UseGuards(WalletAuthGuard)
+  regeneratePreviews(@Param("id") id: string, @WalletAddress() walletAddress: string) {
+    return this.generator.regeneratePreviews(id, walletAddress);
   }
 
   @Post("runs/:id/approve")
-  approve(@Param("id") id: string, @Body() body: ApproveGenerationRunInput) {
-    return this.generator.approve(id, body);
+  @UseGuards(WalletAuthGuard)
+  approve(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.generator.approve(id, { ...(approveSchema.parse(body) as ApproveGenerationRunInput), walletAddress });
   }
 
   @Post("runs/:id/launch-collection")
-  launchCollection(@Param("id") id: string, @Body() body: LaunchCollectionInput) {
-    return this.generator.launchCollection(id, body);
+  @UseGuards(WalletAuthGuard)
+  launchCollection(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.generator.launchCollection(id, { ...(launchSchema.parse(body) as LaunchCollectionInput), walletAddress });
   }
 
   @Post("runs/:id/sample-metadata")
-  sampleMetadata(@Param("id") id: string) {
-    return this.generator.sampleMetadata(id);
+  @UseGuards(WalletAuthGuard)
+  sampleMetadata(@Param("id") id: string, @WalletAddress() walletAddress: string) {
+    return this.generator.sampleMetadata(id, walletAddress);
   }
 }

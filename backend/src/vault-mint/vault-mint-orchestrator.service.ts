@@ -36,6 +36,12 @@ export class VaultMintOrchestratorService {
       throw new BadRequestException("Collection is paused, risk disabled, or under emergency controls.");
     }
     if (collection.token.mint !== normalized.tokenMint) throw new BadRequestException("Token mint does not match the collection profile.");
+    if (process.env.NODE_ENV === "production" && (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") === "mock") {
+      throw new BadRequestException("Production minting is blocked until FINAL_ASSET_STORAGE_PROVIDER is immutable storage.");
+    }
+    if (process.env.NODE_ENV === "production" && (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "mock") {
+      throw new BadRequestException("Production minting is blocked until SOLANA_TRANSACTION_PROVIDER is real devnet/mainnet adapter.");
+    }
 
     const profile = await this.approvedProfile(collection.approvedGenerationRunId, collection.styleProfileVersion);
     const quality = profile.qualityReports[0];
@@ -87,18 +93,20 @@ export class VaultMintOrchestratorService {
     });
   }
 
-  async getMintTransaction(id: string) {
+  async getMintTransaction(id: string, walletAddress?: string) {
     const tx = await this.prisma.mintTransaction.findUnique({ where: { id }, include: { vaultNft: true, collection: true } });
     if (!tx) throw new NotFoundException("Mint transaction not found");
+    if (tx.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this mint transaction.");
     return tx;
   }
 
-  async submitMintTransaction(id: string, input: SubmitMintTransactionInput) {
+  async submitMintTransaction(id: string, input: SubmitMintTransactionInput, walletAddress?: string) {
     const tx = await this.prisma.mintTransaction.findUnique({ where: { id }, include: { collection: { include: { token: true } }, vaultNft: true } });
     if (!tx) throw new NotFoundException("Mint transaction not found");
+    if (tx.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this mint transaction.");
     if (!["TX_BUILT", "SUBMITTED", "FAILED"].includes(tx.status)) throw new ConflictException(`Mint transaction cannot be submitted from ${tx.status}`);
 
-    const result = await this.solana.submitAndConfirm({ transactionId: id, txSignature: input.txSignature ?? undefined, confirmMock: input.confirmMock });
+    const result = await this.solana.submitAndConfirm({ transactionId: id, txSignature: input.txSignature ?? undefined, signedTransaction: input.signedTransaction, confirmMock: input.confirmMock });
     const updated = await this.prisma.mintTransaction.update({
       where: { id },
       data: {

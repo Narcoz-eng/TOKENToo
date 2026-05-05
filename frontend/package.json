@@ -13,6 +13,7 @@
     "@solana/wallet-adapter-react": "latest",
     "@solana/wallet-adapter-react-ui": "latest",
     "@solana/web3.js": "latest",
+    "bs58": "^6.0.0",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",

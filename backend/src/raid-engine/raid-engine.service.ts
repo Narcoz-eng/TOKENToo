@@ -45,6 +45,8 @@ export class RaidEngineService {
   }) {
     const mission = await this.prisma.raidMission.findUnique({ where: { id: input.raidMissionId }, include: { raidRoom: true } });
     if (!mission || mission.raidRoomId !== input.raidRoomId) throw new NotFoundException("Raid mission not found");
+    const user = await this.prisma.user.findUnique({ where: { id: input.userId } });
+    if (!user || user.walletAddress !== input.walletAddress) throw new BadRequestException("Wallet does not own this user profile.");
     if (mission.raidRoom.status !== "LIVE") throw new BadRequestException("Raid room is not live");
     const now = new Date();
     if (mission.startsAt > now || mission.endsAt < now) throw new BadRequestException("Mission is outside its active window");

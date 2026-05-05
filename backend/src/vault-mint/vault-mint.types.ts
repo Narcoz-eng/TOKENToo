@@ -9,6 +9,7 @@ export type CreateMintIntentInput = {
 
 export type SubmitMintTransactionInput = {
   txSignature?: string;
+  signedTransaction?: string;
   nftMint?: string;
   vaultPositionPda?: string;
   confirmMock?: boolean;

@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { CollectionPreview } from "@/components/CollectionPreview";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { CollectionGeneratorPreview } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
@@ -67,6 +68,7 @@ type GeneratorRun = {
 };
 
 export default function CreateCollectionPage() {
+  const walletAuth = useWalletAuth();
   const [presets, setPresets] = useState<Preset[]>([]);
   const [selectedPreset, setSelectedPreset] = useState("mystic-pixel-cult");
   const [tokenName, setTokenName] = useState("Frog Vault Token");
@@ -82,7 +84,6 @@ export default function CreateCollectionPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [approvalConfirmed, setApprovalConfirmed] = useState(false);
-  const [creatorWallet, setCreatorWallet] = useState("9x...7Q3e");
   const [launchResult, setLaunchResult] = useState<string | null>(null);
   const preview = useMemo(() => (run ? mapRunToPreview(run, selectedPresetName(presets, selectedPreset)) : null), [run, presets, selectedPreset]);
   const latestProfile = run?.styleProfiles[0];
@@ -101,9 +102,8 @@ export default function CreateCollectionPage() {
 
   async function createRun() {
     await action(async () => {
-      const data = await fetchJson<GeneratorRun>("/generator/runs", {
+      const data = await walletAuth.authFetch<GeneratorRun>("/generator/runs", {
         method: "POST",
-        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           tokenName,
           tokenSymbol,
@@ -127,7 +127,7 @@ export default function CreateCollectionPage() {
   async function mutateRun(path: string) {
     if (!run) return;
     await action(async () => {
-      const data = await fetchJson<GeneratorRun>(`/generator/runs/${run.id}/${path}`, { method: "POST" });
+      const data = await walletAuth.authFetch<GeneratorRun>(`/generator/runs/${run.id}/${path}`, { method: "POST" });
       setRun(data);
     });
   }
@@ -135,11 +135,9 @@ export default function CreateCollectionPage() {
   async function approveRun() {
     if (!run) return;
     await action(async () => {
-      const data = await fetchJson<GeneratorRun>(`/generator/runs/${run.id}/approve`, {
+      const data = await walletAuth.authFetch<GeneratorRun>(`/generator/runs/${run.id}/approve`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          walletAddress: creatorWallet,
           explicitConfirmation: approvalConfirmed,
           acceptedVersion: run.styleProfiles[0]?.version
         })
@@ -151,10 +149,9 @@ export default function CreateCollectionPage() {
   async function launchCollection() {
     if (!run) return;
     await action(async () => {
-      const data = await fetchJson<{ id: string; slug: string }>(`/generator/runs/${run.id}/launch-collection`, {
+      const data = await walletAuth.authFetch<{ id: string; slug: string }>(`/generator/runs/${run.id}/launch-collection`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ walletAddress: creatorWallet })
+        body: JSON.stringify({})
       });
       setLaunchResult(`/collections/${data.slug}`);
     });
@@ -162,7 +159,7 @@ export default function CreateCollectionPage() {
 
   async function reloadRun() {
     if (!run) return;
-    await action(async () => setRun(await fetchJson<GeneratorRun>(`/generator/runs/${run.id}`)));
+    await action(async () => setRun(await walletAuth.authFetch<GeneratorRun>(`/generator/runs/${run.id}`)));
   }
 
   async function action(fn: () => Promise<void>) {
@@ -198,6 +195,7 @@ export default function CreateCollectionPage() {
         </div>
 
         {error ? <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-4 text-sm text-vault-red">{error}</div> : null}
+        {walletAuth.error ? <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-4 text-sm text-vault-red">{walletAuth.error}</div> : null}
 
         <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
           <aside className="space-y-5">
@@ -234,7 +232,10 @@ export default function CreateCollectionPage() {
 
             <SectionCard title="Community Context">
               <div className="space-y-3">
-                <Field label="Creator wallet" value={creatorWallet} onChange={setCreatorWallet} />
+                <div className="rounded-lg border border-vault-line bg-black/25 p-3 text-sm">
+                  <span className="text-slate-400">Authenticated creator wallet</span>
+                  <p className="mt-1 font-bold">{walletAuth.address ?? "Connect wallet to create"}</p>
+                </div>
                 <Field label="Memes / inside jokes" value={memes} onChange={setMemes} />
                 <Field label="Telegram / X phrases" value={phrases} onChange={setPhrases} />
                 <Field label="Mascot preference" value={mascotPreference} onChange={setMascotPreference} />
@@ -273,7 +274,7 @@ export default function CreateCollectionPage() {
             </SectionCard>
 
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={createRun} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow disabled:opacity-60">
+              <button type="button" onClick={createRun} disabled={loading || !walletAuth.connected} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow disabled:opacity-60">
                 {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Create Persisted Run
               </button>
               <button type="button" onClick={() => mutateRun("regenerate-style")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-purple/50 bg-vault-purple/10 px-4 text-sm font-bold text-vault-purple disabled:opacity-50">

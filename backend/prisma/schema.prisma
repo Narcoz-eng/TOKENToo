@@ -183,6 +183,7 @@ model GenerationRun {
   description         String
   communityHints      Json                    @default("{}")
   selectedPreset      String?
+  creatorWallet       String?
   status              GeneratorRunStatus      @default(DRAFT)
   approvedVersion     Int?
   approvedByWallet    String?
@@ -200,6 +201,7 @@ model GenerationRun {
   distinctivenessReports DistinctivenessReport[]
 
   @@index([tokenMint])
+  @@index([creatorWallet])
   @@index([status])
   @@index([createdAt])
 }

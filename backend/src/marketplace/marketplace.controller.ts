@@ -1,5 +1,20 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, Post, UseGuards } from "@nestjs/common";
+import { z } from "zod";
+import { WalletAddress } from "../auth/wallet-address.decorator";
+import { WalletAuthGuard } from "../auth/wallet-auth.guard";
 import { MarketplaceEngineService } from "./marketplace.service";
+
+const listingSchema = z.object({
+  vaultNftId: z.string().min(1),
+  sellerUserId: z.string().min(1),
+  priceSol: z.number().positive(),
+  idempotencyKey: z.string().optional()
+});
+
+const quoteSchema = z.object({
+  vaultNftId: z.string().min(1),
+  backingValueSol: z.number().positive()
+});
 
 @Controller("marketplace")
 export class MarketplaceController {
@@ -11,12 +26,14 @@ export class MarketplaceController {
   }
 
   @Post("listings")
-  createListing(@Body() body: { vaultNftId: string; sellerUserId: string; priceSol: number; idempotencyKey?: string; walletAddress?: string }) {
-    return this.marketplace.createListing({ ...body, priceSol: Number(body.priceSol) });
+  @UseGuards(WalletAuthGuard)
+  createListing(@Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.marketplace.createListing({ ...listingSchema.parse(body), walletAddress });
   }
 
   @Post("instant-sell/quotes")
-  instantSellQuote(@Body() body: { vaultNftId: string; walletAddress: string; backingValueSol: number }) {
-    return this.marketplace.persistInstantSellQuote({ ...body, backingValueSol: Number(body.backingValueSol) });
+  @UseGuards(WalletAuthGuard)
+  instantSellQuote(@Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.marketplace.persistInstantSellQuote({ ...quoteSchema.parse(body), walletAddress });
   }
 }

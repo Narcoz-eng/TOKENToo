@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AuthModule } from "../auth/auth.module";
 import { PrismaService } from "../db/prisma.service";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
 import { AssetProductionLayerService } from "./asset-production-layer.service";
@@ -16,6 +17,7 @@ import { StyleProfileGeneratorService } from "./style-profile-generator.service"
 import { TraitPackGeneratorService } from "./trait-pack-generator.service";
 
 @Module({
+  imports: [AuthModule],
   controllers: [GeneratorController],
   providers: [
     PrismaService,

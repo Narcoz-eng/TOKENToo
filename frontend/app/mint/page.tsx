@@ -4,42 +4,46 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, Loader2, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { EmptyState, ErrorState, LoadingState, WalletDisconnectedState } from "@/components/ApiState";
 import { ProgressBar } from "@/components/ProgressBar";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
-import { collections, getCollection } from "@/lib/mock-data";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
+import { useApiResource } from "@/hooks/useApiResource";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
+import type { VaultCollection } from "@/lib/types";
 
 export default function MintPage() {
-  const defaultCollection = getCollection();
+  const wallet = useWalletAuth();
+  const collectionState = useApiResource<VaultCollection[]>("/product/collections");
+  const collections = collectionState.data ?? [];
+  const defaultCollection = collections[0];
   const [amount, setAmount] = useState("50000");
   const [lockDurationDays, setLockDurationDays] = useState(90);
-  const [walletAddress, setWalletAddress] = useState("9x...7Q3e");
-  const [collectionId, setCollectionId] = useState(defaultCollection.id);
+  const [collectionId, setCollectionId] = useState("");
   const [mintState, setMintState] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const collection = collections.find((item) => item.id === collectionId) ?? defaultCollection;
+  const collection = collections.find((item) => item.id === collectionId || item.dbId === collectionId) ?? defaultCollection;
 
   async function createIntent() {
+    if (!collection || !wallet.address) {
+      setError("Connect a wallet and select a launched collection first.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/vault/mint/intents`, {
+      const data = await wallet.authFetch<any>("/vault/mint/intents", {
         method: "POST",
-        headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          idempotencyKey: `${walletAddress}:${collectionId}:${amount}:${lockDurationDays}`,
-          walletAddress,
-          collectionId,
+          idempotencyKey: `${wallet.address}:${collection.dbId ?? collection.id}:${amount}:${lockDurationDays}`,
+          collectionId: collection.dbId ?? collection.id,
           tokenMint: collection.tokenMint,
           amount,
           lockDurationDays
         })
       });
-      if (!response.ok) throw new Error(await response.text());
-      setMintState(await response.json());
+      setMintState(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Mint intent failed");
     } finally {
@@ -49,6 +53,11 @@ export default function MintPage() {
 
   return (
     <AppShell active="mint">
+      {collectionState.loading ? <LoadingState label="Loading launched collections" /> : null}
+      {collectionState.error ? <ErrorState error={collectionState.error} retry={collectionState.reload} /> : null}
+      {!wallet.connected ? <WalletDisconnectedState /> : null}
+      {!collectionState.loading && !collectionState.error && !collections.length ? <EmptyState title="No launched collections yet" body="Create and approve a community, then launch it before minting a backed Vault NFT." /> : null}
+      {collection ? (
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-5">
           <div>
@@ -72,10 +81,7 @@ export default function MintPage() {
           <SectionCard title="Deposit and Lock">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
               <form className="space-y-5">
-                <label className="block">
-                  <span className="text-sm text-slate-400">Wallet address</span>
-                  <input className="mt-2 h-12 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" value={walletAddress} onChange={(event) => setWalletAddress(event.target.value)} />
-                </label>
+                <PreviewRow label="Connected wallet" value={wallet.address ?? "Disconnected"} />
                 <label className="block">
                   <span className="text-sm text-slate-400">SPL Token Mint</span>
                   <input className="mt-2 h-12 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" defaultValue={collection.tokenMint} />
@@ -176,6 +182,7 @@ export default function MintPage() {
           </SectionCard>
         </aside>
       </div>
+      ) : null}
     </AppShell>
   );
 }

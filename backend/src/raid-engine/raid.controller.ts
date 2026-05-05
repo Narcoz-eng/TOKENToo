@@ -1,4 +1,7 @@
-import { Body, Controller, Param, Post } from "@nestjs/common";
+import { Body, Controller, Param, Post, UseGuards } from "@nestjs/common";
+import { z } from "zod";
+import { WalletAddress } from "../auth/wallet-address.decorator";
+import { WalletAuthGuard } from "../auth/wallet-auth.guard";
 import { RaidEngineService } from "./raid-engine.service";
 
 type ClaimBody = {
@@ -11,17 +14,27 @@ type ClaimBody = {
   proof?: Record<string, unknown>;
 };
 
+const claimSchema = z.object({
+  userId: z.string().min(1),
+  walletAgeHours: z.number().nonnegative(),
+  holdingHours: z.number().nonnegative(),
+  notionalValueUsd: z.number().nonnegative(),
+  possibleWashTrade: z.boolean().optional(),
+  proof: z.record(z.string(), z.unknown()).optional()
+});
+
 @Controller("raids")
+@UseGuards(WalletAuthGuard)
 export class RaidController {
   constructor(private readonly raids: RaidEngineService) {}
 
   @Post(":raidRoomId/missions/:missionId/claims/validate")
-  validateClaim(@Param("raidRoomId") raidRoomId: string, @Param("missionId") raidMissionId: string, @Body() body: ClaimBody) {
-    return this.raids.validateMissionClaim({ raidRoomId, raidMissionId, ...body });
+  validateClaim(@Param("raidRoomId") raidRoomId: string, @Param("missionId") raidMissionId: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.raids.validateMissionClaim({ raidRoomId, raidMissionId, ...claimSchema.parse(body), walletAddress } as ClaimBody & { raidRoomId: string; raidMissionId: string });
   }
 
   @Post(":raidRoomId/missions/:missionId/claims")
-  claimMission(@Param("raidRoomId") raidRoomId: string, @Param("missionId") raidMissionId: string, @Body() body: ClaimBody) {
-    return this.raids.claimMission({ raidRoomId, raidMissionId, ...body });
+  claimMission(@Param("raidRoomId") raidRoomId: string, @Param("missionId") raidMissionId: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.raids.claimMission({ raidRoomId, raidMissionId, ...claimSchema.parse(body), walletAddress } as ClaimBody & { raidRoomId: string; raidMissionId: string });
   }
 }

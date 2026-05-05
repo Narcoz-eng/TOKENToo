@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BadgeCheck, Users } from "lucide-react";
 import type { VaultCollection } from "@/lib/types";
-import { riskAccent } from "@/lib/mock-data";
+import { riskAccent } from "@/lib/risk";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
 

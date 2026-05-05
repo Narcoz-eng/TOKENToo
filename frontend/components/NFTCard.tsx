@@ -3,7 +3,7 @@ import { Heart, LockKeyhole, Sparkles, TrendingUp } from "lucide-react";
 import type { VaultCollection, VaultNft } from "@/lib/types";
 import { StatusPill } from "./StatusPill";
 import { ProgressBar } from "./ProgressBar";
-import { riskAccent } from "@/lib/mock-data";
+import { riskAccent } from "@/lib/risk";
 
 export function NFTCard({ nft, collection }: { nft: VaultNft; collection: VaultCollection }) {
   const premium = Math.round(((nft.priceSol - nft.backingSol) / nft.backingSol) * 100);

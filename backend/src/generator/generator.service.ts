@@ -35,7 +35,7 @@ export class GeneratorService {
     return artPresets;
   }
 
-  async createRun(input: CreateGenerationRunInput) {
+  async createRun(input: CreateGenerationRunInput, creatorWallet?: string) {
     const normalized = this.normalize(input);
     const seed = `${normalized.tokenMint}:${seedFrom(`${process.env.GENERATOR_SEED_SALT ?? "vaultx"}:${JSON.stringify(normalized)}`)}`;
     const run = await this.prisma.generationRun.create({
@@ -48,6 +48,7 @@ export class GeneratorService {
         description: normalized.description,
         communityHints: this.json(normalized.hints ?? {}),
         selectedPreset: normalized.selectedPreset,
+        creatorWallet,
         seed
       }
     });
@@ -114,8 +115,15 @@ export class GeneratorService {
     return run;
   }
 
-  async regenerateStyle(id: string) {
+  async getRunForWallet(id: string, walletAddress: string) {
     const run = await this.getRun(id);
+    this.assertOwner(run, walletAddress);
+    return run;
+  }
+
+  async regenerateStyle(id: string, walletAddress?: string) {
+    const run = await this.getRun(id);
+    this.assertOwner(run, walletAddress);
     if (run.status === "APPROVED") throw new ConflictException("Approved generator runs are immutable. Regenerate before approval or create a new run.");
     if (!run.logoAnalysis || !run.communityContext) throw new NotFoundException("Generation run is missing analysis data");
     const version = (run.styleProfiles[0]?.version ?? 0) + 1;
@@ -130,8 +138,9 @@ export class GeneratorService {
     return this.getRun(id);
   }
 
-  async regeneratePreviews(id: string) {
+  async regeneratePreviews(id: string, walletAddress?: string) {
     const run = await this.getRun(id);
+    this.assertOwner(run, walletAddress);
     if (run.status === "APPROVED") throw new ConflictException("Approved generator runs are immutable. Regenerate previews before approval or create a new run.");
     const latest = run.styleProfiles[0];
     if (!latest?.traitPack) throw new NotFoundException("Generation run has no style profile to preview");
@@ -145,6 +154,7 @@ export class GeneratorService {
 
   async approve(id: string, input: ApproveGenerationRunInput = {}) {
     const run = await this.getRun(id);
+    this.assertOwner(run, input.walletAddress);
     const latest = run.styleProfiles[0];
     const report = latest?.qualityReports[0];
     const distinctiveness = latest?.distinctivenessReports[0];
@@ -183,6 +193,7 @@ export class GeneratorService {
     if (!walletAddress) throw new BadRequestException("walletAddress is required to launch a collection");
 
     const run = await this.getRun(id);
+    this.assertOwner(run, input.walletAddress);
     if (run.status !== "APPROVED" || !run.approvedVersion) throw new BadRequestException("Approve a Premium+ generator run before launch.");
     const profile = run.styleProfiles.find((item) => item.version === run.approvedVersion && item.isApproved);
     const report = profile?.qualityReports[0];
@@ -271,8 +282,9 @@ export class GeneratorService {
     });
   }
 
-  async sampleMetadata(id: string) {
+  async sampleMetadata(id: string, walletAddress?: string) {
     const run = await this.getRun(id);
+    this.assertOwner(run, walletAddress);
     const profile = run.styleProfiles.find((item) => item.isApproved) ?? run.styleProfiles[0];
     if (!profile?.traitPack) throw new NotFoundException("Generation run has no trait pack");
     const style = this.styleFromRecord(profile);
@@ -510,6 +522,11 @@ export class GeneratorService {
 
   private record(value: unknown) {
     return (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
+  }
+
+  private assertOwner(run: { creatorWallet?: string | null; approvedByWallet?: string | null }, walletAddress?: string) {
+    const owner = run.creatorWallet ?? run.approvedByWallet;
+    if (owner && owner !== walletAddress) throw new ConflictException("Wallet does not own this generator run.");
   }
 
   private slug(value: string) {

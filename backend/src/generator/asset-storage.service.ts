@@ -39,6 +39,7 @@ export class AssetStorageService {
     const provider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
     if (provider === "supabase") return this.storePreviewAsset(`final/${path}`, dataUri);
     if (provider === "mock") return dataUri;
+    if (provider === "pinata") return this.pinataFile(path, dataUri);
     throw new Error(`${provider} final NFT asset storage is not configured. Add an AssetStorageAdapter before production minting.`);
   }
 
@@ -46,6 +47,7 @@ export class AssetStorageService {
     const provider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
     const json = JSON.stringify(metadata);
     if (provider === "mock") return `data:application/json;utf8,${encodeURIComponent(json)}`;
+    if (provider === "pinata") return this.pinataJson(path, metadata);
     if (provider === "supabase") {
       const supabaseUrl = process.env.SUPABASE_URL;
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -71,6 +73,39 @@ export class AssetStorageService {
     }
 
     throw new Error(`${provider} final NFT metadata storage is not configured. Add an AssetStorageAdapter before production minting.`);
+  }
+
+  private async pinataFile(path: string, dataUri: string) {
+    const jwt = process.env.PINATA_JWT;
+    if (!jwt) throw new Error("PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata");
+    const svg = this.decodeSvgDataUri(dataUri);
+    if (!svg) throw new Error("Pinata file upload currently expects SVG data URI asset output");
+    const form = new FormData();
+    form.append("file", new Blob([svg], { type: "image/svg+xml" }), path.split("/").pop() ?? "vaultx.svg");
+    const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}` },
+      body: form
+    });
+    if (!response.ok) throw new Error(`Pinata file upload failed: ${response.status} ${await response.text()}`);
+    const result = (await response.json()) as { IpfsHash: string };
+    return `ipfs://${result.IpfsHash}`;
+  }
+
+  private async pinataJson(path: string, metadata: Record<string, unknown>) {
+    const jwt = process.env.PINATA_JWT;
+    if (!jwt) throw new Error("PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata");
+    const response = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        pinataMetadata: { name: path.split("/").pop() ?? "vaultx-metadata.json" },
+        pinataContent: metadata
+      })
+    });
+    if (!response.ok) throw new Error(`Pinata metadata upload failed: ${response.status} ${await response.text()}`);
+    const result = (await response.json()) as { IpfsHash: string };
+    return `ipfs://${result.IpfsHash}`;
   }
 
   private decodeSvgDataUri(dataUri: string) {

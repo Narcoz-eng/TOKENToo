@@ -2,6 +2,7 @@ export type Accent = "purple" | "green" | "cyan" | "gold" | "red";
 
 export type VaultCollection = {
   id: string;
+  dbId?: string;
   symbol: string;
   name: string;
   subtitle: string;
