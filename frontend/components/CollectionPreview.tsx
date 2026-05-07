@@ -1,8 +1,9 @@
-import { BadgeCheck, Crown, Gem, Palette, ShieldCheck, Sparkles, Wand2 } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Crown, Gem, Palette, ShieldCheck, Sparkles, Wand2 } from "lucide-react";
 import type { CollectionGeneratorPreview } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
 import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
+import { ChestOpenAnimation, LegendaryRevealAnimation, MintRevealAnimation } from "./animations";
 
 export function CollectionPreview({ preview }: { preview: CollectionGeneratorPreview }) {
   return (
@@ -25,6 +26,10 @@ export function CollectionPreview({ preview }: { preview: CollectionGeneratorPre
                 <h2 className="mt-2 text-4xl font-black">{preview.collection}</h2>
                 <p className="mt-2 text-vault-green">{preview.mascot} / {preview.artStyle}</p>
                 <p className="mt-4 text-sm leading-6 text-slate-300">{preview.lore}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {preview.assetProvider ? <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.assetProvider}</StatusPill> : null}
+                  <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : "Preview only"}</StatusPill>
+                </div>
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
@@ -36,7 +41,18 @@ export function CollectionPreview({ preview }: { preview: CollectionGeneratorPre
         </div>
       </SectionCard>
 
-      <SectionCard title="Sample NFTs">
+      {preview.warnings?.length ? (
+        <SectionCard title="Preview-Only Setup Warning">
+          <div className="flex gap-3 rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-4 text-sm text-slate-200">
+            <AlertTriangle className="size-5 shrink-0 text-vault-gold" />
+            <div className="space-y-1">
+              {preview.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+            </div>
+          </div>
+        </SectionCard>
+      ) : null}
+
+      <SectionCard title="NFT Preview Set">
         <div className="grid gap-4 md:grid-cols-5">
           {preview.samples.map((sample) => (
             <article key={sample.id} className="overflow-hidden rounded-lg border border-vault-line bg-black/25">
@@ -79,6 +95,22 @@ export function CollectionPreview({ preview }: { preview: CollectionGeneratorPre
           </div>
         </SectionCard>
 
+        <SectionCard title="Rarity Table">
+          <div className="space-y-3">
+            {Object.entries(preview.rarityWeights).map(([rarity, weight]) => (
+              <div key={rarity}>
+                <div className="mb-1 flex justify-between text-sm">
+                  <span className="text-slate-300">{rarity}</span>
+                  <span className="text-vault-green">{weight} bps</span>
+                </div>
+                <ProgressBar value={weight} max={10000} color={rarity === "Legendary" || rarity === "Mythic" ? "gold" : rarity === "Epic" ? "purple" : "green"} />
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
         <SectionCard title="Quality Gates">
           <Score label="Preview Quality" value={preview.quality.previewQualityScore} />
           <Score label="10k Uniqueness" value={preview.quality.uniquenessScore} />
@@ -100,11 +132,45 @@ export function CollectionPreview({ preview }: { preview: CollectionGeneratorPre
           <Score label="Trait Language" value={preview.distinctiveness.traitLanguageUniqueness} />
         </SectionCard>
 
+        <SectionCard title="10k Readiness">
+          {preview.tenKReadiness ? (
+            <div className="space-y-4">
+              <StatusPill accent={preview.tenKReadiness.estimated10kFeasible ? "green" : "gold"}>{preview.tenKReadiness.estimated10kFeasible ? "10k feasible" : "Needs production review"}</StatusPill>
+              <Score label="Visual Diversity" value={preview.tenKReadiness.visualDiversityScore} />
+              <div className="rounded-lg border border-vault-line bg-black/25 p-3 text-sm">
+                <p className="text-slate-400">Possible unique combinations</p>
+                <p className="mt-1 font-bold text-white">{preview.tenKReadiness.possibleUniqueCombinations}</p>
+              </div>
+              <div className="rounded-lg border border-vault-line bg-black/25 p-3 text-sm">
+                <p className="text-slate-400">Duplicate risk</p>
+                <p className="mt-1 font-bold text-white">{preview.tenKReadiness.duplicateRisk}</p>
+              </div>
+              {preview.tenKReadiness.blockers.length ? (
+                <div className="rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-3 text-sm text-slate-200">
+                  {preview.tenKReadiness.blockers.map((blocker) => <p key={blocker}>{blocker}</p>)}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">10k readiness is available on preview-only generation responses.</p>
+          )}
+        </SectionCard>
+      </div>
+
+      <SectionCard title="Animation Direction">
+        <div className="grid gap-4 md:grid-cols-3">
+          <MintRevealAnimation rarity="Rare" label="Mint reveal" />
+          <ChestOpenAnimation rarity="Epic" label="Chest open" />
+          <LegendaryRevealAnimation rarity="Legendary" label="Legendary reveal" />
+        </div>
+      </SectionCard>
+
+      <div className="grid gap-5 xl:grid-cols-2">
         <SectionCard title="Approval Checklist">
           <div className="space-y-3 text-sm">
             {[
               ["Avatar and banner reviewed", BadgeCheck],
-              ["5 sample NFTs reviewed", Gem],
+              ["5 NFT previews reviewed", Gem],
               ["Trait language is community-specific", Wand2],
               ["Legendary direction is visually obvious", Crown],
               ["Raid theme and role names approved", ShieldCheck]
@@ -142,4 +208,3 @@ function Score({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
-

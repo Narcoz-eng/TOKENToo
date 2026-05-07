@@ -70,7 +70,6 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
               >
                 <Icon className="size-4" />
                 <span>{item.label}</span>
-                {item.label === "Profile" ? <span className="ml-auto rounded-md bg-vault-purple px-2 py-0.5 text-xs text-white">OG</span> : null}
               </Link>
             );
           })}

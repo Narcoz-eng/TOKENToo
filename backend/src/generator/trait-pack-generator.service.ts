@@ -11,9 +11,11 @@ const categoryTargets = {
   mouthExpression: 32,
   outfitBody: 60,
   accessories: 80,
+  neckChestAccessory: 34,
   auraEffect: 36,
   borderFrame: 18,
-  legendaryOverlay: 12
+  legendaryOverlay: 12,
+  animationOverlay: 10
 };
 
 @Injectable()
@@ -30,9 +32,11 @@ export class TraitPackGeneratorService {
       mouthExpression: this.names(style, seed + 41, categoryTargets.mouthExpression, ["Grin", "Snarl", "Whisper", "Chant", "Smirk"]),
       outfitBody: this.names(style, seed + 53, categoryTargets.outfitBody, ["Cloak", "Armor", "Cape", "Jacket", "Robe", "Plate"]),
       accessories: this.names(style, seed + 67, categoryTargets.accessories, ["Staff", "Blade", "Relic", "Banner", "Orb", "Key", "Scepter"]),
+      neckChestAccessory: this.names(style, seed + 71, categoryTargets.neckChestAccessory, ["Amulet", "Medallion", "Chain", "Collar", "Chest Sigil", "Pendant"]),
       auraEffect: this.names(style, seed + 79, categoryTargets.auraEffect, ["Aura", "Mist", "Pulse", "Static", "Flame", "Glow"]),
       borderFrame: this.names(style, seed + 83, categoryTargets.borderFrame, ["Frame", "Seal", "Sigil", "Border", "Insignia"]),
-      legendaryOverlay: this.names(style, seed + 97, categoryTargets.legendaryOverlay, ["Ascension", "Mythic Overlay", "One Of One", "King Scene"])
+      legendaryOverlay: this.names(style, seed + 97, categoryTargets.legendaryOverlay, ["Ascension", "Mythic Overlay", "One Of One", "King Scene"]),
+      animationOverlay: this.names(style, seed + 109, categoryTargets.animationOverlay, ["Reveal Burst", "Aura Loop", "Frame Assemble", "Energy Trail", "Level Pulse"])
     };
 
     const traits = Object.entries(categories).flatMap(([category, names]) => this.definitions(category, names, style));
@@ -45,8 +49,8 @@ export class TraitPackGeneratorService {
         level1: ["baseCharacter", "backgrounds", "headgear", "eyes", "mouthExpression", "outfitBody"],
         level2: categories.backgrounds.slice(0, 10),
         level3: categories.accessories.slice(0, 10),
-        level4: categories.auraEffect.slice(0, 10),
-        level5: categories.legendaryOverlay.slice(0, 5)
+        level4: [...categories.auraEffect.slice(0, 8), ...categories.neckChestAccessory.slice(0, 4)],
+        level5: [...categories.legendaryOverlay.slice(0, 5), ...categories.animationOverlay.slice(0, 3)]
       },
       uniquenessRules: {
         noDuplicateFullCombinations: true,
@@ -121,6 +125,8 @@ export class TraitPackGeneratorService {
   private unlockLevel(category: string, rarity: string) {
     if (rarity === "Legendary" || rarity === "Mythic" || category === "legendaryOverlay") return 5;
     if (category === "auraEffect") return 4;
+    if (category === "neckChestAccessory") return 4;
+    if (category === "animationOverlay") return 5;
     if (category === "accessories") return 3;
     if (category === "backgrounds") return 2;
     return 1;
@@ -135,4 +141,3 @@ export class TraitPackGeneratorService {
     return tags;
   }
 }
-

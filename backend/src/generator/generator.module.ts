@@ -16,6 +16,7 @@ import { QualityValidatorService } from "./quality-validator.service";
 import { RarityEngineService } from "./rarity-engine.service";
 import { StyleProfileGeneratorService } from "./style-profile-generator.service";
 import { TraitPackGeneratorService } from "./trait-pack-generator.service";
+import { CuratedAssetProvider, HybridAssetProvider, MockImageProvider, OpenAIImageProvider } from "./image-providers";
 
 @Module({
   imports: [AuthModule],
@@ -35,7 +36,11 @@ import { TraitPackGeneratorService } from "./trait-pack-generator.service";
     CollectionDistinctivenessScorerService,
     ArtPreviewGeneratorService,
     MetadataGeneratorService,
-    SolanaTransactionAdapterService
+    SolanaTransactionAdapterService,
+    OpenAIImageProvider,
+    MockImageProvider,
+    CuratedAssetProvider,
+    HybridAssetProvider
   ],
   exports: [GeneratorService, AssetProductionLayerService, AssetStorageService, MetadataGeneratorService]
 })

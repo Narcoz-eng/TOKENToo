@@ -9,7 +9,9 @@ import { validateStartupEnvironment } from "./env/startup-validation";
 async function bootstrap() {
   loadLocalEnv();
   validateStartupEnvironment();
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: process.env.PHEW_SILENT_LOGS === "true" ? false : undefined
+  });
   app.useGlobalFilters(new DatabaseExceptionFilter(app.get(HttpAdapterHost)));
   app.enableCors({
     origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:3000"

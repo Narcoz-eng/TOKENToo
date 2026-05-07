@@ -19,8 +19,8 @@ export class ArtGeneratorService {
     const animated = baseVariant.rarityBias === "legendary" || layers.some((layer) => /pulse|mythic|legendary|static/i.test(layer));
 
     return {
-      imageUri: `ipfs://vaultx/${profile.symbol.toLowerCase().replace("$", "")}/${positionId}.png`,
-      metadataUri: `ipfs://vaultx/${profile.symbol.toLowerCase().replace("$", "")}/${positionId}.json`,
+      imageUri: `ipfs://phew/${profile.symbol.toLowerCase().replace("$", "")}/${positionId}.png`,
+      metadataUri: `ipfs://phew/${profile.symbol.toLowerCase().replace("$", "")}/${positionId}.json`,
       layers,
       baseVariant,
       microRandomization,
@@ -30,8 +30,8 @@ export class ArtGeneratorService {
   }
 
   async uploadMetadata(metadata: Record<string, unknown>) {
-    const symbol = String(metadata.symbol ?? "vaultx").toLowerCase().replace("$", "");
-    return `arweave://vaultx/${symbol}/${Date.now()}.json`;
+    const symbol = String(metadata.symbol ?? "phew").toLowerCase().replace("$", "");
+    return `arweave://phew/${symbol}/${Date.now()}.json`;
   }
 
   createGenerationPlan(profile: CommunityProfile, collectionSize = 10_000) {

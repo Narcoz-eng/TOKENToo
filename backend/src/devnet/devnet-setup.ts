@@ -131,16 +131,16 @@ async function createCollectionAsset(connection: Connection, payer: Keypair) {
   if (!process.env.PINATA_JWT) throw new Error("PINATA_JWT is required to upload collection metadata.");
 
   const storage = new AssetStorageService();
-  const metadataUri = await storage.storeFinalNftMetadata("devnet/vaultx-test-collection.json", {
-    name: "VaultX Devnet Test Collection",
-    description: "Devnet-only Metaplex Core collection asset for VaultX E2E verification.",
+  const metadataUri = await storage.storeFinalNftMetadata("devnet/phew-test-collection.json", {
+    name: "Phew.run Devnet Test Collection",
+    description: "Devnet-only Metaplex Core collection asset for Phew.run E2E verification.",
     external_url: process.env.NEXT_PUBLIC_APP_URL,
     properties: { vaultx: { devnetSetup: true, createdAt: new Date().toISOString() } }
   });
   const adapter = new SolanaTransactionAdapterService();
   const built = await adapter.buildCollectionAssetTransaction({
     walletAddress: payer.publicKey.toBase58(),
-    name: "VaultX Devnet Test",
+    name: "Phew.run Devnet Test",
     metadataUri
   });
   if (!built.base64UnsignedTransaction) throw new Error("Collection asset builder did not return a signable devnet transaction.");

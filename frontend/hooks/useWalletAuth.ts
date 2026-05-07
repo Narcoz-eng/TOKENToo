@@ -4,8 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Transaction } from "@solana/web3.js";
 import bs58 from "bs58";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
+import { API_BASE_URL, safeErrorMessage } from "@/lib/api";
 
 export function useWalletAuth() {
   const wallet = useWallet();
@@ -83,15 +82,4 @@ async function postJson<T>(path: string, body: unknown) {
   });
   if (!response.ok) throw new Error(await safeErrorMessage(response));
   return response.json() as Promise<T>;
-}
-
-async function safeErrorMessage(response: Response) {
-  const body = await response.text().catch(() => "");
-  try {
-    const parsed = JSON.parse(body) as { message?: unknown };
-    if (typeof parsed.message === "string") return parsed.message;
-  } catch {
-    // Fall back to raw text.
-  }
-  return body || `Request failed with ${response.status}`;
 }

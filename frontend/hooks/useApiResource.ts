@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
+import { API_BASE_URL, safeErrorMessage } from "@/lib/api";
 
 export type ApiResourceState<T> = {
   data: T | null;
@@ -30,7 +29,7 @@ export function useApiResource<T>(path: string): ApiResourceState<T> {
         if (!cancelled) setData(next);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "API request failed");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Data request failed");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -41,15 +40,4 @@ export function useApiResource<T>(path: string): ApiResourceState<T> {
   }, [path, version]);
 
   return { data, loading, error, reload: () => setVersion((value) => value + 1) };
-}
-
-async function safeErrorMessage(response: Response) {
-  const body = await response.text().catch(() => "");
-  try {
-    const parsed = JSON.parse(body) as { message?: unknown };
-    if (typeof parsed.message === "string") return parsed.message;
-  } catch {
-    // Fall back to the raw response text below.
-  }
-  return body || `Request failed with ${response.status}`;
 }

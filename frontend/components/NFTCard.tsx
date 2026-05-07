@@ -6,8 +6,9 @@ import { ProgressBar } from "./ProgressBar";
 import { riskAccent } from "@/lib/risk";
 
 export function NFTCard({ nft, collection }: { nft: VaultNft; collection: VaultCollection }) {
-  const premium = Math.round(((nft.priceSol - nft.backingSol) / nft.backingSol) * 100);
-  const backingPercent = Math.min(100, Math.round((nft.backingSol / nft.priceSol) * 100));
+  const hasBacking = nft.backingSol > 0 && nft.priceSol > 0;
+  const premium = hasBacking ? Math.round(((nft.priceSol - nft.backingSol) / nft.backingSol) * 100) : 0;
+  const backingPercent = hasBacking ? Math.min(100, Math.round((nft.backingSol / nft.priceSol) * 100)) : 0;
 
   return (
     <article className="glass group overflow-hidden rounded-lg transition hover:-translate-y-0.5 hover:border-vault-purple/60">
@@ -54,7 +55,7 @@ export function NFTCard({ nft, collection }: { nft: VaultNft; collection: VaultC
           <div className="mb-2 flex items-center justify-between text-xs">
             <span className="text-slate-400">Price vs backing</span>
             <span className={premium >= 0 ? "font-bold text-vault-gold" : "font-bold text-vault-green"}>
-              {premium >= 0 ? "+" : ""}{premium}% premium
+              {hasBacking ? `${premium >= 0 ? "+" : ""}${premium}% premium` : "Awaiting market data"}
             </span>
           </div>
           <ProgressBar value={backingPercent} color={premium > 25 ? "gold" : "green"} />

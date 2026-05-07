@@ -78,10 +78,10 @@ export class AssetStorageService {
   private async pinataFile(path: string, dataUri: string) {
     const jwt = process.env.PINATA_JWT;
     if (!jwt) throw new Error("PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata");
-    const svg = this.decodeSvgDataUri(dataUri);
-    if (!svg) throw new Error("Pinata file upload currently expects SVG data URI asset output");
+    const parsed = this.decodeDataUri(dataUri);
+    if (!parsed) throw new Error("Pinata file upload requires a data URI asset output");
     const form = new FormData();
-    form.append("file", new Blob([svg], { type: "image/svg+xml" }), path.split("/").pop() ?? "vaultx.svg");
+    form.append("file", new Blob([parsed.bytes], { type: parsed.mimeType }), path.split("/").pop() ?? "phew-asset");
     const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
       method: "POST",
       headers: { authorization: `Bearer ${jwt}` },
@@ -99,7 +99,7 @@ export class AssetStorageService {
       method: "POST",
       headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
       body: JSON.stringify({
-        pinataMetadata: { name: path.split("/").pop() ?? "vaultx-metadata.json" },
+        pinataMetadata: { name: path.split("/").pop() ?? "phew-metadata.json" },
         pinataContent: metadata
       })
     });
@@ -112,5 +112,13 @@ export class AssetStorageService {
     const prefix = "data:image/svg+xml;utf8,";
     if (!dataUri.startsWith(prefix)) return undefined;
     return decodeURIComponent(dataUri.slice(prefix.length));
+  }
+
+  private decodeDataUri(dataUri: string) {
+    const utf8Match = /^data:([^;,]+);utf8,(.*)$/s.exec(dataUri);
+    if (utf8Match) return { mimeType: utf8Match[1], bytes: decodeURIComponent(utf8Match[2]) };
+    const base64Match = /^data:([^;,]+);base64,(.*)$/s.exec(dataUri);
+    if (base64Match) return { mimeType: base64Match[1], bytes: Buffer.from(base64Match[2], "base64") };
+    return undefined;
   }
 }

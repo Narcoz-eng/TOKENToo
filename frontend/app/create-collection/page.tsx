@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2, Palette, RefreshCcw, ShieldCheck, Sparkles, Upload, Wand2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { CollectionPreview } from "@/components/CollectionPreview";
-import { WalletDisconnectedState } from "@/components/ApiState";
+import { FounderStatusPanel, SetupWarning, WalletDisconnectedState } from "@/components/ApiState";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
+import { apiFetch } from "@/lib/api";
+import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { CollectionGeneratorPreview } from "@/lib/types";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
 type Preset = { id: string; name: string; artStyle: string; mood: string };
 type GeneratorRun = {
@@ -68,8 +68,58 @@ type GeneratorRun = {
   }>;
 };
 
+type PreviewOnlyResponse = {
+  ok: true;
+  assetProvider: string;
+  finalProductionReady: boolean;
+  brandDna: Record<string, unknown>;
+  collection: {
+    name: string;
+    palette: string[];
+    mascotArchetype: string;
+    description: string;
+    theme: string;
+    world: string;
+    renderStyle: string;
+  };
+  avatarPreviewSpec?: { uri: string };
+  bannerPreviewSpec?: { uri: string };
+  samples: Array<{ label: string; uri: string; metadata: Record<string, unknown> }>;
+  traitTable: Array<{ category: string; count: number; examples: string[] }>;
+  rarityTable: Record<string, number>;
+  animationMoments: Array<{ moment: string; spec: string }>;
+  quality: {
+    previewQualityScore: number;
+    uniquenessScore: number;
+    colorHarmonyScore: number;
+    duplicateRiskScore: number;
+    compatibilityScore: number;
+    tier: "BASIC" | "PREMIUM" | "LEGENDARY_READY";
+    passed: boolean;
+    issues?: string[];
+  };
+  distinctiveness: {
+    silhouetteUniqueness: number;
+    paletteUniqueness: number;
+    mascotUniqueness: number;
+    backgroundWorldUniqueness: number;
+    traitLanguageUniqueness: number;
+    score: number;
+    passed: boolean;
+  };
+  tenKReadiness: {
+    estimated10kFeasible: boolean;
+    possibleUniqueCombinations: string;
+    duplicateRisk: string;
+    visualDiversityScore: number;
+    blockers: string[];
+  };
+  warnings: string[];
+};
+
 export default function CreateCollectionPage() {
   const walletAuth = useWalletAuth();
+  const capabilityState = useApiResource<{ mode: string; capabilities: Record<string, boolean>; warnings: string[] }>("/system/capabilities");
   const [presets, setPresets] = useState<Preset[]>([]);
   const [selectedPreset, setSelectedPreset] = useState("");
   const [tokenName, setTokenName] = useState("");
@@ -82,18 +132,19 @@ export default function CreateCollectionPage() {
   const [mascotPreference, setMascotPreference] = useState("");
   const [mood, setMood] = useState("");
   const [run, setRun] = useState<GeneratorRun | null>(null);
+  const [previewOnly, setPreviewOnly] = useState<PreviewOnlyResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [approvalConfirmed, setApprovalConfirmed] = useState(false);
   const [launchResult, setLaunchResult] = useState<string | null>(null);
-  const preview = useMemo(() => (run ? mapRunToPreview(run, selectedPresetName(presets, selectedPreset)) : null), [run, presets, selectedPreset]);
+  const preview = useMemo(() => (run ? mapRunToPreview(run, selectedPresetName(presets, selectedPreset)) : previewOnly ? mapPreviewOnly(previewOnly, selectedPresetName(presets, selectedPreset)) : null), [run, previewOnly, presets, selectedPreset]);
   const latestProfile = run?.styleProfiles[0];
   const latestQuality = latestProfile?.qualityReports[0];
   const latestDistinctiveness = latestProfile?.distinctivenessReports[0];
-  const canApprove = Boolean(run && approvalConfirmed && latestQuality?.passed && latestQuality.tier !== "BASIC" && latestDistinctiveness?.passed);
+  const canApprove = Boolean(run && approvalConfirmed && latestQuality?.passed && latestQuality.tier !== "BASIC" && latestDistinctiveness?.passed && capabilityState.data?.capabilities?.databaseAvailable);
 
   useEffect(() => {
-    fetchJson<Preset[]>("/generator/presets")
+    apiFetch<Preset[]>("/generator/presets")
       .then((data) => {
         setPresets(data);
         if (data[0] && !data.some((preset) => preset.id === selectedPreset)) setSelectedPreset(data[0].id);
@@ -122,6 +173,18 @@ export default function CreateCollectionPage() {
         })
       });
       setRun(data);
+    });
+  }
+
+  async function generatePreview() {
+    await action(async () => {
+      const data = await apiFetch<PreviewOnlyResponse>("/generator/preview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(previewPayload())
+      });
+      setPreviewOnly(data);
+      setRun(null);
     });
   }
 
@@ -175,20 +238,40 @@ export default function CreateCollectionPage() {
     }
   }
 
+  function previewPayload() {
+    return {
+      tokenName,
+      tokenSymbol,
+      tokenMint,
+      logoUri,
+      description,
+      selectedPreset,
+      hints: {
+        memes: splitList(memes),
+        phrases: splitList(phrases),
+        slogans: ["join the faction"],
+        mascotPreference,
+        mood
+      }
+    };
+  }
+
   return (
     <AppShell active="create">
       <div className="space-y-5">
+        <FounderStatusPanel status={capabilityState.data} />
         {!walletAuth.connected ? <WalletDisconnectedState /> : null}
+        <SetupWarning warnings={previewOnly?.warnings} />
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div>
             <p className="text-sm font-bold uppercase text-vault-purple">Premium NFT Generator</p>
-            <h1 className="mt-2 max-w-4xl text-4xl font-black">Create a persisted, art-directed collection identity.</h1>
-            <p className="mt-3 max-w-3xl text-slate-400">Runs, regenerated versions, preview assets, scores, and approval state are loaded from the generator API.</p>
+            <h1 className="mt-2 max-w-4xl text-4xl font-black">Create a premium Phew.run community identity.</h1>
+            <p className="mt-3 max-w-3xl text-slate-400">Preview works without DB, OpenAI, or Pinata. Persist and launch only unlock when founder setup is complete.</p>
           </div>
           <SectionCard title="Persistence Status">
             <div className="space-y-3">
               <StatusPill accent={run?.status === "APPROVED" ? "green" : run ? "purple" : "gold"}>{run?.status ?? "No Run Yet"}</StatusPill>
-              <p className="text-sm text-slate-400">{run ? `Run ID: ${run.id}` : "Connect a wallet and enter real token metadata to create a run."}</p>
+              <p className="text-sm text-slate-400">{run ? `Run ID: ${run.id}` : previewOnly ? `${previewOnly.assetProvider}; production launch blocked until setup is complete.` : "Enter real token metadata to create a preview."}</p>
               {run ? <button onClick={reloadRun} className="h-10 w-full rounded-lg border border-vault-line bg-black/25 text-sm font-bold">Reload Persisted Run</button> : null}
             </div>
           </SectionCard>
@@ -274,8 +357,11 @@ export default function CreateCollectionPage() {
             </SectionCard>
 
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={createRun} disabled={loading || !walletAuth.connected} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow disabled:opacity-60">
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Create Persisted Run
+              <button type="button" onClick={generatePreview} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow disabled:opacity-60">
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate Preview
+              </button>
+              <button type="button" onClick={createRun} disabled={loading || !walletAuth.connected || !capabilityState.data?.capabilities?.databaseAvailable} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-50">
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Save Run
               </button>
               <button type="button" onClick={() => mutateRun("regenerate-style")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-purple/50 bg-vault-purple/10 px-4 text-sm font-bold text-vault-purple disabled:opacity-50">
                 <RefreshCcw className="size-4" /> Regenerate Style
@@ -286,7 +372,7 @@ export default function CreateCollectionPage() {
               <button type="button" onClick={approveRun} disabled={!canApprove || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-green/50 bg-vault-green/10 px-4 text-sm font-bold text-vault-green disabled:opacity-50">
                 <ShieldCheck className="size-4" /> Approve Version
               </button>
-              <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-green px-4 text-sm font-bold text-black disabled:opacity-50">
+              <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !capabilityState.data?.capabilities?.productionStorageAvailable} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-green px-4 text-sm font-bold text-black disabled:opacity-50">
                 <Check className="size-4" /> Launch Collection
               </button>
             </div>
@@ -313,7 +399,7 @@ export default function CreateCollectionPage() {
             ) : (
               <SectionCard title="No Preview Yet">
               <div className="rounded-lg border border-dashed border-vault-purple/40 bg-vault-purple/10 p-8 text-center text-slate-300">
-                  Enter real token metadata and create a generator run to fetch persisted avatar, banner, sample NFTs, trait table, lore, raid theme, quality report, and distinctiveness report.
+                  Enter token metadata and generate a preview to see Brand DNA, premium fallback assets, trait depth, rarity, animation moments, and 10k readiness blockers.
                 </div>
               </SectionCard>
             )}
@@ -372,6 +458,8 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     traitCounts: Object.fromEntries(Object.entries(categories).map(([key, value]) => [key, value.length])),
     rarityWeights: asRecord<number>(profile.traitPack?.rarityWeights ?? profile.rarityStructure),
     unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
+    assetProvider: "persisted-generator-run",
+    finalProductionReady: quality?.passed && quality.tier !== "BASIC",
     avatar: previews.find((asset) => asset.type === "AVATAR")?.uri ?? "",
     banner: previews.find((asset) => asset.type === "BANNER")?.uri ?? "",
     samples: samples.map((asset, index) => {
@@ -406,17 +494,60 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
   };
 }
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init);
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(message || `Request failed with ${response.status}`);
-  }
-  return response.json() as Promise<T>;
-}
-
 function splitList(value: string) {
   return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGeneratorPreview {
+  return {
+    id: "preview-only",
+    collection: data.collection.name,
+    preset,
+    theme: data.collection.theme,
+    mascot: data.collection.mascotArchetype,
+    artStyle: data.collection.renderStyle,
+    palette: data.collection.palette,
+    backgroundWorld: data.collection.world,
+    lore: data.collection.description,
+    raidTheme: String(data.animationMoments[0]?.moment ?? "Founder Raid"),
+    roleNames: asArray(data.brandDna.roleLanguage),
+    traitLanguage: data.traitTable.flatMap((row) => row.examples).slice(0, 24),
+    traitCounts: Object.fromEntries(data.traitTable.map((row) => [row.category, row.count])),
+    rarityWeights: data.rarityTable,
+    unlocks: {},
+    assetProvider: data.assetProvider,
+    finalProductionReady: data.finalProductionReady,
+    warnings: data.warnings,
+    avatar: data.avatarPreviewSpec?.uri ?? "",
+    banner: data.bannerPreviewSpec?.uri ?? "",
+    samples: data.samples.slice(0, 5).map((sample, index) => ({
+      id: `preview-${index}`,
+      name: sample.label,
+      image: sample.uri,
+      rarity: String(sample.metadata.rarity ?? "Rare"),
+      role: asArray(data.brandDna.roleLanguage)[index] ?? "Founder",
+      traits: [sample.metadata.headgear, sample.metadata.aura, sample.metadata.accessory].filter(Boolean).map(String)
+    })),
+    quality: {
+      previewQualityScore: data.quality.previewQualityScore,
+      uniquenessScore: data.quality.uniquenessScore,
+      colorHarmonyScore: data.quality.colorHarmonyScore,
+      duplicateRiskScore: data.quality.duplicateRiskScore,
+      compatibilityScore: data.quality.compatibilityScore,
+      tier: data.quality.tier === "LEGENDARY_READY" ? "Legendary-ready" : data.quality.tier === "PREMIUM" ? "Premium" : "Basic",
+      passed: false
+    },
+    distinctiveness: {
+      silhouetteUniqueness: data.distinctiveness.silhouetteUniqueness,
+      paletteUniqueness: data.distinctiveness.paletteUniqueness,
+      mascotUniqueness: data.distinctiveness.mascotUniqueness,
+      backgroundWorldUniqueness: data.distinctiveness.backgroundWorldUniqueness,
+      traitLanguageUniqueness: data.distinctiveness.traitLanguageUniqueness,
+      score: data.distinctiveness.score,
+      passed: data.distinctiveness.passed
+    },
+    tenKReadiness: data.tenKReadiness
+  };
 }
 
 function selectedPresetName(presets: Preset[], id: string) {

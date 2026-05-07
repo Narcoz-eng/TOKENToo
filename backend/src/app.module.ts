@@ -17,10 +17,15 @@ import { RiskService } from "./risk/risk.service";
 import { TokenScannerService } from "./token-scanner/token-scanner.service";
 import { VaultMintModule } from "./vault-mint/vault-mint.module";
 import { ProductDataModule } from "./product-data/product-data.module";
+import { SystemController } from "./system/system.controller";
+import { CapabilitiesService } from "./system/capabilities.service";
+import { TokenMetadataController } from "./token-metadata/token-metadata.controller";
+import { TokenMetadataService } from "./token-metadata/token-metadata.service";
+import { AssetStorageService } from "./generator/asset-storage.service";
 
 @Module({
   imports: [AuthModule, GeneratorModule, VaultMintModule, ProductDataModule],
-  controllers: [AppController, MarketplaceController, RaidController],
+  controllers: [AppController, MarketplaceController, RaidController, SystemController, TokenMetadataController],
   providers: [
     PrismaService,
     TokenScannerService,
@@ -31,6 +36,9 @@ import { ProductDataModule } from "./product-data/product-data.module";
     CommunityFeeRouterService,
     RiskService,
     MarketplaceEngineService,
+    CapabilitiesService,
+    TokenMetadataService,
+    AssetStorageService,
     { provide: APP_GUARD, useClass: RateLimitGuard }
   ]
 })

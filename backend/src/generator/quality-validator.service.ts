@@ -49,9 +49,11 @@ export class QualityValidatorService {
       mouthExpression: 20,
       outfitBody: 40,
       accessories: 40,
+      neckChestAccessory: 20,
       auraEffect: 20,
       borderFrame: 10,
-      legendaryOverlay: 5
+      legendaryOverlay: 5,
+      animationOverlay: 4
     };
     const scores = Object.entries(minimums).map(([category, minimum]) => ((pack.categories[category]?.length ?? 0) >= minimum ? 100 : 0));
     return average(scores);
@@ -100,6 +102,7 @@ export class QualityValidatorService {
       pack.categories.mouthExpression.length *
       pack.categories.outfitBody.length *
       pack.categories.accessories.length *
+      (pack.categories.neckChestAccessory?.length ?? 1) *
       pack.categories.auraEffect.length;
     return combinationSpace > 10_000_000_000 ? 98 : combinationSpace > 1_000_000 ? 86 : 64;
   }

@@ -188,6 +188,9 @@ export type CollectionGeneratorPreview = {
   traitCounts: Record<string, number>;
   rarityWeights: Record<string, number>;
   unlocks: Record<string, string[]>;
+  assetProvider?: string;
+  finalProductionReady?: boolean;
+  warnings?: string[];
   avatar: string;
   banner: string;
   samples: Array<{
@@ -215,5 +218,12 @@ export type CollectionGeneratorPreview = {
     traitLanguageUniqueness: number;
     score: number;
     passed: boolean;
+  };
+  tenKReadiness?: {
+    estimated10kFeasible: boolean;
+    possibleUniqueCombinations: string;
+    duplicateRisk: string;
+    visualDiversityScore: number;
+    blockers: string[];
   };
 };

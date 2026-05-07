@@ -66,3 +66,94 @@ select {
   background: #090f1a !important;
   border: 1px solid rgba(22, 215, 210, 0.35) !important;
 }
+
+.rounded-inherit {
+  border-radius: inherit;
+}
+
+.phew-aura-pulse {
+  background: radial-gradient(circle at 50% 48%, rgba(186, 255, 0, 0.28), transparent 36%);
+  animation: phew-aura 1.8s ease-in-out infinite;
+}
+
+.phew-glow-trail::before {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  border: 1px solid rgba(22, 215, 210, 0.42);
+  border-radius: 999px;
+  box-shadow: 0 0 28px rgba(22, 215, 210, 0.35);
+  animation: phew-ring 2.4s ease-in-out infinite;
+}
+
+.phew-particle {
+  --angle: calc((360deg / var(--count)) * var(--i));
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #baff00;
+  box-shadow: 0 0 14px rgba(186, 255, 0, 0.8);
+  transform: rotate(var(--angle)) translateX(22px);
+  animation: phew-burst 1.5s ease-out infinite;
+  animation-delay: calc(var(--i) * 38ms);
+}
+
+.phew-card-core {
+  animation: phew-card 2s ease-in-out infinite;
+}
+
+.phew-lock .phew-card-core,
+.phew-mint .phew-card-core {
+  animation-name: phew-lock-card;
+}
+
+.phew-unlock .phew-card-core {
+  animation-name: phew-unlock-card;
+}
+
+.phew-redeem .phew-card-core {
+  animation-name: phew-redeem-card;
+}
+
+.phew-legendary {
+  box-shadow: inset 0 0 0 1px rgba(244, 197, 66, 0.36), 0 0 46px rgba(244, 197, 66, 0.18);
+}
+
+@keyframes phew-aura {
+  0%, 100% { opacity: 0.45; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+@keyframes phew-ring {
+  0%, 100% { transform: scale(0.82); opacity: 0.42; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+@keyframes phew-burst {
+  0% { opacity: 0; transform: rotate(var(--angle)) translateX(12px) scale(0.4); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--angle)) translateX(132px) scale(1); }
+}
+
+@keyframes phew-card {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.96); }
+  50% { transform: translate(-50%, -54%) scale(1.03); }
+}
+
+@keyframes phew-lock-card {
+  0% { transform: translate(-50%, -68%) scale(1); }
+  55%, 100% { transform: translate(-50%, -50%) scale(0.92); }
+}
+
+@keyframes phew-unlock-card {
+  0% { transform: translate(-50%, -48%) scale(0.92); opacity: 0.72; }
+  70%, 100% { transform: translate(-50%, -72%) scale(1.03); opacity: 1; }
+}
+
+@keyframes phew-redeem-card {
+  0% { filter: blur(0); opacity: 1; }
+  65%, 100% { filter: blur(8px); opacity: 0.25; transform: translate(-50%, -50%) scale(0.86); }
+}

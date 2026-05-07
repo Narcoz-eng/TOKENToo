@@ -1,7 +1,8 @@
 "use client";
 
-import { AlertTriangle, Loader2, RefreshCcw, Wallet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, RefreshCcw, Wallet, XCircle } from "lucide-react";
 import { SectionCard } from "./SectionCard";
+import { StatusPill } from "./StatusPill";
 
 export function LoadingState({ label = "Loading Phew.run data" }: { label?: string }) {
   return (
@@ -21,7 +22,7 @@ export function ErrorState({ error, retry }: { error: string; retry?: () => void
         <div className="flex items-start gap-3">
           <AlertTriangle className="size-5 text-vault-red" />
           <div className="min-w-0 flex-1">
-            <p className="font-bold text-vault-red">API request failed</p>
+            <p className="font-bold text-vault-red">Data is temporarily unavailable</p>
             <p className="mt-2 break-words text-sm text-slate-300">{error}</p>
           </div>
         </div>
@@ -60,6 +61,51 @@ export function WalletDisconnectedState({ action }: { action?: React.ReactNode }
           </div>
         </div>
       </div>
+    </SectionCard>
+  );
+}
+
+export function SetupWarning({ warnings }: { warnings?: string[] }) {
+  if (!warnings?.length) return null;
+  return (
+    <div className="rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-4 text-sm text-slate-200">
+      <div className="flex gap-3">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0 text-vault-gold" />
+        <div className="space-y-1">
+          {warnings.map((warning) => <p key={warning}>{warning}</p>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CapabilityBadge({ label, enabled }: { label: string; enabled?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-lg border border-vault-line bg-black/25 px-3 py-2 text-xs font-semibold text-slate-200">
+      {enabled ? <CheckCircle2 className="size-3.5 text-vault-green" /> : <XCircle className="size-3.5 text-vault-gold" />}
+      {label}
+    </span>
+  );
+}
+
+export function FounderStatusPanel({ status }: { status?: { mode?: string; capabilities?: Record<string, boolean>; warnings?: string[] } | null }) {
+  const capabilities = status?.capabilities;
+  if (!capabilities) return null;
+  return (
+    <SectionCard title="Founder Status">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <StatusPill accent="cyan">Mode {status?.mode ?? "development"}</StatusPill>
+        <StatusPill accent={capabilities.databaseAvailable ? "green" : "gold"}>{capabilities.databaseAvailable ? "DB connected" : "DB setup needed"}</StatusPill>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <CapabilityBadge label="OpenAI Images" enabled={capabilities.openaiImagesAvailable} />
+        <CapabilityBadge label="Pinata" enabled={capabilities.pinataAvailable} />
+        <CapabilityBadge label="Solana" enabled={capabilities.solanaAvailable} />
+        <CapabilityBadge label="Program ID" enabled={capabilities.devnetProgramConfigured} />
+        <CapabilityBadge label="Founder wallet" enabled={capabilities.walletConfigured} />
+        <CapabilityBadge label="Token metadata" enabled={capabilities.tokenMetadataAvailable} />
+      </div>
+      <SetupWarning warnings={status?.warnings} />
     </SectionCard>
   );
 }

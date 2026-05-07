@@ -26,9 +26,8 @@ export class MetadataGeneratorService {
       name: `${attributes[4].value} #${1000 + (seed % 8999)}`,
       collection: style.collection,
       description: `A backed Vault NFT from the ${style.collection} community. ${style.lore}`,
-      image: preview?.uri ?? "ipfs://vaultx/preview.png",
+      image: preview?.uri ?? "ipfs://phew/preview.png",
       attributes
     };
   }
 }
-

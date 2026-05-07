@@ -32,14 +32,16 @@ export class ArtPreviewGeneratorService {
       eyes: pick(pack.categories.eyes, seed + 3),
       outfit: pick(pack.categories.outfitBody, seed + 4),
       accessory: pick(pack.categories.accessories, seed + 5),
+      neckChestAccessory: pick(pack.categories.neckChestAccessory ?? ["Vault Sigil"], seed + 6),
       aura: pick(pack.categories.auraEffect, seed + 6),
       frame: pick(pack.categories.borderFrame, seed + 7),
+      animationOverlay: pick(pack.categories.animationOverlay ?? ["Static Still"], seed + 8),
       rarity
     };
 
     return {
       type: "SAMPLE_NFT",
-      label: `${style.collection} sample #${index}`,
+      label: `${style.collection} preview #${index}`,
       uri: this.svgUri(this.nftSvg(style, traits, seed)),
       metadata: traits
     };
@@ -201,4 +203,3 @@ export class ArtPreviewGeneratorService {
     return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char] ?? char);
   }
 }
-

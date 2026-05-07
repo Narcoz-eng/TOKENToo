@@ -42,6 +42,7 @@ export class WalletAuthService {
 
   authenticate(authHeader?: string) {
     const token = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1];
+    if (!token && this.singleUserFounderMode() && process.env.DEVNET_TEST_WALLET_PUBLIC_KEY) return process.env.DEVNET_TEST_WALLET_PUBLIC_KEY;
     if (!token) throw new UnauthorizedException("Missing bearer token");
     const payload = this.verifySignedPayload<TokenPayload>(token);
     if (payload.exp < Date.now()) throw new UnauthorizedException("Token expired");
@@ -85,5 +86,10 @@ export class WalletAuthService {
     const wallet = walletAddress?.trim();
     if (!wallet) throw new BadRequestException("walletAddress is required");
     return wallet;
+  }
+
+  private singleUserFounderMode() {
+    const mode = process.env.APP_MODE ?? process.env.APP_ENV ?? process.env.NODE_ENV;
+    return mode === "founder" && (process.env.SINGLE_USER_MODE ?? "false") === "true";
   }
 }

@@ -10,12 +10,13 @@ import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
+import { unwrapApiData } from "@/lib/api";
 import type { VaultCollection } from "@/lib/types";
 
 export default function MintPage() {
   const wallet = useWalletAuth();
   const collectionState = useApiResource<VaultCollection[]>("/product/collections");
-  const collections = collectionState.data ?? [];
+  const collections = unwrapApiData(collectionState.data) ?? [];
   const defaultCollection = collections[0];
   const [amount, setAmount] = useState("50000");
   const [lockDurationDays, setLockDurationDays] = useState(90);

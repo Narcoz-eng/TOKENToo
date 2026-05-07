@@ -48,6 +48,12 @@ export class GeneratorController {
     return this.generator.createRun(runSchema.parse(body) as CreateGenerationRunInput, walletAddress);
   }
 
+  @Post("preview")
+  preview(@Body() body: unknown) {
+    const parsed = runSchema.extend({ description: z.string().optional() }).parse(body);
+    return this.generator.preview(parsed as CreateGenerationRunInput);
+  }
+
   @Get("runs/:id")
   @UseGuards(WalletAuthGuard)
   getRun(@Param("id") id: string, @WalletAddress() walletAddress: string) {

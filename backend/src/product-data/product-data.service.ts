@@ -1,5 +1,6 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { HttpException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { isDatabaseSetupError } from "../db/database-errors";
+import { publicEndpointFallback } from "../db/db-safety";
 import { PrismaService } from "../db/prisma.service";
 
 type HomeStats = {
@@ -17,6 +18,68 @@ export class ProductDataService {
   private readonly logger = new Logger(ProductDataService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  async publicHome() {
+    return this.publicRead(() => this.home(), this.emptyHome());
+  }
+
+  async publicCollections() {
+    return this.publicRead(() => this.collections(), []);
+  }
+
+  async publicCollection(idOrSlug: string) {
+    return this.publicRead<any>(() => this.collection(idOrSlug), { collection: null, nfts: [], raids: [], listings: [], members: [], activity: [] });
+  }
+
+  async publicCommunity(idOrSlug: string) {
+    return this.publicRead<any>(() => this.community(idOrSlug), { collection: null, nfts: [], raids: [], listings: [], members: [], activity: [], identity: null, joinBenefits: [] });
+  }
+
+  async publicCollectionRaids(idOrSlug: string) {
+    const collection = await this.publicRead(() => this.collection(idOrSlug), { collection: null, raids: [] });
+    const data = this.unwrapPublic(collection) as { raids?: unknown[] };
+    return publicEndpointFallback(data.raids ?? [], collection.warnings ?? []);
+  }
+
+  async publicRaidRoom(collectionId: string, raidId: string) {
+    return this.publicRead<any>(() => this.raidRoom(collectionId, raidId), { collection: null, raid: null, missions: [], participants: [], claims: [] });
+  }
+
+  async publicRaids() {
+    return this.publicRead(() => this.raids(), []);
+  }
+
+  async publicMarketplace() {
+    return this.publicRead(() => this.marketplace(), { collections: [], nfts: [], listings: [], sales: [], stats: this.emptyStats() });
+  }
+
+  async publicStaking(walletAddress?: string) {
+    return this.publicRead(() => this.staking(walletAddress), { walletRequired: true, walletAddress, positions: [] });
+  }
+
+  async publicProfile(walletAddress?: string) {
+    return this.publicRead<any>(() => this.profile(walletAddress), { walletRequired: true, walletAddress, user: null, nfts: [], raids: [], activity: [] });
+  }
+
+  async publicVaultNfts() {
+    return this.publicRead(() => this.vaultNfts(), []);
+  }
+
+  async publicNft(idOrMint: string) {
+    return this.publicRead(() => this.nft(idOrMint), { nft: null, collection: null, listings: [], mintTransaction: null, redeemTransactions: [] });
+  }
+
+  async publicInstantSell(walletAddress?: string) {
+    return this.publicRead<any>(() => this.instantSell(walletAddress), { walletRequired: true, walletAddress, quotes: [], poolConfigured: false });
+  }
+
+  async publicInstantSellStatus() {
+    return this.publicRead(async () => ({ poolConfigured: false, available: false, reason: "Instant sell liquidity pool is not configured." }), { poolConfigured: false, available: false, reason: "Instant sell liquidity pool is not configured." });
+  }
+
+  async publicAdminRisk() {
+    return this.publicRead<any>(() => this.adminRisk(), { founderOnly: true, collections: [], snapshots: [] });
+  }
 
   async home() {
     const [collections, raids, activity, stats] = await Promise.all([
@@ -229,6 +292,74 @@ export class ProductDataService {
 
   private emptyStats(): HomeStats {
     return { collections: 0, nfts: null, raids: 0, totalVaults: null, tvlUsd: null };
+  }
+
+  private emptyHome() {
+    return {
+      title: "Phew.run Faction Network",
+      subtitle: "Real token-backed vault NFTs, communities, raids, and liquidity tools on Solana.",
+      collections: [],
+      raids: [],
+      activity: [],
+      stats: this.emptyStats(),
+      empty: true
+    };
+  }
+
+  private async publicRead<T>(read: () => Promise<T>, fallback: T) {
+    const warnings: string[] = [];
+    let data = fallback;
+    let databaseAvailable = await this.fastDatabaseCheck();
+    try {
+      data = await read();
+    } catch (error) {
+      if (isDatabaseSetupError(error) || error instanceof ProductReadTimeoutError) {
+        databaseAvailable = false;
+        warnings.push("Database is unavailable; returning a safe empty state.");
+      } else if (error instanceof NotFoundException || (error instanceof HttpException && error.getStatus() === 404)) {
+        warnings.push(error.message);
+      } else {
+        this.logger.warn(`Public product read returned fallback. ${this.safeErrorMessage(error)}`);
+        warnings.push("The requested public data is unavailable; returning a safe empty state.");
+      }
+    }
+    return {
+      ...publicEndpointFallback(data, warnings),
+      capabilities: this.publicCapabilities(databaseAvailable)
+    };
+  }
+
+  private unwrapPublic(value: unknown) {
+    if (value && typeof value === "object" && "data" in value) return (value as { data: unknown }).data;
+    return value;
+  }
+
+  private publicCapabilities(databaseAvailable: boolean) {
+    const finalStorageProvider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER;
+    const permanentStorage = finalStorageProvider === "pinata" ? Boolean(process.env.PINATA_JWT) : finalStorageProvider === "supabase" ? Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) : false;
+    return {
+      databaseAvailable,
+      openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
+      pinataAvailable: Boolean(process.env.PINATA_JWT),
+      solanaAvailable: Boolean(process.env.SOLANA_RPC_URL || process.env.ANCHOR_PROVIDER_URL || process.env.PROGRAM_ID),
+      walletConfigured: Boolean(process.env.DEVNET_TEST_WALLET_PUBLIC_KEY || process.env.ANCHOR_WALLET),
+      devnetProgramConfigured: Boolean(process.env.PROGRAM_ID && process.env.PROGRAM_ID !== "11111111111111111111111111111111"),
+      aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+      productionStorageAvailable: permanentStorage,
+      tokenMetadataAvailable: permanentStorage && Boolean(process.env.PROGRAM_ID)
+    };
+  }
+
+  private async fastDatabaseCheck() {
+    try {
+      await Promise.race([
+        this.prisma.$queryRaw`SELECT 1`,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new ProductReadTimeoutError("Database capability check timed out.")), 1200))
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async safeHomeRead<T>(label: string, fallback: T, read: () => Promise<T>) {

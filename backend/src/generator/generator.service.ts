@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
+import { requireDbForWrite } from "../db/db-safety";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
 import { AssetProductionLayerService } from "./asset-production-layer.service";
 import { AssetStorageService } from "./asset-storage.service";
@@ -47,7 +48,69 @@ export class GeneratorService {
     return artPresets;
   }
 
+  async preview(input: CreateGenerationRunInput) {
+    const normalized = this.normalizePreviewInput(input);
+    const analysis = this.logoAnalysis.analyze(normalized);
+    const context = this.communityContext.build(normalized.tokenSymbol, normalized.description, normalized.hints, analysis);
+    const style = this.styleProfiles.generate(normalized, analysis, context, 1);
+    const pack = this.traitPacks.generate(style);
+    const compatibilityRules = this.traitPacks.compatibilityRules(pack);
+    const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
+    const previews = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
+    const distinctiveness = this.distinctiveness.score(style, []);
+    const quality = this.quality.validate(style, pack, compatibilityRules, previews, distinctiveness);
+    if (!compatibilityResult.passed) quality.issues.push(...compatibilityResult.issues);
+    const readiness = this.tenKReadinessReport(pack, style, quality);
+
+    return {
+      ok: true,
+      mode: "preview-only",
+      assetProvider: "premium-fallback-preview",
+      finalProductionReady: false,
+      brandDna: style.brandDna,
+      collection: {
+        name: style.collection,
+        palette: style.colors,
+        mascotArchetype: style.brandDna.mascotArchetype,
+        description: style.lore,
+        theme: style.theme,
+        world: style.backgroundWorld,
+        shapeLanguage: style.brandDna.shapeLanguage,
+        renderStyle: style.artStyle,
+        visualFxLanguage: style.brandDna.legendaryDirection,
+        forbiddenSimilarities: style.brandDna.forbiddenSimilarities
+      },
+      avatarPreviewSpec: previews.find((preview) => preview.type === "AVATAR"),
+      bannerPreviewSpec: previews.find((preview) => preview.type === "BANNER"),
+      samples: previews.filter((preview) => preview.type === "SAMPLE_NFT"),
+      traitTable: this.traitTable(pack),
+      rarityTable: pack.rarityWeights,
+      animationMoments: this.animationMoments(style),
+      quality: {
+        ...quality,
+        issues: [...quality.issues, "Fallback preview is concept-only and cannot be approved for public production launch."]
+      },
+      distinctiveness: {
+        ...distinctiveness,
+        fingerprint: style.visualFingerprint,
+        estimate: distinctiveness.score >= 86 ? "highly distinct" : distinctiveness.score >= 72 ? "distinct with review" : "too close"
+      },
+      tenKReadiness: readiness,
+      capabilities: {
+        openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
+        pinataAvailable: Boolean(process.env.PINATA_JWT),
+        aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+        productionStorageAvailable: (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") !== "mock" && Boolean(process.env.PINATA_JWT)
+      },
+      warnings: [
+        "Preview generated without DB persistence.",
+        "Fallback assets are premium concept previews; final launch requires OpenAI/curated production assets and permanent storage."
+      ]
+    };
+  }
+
   async createRun(input: CreateGenerationRunInput, creatorWallet?: string) {
+    await requireDbForWrite(this.prisma);
     const normalized = this.normalize(input);
     const seed = `${normalized.tokenMint}:${seedFrom(`${process.env.GENERATOR_SEED_SALT ?? "vaultx"}:${JSON.stringify(normalized)}`)}`;
     const run = await this.prisma.generationRun.create({
@@ -165,6 +228,7 @@ export class GeneratorService {
   }
 
   async approve(id: string, input: ApproveGenerationRunInput = {}) {
+    await requireDbForWrite(this.prisma);
     const run = await this.getRun(id);
     this.assertOwner(run, input.walletAddress);
     const latest = run.styleProfiles[0];
@@ -205,6 +269,7 @@ export class GeneratorService {
   }
 
   async launchCollection(id: string, input: LaunchCollectionInput) {
+    await requireDbForWrite(this.prisma);
     const walletAddress = input.walletAddress?.trim();
     if (!walletAddress) throw new BadRequestException("walletAddress is required to launch a collection");
 
@@ -253,7 +318,7 @@ export class GeneratorService {
           approvedGenerationRunId: run.id,
           styleProfileVersion: profile.version,
           traitPackVersion: profile.version,
-          metadataSchemaVersion: "vaultx-v1",
+          metadataSchemaVersion: "phew-v1",
           collectionAssetAddress: input.collectionAssetAddress,
           collectionMetadataUri: input.metadataUri,
           launchStatus: input.collectionAssetAddress ? "CONFIRMED" : "PENDING",
@@ -279,7 +344,7 @@ export class GeneratorService {
           approvedGenerationRunId: run.id,
           styleProfileVersion: profile.version,
           traitPackVersion: profile.version,
-          metadataSchemaVersion: "vaultx-v1",
+          metadataSchemaVersion: "phew-v1",
           collectionAssetAddress: input.collectionAssetAddress,
           collectionMetadataUri: input.metadataUri,
           launchStatus: input.collectionAssetAddress ? "CONFIRMED" : "PENDING",
@@ -304,6 +369,7 @@ export class GeneratorService {
   }
 
   async buildCollectionLaunch(id: string, walletAddress: string) {
+    await requireDbForWrite(this.prisma);
     const run = await this.getRunForWallet(id, walletAddress);
     const profile = run.styleProfiles.find((item) => item.version === run.approvedVersion && item.isApproved);
     if (!profile) throw new BadRequestException("Approve a collection profile before building launch transaction.");
@@ -322,7 +388,7 @@ export class GeneratorService {
         banner: profile.previewAssets.find((asset) => asset.type === "BANNER")?.uri,
         external_url: process.env.NEXT_PUBLIC_APP_URL,
         properties: {
-          vaultx: {
+          phew: {
             generationRunId: run.id,
             styleProfileVersion: profile.version,
             brandDna: profile.brandDna,
@@ -350,6 +416,7 @@ export class GeneratorService {
   }
 
   async submitCollectionLaunch(id: string, input: SubmitCollectionLaunchInput) {
+    await requireDbForWrite(this.prisma);
     const run = await this.getRunForWallet(id, input.walletAddress);
     const collection = await this.prisma.collection.findFirst({ where: { approvedGenerationRunId: run.id }, include: { creator: true } });
     if (!collection) throw new BadRequestException("Collection launch record not found.");
@@ -526,6 +593,77 @@ export class GeneratorService {
       tokenMint: input.tokenMint.trim(),
       description: input.description.trim(),
       selectedPreset: input.selectedPreset ?? process.env.GENERATOR_DEFAULT_PRESET ?? "mystic-pixel-cult"
+    };
+  }
+
+  private normalizePreviewInput(input: CreateGenerationRunInput): CreateGenerationRunInput {
+    const description = input.description?.trim() || input.hints?.lore?.trim() || `${input.tokenName || "Token"} founder community on Phew.run`;
+    return this.normalize({ ...input, description });
+  }
+
+  private traitTable(pack: TraitPackPlan) {
+    const labels: Record<string, string> = {
+      baseCharacter: "base body",
+      backgrounds: "background",
+      mouthExpression: "mouth/expression",
+      outfitBody: "outfit/armor",
+      accessories: "handheld/accessory",
+      auraEffect: "aura/effect",
+      borderFrame: "frame/border",
+      legendaryOverlay: "legendary/mythic overlay"
+    };
+    return Object.entries(pack.categories).map(([category, values]) => ({
+      category: labels[category] ?? category,
+      count: values.length,
+      examples: values.slice(0, 8),
+      productionReady: false,
+      conceptOnly: true,
+      rarityTiers: [...new Set(pack.traits.filter((trait) => trait.category === category).map((trait) => trait.rarity))]
+    }));
+  }
+
+  private animationMoments(style: GeneratedStyleProfile) {
+    return [
+      { moment: "Stake NFT", spec: "NFT card slides into a neon vault chamber, ring lights up, lock seals, token energy pulse confirms stake." },
+      { moment: "Unstake NFT", spec: "Vault opens, card rises through cyan haze, lock fragments dissolve into particles, release aura expands." },
+      { moment: "Claim Rewards", spec: "Token shards burst from the reward badge, amount highlight counts up, progress rail emits a lime pulse." },
+      { moment: "Open Chest", spec: "Chest shakes, hinge glow blooms, rarity color floods the frame, rare+ receives stronger particle density." },
+      { moment: "Mint Vault NFT", spec: `Forge energy wraps the ${style.mascot}, collection frame assembles, final NFT lands in a showcase glow.` },
+      { moment: "Redeem NFT", spec: "NFT dissolves cleanly, vault unlocks, token stream returns to wallet, confirmation state snaps into focus." },
+      { moment: "Raid Success", spec: "Raid boss mark breaks, squad cards flare, XP trail sweeps across the board." },
+      { moment: "Raid Level Up", spec: "Community level badge rotates through a cyan ring and emits a lime shockwave." },
+      { moment: "Collection Upgrade", spec: "Trait pack tile unlocks with layered glass panels and a short aura pass." },
+      { moment: "Legendary Reveal", spec: `${style.legendaryTheme}; darkened background, premium frame assembly, high-intensity aura, final freeze-frame.` }
+    ];
+  }
+
+  private tenKReadinessReport(pack: TraitPackPlan, style: GeneratedStyleProfile, quality: { duplicateRiskScore: number; rarityDistributionScore: number; issues: string[] }) {
+    const possible =
+      BigInt(pack.categories.baseCharacter.length) *
+      BigInt(pack.categories.backgrounds.length) *
+      BigInt(pack.categories.headgear.length) *
+      BigInt(pack.categories.eyes.length) *
+      BigInt(pack.categories.mouthExpression.length) *
+      BigInt(pack.categories.outfitBody.length) *
+      BigInt(pack.categories.accessories.length) *
+      BigInt(pack.categories.auraEffect.length) *
+      BigInt(pack.categories.borderFrame.length);
+    const blockers = [
+      ...quality.issues,
+      ...(style.artSource === "PROCEDURAL_FALLBACK" ? ["Production asset provider is not configured."] : []),
+      ...(!style.tenKReadiness.pass ? ["10k readiness needs logo/reference input and non-generic silhouette validation."] : [])
+    ];
+    return {
+      possibleUniqueCombinations: possible.toString(),
+      validUniqueCombinations: possible.toString(),
+      estimated10kFeasible: blockers.length === 0 && possible >= 10_000n,
+      duplicateRisk: quality.duplicateRiskScore >= 90 ? "LOW" : quality.duplicateRiskScore >= 75 ? "MEDIUM" : "HIGH",
+      visualDiversityScore: Math.min(98, Math.round((quality.duplicateRiskScore + quality.rarityDistributionScore) / 2)),
+      rarityDistributionReport: pack.rarityWeights,
+      backgroundDistributionCorrectness: pack.categories.backgrounds.length >= 40 ? "PASS" : "BLOCKED",
+      legendaryCaps: { maxPct: pack.uniquenessRules.legendaryCapPct, configured: true },
+      compatibilityValidated: true,
+      blockers
     };
   }
 

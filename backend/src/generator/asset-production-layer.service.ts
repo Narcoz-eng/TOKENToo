@@ -19,8 +19,10 @@ export class AssetProductionLayerService {
       pack.categories.mouthExpression.length +
       pack.categories.outfitBody.length +
       pack.categories.accessories.length +
+      (pack.categories.neckChestAccessory?.length ?? 0) +
       pack.categories.auraEffect.length +
-      pack.categories.borderFrame.length;
+      pack.categories.borderFrame.length +
+      (pack.categories.animationOverlay?.length ?? 0);
     const readinessReport = {
       selectedAssetPack: style.assetPackId,
       availableBaseVariants: pack.categories.baseCharacter.length,
@@ -44,10 +46,11 @@ export class AssetProductionLayerService {
         ...pack.categories.mouthExpression,
         ...pack.categories.outfitBody,
         ...pack.categories.accessories,
+        ...(pack.categories.neckChestAccessory ?? []),
         ...pack.categories.auraEffect,
         ...pack.categories.borderFrame
       ], "Premium trait layers must be handmade, curated, or generated from the approved art direction."),
-      legendaryAssets: this.layerSet(legendaryProvider, pack.categories.legendaryOverlay, "Legendary and mythic traits require visibly premium composition and optional animation."),
+      legendaryAssets: this.layerSet(legendaryProvider, [...pack.categories.legendaryOverlay, ...(pack.categories.animationOverlay ?? [])], "Legendary and mythic traits require visibly premium composition and optional animation."),
       readinessReport,
       warnings: productionReady
         ? []
@@ -76,8 +79,8 @@ export class AssetProductionLayerService {
       image: "",
       properties: {
         category: "image",
-        vaultx: {
-          metadataSchemaVersion: "vaultx-v1",
+        phew: {
+          metadataSchemaVersion: "phew-v1",
           nftStandard: "Metaplex Core",
           assetProductionReady: this.manifest(input.style, input.pack, input.qualityTier).productionReady
         }
@@ -96,6 +99,9 @@ export class AssetProductionLayerService {
         { trait_type: "Outfit", value: visualTraits.outfit ?? pick(input.pack.categories.outfitBody, seed + 7) },
         { trait_type: "Aura", value: visualTraits.aura ?? pick(input.pack.categories.auraEffect, seed + 8) },
         { trait_type: "Accessory", value: visualTraits.accessory ?? pick(input.pack.categories.accessories, seed + 9) },
+        { trait_type: "Neck/Chest Accessory", value: visualTraits.neckChestAccessory ?? pick(input.pack.categories.neckChestAccessory ?? ["Vault Sigil"], seed + 10) },
+        { trait_type: "Frame/Border", value: visualTraits.frame ?? pick(input.pack.categories.borderFrame, seed + 11) },
+        { trait_type: "Animation Overlay", value: visualTraits.animationOverlay ?? pick(input.pack.categories.animationOverlay ?? ["Static Still"], seed + 12) },
         { trait_type: "Rarity", value: rarity }
       ]
     };

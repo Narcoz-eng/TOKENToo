@@ -64,7 +64,7 @@ async function main() {
     amount,
     lockDurationDays: 0,
     metadataUri: "ipfs://devnet-e2e-placeholder",
-    collectionName: "VaultX Devnet E2E",
+    collectionName: "Phew.run Devnet E2E",
     collectionAssetAddress
   });
   if (!mintTx.base64UnsignedTransaction || !mintTx.nftAssetAddress || !mintTx.vaultPositionPda) {
