@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "tsx src/db/seed-devnet.ts",
     "db:verify:generator": "tsx src/generator/verify-generator-tables.ts",
     "generator:quality-samples": "tsx src/generator/run-quality-samples.ts",
     "devnet:setup": "tsx src/devnet/devnet-setup.ts",
@@ -26,6 +27,7 @@
     "@nestjs/platform-express": "latest",
     "@prisma/adapter-pg": "latest",
     "@prisma/client": "latest",
+    "prisma": "latest",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "bs58": "^6.0.0",
@@ -37,7 +39,6 @@
   "devDependencies": {
     "@types/node": "latest",
     "@types/pg": "latest",
-    "prisma": "latest",
     "tsx": "latest",
     "typescript": "latest"
   }
