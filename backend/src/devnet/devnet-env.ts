@@ -14,12 +14,14 @@ export const requiredDevnetEnv = [
 ];
 
 export function validateDevnetEnv() {
+  const placeholderProgramId = "11111111111111111111111111111111";
   return requiredDevnetEnv
     .map((item) => {
       const value = process.env[item.name];
       const missing = !value;
       const wrongValue = Boolean(item.expected && value && value !== item.expected);
-      return missing || wrongValue ? { ...item, actual: value ?? null, reason: missing ? "missing" : `expected ${item.expected}` } : null;
+      const placeholder = item.name === "PROGRAM_ID" && value === placeholderProgramId;
+      return missing || wrongValue || placeholder ? { ...item, actual: value ?? null, reason: missing ? "missing" : placeholder ? "placeholder" : `expected ${item.expected}` } : null;
     })
     .filter(Boolean);
 }

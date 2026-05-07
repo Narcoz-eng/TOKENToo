@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
-declare_id!("11111111111111111111111111111111");
+declare_id!("8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6");
 
 const MAX_THEME_LEN: usize = 64;
 const MAX_MASCOT_LEN: usize = 64;
@@ -321,7 +321,7 @@ pub struct InitializePlatform<'info> {
 #[derive(Accounts)]
 pub struct CreateCollectionProfile<'info> {
     #[account(seeds = [b"global-config"], bump = global_config.bump)]
-    pub global_config: Account<'info, GlobalConfig>,
+    pub global_config: Box<Account<'info, GlobalConfig>>,
     #[account(
         init,
         payer = creator,
@@ -329,7 +329,7 @@ pub struct CreateCollectionProfile<'info> {
         seeds = [b"collection", token_mint.key().as_ref()],
         bump
     )]
-    pub collection_profile: Account<'info, CollectionProfile>,
+    pub collection_profile: Box<Account<'info, CollectionProfile>>,
     #[account(
         init,
         payer = creator,
@@ -337,7 +337,7 @@ pub struct CreateCollectionProfile<'info> {
         seeds = [b"fee-vault", collection_profile.key().as_ref()],
         bump
     )]
-    pub fee_vault: Account<'info, FeeVault>,
+    pub fee_vault: Box<Account<'info, FeeVault>>,
     #[account(
         init,
         payer = creator,
@@ -345,16 +345,16 @@ pub struct CreateCollectionProfile<'info> {
         seeds = [b"token-vault-state", collection_profile.key().as_ref()],
         bump
     )]
-    pub token_vault_state: Account<'info, TokenVault>,
+    pub token_vault_state: Box<Account<'info, TokenVault>>,
     /// CHECK: PDA authority for SPL token custody. Used as token account owner in CPI setup.
     #[account(seeds = [b"token-vault-authority", collection_profile.key().as_ref()], bump)]
     pub token_vault_authority: UncheckedAccount<'info>,
-    pub token_mint: InterfaceAccount<'info, Mint>,
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         constraint = creator_token_account.mint == token_mint.key() @ VaultXError::InvalidMint,
         constraint = creator_token_account.owner == creator.key() @ VaultXError::CreatorNotEligible
     )]
-    pub creator_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub creator_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(mut)]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -363,13 +363,13 @@ pub struct CreateCollectionProfile<'info> {
 #[derive(Accounts)]
 pub struct DepositAndMintVaultNft<'info> {
     #[account(seeds = [b"global-config"], bump = global_config.bump)]
-    pub global_config: Account<'info, GlobalConfig>,
+    pub global_config: Box<Account<'info, GlobalConfig>>,
     #[account(
         mut,
         seeds = [b"collection", token_mint.key().as_ref()],
         bump = collection_profile.bump
     )]
-    pub collection_profile: Account<'info, CollectionProfile>,
+    pub collection_profile: Box<Account<'info, CollectionProfile>>,
     #[account(
         init,
         payer = owner,
@@ -377,8 +377,8 @@ pub struct DepositAndMintVaultNft<'info> {
         seeds = [b"position", nft_mint.key().as_ref()],
         bump
     )]
-    pub vault_position: Account<'info, VaultPosition>,
-    pub token_mint: InterfaceAccount<'info, Mint>,
+    pub vault_position: Box<Account<'info, VaultPosition>>,
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
     /// CHECK: Metaplex Core asset address or Token Metadata mint address recorded for this position.
     pub nft_mint: UncheckedAccount<'info>,
     #[account(
@@ -386,13 +386,13 @@ pub struct DepositAndMintVaultNft<'info> {
         constraint = owner_token_account.mint == token_mint.key() @ VaultXError::InvalidMint,
         constraint = owner_token_account.owner == owner.key() @ VaultXError::Unauthorized
     )]
-    pub owner_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub owner_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         mut,
         constraint = vault_token_account.mint == token_mint.key() @ VaultXError::InvalidMint,
         constraint = vault_token_account.owner == token_vault_authority.key() @ VaultXError::InvalidVaultAuthority
     )]
-    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub vault_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
     /// CHECK: PDA authority for SPL token custody.
     #[account(seeds = [b"token-vault-authority", collection_profile.key().as_ref()], bump)]
     pub token_vault_authority: UncheckedAccount<'info>,

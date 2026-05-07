@@ -10,6 +10,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:verify:generator": "tsx src/generator/verify-generator-tables.ts",
     "generator:quality-samples": "tsx src/generator/run-quality-samples.ts",
+    "devnet:setup": "tsx src/devnet/devnet-setup.ts",
+    "devnet:validate-program": "tsx src/devnet/validate-program.ts",
     "devnet:e2e": "tsx src/devnet/devnet-e2e.ts",
     "db:push": "prisma db push",
     "db:studio": "prisma studio"

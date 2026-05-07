@@ -8,7 +8,7 @@ Current file: `programs/vaultx/src/lib.rs`
 - `deposit_and_mint_vault_nft` now transfers SPL tokens into PDA custody and creates `VaultPosition` state.
 - `deposit_and_mint_vault_nft` records the Metaplex Core asset address, but Core asset creation/collection verification happens in the backend-built transaction.
 - `redeem_vault_nft` now validates owner/unlock/not-staked/not-redeemed/collection/token vault state and transfers SPL tokens back from PDA custody.
-- `redeem_vault_nft` does not yet burn or invalidate the Metaplex Core asset.
+- `redeem_vault_nft` does not burn or invalidate the Metaplex Core asset by itself. The backend redeem builder adds the Metaplex Core burn instruction and the Anchor redeem instruction to the same wallet-signed transaction for devnet V1.
 - `redeem_vault_nft` does not yet parse Metaplex Core collection/owner state on-chain.
 - `stake_vault_nft` does not validate holder ownership and does not freeze/escrow/custody the NFT.
 - `claim_rewards` does not calculate or transfer staking/raid rewards.
@@ -34,8 +34,8 @@ Current file: `programs/vaultx/src/lib.rs`
   - Mint/verify Vault NFT through the selected Metaplex path in the same client-built transaction.
   - Emit tx data needed by backend indexer.
 - Redeem instruction:
-  - Validate current NFT owner through Metaplex Core account parsing or plugin authority.
-  - Validate NFT belongs to collection and is not forged through Metaplex Core/Token Metadata.
+  - Validate current NFT owner through Metaplex Core account parsing or plugin authority. Backend currently performs this before transaction build; on-chain parsing remains incomplete.
+  - Validate NFT belongs to collection and is not forged through Metaplex Core/Token Metadata. Backend currently performs this before transaction build; on-chain parsing remains incomplete.
   - Validate unlock date, not staked, not redeemed.
   - Burn/invalidate NFT before or atomically with token release.
   - Transfer full amount from PDA vault to redeemer. Implemented for SPL custody.
@@ -57,3 +57,9 @@ Current file: `programs/vaultx/src/lib.rs`
   - Staked redeem rejected.
   - Pause/risk disable rejected.
   - PDA custody balance changes exactly match locked/redeemed amounts.
+
+## Current Test Status
+
+- `programs/vaultx/tests/vaultx.ts` now contains executable custody/redeem coverage, but it has not passed in this environment.
+- Cargo/Anchor tests could not run in this environment because `cargo` is not installed and the program id remains a placeholder.
+- Do not treat the Anchor program as production-ready until these tests pass against localnet and devnet.

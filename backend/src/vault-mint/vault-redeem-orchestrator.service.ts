@@ -53,7 +53,8 @@ export class VaultRedeemOrchestratorService {
       tokenMint: nft.collection.token.mint,
       nftAssetAddress: nft.mint,
       collectionAssetAddress: nft.collection.collectionAssetAddress,
-      vaultPositionPda: nft.positionPda
+      vaultPositionPda: nft.positionPda,
+      lockedAmount: nft.amount.toString()
     });
 
     return this.prisma.redeemTransaction.update({
@@ -63,11 +64,36 @@ export class VaultRedeemOrchestratorService {
   }
 
   async submitRedeem(id: string, input: { signedTransaction?: string; txSignature?: string }, walletAddress: string) {
-    const tx = await this.prisma.redeemTransaction.findUnique({ where: { id }, include: { vaultNft: true } });
+    const tx = await this.prisma.redeemTransaction.findUnique({ where: { id }, include: { vaultNft: { include: { collection: { include: { token: true } } } } } });
     if (!tx) throw new NotFoundException("Redeem transaction not found");
     if (tx.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this redeem transaction.");
     if (!["TX_BUILT", "SUBMITTED", "FAILED"].includes(tx.status)) throw new ConflictException(`Redeem cannot be submitted from ${tx.status}`);
     const result = await this.solana.submitAndConfirm({ transactionId: id, signedTransaction: input.signedTransaction, txSignature: input.txSignature });
+    if (result.confirmed) {
+      const unsigned = this.record(tx.unsignedTransaction);
+      const summary = this.record(unsigned.transactionSummary);
+      const finalization = await this.solana.verifyRedeemFinalization({
+        walletAddress,
+        tokenMint: tx.vaultNft.collection.token.mint,
+        nftAssetAddress: tx.vaultNft.mint,
+        vaultPositionPda: tx.vaultNft.positionPda,
+        lockedAmount: tx.vaultNft.amount.toString(),
+        preRedeemUserTokenBalance: typeof summary.preRedeemUserTokenBalance === "string" ? summary.preRedeemUserTokenBalance : undefined,
+        preRedeemVaultTokenBalance: typeof summary.preRedeemVaultTokenBalance === "string" ? summary.preRedeemVaultTokenBalance : undefined
+      });
+      if (!finalization.passed) {
+        const coreUnverified = !finalization.coreAssetInvalidated;
+        return this.prisma.redeemTransaction.update({
+          where: { id },
+          data: {
+            status: coreUnverified ? "NEEDS_CORE_VERIFY" : "FAILED",
+            txSignature: result.txSignature,
+            errorCode: coreUnverified ? "CORE_INVALIDATION_UNVERIFIED" : "POST_CONFIRM_CHECK_FAILED",
+            errorMessage: JSON.stringify(finalization.issues ?? finalization)
+          }
+        });
+      }
+    }
     const updated = await this.prisma.redeemTransaction.update({
       where: { id },
       data: {
@@ -98,5 +124,9 @@ export class VaultRedeemOrchestratorService {
 
   private json(value: unknown): Prisma.InputJsonValue {
     return value as Prisma.InputJsonValue;
+  }
+
+  private record(value: unknown) {
+    return (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
   }
 }

@@ -32,7 +32,24 @@
   - creates a Metaplex Core asset in the launched collection
   - returns base64 unsigned transaction, required signers, blockhash, Core asset address, and vault position PDA
 - The Core collection asset must already be confirmed and stored on the launched collection before mint build.
+- Mint finalization now performs V1 post-confirmation checks before creating `VaultNFT`:
+  - vault position PDA exists
+  - vault token account balance is at least the locked amount
+  - Core asset owner matches the wallet
+  - Core asset collection matches the launched collection
+- Redeem submit now requires a post-confirmation check that the Core asset no longer resolves after the burn instruction.
+- If Core burn/invalidation cannot be verified, redeem transactions are marked `NEEDS_CORE_VERIFY` and the `VaultNFT` DB record is not marked redeemed.
 - Token Metadata fallback remains planned, not implemented.
+
+## Devnet Automation
+
+- `npm --prefix backend run devnet:setup` validates env, RPC, wallet funding, provider settings, storage settings, and program id safety.
+- Optional flags:
+  - `--create-token`
+  - `--mint-test-tokens`
+  - `--create-collection-asset`
+  - `--print-env`
+- `npm --prefix backend run devnet:validate-program` checks that `PROGRAM_ID`, `Anchor.toml`, `declare_id!`, and the deployed devnet account match.
 
 ## Final NFT Storage
 
@@ -40,6 +57,19 @@
 - Final NFT assets can use Pinata pinned IPFS through `FINAL_ASSET_STORAGE_PROVIDER=pinata` and `PINATA_JWT`.
 - Production minting is blocked if `FINAL_ASSET_STORAGE_PROVIDER=mock`.
 - Irys/Arweave support remains planned.
+
+## Community Fee Router
+
+- Prisma now includes `FeeAllocationPlan` and `CommunityTreasuryBucket`.
+- `FeeLedger` tracks gross fee, fixed 1% platform fee, net community amount, preset, routed amounts, and route time.
+- V1 guardrails are enforced in `CommunityFeeRouterService`:
+  - platform fee exactly 100 bps
+  - creator max 2000 bps
+  - raid rewards min 1000 bps
+  - Meteora liquidity + instant sell pool min 1000 bps
+  - safety reserve min 300 bps
+  - community route total exactly 10000 bps
+- Safe Vault invariant remains: locked backing tokens are never routed. Only generated fee events are routable.
 
 ## Generator Quality Review
 
@@ -74,17 +104,19 @@ See `docs/anchor-gap-report.md`.
 
 Key blockers:
 
-- SPL token custody transfer is not implemented.
-- PDA vault token authority is not fully enforced.
-- Vault position state is not fully validated.
-- NFT ownership and collection validation are not complete.
-- Redeem burn/mark-redeemed then release flow is not implemented.
+- `declare_id!` and `Anchor.toml` still use the placeholder program id.
+- SPL token custody transfer is implemented in `deposit_and_mint_vault_nft`.
+- SPL custody release is implemented in `redeem_vault_nft`.
+- Metaplex Core burn/invalidation is implemented in the backend-built redeem transaction, not inside Anchor.
+- Anchor does not parse/verify Metaplex Core ownership or collection on-chain.
+- Anchor tests now contain executable custody/redeem coverage, but have not passed locally because Cargo is missing and the program id is still placeholder.
 - Pause and emergency controls need complete program tests.
 
 ## Public Launch Blockers
 
-- Real Anchor deposit/redeem program implementation.
-- Full Anchor test execution and deployed devnet program validation.
+- Replace the placeholder Anchor program id with a deployed devnet program id.
+- Full Anchor test implementation/execution and deployed devnet program validation.
+- Full devnet E2E execution with funded wallet, SPL token mint, confirmed Core collection asset, Pinata JWT, and deployed program.
 - Backend collection asset transaction confirmation flow.
 - Production-quality asset provider for mascots, backgrounds, trait packs, and legendary/animated assets.
 - Full marketplace execution and fee ledger chain settlement.

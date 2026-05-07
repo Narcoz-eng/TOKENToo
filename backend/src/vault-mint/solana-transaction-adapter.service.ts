@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { burnV1, createV1, fetchAssetV1 } from "@metaplex-foundation/mpl-core";
+import { burnV1, createCollection, createV1, fetchAssetV1 } from "@metaplex-foundation/mpl-core";
 import { createNoopSigner, createSignerFromKeypair, publicKey } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
@@ -78,6 +78,7 @@ export class SolanaTransactionAdapterService {
     nftAssetAddress: string;
     collectionAssetAddress: string;
     vaultPositionPda: string;
+    lockedAmount: string;
   }) {
     const provider = process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock";
     if (provider !== "devnet") {
@@ -99,6 +100,8 @@ export class SolanaTransactionAdapterService {
     const [tokenVaultAuthority] = PublicKey.findProgramAddressSync([Buffer.from(TOKEN_VAULT_AUTHORITY_SEED), collectionProfile.toBuffer()], programId);
     const ownerTokenAccount = this.associatedTokenAddress(tokenMint, owner);
     const vaultTokenAccount = this.associatedTokenAddress(tokenMint, tokenVaultAuthority);
+    const preRedeemUserTokenBalance = await this.tokenBalance(connection, ownerTokenAccount);
+    const preRedeemVaultTokenBalance = await this.tokenBalance(connection, vaultTokenAccount);
     const blockhash = await connection.getLatestBlockhash("confirmed");
     const tx = new Transaction({ feePayer: owner, recentBlockhash: blockhash.blockhash });
     const umi = createUmi(this.rpcUrl());
@@ -106,6 +109,7 @@ export class SolanaTransactionAdapterService {
     const burnBuilder = burnV1(umi, {
       asset: publicKey(nftAsset.toBase58()),
       collection: publicKey(collectionAsset.toBase58()),
+      payer: createNoopSigner(publicKey(owner.toBase58())),
       authority: createNoopSigner(publicKey(owner.toBase58()))
     });
     for (const instruction of burnBuilder.getInstructions()) {
@@ -143,6 +147,9 @@ export class SolanaTransactionAdapterService {
         nftAssetAddress: input.nftAssetAddress,
         collectionAssetAddress: input.collectionAssetAddress,
         vaultPositionPda: input.vaultPositionPda,
+        lockedAmount: input.lockedAmount,
+        preRedeemUserTokenBalance,
+        preRedeemVaultTokenBalance,
         action: "Burn Metaplex Core asset and redeem vault custody atomically."
       }
     };
@@ -155,6 +162,112 @@ export class SolanaTransactionAdapterService {
     const updateAuthority = JSON.stringify(asset.updateAuthority ?? {});
     const collectionMatches = updateAuthority.includes(input.collectionAssetAddress);
     return { ownerMatches, collectionMatches, asset };
+  }
+
+  async verifyMintFinalization(input: {
+    walletAddress: string;
+    tokenMint: string;
+    expectedAmount: string;
+    nftAssetAddress: string;
+    collectionAssetAddress: string;
+    vaultPositionPda: string;
+  }) {
+    const provider = process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock";
+    if (provider !== "devnet") return { passed: true, checks: ["non-devnet adapter does not support chain finalization checks"] };
+
+    const programId = new PublicKey(process.env.PROGRAM_ID ?? "11111111111111111111111111111111");
+    const connection = this.connection();
+    const tokenMint = new PublicKey(input.tokenMint);
+    const [collectionProfile] = PublicKey.findProgramAddressSync([Buffer.from(COLLECTION_SEED), tokenMint.toBuffer()], programId);
+    const [tokenVaultAuthority] = PublicKey.findProgramAddressSync([Buffer.from(TOKEN_VAULT_AUTHORITY_SEED), collectionProfile.toBuffer()], programId);
+    const vaultTokenAccount = this.associatedTokenAddress(tokenMint, tokenVaultAuthority);
+    const vaultPositionInfo = await connection.getAccountInfo(new PublicKey(input.vaultPositionPda), "confirmed");
+    let vaultBalanceAmount = "0";
+    let vaultBalanceError: string | null = null;
+    try {
+      const vaultBalance = await connection.getTokenAccountBalance(vaultTokenAccount, "confirmed");
+      vaultBalanceAmount = vaultBalance.value.amount;
+    } catch (error) {
+      vaultBalanceError = error instanceof Error ? error.message : String(error);
+    }
+    const core = await this.verifyCoreAssetOwnerAndCollection({
+      assetAddress: input.nftAssetAddress,
+      owner: input.walletAddress,
+      collectionAssetAddress: input.collectionAssetAddress
+    });
+    const vaultHasAmount = BigInt(vaultBalanceAmount) >= BigInt(input.expectedAmount);
+    const issues = [
+      !vaultPositionInfo ? "Vault position PDA does not exist after confirmation." : null,
+      vaultBalanceError ? `Vault token account balance could not be fetched: ${vaultBalanceError}` : null,
+      !vaultHasAmount ? "Vault token account balance is below the locked amount." : null,
+      !core.ownerMatches ? "Core asset owner does not match minting wallet." : null,
+      !core.collectionMatches ? "Core asset collection does not match launched collection." : null
+    ].filter(Boolean);
+    return {
+      passed: issues.length === 0,
+      issues,
+      vaultPositionPda: input.vaultPositionPda,
+      vaultTokenAccount: vaultTokenAccount.toBase58(),
+      vaultTokenBalance: vaultBalanceAmount,
+      ownerMatches: core.ownerMatches,
+      collectionMatches: core.collectionMatches
+    };
+  }
+
+  async verifyRedeemFinalization(input: {
+    walletAddress: string;
+    tokenMint: string;
+    nftAssetAddress: string;
+    vaultPositionPda: string;
+    lockedAmount: string;
+    preRedeemUserTokenBalance?: string;
+    preRedeemVaultTokenBalance?: string;
+  }) {
+    const provider = process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock";
+    if (provider !== "devnet") return { passed: true, checks: ["non-devnet adapter does not support chain finalization checks"] };
+
+    const connection = this.connection();
+    const tokenMint = new PublicKey(input.tokenMint);
+    const owner = new PublicKey(input.walletAddress);
+    const ownerTokenAccount = this.associatedTokenAddress(tokenMint, owner);
+    const programId = new PublicKey(process.env.PROGRAM_ID ?? "11111111111111111111111111111111");
+    const [collectionProfile] = PublicKey.findProgramAddressSync([Buffer.from(COLLECTION_SEED), tokenMint.toBuffer()], programId);
+    const [tokenVaultAuthority] = PublicKey.findProgramAddressSync([Buffer.from(TOKEN_VAULT_AUTHORITY_SEED), collectionProfile.toBuffer()], programId);
+    const vaultTokenAccount = this.associatedTokenAddress(tokenMint, tokenVaultAuthority);
+    const vaultPositionInfo = await connection.getAccountInfo(new PublicKey(input.vaultPositionPda), "confirmed");
+    const redeemed = vaultPositionInfo ? this.decodeVaultPositionRedeemed(vaultPositionInfo.data) : false;
+    const postRedeemUserTokenBalance = await this.tokenBalance(connection, ownerTokenAccount);
+    const postRedeemVaultTokenBalance = await this.tokenBalance(connection, vaultTokenAccount);
+    const userIncreased =
+      input.preRedeemUserTokenBalance === undefined ||
+      BigInt(postRedeemUserTokenBalance) >= BigInt(input.preRedeemUserTokenBalance) + BigInt(input.lockedAmount);
+    const vaultDecreased =
+      input.preRedeemVaultTokenBalance === undefined ||
+      BigInt(postRedeemVaultTokenBalance) + BigInt(input.lockedAmount) <= BigInt(input.preRedeemVaultTokenBalance);
+    let coreAssetStillExists = true;
+    try {
+      await fetchAssetV1(createUmi(this.rpcUrl()), publicKey(input.nftAssetAddress));
+    } catch {
+      coreAssetStillExists = false;
+    }
+    const issues = [
+      !vaultPositionInfo ? "Vault position PDA is missing after redeem confirmation." : null,
+      vaultPositionInfo && !redeemed ? "Vault position did not decode as redeemed=true after confirmation." : null,
+      !userIncreased ? "User token balance did not increase by the locked amount." : null,
+      !vaultDecreased ? "Vault token balance did not decrease by the locked amount." : null,
+      coreAssetStillExists ? "Core asset still exists after redeem; NFT was not invalidated/burned." : null
+    ].filter(Boolean);
+    return {
+      passed: issues.length === 0,
+      issues,
+      vaultPositionPda: input.vaultPositionPda,
+      redeemed,
+      preRedeemUserTokenBalance: input.preRedeemUserTokenBalance,
+      postRedeemUserTokenBalance,
+      preRedeemVaultTokenBalance: input.preRedeemVaultTokenBalance,
+      postRedeemVaultTokenBalance,
+      coreAssetInvalidated: !coreAssetStillExists
+    };
   }
 
   async buildCollectionAssetTransaction(input: { walletAddress: string; name: string; metadataUri: string }) {
@@ -172,10 +285,10 @@ export class SolanaTransactionAdapterService {
     const payer = new PublicKey(input.walletAddress);
     const blockhash = await connection.getLatestBlockhash("confirmed");
     const umi = createUmi(this.rpcUrl());
-    const builder = createV1(umi, {
-      asset: createSignerFromKeypair(umi, fromWeb3JsKeypair(collectionKeypair)),
-      authority: createNoopSigner(publicKey(payer.toBase58())),
-      owner: publicKey(payer.toBase58()),
+    const builder = createCollection(umi, {
+      collection: createSignerFromKeypair(umi, fromWeb3JsKeypair(collectionKeypair)),
+      updateAuthority: publicKey(payer.toBase58()),
+      payer: createNoopSigner(publicKey(payer.toBase58())),
       name: input.name.slice(0, 32),
       uri: input.metadataUri
     });
@@ -255,6 +368,7 @@ export class SolanaTransactionAdapterService {
       asset: createSignerFromKeypair(umi, fromWeb3JsKeypair(nftAsset)),
       collection: publicKey(input.collectionAssetAddress),
       authority: createNoopSigner(publicKey(owner.toBase58())),
+      payer: createNoopSigner(publicKey(owner.toBase58())),
       owner: publicKey(owner.toBase58()),
       name: `${input.collectionName} Vault`.slice(0, 32),
       uri: input.metadataUri
@@ -361,6 +475,20 @@ export class SolanaTransactionAdapterService {
 
   private associatedTokenAddress(mint: PublicKey, owner: PublicKey) {
     return PublicKey.findProgramAddressSync([owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()], ASSOCIATED_TOKEN_PROGRAM_ID)[0];
+  }
+
+  private async tokenBalance(connection: Connection, tokenAccount: PublicKey) {
+    try {
+      const balance = await connection.getTokenAccountBalance(tokenAccount, "confirmed");
+      return balance.value.amount;
+    } catch {
+      return "0";
+    }
+  }
+
+  private decodeVaultPositionRedeemed(data: Buffer) {
+    const redeemedOffset = 8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 8;
+    return data.length > redeemedOffset && data[redeemedOffset] === 1;
   }
 
   private createAssociatedTokenAccountIdempotentInstruction(payer: PublicKey, ata: PublicKey, owner: PublicKey, mint: PublicKey) {

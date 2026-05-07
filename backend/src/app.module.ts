@@ -6,6 +6,7 @@ import { RateLimitGuard } from "./auth/rate-limit.guard";
 import { ArtGeneratorService } from "./art-generator/art-generator.service";
 import { PrismaService } from "./db/prisma.service";
 import { FeeEngineService } from "./fee-engine/fee-engine.service";
+import { CommunityFeeRouterService } from "./fee-engine/community-fee-router.service";
 import { GeneratorModule } from "./generator/generator.module";
 import { IdentityEngineService } from "./identity-engine/identity-engine.service";
 import { MarketplaceEngineService } from "./marketplace/marketplace.service";
@@ -27,6 +28,7 @@ import { ProductDataModule } from "./product-data/product-data.module";
     ArtGeneratorService,
     RaidEngineService,
     FeeEngineService,
+    CommunityFeeRouterService,
     RiskService,
     MarketplaceEngineService,
     { provide: APP_GUARD, useClass: RateLimitGuard }

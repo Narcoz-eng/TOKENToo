@@ -143,13 +143,37 @@ export class VaultMintOrchestratorService {
     if (result.confirmed && mockOutputRequested && !this.mockMintEnabled()) {
       throw new BadRequestException("Confirmed mint cannot finalize without real nftMint/coreAssetAddress and vaultPositionPda from the built transaction.");
     }
+    const finalizedNftMint = input.nftMint ?? tx.nftMint ?? (result.confirmed && this.mockMintEnabled() ? `mock_nft_${id.replace(/-/g, "").slice(0, 32)}` : undefined);
+    const finalizedVaultPosition = input.vaultPositionPda ?? tx.vaultPositionPda ?? (result.confirmed && this.mockMintEnabled() ? `mock_position_${id.replace(/-/g, "").slice(0, 32)}` : undefined);
+    if (result.confirmed && finalizedNftMint && finalizedVaultPosition && tx.collection.collectionAssetAddress) {
+      const finalization = await this.solana.verifyMintFinalization({
+        walletAddress: tx.walletAddress,
+        tokenMint: tx.tokenMint,
+        expectedAmount: tx.amount.toString(),
+        nftAssetAddress: finalizedNftMint,
+        collectionAssetAddress: tx.collection.collectionAssetAddress,
+        vaultPositionPda: finalizedVaultPosition
+      });
+      if (!finalization.passed) {
+        await this.prisma.mintTransaction.update({
+          where: { id },
+          data: {
+            status: "FAILED",
+            txSignature: result.txSignature,
+            errorCode: "POST_CONFIRM_CHECK_FAILED",
+            errorMessage: JSON.stringify(finalization.issues ?? finalization)
+          }
+        });
+        throw new BadRequestException("Mint transaction confirmed but post-confirmation chain checks failed.");
+      }
+    }
     const updated = await this.prisma.mintTransaction.update({
       where: { id },
       data: {
         status: result.status,
         txSignature: result.txSignature,
-        nftMint: input.nftMint ?? tx.nftMint ?? (result.confirmed && this.mockMintEnabled() ? `mock_nft_${id.replace(/-/g, "").slice(0, 32)}` : undefined),
-        vaultPositionPda: input.vaultPositionPda ?? tx.vaultPositionPda ?? (result.confirmed && this.mockMintEnabled() ? `mock_position_${id.replace(/-/g, "").slice(0, 32)}` : undefined),
+        nftMint: finalizedNftMint,
+        vaultPositionPda: finalizedVaultPosition,
         confirmedAt: result.confirmed ? new Date() : undefined
       }
     });

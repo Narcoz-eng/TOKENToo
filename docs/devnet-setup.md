@@ -197,9 +197,21 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ## 10. Run Devnet E2E
 
 ```powershell
+npm --prefix backend run devnet:setup
+npm --prefix backend run devnet:setup -- --create-token --mint-test-tokens --print-env
+npm --prefix backend run devnet:setup -- --create-collection-asset --print-env
 npm --prefix backend run db:migrate:deploy
 npm --prefix backend run db:generate
 npm --prefix backend run devnet:e2e
 ```
 
-If the test skips, it prints the exact missing env vars and where to get them.
+`devnet:setup` validates RPC connectivity, wallet funding when `DEVNET_TEST_WALLET_PUBLIC_KEY` is set, and prints the exact commands/env values still needed.
+
+Optional flags:
+
+- `--create-token`: creates a devnet SPL token mint, creates the wallet ATA, mints test tokens, and prints `DEVNET_TEST_TOKEN_MINT`.
+- `--mint-test-tokens`: mints more tokens to the configured devnet test wallet.
+- `--create-collection-asset`: uploads devnet collection metadata to Pinata, creates a Metaplex Core collection asset, signs with `ANCHOR_WALLET`, confirms it, and prints `DEVNET_TEST_COLLECTION_ASSET`.
+- `--print-env`: prints a final redacted `.env` block.
+
+If `devnet:e2e` skips, it prints the exact missing env vars and where to get them. The current script validates/builds the devnet transaction path; full automated signing/submission requires a funded signer path or key management flow and remains a launch blocker until completed.

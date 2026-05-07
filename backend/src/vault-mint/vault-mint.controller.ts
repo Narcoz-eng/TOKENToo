@@ -41,6 +41,11 @@ export class VaultMintController {
     return this.orchestrator.createOrResumeMint({ ...(mintIntentSchema.parse(body) as CreateMintIntentInput), walletAddress });
   }
 
+  @Post("mint/transactions/create")
+  createMintTransactionAlias(@Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.createMintIntent(body, walletAddress);
+  }
+
   @Get("mint/transactions/:id")
   getMintTransaction(@Param("id") id: string, @WalletAddress() walletAddress: string) {
     return this.orchestrator.getMintTransaction(id, walletAddress);

@@ -80,6 +80,26 @@ enum FeeDestination {
   PROTOCOL_TREASURY
   CREATOR_COMMUNITY
   SAFETY_RESERVE
+  METEORA_LIQUIDITY
+  INSTANT_SELL_POOL
+}
+
+enum FeeAllocationPreset {
+  BALANCED
+  LIQUIDITY_FIRST
+  RAID_FIRST
+  DEFENSIVE
+  CUSTOM
+}
+
+enum TreasuryBucketType {
+  CREATOR
+  RAID_REWARDS
+  METEORA_LIQUIDITY
+  INSTANT_SELL_POOL
+  SAFETY_RESERVE
+  BUYBACK_BACKING
+  PROTOCOL
 }
 
 enum GeneratorRunStatus {
@@ -108,6 +128,7 @@ enum TransactionStatus {
   TX_BUILT
   SUBMITTED
   CONFIRMED
+  NEEDS_CORE_VERIFY
   FAILED
   EXPIRED
   CANCELLED
@@ -418,6 +439,8 @@ model Collection {
   listings              Listing[]
   sales                 Sale[]
   feeLedger             FeeLedger[]
+  feeAllocationPlans    FeeAllocationPlan[]
+  treasuryBuckets       CommunityTreasuryBucket[]
   buybackEvents         BuybackEvent[]
   mintTransactions      MintTransaction[]
   instantSellQuotes     InstantSellQuote[]
@@ -811,19 +834,59 @@ model ListingTransaction {
 }
 
 model FeeLedger {
-  id            String          @id @default(uuid()) @db.Uuid
-  collectionId  String          @db.Uuid
-  sourceType    FeeType
-  destination   FeeDestination
-  grossSol      Decimal         @db.Decimal(20, 9)
-  allocatedSol  Decimal         @db.Decimal(20, 9)
-  txSignature   String?
-  metadata      Json?
-  createdAt     DateTime        @default(now())
-  collection    Collection      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  id                       String               @id @default(uuid()) @db.Uuid
+  collectionId             String               @db.Uuid
+  sourceType               FeeType
+  destination              FeeDestination?
+  grossSol                 Decimal              @db.Decimal(20, 9)
+  platformFeeSol           Decimal              @default(0) @db.Decimal(20, 9)
+  netCommunitySol          Decimal              @default(0) @db.Decimal(20, 9)
+  allocatedSol             Decimal              @db.Decimal(20, 9)
+  allocationPreset         FeeAllocationPreset?
+  creatorSol               Decimal              @default(0) @db.Decimal(20, 9)
+  raidRewardsSol           Decimal              @default(0) @db.Decimal(20, 9)
+  meteoraLiquiditySol      Decimal              @default(0) @db.Decimal(20, 9)
+  instantSellPoolSol       Decimal              @default(0) @db.Decimal(20, 9)
+  safetyReserveSol         Decimal              @default(0) @db.Decimal(20, 9)
+  buybackBackingSol        Decimal              @default(0) @db.Decimal(20, 9)
+  txSignature              String?
+  metadata                 Json?
+  routedAt                 DateTime?
+  createdAt                DateTime             @default(now())
+  collection               Collection           @relation(fields: [collectionId], references: [id], onDelete: Cascade)
 
   @@index([collectionId, createdAt])
   @@index([sourceType])
+}
+
+model FeeAllocationPlan {
+  id                    String              @id @default(uuid()) @db.Uuid
+  collectionId          String              @db.Uuid
+  preset                FeeAllocationPreset @default(BALANCED)
+  platformFeeBps        Int                 @default(100)
+  creatorBps            Int                 @default(1000)
+  raidRewardsBps        Int                 @default(3000)
+  meteoraLiquidityBps   Int                 @default(1500)
+  instantSellPoolBps    Int                 @default(1000)
+  safetyReserveBps      Int                 @default(500)
+  buybackBackingBps     Int                 @default(3000)
+  isActive              Boolean             @default(true)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  collection            Collection          @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, isActive])
+}
+
+model CommunityTreasuryBucket {
+  id            String             @id @default(uuid()) @db.Uuid
+  collectionId  String             @db.Uuid
+  bucket        TreasuryBucketType
+  balanceSol    Decimal            @default(0) @db.Decimal(20, 9)
+  updatedAt     DateTime           @updatedAt
+  collection    Collection         @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, bucket])
 }
 
 model BuybackEvent {
