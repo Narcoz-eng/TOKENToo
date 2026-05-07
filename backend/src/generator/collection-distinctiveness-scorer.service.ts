@@ -54,7 +54,7 @@ export class CollectionDistinctivenessScorerService {
     backgroundWorldUniqueness: number,
     traitLanguageUniqueness: number
   ) {
-    const score = average([silhouetteUniqueness, paletteUniqueness, mascotUniqueness, backgroundWorldUniqueness, traitLanguageUniqueness]);
+    const score = average([silhouetteUniqueness, paletteUniqueness, paletteUniqueness, mascotUniqueness, backgroundWorldUniqueness, traitLanguageUniqueness]);
     return {
       silhouetteUniqueness,
       paletteUniqueness,
@@ -62,13 +62,16 @@ export class CollectionDistinctivenessScorerService {
       backgroundWorldUniqueness,
       traitLanguageUniqueness,
       score,
-      passed: score >= 72
+      passed: score >= 72 && paletteUniqueness >= 72
     };
   }
 
   private similarity(style: GeneratedStyleProfile, existing: ExistingStyle) {
     return {
-      palette: this.paletteSimilarity(style.colors, this.stringArray(existing.colors)),
+      palette: Math.max(
+        this.paletteSimilarity(style.colors, this.stringArray(existing.colors)),
+        this.paletteSimilarity(this.paletteFingerprint(style.brandDna?.colorSystem), this.paletteFingerprint(this.brandColorSystem(existing.brandDna)))
+      ),
       mascot: this.wordOverlap([style.mascot], [existing.mascot]) * 100,
       world: this.wordOverlap([style.backgroundWorld], [existing.backgroundWorld]) * 100,
       language: this.wordOverlap(style.traitLanguage, this.stringArray(existing.traitLanguage)) * 100,
@@ -85,8 +88,20 @@ export class CollectionDistinctivenessScorerService {
 
   private paletteSimilarity(left: string[], right: string[]) {
     if (right.length === 0) return 0;
-    const shared = left.filter((color) => right.includes(color)).length;
+    const normalizedRight = right.map((item) => item.toLowerCase());
+    const shared = left.map((color) => color.toLowerCase()).filter((color) => normalizedRight.includes(color)).length;
     return Math.round((shared / Math.max(left.length, right.length)) * 100);
+  }
+
+  private paletteFingerprint(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    const record = value as Record<string, unknown>;
+    return ["primaryColors", "secondaryColors", "accentColors", "glowLightColors", "backgroundColors"].flatMap((key) => this.stringArray(record[key]));
+  }
+
+  private brandColorSystem(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    return (value as Record<string, unknown>).colorSystem;
   }
 
   private wordOverlap(left: string[], right: string[]) {

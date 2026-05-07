@@ -10,5 +10,5 @@ export function validateStartupEnvironment() {
   if ((process.env.LAYER_PACK_PROVIDER ?? "mock") === "mock") issues.push("LAYER_PACK_PROVIDER cannot be mock in production.");
   if ((process.env.LEGENDARY_ASSET_PROVIDER ?? "mock") === "mock") issues.push("LEGENDARY_ASSET_PROVIDER cannot be mock in production.");
   if ((process.env.METAPLEX_NFT_STANDARD ?? "METAPLEX_CORE") !== "METAPLEX_CORE") issues.push("METAPLEX_NFT_STANDARD must be METAPLEX_CORE until the fallback is implemented.");
-  if (issues.length) throw new Error(`VaultX production environment is unsafe: ${issues.join(" ")}`);
+  if (issues.length) throw new Error(`Phew.run production environment is unsafe: ${issues.join(" ")}`);
 }

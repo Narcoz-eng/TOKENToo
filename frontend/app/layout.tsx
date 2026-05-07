@@ -4,8 +4,11 @@ import "./globals.css";
 import { WalletContextProvider } from "@/components/WalletContextProvider";
 
 export const metadata: Metadata = {
-  title: "VaultX",
-  description: "Lock tokens, mint Vault NFTs, raid with your community, and earn rewards."
+  title: "Phew.run",
+  description: "Lock tokens. Mint vault NFTs. Build token communities.",
+  icons: {
+    icon: "/brand/phew-run-logo.svg"
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

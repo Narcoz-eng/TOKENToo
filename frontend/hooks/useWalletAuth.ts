@@ -19,7 +19,7 @@ export function useWalletAuth() {
       setToken(null);
       return;
     }
-    const stored = window.localStorage.getItem(`vaultx.auth.${address}`);
+    const stored = window.localStorage.getItem(`phew.run.auth.${address}`);
     setToken(stored);
   }, [address]);
 
@@ -37,7 +37,7 @@ export function useWalletAuth() {
         signature: bs58.encode(signature),
         challengeToken: challenge.challengeToken
       });
-      window.localStorage.setItem(`vaultx.auth.${address}`, session.accessToken);
+      window.localStorage.setItem(`phew.run.auth.${address}`, session.accessToken);
       setToken(session.accessToken);
       return session.accessToken;
     } catch (err) {
@@ -56,7 +56,7 @@ export function useWalletAuth() {
       headers.set("authorization", `Bearer ${accessToken}`);
       if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
       const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw new Error(await safeErrorMessage(response));
       return response.json() as Promise<T>;
     },
     [login, token]
@@ -81,6 +81,17 @@ async function postJson<T>(path: string, body: unknown) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw new Error(await safeErrorMessage(response));
   return response.json() as Promise<T>;
+}
+
+async function safeErrorMessage(response: Response) {
+  const body = await response.text().catch(() => "");
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown };
+    if (typeof parsed.message === "string") return parsed.message;
+  } catch {
+    // Fall back to raw text.
+  }
+  return body || `Request failed with ${response.status}`;
 }

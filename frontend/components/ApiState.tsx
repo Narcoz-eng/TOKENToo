@@ -3,7 +3,7 @@
 import { AlertTriangle, Loader2, RefreshCcw, Wallet } from "lucide-react";
 import { SectionCard } from "./SectionCard";
 
-export function LoadingState({ label = "Loading VaultX data" }: { label?: string }) {
+export function LoadingState({ label = "Loading Phew.run data" }: { label?: string }) {
   return (
     <SectionCard>
       <div className="flex min-h-48 items-center justify-center gap-3 text-slate-300">

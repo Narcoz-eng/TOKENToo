@@ -53,8 +53,19 @@ export type VaultCollection = {
     visualFx: string[];
     baseVariantCount: number;
     microRandomization: string;
+    colorSystem?: CollectionColorSystem;
   };
   nextUnlocks: string[];
+};
+
+export type CollectionColorSystem = {
+  primaryColors: string[];
+  secondaryColors: string[];
+  accentColors: string[];
+  neutralSupportColors: string[];
+  glowLightColors: string[];
+  backgroundColors: string[];
+  forbiddenColorCombinations: string[];
 };
 
 export type VaultNft = {

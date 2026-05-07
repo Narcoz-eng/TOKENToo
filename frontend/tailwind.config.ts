@@ -12,24 +12,24 @@ const config: Config = {
       colors: {
         vault: {
           ink: "#05070f",
-          panel: "#080d16",
-          panel2: "#0b1320",
-          line: "#182235",
-          purple: "#7a35ff",
-          violet: "#4f1fc7",
-          green: "#21f26b",
-          cyan: "#28d7ff",
+          panel: "#071017",
+          panel2: "#0a1620",
+          line: "#18313a",
+          purple: "#15cfe0",
+          violet: "#0b8da5",
+          green: "#baff00",
+          cyan: "#16d7d2",
           gold: "#f4c542",
           red: "#ff4f70"
         }
       },
       boxShadow: {
-        glow: "0 0 32px rgba(122, 53, 255, 0.28)",
-        green: "0 0 26px rgba(33, 242, 107, 0.24)",
+        glow: "0 0 32px rgba(22, 215, 210, 0.26)",
+        green: "0 0 26px rgba(186, 255, 0, 0.22)",
         card: "0 16px 40px rgba(0, 0, 0, 0.32)"
       },
       backgroundImage: {
-        "vault-radial": "radial-gradient(circle at top left, rgba(122,53,255,.20), transparent 30%), radial-gradient(circle at 80% 20%, rgba(33,242,107,.14), transparent 26%), linear-gradient(180deg, #05070f 0%, #070b13 55%, #05070f 100%)"
+        "vault-radial": "radial-gradient(circle at top left, rgba(22,215,210,.18), transparent 30%), radial-gradient(circle at 80% 20%, rgba(186,255,0,.12), transparent 26%), linear-gradient(180deg, #05070f 0%, #071017 55%, #05070f 100%)"
       }
     }
   },
@@ -37,4 +37,3 @@ const config: Config = {
 };
 
 export default config;
-

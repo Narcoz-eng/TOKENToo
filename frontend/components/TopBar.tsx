@@ -1,8 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import { Bell, ChevronDown, Command, Search } from "lucide-react";
 import { WalletButton } from "./WalletButton";
+import { useWalletDisplay } from "@/hooks/useWalletDisplay";
 
 export function TopBar() {
+  const wallet = useWalletDisplay();
+
   return (
     <header className="sticky top-0 z-20 border-b border-vault-line bg-[#050912]/90 backdrop-blur-xl">
       <div className="flex min-h-20 items-center gap-4 px-4 sm:px-6 lg:px-8">
@@ -24,10 +29,10 @@ export function TopBar() {
           <span className="absolute right-2 top-2 size-2 rounded-full bg-vault-red" />
         </button>
         <Link href="/profile" className="hidden items-center gap-3 sm:flex">
-          <img src="/art/frog-vault-v2.png" alt="FrogMaster avatar" className="size-10 rounded-full border border-vault-purple object-cover" />
+          <img src="/brand/phew-run-logo.svg" alt="Phew.run" className="size-10 rounded-lg border border-vault-purple object-cover" />
           <div className="text-sm">
-            <p className="font-semibold">FrogMaster</p>
-            <p className="text-xs text-vault-purple">OG Raider</p>
+            <p className="font-semibold">{wallet.connected ? wallet.label : "Profile"}</p>
+            <p className="text-xs text-vault-purple">{wallet.connected ? "Wallet connected" : "Connect wallet"}</p>
           </div>
           <ChevronDown className="size-4 text-slate-400" />
         </Link>

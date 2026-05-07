@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2, Palette, RefreshCcw, ShieldCheck, Sparkles, Upload, Wand2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { CollectionPreview } from "@/components/CollectionPreview";
+import { WalletDisconnectedState } from "@/components/ApiState";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
@@ -70,16 +71,16 @@ type GeneratorRun = {
 export default function CreateCollectionPage() {
   const walletAuth = useWalletAuth();
   const [presets, setPresets] = useState<Preset[]>([]);
-  const [selectedPreset, setSelectedPreset] = useState("mystic-pixel-cult");
-  const [tokenName, setTokenName] = useState("Frog Vault Token");
-  const [tokenSymbol, setTokenSymbol] = useState("$FROG");
-  const [tokenMint, setTokenMint] = useState("Frg111111111111111111111111111111111111111");
-  const [logoUri, setLogoUri] = useState("https://example.com/frog-logo.png");
-  const [description, setDescription] = useState("A swamp cult meme community that locks together, raids together, and unlocks toxic legendary traits.");
-  const [memes, setMemes] = useState("lily hands, toxic bog, ribbit raid");
-  const [phrases, setPhrases] = useState("lock the swamp, summon the prophet");
-  const [mascotPreference, setMascotPreference] = useState("frog prophet");
-  const [mood, setMood] = useState("fantasy");
+  const [selectedPreset, setSelectedPreset] = useState("");
+  const [tokenName, setTokenName] = useState("");
+  const [tokenSymbol, setTokenSymbol] = useState("");
+  const [tokenMint, setTokenMint] = useState("");
+  const [logoUri, setLogoUri] = useState("");
+  const [description, setDescription] = useState("");
+  const [memes, setMemes] = useState("");
+  const [phrases, setPhrases] = useState("");
+  const [mascotPreference, setMascotPreference] = useState("");
+  const [mood, setMood] = useState("");
   const [run, setRun] = useState<GeneratorRun | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -177,18 +178,17 @@ export default function CreateCollectionPage() {
   return (
     <AppShell active="create">
       <div className="space-y-5">
+        {!walletAuth.connected ? <WalletDisconnectedState /> : null}
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div>
             <p className="text-sm font-bold uppercase text-vault-purple">Premium NFT Generator</p>
             <h1 className="mt-2 max-w-4xl text-4xl font-black">Create a persisted, art-directed collection identity.</h1>
-            <p className="mt-3 max-w-3xl text-slate-400">
-              This flow now calls the real generator API. Runs, regenerated versions, preview assets, scores, and approval state are stored in Supabase through Prisma.
-            </p>
+            <p className="mt-3 max-w-3xl text-slate-400">Runs, regenerated versions, preview assets, scores, and approval state are loaded from the generator API.</p>
           </div>
           <SectionCard title="Persistence Status">
             <div className="space-y-3">
               <StatusPill accent={run?.status === "APPROVED" ? "green" : run ? "purple" : "gold"}>{run?.status ?? "No Run Yet"}</StatusPill>
-              <p className="text-sm text-slate-400">{run ? `Run ID: ${run.id}` : "Create a run to persist generator state."}</p>
+              <p className="text-sm text-slate-400">{run ? `Run ID: ${run.id}` : "Connect a wallet and enter real token metadata to create a run."}</p>
               {run ? <button onClick={reloadRun} className="h-10 w-full rounded-lg border border-vault-line bg-black/25 text-sm font-bold">Reload Persisted Run</button> : null}
             </div>
           </SectionCard>
@@ -248,8 +248,8 @@ export default function CreateCollectionPage() {
                 {["POST /generator/runs", "GET /generator/runs/:id", "POST regenerate-style", "POST regenerate-previews", "POST approve"].map((label, index) => (
                   <div key={label} className="flex items-center gap-3 rounded-lg bg-black/25 p-3">
                     <Check className={`size-4 ${run && (index === 0 || run.status === "APPROVED") ? "text-vault-green" : "text-slate-500"}`} />
-                    <span>{label}</span>
-                  </div>
+                  <span>{label}</span>
+                </div>
                 ))}
               </div>
             </SectionCard>
@@ -312,8 +312,8 @@ export default function CreateCollectionPage() {
               <CollectionPreview preview={preview} />
             ) : (
               <SectionCard title="No Preview Yet">
-                <div className="rounded-lg border border-dashed border-vault-purple/40 bg-vault-purple/10 p-8 text-center text-slate-300">
-                  Create a generator run to fetch the persisted avatar, banner, sample NFTs, trait table, lore, raid theme, quality report, and distinctiveness report.
+              <div className="rounded-lg border border-dashed border-vault-purple/40 bg-vault-purple/10 p-8 text-center text-slate-300">
+                  Enter real token metadata and create a generator run to fetch persisted avatar, banner, sample NFTs, trait table, lore, raid theme, quality report, and distinctiveness report.
                 </div>
               </SectionCard>
             )}

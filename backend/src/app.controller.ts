@@ -19,7 +19,7 @@ export class AppController {
 
   @Get("health")
   health() {
-    return { ok: true, service: "vaultx-backend" };
+    return { ok: true, service: "phew-run-backend" };
   }
 
   @Get("tokens/:mint/scan")

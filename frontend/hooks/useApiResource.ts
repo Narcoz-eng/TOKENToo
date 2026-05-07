@@ -23,7 +23,7 @@ export function useApiResource<T>(path: string): ApiResourceState<T> {
     setError(null);
     fetch(`${API_BASE_URL}${path}`, { cache: "no-store" })
       .then(async (response) => {
-        if (!response.ok) throw new Error(await response.text());
+        if (!response.ok) throw new Error(await safeErrorMessage(response));
         return response.json() as Promise<T>;
       })
       .then((next) => {
@@ -41,4 +41,15 @@ export function useApiResource<T>(path: string): ApiResourceState<T> {
   }, [path, version]);
 
   return { data, loading, error, reload: () => setVersion((value) => value + 1) };
+}
+
+async function safeErrorMessage(response: Response) {
+  const body = await response.text().catch(() => "");
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown };
+    if (typeof parsed.message === "string") return parsed.message;
+  } catch {
+    // Fall back to the raw response text below.
+  }
+  return body || `Request failed with ${response.status}`;
 }

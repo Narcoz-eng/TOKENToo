@@ -104,6 +104,7 @@ export type BrandDNA = {
   mintAddress: string;
   logoPalette: string[];
   logoDerivedColors: string[];
+  colorSystem: CollectionColorSystem;
   mascotArchetype: string;
   memeLanguage: string[];
   lore: string;
@@ -117,6 +118,16 @@ export type BrandDNA = {
   legendaryDirection: string;
   forbiddenSimilarities: string[];
   sourceMetadataSummary: Record<string, unknown>;
+};
+
+export type CollectionColorSystem = {
+  primaryColors: string[];
+  secondaryColors: string[];
+  accentColors: string[];
+  neutralSupportColors: string[];
+  glowLightColors: string[];
+  backgroundColors: string[];
+  forbiddenColorCombinations: string[];
 };
 
 export type TenKReadinessReport = {

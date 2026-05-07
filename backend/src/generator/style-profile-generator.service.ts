@@ -29,12 +29,14 @@ export class StyleProfileGeneratorService {
 
     const lore = this.lore(input, analysis, context, theme, world);
     const tenKReadiness = this.tenKReadiness(input, analysis);
+    const colorSystem = this.collectionColorSystem(analysis.palette, input.hints?.colorPreference);
     const brandDna = {
       tokenSymbol: input.tokenSymbol,
       tokenName: input.tokenName,
       mintAddress: input.tokenMint,
       logoPalette: analysis.palette,
       logoDerivedColors: analysis.palette,
+      colorSystem,
       mascotArchetype: analysis.mascot,
       memeLanguage: unique([...context.memes, ...context.phrases, ...context.slogans, ...context.extractedVocabulary]).slice(0, 24),
       lore,
@@ -78,7 +80,7 @@ export class StyleProfileGeneratorService {
       visualFingerprint: {
         mascotArchetype: analysis.mascot,
         silhouetteFamily: analysis.shapeLanguage,
-        palette: analysis.palette,
+        palette: colorSystem,
         backgroundWorld: world,
         traitVocabulary: traitLanguage,
         compositionType: assetPack.compositionRules,
@@ -108,6 +110,23 @@ export class StyleProfileGeneratorService {
       silhouetteDominanceRisk: analysis.shapeLanguage.toLowerCase().includes("generic"),
       shallowCategories: [],
       pass: Boolean(input.logoUri || input.logoData) && !analysis.shapeLanguage.toLowerCase().includes("generic")
+    };
+  }
+
+  private collectionColorSystem(palette: string[], colorPreference?: string) {
+    const cleanPalette = unique([...palette, ...(colorPreference ? [colorPreference] : [])]).slice(0, 8);
+    const [primary = "#7cff00", secondary = "#16d7d2", accent = "#f4c542"] = cleanPalette;
+    return {
+      primaryColors: [primary],
+      secondaryColors: [secondary],
+      accentColors: cleanPalette.slice(2, 5).length ? cleanPalette.slice(2, 5) : [accent],
+      neutralSupportColors: ["#031017", "#0f172a", "#e5f7f5"],
+      glowLightColors: cleanPalette.slice(0, 3),
+      backgroundColors: ["#031017", "#07131b", secondary],
+      forbiddenColorCombinations: [
+        "Do not reuse the global Phew.run platform palette as the collection identity.",
+        "Do not approve palettes that collapse into an existing collection color system."
+      ]
     };
   }
 }

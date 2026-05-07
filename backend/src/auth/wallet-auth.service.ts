@@ -13,11 +13,11 @@ export class WalletAuthService {
     const nonce = randomBytes(16).toString("hex");
     const expiresAt = Date.now() + 5 * 60 * 1000;
     const message = [
-      "VaultX wallet login",
+      "Phew.run wallet login",
       `Wallet: ${wallet}`,
       `Nonce: ${nonce}`,
       `Expires: ${new Date(expiresAt).toISOString()}`,
-      "Only sign this message on vaultx.io or your local VaultX dev server."
+      "Only sign this message on phew.run or your local Phew.run dev server."
     ].join("\n");
     const challengeToken = this.sign({ walletAddress: wallet, exp: expiresAt, nonce });
     return { walletAddress: wallet, message, challengeToken, expiresAt };
@@ -76,7 +76,7 @@ export class WalletAuthService {
   }
 
   private hmac(body: string) {
-    return createHmac("sha256", process.env.WALLET_AUTH_SECRET ?? process.env.GENERATOR_SEED_SALT ?? "vaultx-dev-secret")
+    return createHmac("sha256", process.env.WALLET_AUTH_SECRET ?? process.env.GENERATOR_SEED_SALT ?? "phew-run-dev-secret")
       .update(body)
       .digest("base64url");
   }

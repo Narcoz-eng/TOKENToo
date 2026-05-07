@@ -21,7 +21,7 @@ type ProductData = {
   collection?: VaultCollection;
   nfts?: VaultNft[];
   raids?: RaidRoom[];
-  stats?: Record<string, number>;
+  stats?: Record<string, number | null>;
   walletRequired?: boolean;
   walletAddress?: string;
   positions?: unknown[];
@@ -32,27 +32,29 @@ type ProductData = {
 
 export function ProductDataPage({ active, title, endpoint, walletRequired, children }: { active: string; title: string; endpoint: string; walletRequired?: boolean; children?: (data: ProductData) => React.ReactNode }) {
   const wallet = useWalletDisplay();
+  const blockedByWallet = Boolean(walletRequired && !wallet.connected);
   const walletPath = wallet.address ? `${endpoint}${endpoint.includes("?") ? "&" : "?"}wallet=${encodeURIComponent(wallet.address)}` : endpoint;
-  const state = useApiResource<ProductData>(walletPath);
+  const state = useApiResource<ProductData | VaultCollection[] | VaultNft[] | RaidRoom[]>(walletPath);
+  const data = normalizeProductData(endpoint, state.data);
 
   return (
-    <AppShell active={active}>
+    <AppShell active={active} stats={data?.stats}>
       <div className="space-y-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-bold uppercase text-vault-purple">API-backed</p>
             <h1 className="mt-2 text-4xl font-black">{title}</h1>
-            <p className="mt-2 max-w-3xl text-slate-400">This page now reads persisted VaultX API state and shows loading, empty, error, and wallet-disconnected states instead of prototype mock data.</p>
+            <p className="mt-2 max-w-3xl text-slate-400">Real token-backed vault NFTs, communities, raids, and liquidity tools on Solana.</p>
           </div>
           <Link href="/create-collection" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow">
             <UserPlus className="size-4" /> Create Community
           </Link>
         </div>
 
-        {walletRequired && !wallet.connected ? <WalletDisconnectedState /> : null}
-        {state.loading ? <LoadingState /> : null}
-        {state.error ? <ErrorState error={state.error} retry={state.reload} /> : null}
-        {!state.loading && !state.error && state.data ? children ? children(state.data) : <DefaultProductView data={state.data} /> : null}
+        {blockedByWallet ? <WalletDisconnectedState /> : null}
+        {!blockedByWallet && state.loading ? <LoadingState /> : null}
+        {!blockedByWallet && state.error ? <ErrorState error={state.error} retry={state.reload} /> : null}
+        {!blockedByWallet && !state.loading && !state.error && data ? children ? children(data) : <DefaultProductView data={data} /> : null}
       </div>
     </AppShell>
   );
@@ -64,7 +66,7 @@ export function DefaultProductView({ data }: { data: ProductData }) {
   const raids = data.raids ?? [];
 
   if (!collections.length && !nfts.length && !raids.length && !data.stats) {
-    return <EmptyState title="No persisted data yet" body="Create and approve a community, launch it, then mint a Vault NFT to populate this page from Supabase." action={<Link href="/create-collection" className="inline-flex h-11 items-center justify-center rounded-lg bg-vault-purple px-5 text-sm font-bold">Start Create Community</Link>} />;
+    return <EmptyState title="No communities yet" body="Create and approve a community, launch it, then mint a vault NFT to populate this page from the API." action={<Link href="/create-collection" className="inline-flex h-11 items-center justify-center rounded-lg bg-vault-purple px-5 text-sm font-bold">Start Create Community</Link>} />;
   }
 
   return (
@@ -108,4 +110,12 @@ export function DefaultProductView({ data }: { data: ProductData }) {
       </SectionCard>
     </div>
   );
+}
+
+function normalizeProductData(endpoint: string, data: ProductData | VaultCollection[] | VaultNft[] | RaidRoom[] | null): ProductData | null {
+  if (!data) return null;
+  if (!Array.isArray(data)) return data;
+  if (endpoint.includes("/raids")) return { raids: data as RaidRoom[] };
+  if (endpoint.includes("/nfts")) return { nfts: data as VaultNft[] };
+  return { collections: data as VaultCollection[] };
 }

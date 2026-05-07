@@ -249,7 +249,7 @@ function stateCopy(status: string) {
   const copy: Record<string, string> = {
     PENDING: "Intent exists and can be safely retried with the same idempotency key.",
     ASSET_UPLOADED: "Final image and metadata have immutable storage URIs.",
-    TX_BUILT: "Wallet can sign the generated VaultX + Metaplex transaction plan.",
+    TX_BUILT: "Wallet can sign the generated Phew.run + Metaplex transaction plan.",
     CONFIRMED: "A Vault NFT row is created only after confirmed chain state."
   };
   return copy[status] ?? status;

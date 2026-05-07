@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import Image from "next/image";
 import {
   BarChart3,
   Bell,
@@ -17,6 +20,7 @@ import {
   Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWalletDisplay } from "@/hooks/useWalletDisplay";
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home, key: "home" },
@@ -31,15 +35,24 @@ const navItems = [
   { href: "/admin/risk", label: "Risk Admin", icon: ShieldAlert, key: "risk" }
 ];
 
-export function Sidebar({ active }: { active: string }) {
+type SidebarStats = {
+  collections?: number | null;
+  nfts?: number | null;
+  totalVaults?: number | null;
+  tvlUsd?: number | null;
+};
+
+export function Sidebar({ active, stats }: { active: string; stats?: SidebarStats }) {
+  const wallet = useWalletDisplay();
+  const communities = typeof stats?.collections === "number" ? stats.collections.toLocaleString() : "0";
+  const totalVaults = typeof stats?.totalVaults === "number" ? stats.totalVaults.toLocaleString() : typeof stats?.nfts === "number" ? stats.nfts.toLocaleString() : "—";
+  const tvl = typeof stats?.tvlUsd === "number" ? `$${stats.tvlUsd.toLocaleString()}` : "—";
+
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-vault-line bg-[#050912]/95 lg:block">
       <div className="flex h-full flex-col">
         <Link href="/home" className="flex h-20 items-center gap-3 border-b border-vault-line px-6">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-vault-purple/20 text-vault-purple">
-            <ShieldLogo />
-          </div>
-          <span className="text-2xl font-black tracking-normal">VAULT<span className="text-vault-purple">X</span></span>
+          <Image src="/brand/phew-run-logo.svg" alt="Phew.run" width={136} height={46} className="h-12 w-auto object-contain" priority />
         </Link>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-5">
@@ -70,18 +83,18 @@ export function Sidebar({ active }: { active: string }) {
               <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-vault-green to-vault-purple">
                 <Coins className="size-5 text-white" />
               </div>
-              <div className="text-sm">
-                <p>9x...7Q3e</p>
-                <p className="text-slate-400">12.45 SOL</p>
+              <div className="min-w-0 text-sm">
+                <p className="truncate">{wallet.connected ? wallet.label : "Wallet disconnected"}</p>
+                <p className="text-slate-400">{wallet.connected && wallet.balanceSol !== null ? `${wallet.balanceSol.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL` : wallet.connected ? "Balance unavailable" : "Connect wallet to view balance"}</p>
               </div>
             </div>
           </div>
           <div className="glass rounded-lg p-3">
             <p className="text-xs uppercase text-slate-400">Platform Stats</p>
             <div className="mt-3 space-y-3 text-sm">
-              <SidebarMetric label="Total Value Locked" value="$18,420,693" />
-              <SidebarMetric label="Total Vaults" value="4,523" />
-              <SidebarMetric label="Communities" value="128" />
+              <SidebarMetric label="Total Value Locked" value={tvl} />
+              <SidebarMetric label="Total Vaults" value={totalVaults} />
+              <SidebarMetric label="Communities" value={communities} />
             </div>
             <Link href="/admin/risk" className="mt-4 flex h-10 items-center justify-center rounded-lg bg-vault-purple text-sm font-semibold">
               View Analytics
@@ -104,17 +117,6 @@ function SidebarMetric({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-slate-500">{label}</p>
       <p className="font-bold text-white">{value}</p>
-      <p className="text-xs font-semibold text-vault-green">+24.8%</p>
     </div>
   );
 }
-
-function ShieldLogo() {
-  return (
-    <svg viewBox="0 0 32 32" className="size-6" aria-hidden="true">
-      <path fill="currentColor" d="M16 3 29 8v6c0 8-5.4 13.1-13 15C8.4 27.1 3 22 3 14V8l13-5Z" />
-      <path fill="#21f26b" d="m8 10 8 4 8-4v4l-8 4-8-4v-4Z" />
-    </svg>
-  );
-}
-
