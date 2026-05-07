@@ -52,10 +52,10 @@ function BaseFlow({
     setDetail(null);
     try {
       const result = await onRun();
-      setStatus("success");
+      setStatus("confirmed");
       setDetail(result.message ?? null);
     } catch (error) {
-      setStatus("error");
+      setStatus("failed");
       setDetail(error instanceof Error ? error.message : "Transaction failed");
     }
   }
@@ -65,10 +65,10 @@ function BaseFlow({
       <p className="text-sm font-black uppercase text-white">{title}</p>
       {animation === "stake" ? <StakeAnimation active={status === "pending"} rarity="Epic" label={status === "pending" ? "Lock-in" : "Stake"} /> : null}
       {animation === "unstake" ? <UnstakeAnimation active={status === "pending"} rarity="Rare" label={status === "pending" ? "Unlock" : "Unstake"} /> : null}
-      {animation === "claim" ? <RewardBurstAnimation active={status === "pending" || status === "success"} rarity="Rare" label={status === "success" ? "Claimed" : "Rewards"} /> : null}
+      {animation === "claim" ? <RewardBurstAnimation active={status === "pending" || status === "confirmed"} rarity="Rare" label={status === "confirmed" ? "Claimed" : "Rewards"} /> : null}
       {status === "pending" ? <ProgressBar value={62} label={pendingLabel} /> : null}
-      <TransactionStatus status={status} label={status === "pending" ? pendingLabel : status === "success" ? successLabel : status === "error" ? "Action failed" : idleLabel} detail={detail} />
-      <AnimatedButton tone="outline" icon={icon} loading={status === "pending"} success={status === "success"} onClick={run}>
+      <TransactionStatus status={status} label={status === "pending" ? pendingLabel : status === "confirmed" ? successLabel : status === "failed" ? "Action failed" : idleLabel} detail={detail} />
+      <AnimatedButton tone="outline" icon={icon} loading={status === "pending"} success={status === "confirmed"} onClick={run}>
         {buttonLabel}
       </AnimatedButton>
     </div>

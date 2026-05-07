@@ -9,7 +9,10 @@ export function LoadingState({ label = "Loading Phew.run data" }: { label?: stri
   return (
     <SectionCard>
       <div className="flex min-h-48 items-center justify-center gap-3 text-slate-300">
-        <Loader2 className="size-5 animate-spin text-vault-purple" />
+        <div className="relative size-14 overflow-hidden rounded-md border border-vault-green/30 bg-black/40 shadow-green">
+          <img src={brandAssets.actionIcons} alt="" className="h-full w-full object-cover opacity-80" />
+          <Loader2 className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 animate-spin text-vault-green" />
+        </div>
         {label}
       </div>
     </SectionCard>

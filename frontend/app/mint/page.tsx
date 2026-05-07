@@ -15,6 +15,7 @@ import type { VaultCollection } from "@/lib/types";
 import { AnimatedButton } from "@/components/AnimatedButton";
 import { MintRevealAnimation, ParticleBurst } from "@/components/animations";
 import { brandAssets } from "@/lib/brand-assets";
+import { TransactionStatus, type TxStatus } from "@/components/TransactionStatus";
 
 export default function MintPage() {
   const wallet = useWalletAuth();
@@ -25,7 +26,7 @@ export default function MintPage() {
   const [lockDurationDays, setLockDurationDays] = useState(90);
   const [collectionId, setCollectionId] = useState("");
   const [mintState, setMintState] = useState<any>(null);
-  const [visualState, setVisualState] = useState<"idle" | "pending" | "built" | "success">("idle");
+  const [txStatus, setTxStatus] = useState<TxStatus>("idle");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const collection = collections.find((item) => item.id === collectionId || item.dbId === collectionId) ?? defaultCollection;
@@ -36,9 +37,10 @@ export default function MintPage() {
       return;
     }
     setLoading(true);
-    setVisualState("pending");
+    setTxStatus("validating");
     setError(null);
     try {
+      setTxStatus("pending");
       const data = await wallet.authFetch<any>("/vault/mint/intents", {
         method: "POST",
         body: JSON.stringify({
@@ -50,9 +52,11 @@ export default function MintPage() {
         })
       });
       setMintState(data);
-      setVisualState("built");
+      setTxStatus("idle");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Mint intent failed");
+      const message = err instanceof Error ? err.message : "Mint intent failed";
+      setError(message);
+      setTxStatus("failed");
     } finally {
       setLoading(false);
     }
@@ -61,13 +65,15 @@ export default function MintPage() {
   async function buildTransaction() {
     if (!mintState?.id) return setError("Create a mint intent first.");
     setLoading(true);
-    setVisualState("pending");
+    setTxStatus("pending");
     setError(null);
     try {
       setMintState(await wallet.authFetch<any>(`/vault/mint/transactions/${mintState.id}/build`, { method: "POST" }));
-      setVisualState("built");
+      setTxStatus("idle");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Transaction build failed");
+      const message = err instanceof Error ? err.message : "Transaction build failed";
+      setError(message);
+      setTxStatus("failed");
     } finally {
       setLoading(false);
     }
@@ -78,19 +84,22 @@ export default function MintPage() {
     const base64 = mintState.unsignedTransaction?.base64UnsignedTransaction;
     if (!base64) return setError("The backend did not return a signable devnet transaction.");
     setLoading(true);
-    setVisualState("pending");
+    setTxStatus("signing");
     setError(null);
     try {
       const signedTransactionBase64 = await wallet.signTransactionBase64(base64);
+      setTxStatus("pending");
       setMintState(
         await wallet.authFetch<any>(`/vault/mint/transactions/${mintState.id}/submit`, {
           method: "POST",
           body: JSON.stringify({ signedTransactionBase64 })
         })
       );
-      setVisualState("success");
+      setTxStatus("confirmed");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Wallet signing or submission failed");
+      const message = err instanceof Error ? err.message : "Wallet signing or submission failed";
+      setError(message);
+      setTxStatus("failed");
     } finally {
       setLoading(false);
     }
@@ -155,7 +164,7 @@ export default function MintPage() {
                   </div>
                 </div>
                 {error ? <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</div> : null}
-                <AnimatedButton type="button" onClick={createIntent} loading={loading && visualState === "pending"} className="h-12 w-full" icon={ArrowRight}>
+                <AnimatedButton type="button" onClick={createIntent} loading={loading && (txStatus === "validating" || txStatus === "pending")} className="h-12 w-full" icon={ArrowRight}>
                   Create Mint Intent
                 </AnimatedButton>
                 <div className="grid gap-2 md:grid-cols-2">
@@ -167,8 +176,8 @@ export default function MintPage() {
                   </AnimatedButton>
                 </div>
               </form>
-              <div className={`relative overflow-hidden rounded-lg border border-vault-line bg-black/25 p-4 ${visualState === "pending" ? "shadow-green" : ""}`}>
-                <ParticleBurst active={visualState === "success"} rarity="Legendary" />
+              <div className={`relative overflow-hidden rounded-lg border border-vault-line bg-black/25 p-4 ${txStatus === "pending" || txStatus === "signing" ? "shadow-green" : ""}`}>
+                <ParticleBurst active={txStatus === "confirmed"} rarity="Legendary" />
                 <img src={collection.image} alt="" className="aspect-square w-full rounded-lg object-cover" />
                 <div className="mt-4 space-y-3">
                   <PreviewRow label="Collection" value={collection.name} />
@@ -204,7 +213,10 @@ export default function MintPage() {
           </SectionCard>
 
           <SectionCard title="Mint Animation">
-            <MintRevealAnimation rarity={visualState === "success" ? "Legendary" : "Epic"} label={visualState === "success" ? "Vault revealed" : visualState === "pending" ? "Sealing vault" : "Ready to mint"} />
+            <MintRevealAnimation rarity={txStatus === "confirmed" ? "Legendary" : "Epic"} label={txStatus === "confirmed" ? "Vault revealed" : txStatus === "pending" || txStatus === "signing" ? "Sealing vault" : "Ready to mint"} />
+            <div className="mt-4">
+              <TransactionStatus status={txStatus} label={mintStatusLabel(txStatus)} detail={error} />
+            </div>
           </SectionCard>
 
           <SectionCard title="Mint Safety Rules">
@@ -272,4 +284,16 @@ function stateCopy(status: string) {
     CONFIRMED: "A Vault NFT row is created only after confirmed chain state."
   };
   return copy[status] ?? status;
+}
+
+function mintStatusLabel(status: TxStatus) {
+  const labels: Record<TxStatus, string> = {
+    idle: "Ready for mint action",
+    validating: "Validating wallet and collection",
+    signing: "Waiting for wallet signature",
+    pending: "Transaction pending",
+    confirmed: "Vault mint confirmed",
+    failed: "Mint action failed"
+  };
+  return labels[status];
 }

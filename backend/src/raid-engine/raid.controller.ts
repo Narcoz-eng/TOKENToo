@@ -23,10 +23,19 @@ const claimSchema = z.object({
   proof: z.record(z.string(), z.unknown()).optional()
 });
 
+const joinSchema = z.object({
+  idempotencyKey: z.string().optional()
+});
+
 @Controller("raids")
 @UseGuards(WalletAuthGuard)
 export class RaidController {
   constructor(private readonly raids: RaidEngineService) {}
+
+  @Post(":raidRoomId/join")
+  joinRaid(@Param("raidRoomId") raidRoomId: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.raids.joinRaid({ raidRoomId, ...joinSchema.parse(body), walletAddress });
+  }
 
   @Post(":raidRoomId/missions/:missionId/claims/validate")
   validateClaim(@Param("raidRoomId") raidRoomId: string, @Param("missionId") raidMissionId: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {

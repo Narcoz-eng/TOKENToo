@@ -16,6 +16,11 @@ const quoteSchema = z.object({
   backingValueSol: z.number().positive()
 });
 
+const purchaseSchema = z.object({
+  listingId: z.string().min(1),
+  idempotencyKey: z.string().optional()
+});
+
 @Controller("marketplace")
 export class MarketplaceController {
   constructor(private readonly marketplace: MarketplaceEngineService) {}
@@ -35,5 +40,11 @@ export class MarketplaceController {
   @UseGuards(WalletAuthGuard)
   instantSellQuote(@Body() body: unknown, @WalletAddress() walletAddress: string) {
     return this.marketplace.persistInstantSellQuote({ ...quoteSchema.parse(body), walletAddress });
+  }
+
+  @Post("purchases/intents")
+  @UseGuards(WalletAuthGuard)
+  createPurchaseIntent(@Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.marketplace.createPurchaseIntent({ ...purchaseSchema.parse(body), walletAddress });
   }
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, NotImplementedException } from "@nestjs/common";
 import { FeeEngineService } from "../fee-engine/fee-engine.service";
 import { PrismaService } from "../db/prisma.service";
 import { RiskService } from "../risk/risk.service";
@@ -114,6 +114,18 @@ export class MarketplaceEngineService {
         riskTier: this.riskTier(vault.collection.token.riskScore),
         expiresAt: new Date(Date.now() + 5 * 60 * 1000)
       }
+    });
+  }
+
+  createPurchaseIntent(input: { listingId: string; walletAddress: string; idempotencyKey?: string }): never {
+    throw new NotImplementedException({
+      code: "ACTION_NOT_IMPLEMENTED",
+      action: "PURCHASE_LISTING",
+      message: "PURCHASE_LISTING is not implemented on the backend yet.",
+      nextStep: "Wire listing purchase escrow/transfer orchestration before enabling production success states.",
+      listingId: input.listingId,
+      walletAddress: input.walletAddress,
+      idempotencyKey: input.idempotencyKey
     });
   }
 

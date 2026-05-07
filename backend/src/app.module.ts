@@ -22,10 +22,12 @@ import { CapabilitiesService } from "./system/capabilities.service";
 import { TokenMetadataController } from "./token-metadata/token-metadata.controller";
 import { TokenMetadataService } from "./token-metadata/token-metadata.service";
 import { AssetStorageService } from "./generator/asset-storage.service";
+import { StakingController } from "./staking/staking.controller";
+import { StakingService } from "./staking/staking.service";
 
 @Module({
   imports: [AuthModule, GeneratorModule, VaultMintModule, ProductDataModule],
-  controllers: [AppController, MarketplaceController, RaidController, SystemController, TokenMetadataController],
+  controllers: [AppController, MarketplaceController, RaidController, StakingController, SystemController, TokenMetadataController],
   providers: [
     PrismaService,
     TokenScannerService,
@@ -36,6 +38,7 @@ import { AssetStorageService } from "./generator/asset-storage.service";
     CommunityFeeRouterService,
     RiskService,
     MarketplaceEngineService,
+    StakingService,
     CapabilitiesService,
     TokenMetadataService,
     AssetStorageService,

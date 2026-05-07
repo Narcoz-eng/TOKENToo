@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, NotImplementedException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import type { RaidScoreInput } from "../types";
@@ -20,6 +20,18 @@ export class RaidEngineService {
         scoreByValue: true
       }
     };
+  }
+
+  joinRaid(input: { raidRoomId: string; walletAddress: string; idempotencyKey?: string }): never {
+    throw new NotImplementedException({
+      code: "ACTION_NOT_IMPLEMENTED",
+      action: "JOIN_RAID",
+      message: "JOIN_RAID is not implemented on the backend yet.",
+      nextStep: "Persist raid participation and anti-abuse eligibility before enabling production success states.",
+      raidRoomId: input.raidRoomId,
+      walletAddress: input.walletAddress,
+      idempotencyKey: input.idempotencyKey
+    });
   }
 
   scoreMission(input: RaidScoreInput) {

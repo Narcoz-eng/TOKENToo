@@ -7,18 +7,37 @@ import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
 import { ParticleBurst } from "./animations";
 import { brandAssets } from "@/lib/brand-assets";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
 
 export function RaidCard({ raid, collection }: { raid: RaidRoom; collection?: VaultCollection }) {
-  const [state, setState] = useState<"idle" | "joining" | "joined">("idle");
+  const wallet = useWalletAuth();
+  const [state, setState] = useState<"idle" | "validating" | "pending" | "confirmed" | "failed">("idle");
+  const [error, setError] = useState<string | null>(null);
 
-  function joinRaid() {
-    setState("joining");
-    window.setTimeout(() => setState("joined"), 900);
+  async function joinRaid() {
+    setError(null);
+    if (!wallet.connected) {
+      setState("failed");
+      setError("Connect and authenticate your wallet before joining a raid.");
+      return;
+    }
+    setState("validating");
+    try {
+      setState("pending");
+      await wallet.authFetch(`/raids/${raid.id}/join`, {
+        method: "POST",
+        body: JSON.stringify({ idempotencyKey: `${wallet.address}:join:${raid.id}` })
+      });
+      setState("confirmed");
+    } catch (err) {
+      setState("failed");
+      setError(err instanceof Error ? err.message : "Join raid failed");
+    }
   }
 
   return (
-    <article className={`phew-panel phew-card-hover relative overflow-hidden rounded-lg ${state === "joining" ? "shadow-green" : ""}`}>
-      <ParticleBurst active={state === "joined"} rarity="Epic" />
+    <article className={`phew-panel phew-card-hover relative overflow-hidden rounded-lg ${state === "pending" ? "shadow-green" : ""}`}>
+      <ParticleBurst active={state === "confirmed"} rarity="Epic" />
       <div className="relative h-36 overflow-hidden">
         <img src={collection?.banner || brandAssets.vaultHero} alt={raid.name} className="h-full w-full object-cover opacity-80" />
         <div className="absolute inset-0 bg-gradient-to-t from-vault-ink to-transparent" />
@@ -45,8 +64,9 @@ export function RaidCard({ raid, collection }: { raid: RaidRoom; collection?: Va
             <p className="font-semibold text-vault-green">{raid.rewardSol.toLocaleString()} SOL</p>
           </div>
         </div>
-        <button onClick={joinRaid} className="phew-button phew-button-primary flex h-10 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black">
-          <Shield className="size-4" /> {state === "joining" ? "Syncing" : state === "joined" ? "Raid Joined" : raid.status === "Live" ? "Join Raid" : "View Details"}
+        {error ? <p className="rounded-md border border-vault-red/40 bg-vault-red/10 p-2 text-xs text-vault-red">{error}</p> : null}
+        <button onClick={joinRaid} disabled={state === "validating" || state === "pending"} className="phew-button phew-button-primary flex h-10 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black disabled:opacity-60">
+          <Shield className="size-4" /> {state === "validating" ? "Validating" : state === "pending" ? "Joining" : state === "confirmed" ? "Raid Joined" : raid.status === "Live" ? "Join Raid" : "View Details"}
         </button>
       </div>
     </article>

@@ -22,6 +22,7 @@ import {
   Zap
 } from "lucide-react";
 import { useWalletDisplay } from "@/hooks/useWalletDisplay";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { useApiResource } from "@/hooks/useApiResource";
 import type { VaultCollection, VaultNft, RaidRoom } from "@/lib/types";
 import { AppShell } from "./AppShell";
@@ -343,7 +344,7 @@ function CollectionDetailView({ data }: { data: ProductData }) {
             </div>
           </SectionCard>
           <SectionCard id="vault-nfts" title="Vault NFT Preview">
-            {nfts.length ? <MarketplaceGrid items={nfts} collections={[collection]} /> : <EmptyBlock title="No minted vault NFTs" body="Vault NFT cards appear here after confirmed mint transactions." />}
+            {nfts.length ? <MarketplaceGrid items={nfts} collections={[collection]} listings={data.listings} /> : <EmptyBlock title="No minted vault NFTs" body="Vault NFT cards appear here after confirmed mint transactions." />}
           </SectionCard>
           <SectionCard id="raids" title="Raids">
             {raids.length ? <div className="grid gap-3">{raids.map((raid) => <RaidCard key={raid.id} raid={raid} collection={collection} />)}</div> : <EmptyBlock title="No raid rooms yet" body="Raid rooms will appear after this community schedules them." />}
@@ -399,7 +400,7 @@ function MarketplaceView({ data }: { data: ProductData }) {
         <StatCard icon={Shield} label="Backed inventory" value={formatMetric(nfts.length)} accent="green" />
         <StatCard icon={AlertTriangle} label="Price source" value={(data.listings ?? []).length ? "Live listings" : "No listings"} accent="gold" />
       </div>
-      {nfts.length ? <MarketplaceGrid items={nfts} collections={collections} /> : <EmptyState title="No marketplace listings" body="Listings appear only after real active listings or vault NFTs are returned by the API. No production prices are invented." />}
+      {nfts.length ? <MarketplaceGrid items={nfts} collections={collections} listings={data.listings} /> : <EmptyState title="No marketplace listings" body="Listings appear only after real active listings or vault NFTs are returned by the API. No production prices are invented." />}
     </div>
   );
 }
@@ -433,7 +434,32 @@ function RaidsView({ data }: { data: ProductData }) {
 }
 
 function StakingView({ data }: { data: ProductData }) {
+  const wallet = useWalletAuth();
   const positions = data.positions ?? [];
+  const firstPosition = getPositionId(positions[0]);
+
+  async function stakeVault(): Promise<{ message?: string }> {
+    if (!wallet.connected) throw new Error("Connect and authenticate your wallet before staking.");
+    throw new Error("Select an eligible owned Vault NFT before creating a stake intent.");
+  }
+
+  async function unstakeVault() {
+    if (!wallet.connected) throw new Error("Connect and authenticate your wallet before unstaking.");
+    if (!firstPosition) throw new Error("No staking position is available to unstake.");
+    return wallet.authFetch<{ message?: string }>("/staking/unstake/intents", {
+      method: "POST",
+      body: JSON.stringify({ stakingPositionId: firstPosition, idempotencyKey: `${wallet.address}:unstake:${firstPosition}` })
+    });
+  }
+
+  async function claimRewards() {
+    if (!wallet.connected) throw new Error("Connect and authenticate your wallet before claiming rewards.");
+    if (!firstPosition) throw new Error("No staking position is available for reward claims.");
+    return wallet.authFetch<{ message?: string }>("/staking/claim-rewards/intents", {
+      method: "POST",
+      body: JSON.stringify({ stakingPositionId: firstPosition, idempotencyKey: `${wallet.address}:claim:${firstPosition}` })
+    });
+  }
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-5">
@@ -449,9 +475,9 @@ function StakingView({ data }: { data: ProductData }) {
       </div>
       <SectionCard title="Transaction Flows">
         <div className="space-y-5">
-          <StakeFlow />
-          <UnstakeFlow />
-          <ClaimRewardsFlow />
+          <StakeFlow onStake={stakeVault} />
+          <UnstakeFlow onUnstake={unstakeVault} />
+          <ClaimRewardsFlow onClaim={claimRewards} />
         </div>
       </SectionCard>
     </div>
@@ -571,6 +597,10 @@ function formatMetric(value: unknown) {
 
 function formatCurrency(value: unknown) {
   return typeof value === "number" ? `$${value.toLocaleString()}` : "Not available";
+}
+
+function getPositionId(position: unknown) {
+  return position && typeof position === "object" && "id" in position ? String((position as { id?: unknown }).id ?? "") : "";
 }
 
 function normalizeProductData(endpoint: string, data: ProductData | VaultCollection[] | VaultNft[] | RaidRoom[] | null): ProductData | null {
