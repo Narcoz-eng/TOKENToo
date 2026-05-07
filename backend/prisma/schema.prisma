@@ -170,6 +170,14 @@ model User {
   missionCooldowns   MissionCooldown[]
 }
 
+model PlatformConfig {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Token {
   id                 String              @id @default(uuid()) @db.Uuid
   mint               String              @unique
@@ -189,9 +197,34 @@ model Token {
   collection         Collection?
   vaultNfts          VaultNFT[]
   riskSnapshots      RiskScoreSnapshot[]
+  metadataRecords    TokenMetadataRecord[]
 
   @@index([symbol])
   @@index([riskScore])
+}
+
+model TokenMetadataRecord {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tokenId             String?  @db.Uuid
+  mint                String
+  name                String
+  symbol              String
+  description         String?
+  logoUri             String?
+  metadataUri         String?
+  provider            String   @default("backend")
+  onChainWriteStatus  String   @default("PROVIDER_NOT_CONFIGURED")
+  onChainTxSignature  String?
+  indexed             Boolean  @default(false)
+  verificationStatus  String?
+  metadata            Json     @default("{}")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  token               Token?   @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+
+  @@unique([mint])
+  @@index([tokenId])
+  @@index([onChainWriteStatus])
 }
 
 model GenerationRun {

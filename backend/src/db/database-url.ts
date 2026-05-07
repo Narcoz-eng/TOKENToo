@@ -1,5 +1,5 @@
 export function runtimeDatabaseUrl() {
-  return process.env.DATABASE_URL ?? process.env.POSTGRES_PRISMA_URL ?? process.env.POSTGRES_URL ?? "postgresql://postgres:postgres@localhost:5432/vaultx";
+  return process.env.DATABASE_URL ?? process.env.POSTGRES_PRISMA_URL ?? process.env.POSTGRES_URL ?? "postgresql://postgres:postgres@localhost:5432/phew_run";
 }
 
 export function migrationDatabaseUrl() {

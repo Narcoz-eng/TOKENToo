@@ -1,19 +1,22 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCcw, Wallet, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCcw, Wallet, XCircle } from "lucide-react";
 import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
 import { brandAssets } from "@/lib/brand-assets";
 
-export function LoadingState({ label = "Loading Phew.run data" }: { label?: string }) {
+export function LoadingState() {
   return (
-    <SectionCard>
-      <div className="flex min-h-48 items-center justify-center gap-3 text-slate-300">
-        <div className="relative size-14 overflow-hidden rounded-md border border-vault-green/30 bg-black/40 shadow-green">
-          <img src={brandAssets.actionIcons} alt="" className="h-full w-full object-cover opacity-80" />
-          <Loader2 className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 animate-spin text-vault-green" />
+    <SectionCard className="overflow-hidden p-0">
+      <div className="phew-loading-stage relative min-h-56 overflow-hidden rounded-lg" aria-busy="true" aria-live="polite" aria-label="Loading">
+        <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-0 h-full w-full object-cover opacity-45" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(186,255,0,0.2),rgba(2,8,6,0.34)_34%,rgba(2,8,6,0.92)_72%)]" />
+        <div className="absolute inset-0 grid-mask opacity-35" />
+        <div className="absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2">
+          <span className="phew-loader-ring absolute inset-0 rounded-full border border-vault-green/50" />
+          <span className="phew-loader-ring absolute inset-3 rounded-full border border-vault-cyan/45" style={{ animationDelay: "260ms" }} />
+          <span className="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-md bg-vault-green shadow-green" />
         </div>
-        {label}
       </div>
     </SectionCard>
   );
@@ -57,13 +60,13 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
 
 export function WalletDisconnectedState({ action }: { action?: React.ReactNode }) {
   return (
-    <SectionCard>
-      <div className="rounded-lg border border-vault-green/35 bg-vault-green/10 p-6">
+    <SectionCard className="p-4">
+      <div className="rounded-md border border-vault-green/25 bg-vault-green/8 p-4">
         <div className="flex items-start gap-3">
-          <Wallet className="size-6 text-vault-green" />
+          <Wallet className="mt-0.5 size-5 text-vault-green" />
           <div>
-            <p className="text-xl font-black">Connect your wallet</p>
-            <p className="mt-2 text-sm text-slate-300">This view is wallet-specific. Connect and authenticate your wallet to see owned vaults, staking, listings, claims, and mint intents.</p>
+            <p className="font-black">Connect your wallet</p>
+            <p className="mt-1 text-sm text-slate-400">Required for wallet-specific vaults, staking, listings, claims, and mint intents.</p>
             {action ? <div className="mt-4">{action}</div> : null}
           </div>
         </div>

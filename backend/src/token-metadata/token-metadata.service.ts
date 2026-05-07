@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { Connection, PublicKey } from "@solana/web3.js";
+import { requireDbForWrite } from "../db/db-safety";
+import { PrismaService } from "../db/prisma.service";
 import { AssetStorageService } from "../generator/asset-storage.service";
 
 export type TokenMetadataInput = {
@@ -15,7 +17,10 @@ export type TokenMetadataInput = {
 
 @Injectable()
 export class TokenMetadataService {
-  constructor(private readonly storage: AssetStorageService) {}
+  constructor(
+    private readonly storage: AssetStorageService,
+    private readonly prisma: PrismaService
+  ) {}
 
   async uploadTokenLogo(input: { mint: string; logoDataUri?: string; logoUrl?: string }) {
     this.assertMint(input.mint);
@@ -37,7 +42,36 @@ export class TokenMetadataService {
   }
 
   async createOrUpdateTokenMetadata(input: TokenMetadataInput) {
+    await requireDbForWrite(this.prisma);
     const uri = await this.uploadTokenMetadataJson(input);
+    const token = await this.prisma.token.findUnique({ where: { mint: input.mint } });
+    const logoUri = input.logoUrl ?? null;
+    await this.prisma.tokenMetadataRecord.upsert({
+      where: { mint: input.mint },
+      update: {
+        tokenId: token?.id,
+        name: input.name,
+        symbol: input.symbol,
+        description: input.description,
+        logoUri,
+        metadataUri: uri,
+        provider: "backend",
+        onChainWriteStatus: "PROVIDER_NOT_CONFIGURED",
+        metadata: input.extensions ?? {}
+      },
+      create: {
+        tokenId: token?.id,
+        mint: input.mint,
+        name: input.name,
+        symbol: input.symbol,
+        description: input.description,
+        logoUri,
+        metadataUri: uri,
+        provider: "backend",
+        onChainWriteStatus: "PROVIDER_NOT_CONFIGURED",
+        metadata: input.extensions ?? {}
+      }
+    });
     return {
       ok: false,
       code: "PROVIDER_NOT_CONFIGURED",

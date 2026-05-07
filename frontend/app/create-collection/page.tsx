@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Loader2, Palette, RefreshCcw, ShieldCheck, Sparkles, Upload, Wand2 } from "lucide-react";
+import { Check, ChevronDown, Crown, Gem, Layers3, Loader2, LockKeyhole, Palette, RadioTower, RefreshCcw, ShieldCheck, Sparkles, Swords, Upload, Wand2, Zap } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { CollectionPreview } from "@/components/CollectionPreview";
-import { FounderStatusPanel, SetupWarning, WalletDisconnectedState } from "@/components/ApiState";
+import { SetupWarning } from "@/components/ApiState";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { apiFetch } from "@/lib/api";
@@ -12,6 +12,7 @@ import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { CollectionGeneratorPreview } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
+import { cn } from "@/lib/utils";
 
 type Preset = { id: string; name: string; artStyle: string; mood: string };
 type GeneratorRun = {
@@ -118,6 +119,14 @@ type PreviewOnlyResponse = {
   warnings: string[];
 };
 
+const steps = ["Basics", "Brand Kit", "Vault Collection", "Review", "Launch"];
+const rarityRows = [
+  ["Common", "Core vault frame", "62%"],
+  ["Rare", "Charged cyan relic", "24%"],
+  ["Epic", "Overclocked vault core", "10%"],
+  ["Legendary", "Gold founder seal", "4%"]
+];
+
 export default function CreateCollectionPage() {
   const walletAuth = useWalletAuth();
   const capabilityState = useApiResource<{ mode: string; capabilities: Record<string, boolean>; warnings: string[] }>("/system/capabilities");
@@ -138,11 +147,15 @@ export default function CreateCollectionPage() {
   const [error, setError] = useState<string | null>(null);
   const [approvalConfirmed, setApprovalConfirmed] = useState(false);
   const [launchResult, setLaunchResult] = useState<string | null>(null);
-  const preview = useMemo(() => (run ? mapRunToPreview(run, selectedPresetName(presets, selectedPreset)) : previewOnly ? mapPreviewOnly(previewOnly, selectedPresetName(presets, selectedPreset)) : null), [run, previewOnly, presets, selectedPreset]);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const presetName = selectedPresetName(presets, selectedPreset);
+  const preview = useMemo(() => (run ? mapRunToPreview(run, presetName) : previewOnly ? mapPreviewOnly(previewOnly, presetName) : null), [run, previewOnly, presetName]);
   const latestProfile = run?.styleProfiles[0];
   const latestQuality = latestProfile?.qualityReports[0];
   const latestDistinctiveness = latestProfile?.distinctivenessReports[0];
   const canApprove = Boolean(run && approvalConfirmed && latestQuality?.passed && latestQuality.tier !== "BASIC" && latestDistinctiveness?.passed && capabilityState.data?.capabilities?.databaseAvailable);
+  const studioPreview = preview ?? fallbackPreview(tokenName, tokenSymbol, description, presetName);
+  const activeStep = launchResult ? 4 : run?.status === "APPROVED" ? 3 : preview ? 2 : tokenName || tokenSymbol || description ? 1 : 0;
 
   useEffect(() => {
     apiFetch<Preset[]>("/generator/presets")
@@ -222,11 +235,6 @@ export default function CreateCollectionPage() {
     });
   }
 
-  async function reloadRun() {
-    if (!run) return;
-    await action(async () => setRun(await walletAuth.authFetch<GeneratorRun>(`/generator/runs/${run.id}`)));
-  }
-
   async function action(fn: () => Promise<void>) {
     setLoading(true);
     setError(null);
@@ -259,161 +267,139 @@ export default function CreateCollectionPage() {
 
   return (
     <AppShell active="create">
-      <div className="space-y-5">
-        <FounderStatusPanel status={capabilityState.data} />
-        {!walletAuth.connected ? <WalletDisconnectedState /> : null}
-        <SetupWarning warnings={previewOnly?.warnings} />
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
-            <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-1/2 object-cover opacity-30 mix-blend-screen" />
-            <div className="relative">
-              <p className="text-sm font-black uppercase text-vault-green">Create Community</p>
-              <h1 className="mt-2 max-w-4xl text-4xl font-black">Forge a faction identity for token-backed vault NFTs.</h1>
-              <p className="mt-3 max-w-3xl text-slate-300">Set the token, define the brand DNA, generate a vault-ready collection system, then review the launch preview before approval.</p>
-              <div className="mt-6 grid gap-2 md:grid-cols-4">
-                {["Basics", "Branding", "Collection", "Review"].map((step, index) => (
-                  <div key={step} className={`rounded-md border p-3 text-sm font-black ${index === 0 ? "border-vault-green bg-vault-green/15 text-vault-green" : "border-vault-line bg-black/30 text-slate-400"}`}>
-                    <span className="mr-2 text-xs">0{index + 1}</span>{step}
-                  </div>
-                ))}
-              </div>
+      <div className="space-y-6">
+        <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6 lg:p-8">
+          <img src={brandAssets.launchHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-48" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/88 to-[#020806]/28" />
+          <div className="absolute inset-0 grid-mask opacity-25" />
+          <div className="relative max-w-5xl">
+            <p className="text-sm font-black uppercase text-vault-green">Create Community</p>
+            <h1 className="mt-2 text-4xl font-black leading-tight lg:text-5xl">Create Community</h1>
+            <p className="mt-3 max-w-2xl text-base text-slate-300">Launch a token-backed faction with vault NFTs, raids, and staking.</p>
+            <div className="mt-8 grid gap-2 md:grid-cols-5">
+              {steps.map((step, index) => (
+                <div key={step} className={cn("rounded-md border px-3 py-3 text-sm font-black transition", index <= activeStep ? "border-vault-green/70 bg-vault-green/14 text-vault-green shadow-green" : "border-vault-line bg-black/35 text-slate-500")}>
+                  <span className="mr-2 text-xs">{String(index + 1).padStart(2, "0")}</span>
+                  {step}
+                </div>
+              ))}
             </div>
-          </section>
-          <SectionCard title="Persistence Status">
-            <div className="space-y-3">
-              <StatusPill accent={run?.status === "APPROVED" ? "green" : run ? "purple" : "gold"}>{run?.status ?? "No Run Yet"}</StatusPill>
-              <p className="text-sm text-slate-400">{run ? `Run ID: ${run.id}` : previewOnly ? `${previewOnly.assetProvider}; production launch blocked until setup is complete.` : "Enter real token metadata to create a preview."}</p>
-              {run ? <button onClick={reloadRun} className="h-10 w-full rounded-lg border border-vault-line bg-black/25 text-sm font-bold">Reload Persisted Run</button> : null}
-            </div>
-          </SectionCard>
+          </div>
+        </section>
+
+        {error ? <ProductNotice tone="red" message={error} /> : null}
+        {walletAuth.error ? <ProductNotice tone="red" message={walletAuth.error} /> : null}
+        <div className="opacity-80">
+          <SetupWarning warnings={previewOnly?.warnings?.slice(0, 1)} />
         </div>
 
-        {error ? <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-4 text-sm text-vault-red">{error}</div> : null}
-        {walletAuth.error ? <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-4 text-sm text-vault-red">{walletAuth.error}</div> : null}
-
-        <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="grid gap-6 xl:grid-cols-[430px_minmax(0,1fr)]">
           <aside className="space-y-5">
-            <SectionCard title="Create Community Flow">
-              <div className="space-y-2 text-sm">
-                {[
-                  ["1", "Input token"],
-                  ["2", "Add memes and context"],
-                  ["3", "Generate identity"],
-                  ["4", "Review Premium+ quality"],
-                  ["5", "Approve immutable style"],
-                  ["6", "Launch collection"]
-                ].map(([step, label], index) => (
-                  <div key={label} className="flex items-center gap-3 rounded-lg border border-vault-line bg-black/25 p-3">
-                    <span className="flex size-7 items-center justify-center rounded-md bg-vault-purple/20 text-xs font-black text-vault-purple">{step}</span>
-                    <span className={run && (index < 3 || run.status === "APPROVED") ? "font-semibold text-white" : "text-slate-400"}>{label}</span>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Token Inputs">
-              <div className="space-y-3">
-                <Field label="Token name" value={tokenName} onChange={setTokenName} />
-                <Field label="Token symbol" value={tokenSymbol} onChange={setTokenSymbol} />
-                <Field label="Mint address" value={tokenMint} onChange={setTokenMint} />
-                <Field label="Logo URL" value={logoUri} onChange={setLogoUri} icon={Upload} />
+            <SectionCard title="Launch Brief" className="p-5">
+              <div className="space-y-4">
+                <Field label="Community name" value={tokenName} onChange={setTokenName} placeholder="Example: Neon Vault Syndicate" />
+                <Field label="Token symbol" value={tokenSymbol} onChange={setTokenSymbol} placeholder="PHEW" />
                 <label className="block">
-                  <span className="text-sm text-slate-400">Short description / vibe</span>
-                  <textarea className="phew-input mt-2 min-h-24 w-full rounded-md px-4 py-3 text-sm" value={description} onChange={(event) => setDescription(event.target.value)} />
+                  <span className="text-sm font-semibold text-slate-300">Faction story</span>
+                  <textarea className="phew-input mt-2 min-h-28 w-full resize-none rounded-md px-4 py-3 text-sm" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What should this faction feel like to collectors?" />
                 </label>
               </div>
             </SectionCard>
 
-            <SectionCard title="Community Context">
-              <div className="space-y-3">
-                <div className="rounded-lg border border-vault-line bg-black/25 p-3 text-sm">
-                  <span className="text-slate-400">Authenticated creator wallet</span>
-                  <p className="mt-1 font-bold">{walletAuth.address ?? "Connect wallet to create"}</p>
-                </div>
-                <Field label="Memes / inside jokes" value={memes} onChange={setMemes} />
-                <Field label="Telegram / X phrases" value={phrases} onChange={setPhrases} />
-                <Field label="Mascot preference" value={mascotPreference} onChange={setMascotPreference} />
-                <Field label="Mood" value={mood} onChange={setMood} />
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Lifecycle">
-              <div className="space-y-2 text-sm">
-                {["POST /generator/runs", "GET /generator/runs/:id", "POST regenerate-style", "POST regenerate-previews", "POST approve"].map((label, index) => (
-                  <div key={label} className="flex items-center gap-3 rounded-lg bg-black/25 p-3">
-                    <Check className={`size-4 ${run && (index === 0 || run.status === "APPROVED") ? "text-vault-green" : "text-slate-500"}`} />
-                  <span>{label}</span>
-                </div>
-                ))}
-              </div>
-            </SectionCard>
-          </aside>
-
-          <main className="space-y-5">
-            <SectionCard title="Premium Art Presets">
-              <div className="grid gap-3 md:grid-cols-4">
-                {presets.map((preset) => (
+            <SectionCard title="Brand Kit" className="p-5">
+              <div className="grid gap-3">
+                {presets.slice(0, 4).map((preset) => (
                   <button
                     type="button"
                     key={preset.id}
                     onClick={() => setSelectedPreset(preset.id)}
-                    className={`rounded-lg border p-4 text-left transition hover:border-vault-purple ${selectedPreset === preset.id ? "border-vault-purple bg-vault-purple/20" : "border-vault-line bg-black/25"}`}
+                    className={cn("group rounded-md border p-4 text-left transition", selectedPreset === preset.id ? "border-vault-green/70 bg-vault-green/12 text-white shadow-green" : "border-vault-line bg-black/30 text-slate-300 hover:border-vault-cyan/40")}
                   >
-                    <Palette className="mb-3 size-6 text-vault-purple" />
-                    <p className="font-bold">{preset.name}</p>
-                    <p className="mt-1 text-xs text-slate-400">{preset.artStyle}</p>
+                    <div className="flex items-start gap-3">
+                      <Palette className={cn("mt-1 size-5", selectedPreset === preset.id ? "text-vault-green" : "text-vault-cyan")} />
+                      <div>
+                        <p className="font-black">{preset.name}</p>
+                        <p className="mt-1 text-xs text-slate-400">{preset.artStyle}</p>
+                      </div>
+                    </div>
                   </button>
+                ))}
+              </div>
+              <div className="mt-4 grid grid-cols-5 gap-2">
+                {["#baff00", "#16d7d2", "#101a17", "#f4c542", "#f7fbff"].map((color) => (
+                  <span key={color} className="h-9 rounded-md border border-white/10" style={{ background: color }} />
                 ))}
               </div>
             </SectionCard>
 
-            <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={generatePreview} disabled={loading} className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate Preview
+            <SectionCard title="Vault Collection" className="p-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <MiniControl icon={LockKeyhole} label="Vault NFTs" value="10k-ready" />
+                <MiniControl icon={Swords} label="Raids" value="Enabled" />
+                <MiniControl icon={Zap} label="Staking" value="Ready" />
+              </div>
+              <button type="button" onClick={() => setAdvancedOpen((value) => !value)} className="mt-4 flex w-full items-center justify-between rounded-md border border-vault-line bg-black/25 px-4 py-3 text-sm font-bold text-slate-300">
+                Advanced token details
+                <ChevronDown className={cn("size-4 transition", advancedOpen && "rotate-180")} />
               </button>
-              <button type="button" onClick={createRun} disabled={loading || !walletAuth.connected || !capabilityState.data?.capabilities?.databaseAvailable} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-50">
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Save Run
-              </button>
-              <button type="button" onClick={() => mutateRun("regenerate-style")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-purple/50 bg-vault-purple/10 px-4 text-sm font-bold text-vault-purple disabled:opacity-50">
-                <RefreshCcw className="size-4" /> Regenerate Style
-              </button>
-              <button type="button" onClick={() => mutateRun("regenerate-previews")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-line bg-black/25 px-4 text-sm font-bold disabled:opacity-50">
-                <Wand2 className="size-4 text-vault-green" /> Regenerate Previews
-              </button>
-              <button type="button" onClick={approveRun} disabled={!canApprove || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-green/50 bg-vault-green/10 px-4 text-sm font-bold text-vault-green disabled:opacity-50">
-                <ShieldCheck className="size-4" /> Approve Version
-              </button>
-              <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !capabilityState.data?.capabilities?.productionStorageAvailable} className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-4 text-sm font-black text-black disabled:opacity-50">
-                <Check className="size-4" /> Launch Collection
-              </button>
-            </div>
-
-            <SectionCard title="Approval Gate">
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
-                <div className="rounded-lg border border-vault-line bg-black/25 p-4 text-sm text-slate-300">
-                  Approval locks the style profile, trait pack version, lore, role language, rarity table, unlock schedule, and metadata schema. Future upgrades can add unlock packs, but they cannot mutate this approved identity.
+              {advancedOpen ? (
+                <div className="mt-4 space-y-3 rounded-md border border-vault-line bg-black/25 p-4">
+                  <Field label="SPL token mint" value={tokenMint} onChange={setTokenMint} placeholder="Optional until production launch" />
+                  <Field label="Existing logo URL" value={logoUri} onChange={setLogoUri} icon={Upload} placeholder="Optional" />
+                  <Field label="Community phrases" value={phrases} onChange={setPhrases} placeholder="Comma separated" />
+                  <Field label="Faction archetype" value={mascotPreference} onChange={setMascotPreference} placeholder="Vault knights, cyber reapers, etc." />
+                  <Field label="Mood" value={mood} onChange={setMood} placeholder="Dark, elite, high-energy" />
+                  <Field label="Community lore notes" value={memes} onChange={setMemes} placeholder="Optional context, not shown as debug UI" />
                 </div>
-                <label className="flex items-start gap-3 rounded-lg border border-vault-purple/40 bg-vault-purple/10 p-4 text-sm">
-                  <input className="mt-1" type="checkbox" checked={approvalConfirmed} onChange={(event) => setApprovalConfirmed(event.target.checked)} />
-                  <span>I confirm this Premium+ identity is final and ready to become the immutable collection profile.</span>
-                </label>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <Gate label="Quality" value={latestQuality ? `${latestQuality.tier} / ${latestQuality.previewQualityScore}` : "Not generated"} passed={Boolean(latestQuality?.passed && latestQuality.tier !== "BASIC")} />
-                <Gate label="Distinctiveness" value={latestDistinctiveness ? `${latestDistinctiveness.score}` : "Not generated"} passed={Boolean(latestDistinctiveness?.passed)} />
-                <Gate label="Launch route" value={launchResult ?? "Pending"} passed={Boolean(launchResult)} />
-              </div>
+              ) : null}
             </SectionCard>
 
-            {preview ? (
-              <CollectionPreview preview={preview} />
-            ) : (
-              <SectionCard title="No Preview Yet">
-              <div className="rounded-lg border border-dashed border-vault-purple/40 bg-vault-purple/10 p-8 text-center text-slate-300">
-                  Enter token metadata and generate a preview to see Brand DNA, premium fallback assets, trait depth, rarity, animation moments, and 10k readiness blockers.
+            <div className="grid gap-3">
+              <button type="button" onClick={generatePreview} disabled={loading} className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate Preview
+              </button>
+              <button type="button" onClick={createRun} disabled={loading || !walletAuth.connected || !capabilityState.data?.capabilities?.databaseAvailable} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-45">
+                <ShieldCheck className="size-4" /> Save Launch Draft
+              </button>
+            </div>
+          </aside>
+
+          <main className="space-y-6">
+            <LiveLaunchPreview preview={studioPreview} launchResult={launchResult} />
+
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <SectionCard title="Launch Readiness" className="p-5">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <ReadinessItem label="Brand direction" complete={Boolean(tokenName || preview)} />
+                  <ReadinessItem label="Vault NFT preview" complete={Boolean(preview)} />
+                  <ReadinessItem label="Quality reviewed" complete={Boolean(latestQuality?.passed && latestQuality.tier !== "BASIC")} />
+                  <ReadinessItem label="Founder approval" complete={approvalConfirmed} />
+                </div>
+                <label className="mt-4 flex items-start gap-3 rounded-md border border-vault-green/30 bg-vault-green/8 p-4 text-sm text-slate-200">
+                  <input className="mt-1 accent-[#baff00]" type="checkbox" checked={approvalConfirmed} onChange={(event) => setApprovalConfirmed(event.target.checked)} />
+                  <span>This identity is final and ready to become the collection launch profile.</span>
+                </label>
+              </SectionCard>
+
+              <SectionCard title="Launch Actions" className="p-5">
+                <div className="space-y-3">
+                  <button type="button" onClick={() => mutateRun("regenerate-style")} disabled={!run || loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-vault-cyan/40 bg-vault-cyan/8 text-sm font-bold text-vault-cyan disabled:opacity-45">
+                    <RefreshCcw className="size-4" /> Refine Style
+                  </button>
+                  <button type="button" onClick={() => mutateRun("regenerate-previews")} disabled={!run || loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-vault-line bg-black/30 text-sm font-bold disabled:opacity-45">
+                    <Wand2 className="size-4 text-vault-green" /> Refresh Vault Set
+                  </button>
+                  <button type="button" onClick={approveRun} disabled={!canApprove || loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-vault-green/50 bg-vault-green/10 text-sm font-bold text-vault-green disabled:opacity-45">
+                    <ShieldCheck className="size-4" /> Approve Review
+                  </button>
+                  <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !capabilityState.data?.capabilities?.productionStorageAvailable} className="phew-button phew-button-primary flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black disabled:opacity-45">
+                    <Check className="size-4" /> Launch Collection
+                  </button>
                 </div>
               </SectionCard>
-            )}
+            </div>
+
+            <CollectionPreview preview={studioPreview} compact={!preview} />
           </main>
         </div>
       </div>
@@ -421,28 +407,137 @@ export default function CreateCollectionPage() {
   );
 }
 
-function Field({ label, value, onChange, icon: Icon }: { label: string; value: string; onChange: (value: string) => void; icon?: typeof Upload }) {
+function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGeneratorPreview; launchResult: string | null }) {
+  return (
+    <section className="phew-panel relative overflow-hidden rounded-lg">
+      <img src={safeImage(preview.banner, brandAssets.launchHero)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/88 to-[#020806]/30" />
+      <div className="absolute inset-0 grid-mask opacity-25" />
+      <div className="relative grid gap-6 p-6 lg:grid-cols-[150px_minmax(0,1fr)_260px] lg:p-7">
+        <img src={safeImage(preview.avatar, brandAssets.factionMark)} alt="" className="aspect-square rounded-lg border border-vault-green/40 object-cover shadow-green" />
+        <div className="min-w-0">
+          <div className="flex flex-wrap gap-2">
+            <StatusPill accent="green">{preview.preset || "PHEW Launch Studio"}</StatusPill>
+            <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : "Preview mode"}</StatusPill>
+            {launchResult ? <StatusPill accent="cyan">Launched</StatusPill> : null}
+          </div>
+          <h2 className="mt-4 text-4xl font-black leading-tight">{preview.collection}</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{preview.lore}</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {["Vault NFTs", "Raid Rooms", "Staking Hooks", "Faction Identity"].map((tag) => (
+              <span key={tag} className="rounded-md border border-vault-cyan/25 bg-black/35 px-3 py-2 text-xs font-bold text-vault-cyan">{tag}</span>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+          <LaunchStat label="Vault supply" value="10,000" />
+          <LaunchStat label="Rarity tiers" value="4" />
+          <LaunchStat label="Readiness" value={preview.quality.passed ? "Pass" : "Draft"} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Field({ label, value, onChange, icon: Icon, placeholder }: { label: string; value: string; onChange: (value: string) => void; icon?: typeof Upload; placeholder?: string }) {
   return (
     <label className="block">
-      <span className="text-sm text-slate-400">{label}</span>
+      <span className="text-sm font-semibold text-slate-300">{label}</span>
       <div className="relative mt-2">
-        {Icon ? <Icon className="absolute left-3 top-3 size-4 text-vault-purple" /> : null}
-        <input className={`phew-input h-11 w-full rounded-md px-4 text-sm ${Icon ? "pl-10" : ""}`} value={value} onChange={(event) => onChange(event.target.value)} />
+        {Icon ? <Icon className="absolute left-3 top-3 size-4 text-vault-green" /> : null}
+        <input className={cn("phew-input h-11 w-full rounded-md px-4 text-sm", Icon && "pl-10")} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
       </div>
     </label>
   );
 }
 
-function Gate({ label, value, passed }: { label: string; value: string; passed: boolean }) {
+function MiniControl({ icon: Icon, label, value }: { icon: typeof LockKeyhole; label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-vault-line bg-black/25 p-3 text-sm">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-slate-400">{label}</span>
-        <StatusPill accent={passed ? "green" : "gold"}>{passed ? "Pass" : "Blocked"}</StatusPill>
-      </div>
-      <p className="mt-2 font-bold">{value}</p>
+    <div className="rounded-md border border-vault-line bg-black/25 p-3">
+      <Icon className="mb-2 size-5 text-vault-green" />
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-black">{value}</p>
     </div>
   );
+}
+
+function ReadinessItem({ label, complete }: { label: string; complete: boolean }) {
+  return (
+    <div className={cn("flex items-center gap-3 rounded-md border p-3 text-sm", complete ? "border-vault-green/40 bg-vault-green/10 text-white" : "border-vault-line bg-black/25 text-slate-400")}>
+      <span className={cn("grid size-7 place-items-center rounded-md", complete ? "bg-vault-green text-black" : "bg-white/5 text-slate-500")}>{complete ? <Check className="size-4" /> : <RadioTower className="size-4" />}</span>
+      <span className="font-bold">{label}</span>
+    </div>
+  );
+}
+
+function LaunchStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-vault-line bg-black/35 p-3">
+      <p className="text-xs uppercase text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-black text-white">{value}</p>
+    </div>
+  );
+}
+
+function ProductNotice({ tone, message }: { tone: "red" | "gold"; message: string }) {
+  return <div className={cn("rounded-md border p-4 text-sm", tone === "red" ? "border-vault-red/40 bg-vault-red/10 text-vault-red" : "border-vault-gold/40 bg-vault-gold/10 text-vault-gold")}>{message}</div>;
+}
+
+function fallbackPreview(tokenName: string, tokenSymbol: string, description: string, preset: string): CollectionGeneratorPreview {
+  return {
+    id: "studio-preview",
+    collection: tokenName.trim() || "PHEW Vault Faction",
+    preset: preset || "PHEW Vault Faction",
+    theme: "Token-backed vault faction",
+    mascot: tokenSymbol.trim() || "PHEW",
+    artStyle: "Dark premium sci-fi vault",
+    palette: ["#baff00", "#16d7d2", "#071017", "#f4c542"],
+    backgroundWorld: "Cinematic vault command chamber",
+    lore: description.trim() || "A premium faction identity will form here as you define the token, brand kit, vault collection, and launch readiness.",
+    raidTheme: "Vault breach raids",
+    roleNames: ["Founder", "Vault Raider", "Stake Commander", "Relic Guardian"],
+    traitLanguage: ["Obsidian frame", "Lime energy core", "Cyan circuit edge", "Founder seal", "Raid charge", "Vault key"],
+    traitCounts: { frame: 18, core: 16, aura: 14, relic: 12, background: 10 },
+    rarityWeights: { Common: 6200, Rare: 2400, Epic: 1000, Legendary: 400 },
+    unlocks: {},
+    assetProvider: "phew-curated-preview",
+    finalProductionReady: false,
+    avatar: brandAssets.factionMark,
+    banner: brandAssets.launchHero,
+    samples: brandAssets.nftVaults.map((image, index) => ({
+      id: `curated-${index}`,
+      name: [`Vault Relic #001`, `Vault Key #014`, `Founder Crown #077`][index],
+      image,
+      rarity: ["Rare", "Epic", "Legendary"][index],
+      role: ["Vault Raider", "Key Bearer", "Founder Guard"][index],
+      traits: [["Lime core", "Obsidian frame"], ["Cyan charge", "Key relic"], ["Gold seal", "Legendary crown"]][index]
+    })),
+    quality: {
+      previewQualityScore: 84,
+      uniquenessScore: 82,
+      colorHarmonyScore: 92,
+      duplicateRiskScore: 18,
+      compatibilityScore: 88,
+      tier: "Premium",
+      passed: false
+    },
+    distinctiveness: {
+      silhouetteUniqueness: 84,
+      paletteUniqueness: 90,
+      mascotUniqueness: 78,
+      backgroundWorldUniqueness: 86,
+      traitLanguageUniqueness: 82,
+      score: 84,
+      passed: false
+    },
+    tenKReadiness: {
+      estimated10kFeasible: true,
+      possibleUniqueCombinations: "42,000+",
+      duplicateRisk: "Low after production trait expansion",
+      visualDiversityScore: 84,
+      blockers: []
+    }
+  };
 }
 
 function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGeneratorPreview {
@@ -452,6 +547,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
   const samples = previews.filter((asset) => asset.type === "SAMPLE_NFT").slice(-5);
   const quality = profile.qualityReports[0];
   const distinctiveness = profile.distinctivenessReports[0];
+  const roles = asArray(profile.roleNames);
 
   return {
     id: run.id,
@@ -464,26 +560,26 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     backgroundWorld: profile.backgroundWorld,
     lore: profile.lore,
     raidTheme: profile.raidTheme,
-    roleNames: asArray(profile.roleNames),
+    roleNames: roles,
     traitLanguage: asArray(profile.traitLanguage),
     traitCounts: Object.fromEntries(Object.entries(categories).map(([key, value]) => [key, value.length])),
     rarityWeights: asRecord<number>(profile.traitPack?.rarityWeights ?? profile.rarityStructure),
     unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
     assetProvider: "persisted-generator-run",
     finalProductionReady: quality?.passed && quality.tier !== "BASIC",
-    avatar: previews.find((asset) => asset.type === "AVATAR")?.uri ?? "",
-    banner: previews.find((asset) => asset.type === "BANNER")?.uri ?? "",
-    samples: samples.map((asset, index) => {
+    avatar: safeImage(previews.find((asset) => asset.type === "AVATAR")?.uri, brandAssets.factionMark),
+    banner: safeImage(previews.find((asset) => asset.type === "BANNER")?.uri, brandAssets.launchHero),
+    samples: normalizedSamples(samples.map((asset, index) => {
       const metadata = asRecord<string>(asset.metadata);
       return {
         id: `${asset.version}-${index}`,
         name: asset.label,
         image: asset.uri,
         rarity: metadata.rarity ?? "Rare",
-        role: asArray(profile.roleNames)[index] ?? "Raider",
+        role: roles[index] ?? "Raider",
         traits: [metadata.headgear, metadata.aura, metadata.accessory].filter(Boolean)
       };
-    }),
+    })),
     quality: {
       previewQualityScore: quality.previewQualityScore,
       uniquenessScore: quality.uniquenessScore,
@@ -505,11 +601,8 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
   };
 }
 
-function splitList(value: string) {
-  return value.split(",").map((item) => item.trim()).filter(Boolean);
-}
-
 function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGeneratorPreview {
+  const roles = asArray(data.brandDna.roleLanguage);
   return {
     id: "preview-only",
     collection: data.collection.name,
@@ -521,7 +614,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     backgroundWorld: data.collection.world,
     lore: data.collection.description,
     raidTheme: String(data.animationMoments[0]?.moment ?? "Founder Raid"),
-    roleNames: asArray(data.brandDna.roleLanguage),
+    roleNames: roles,
     traitLanguage: data.traitTable.flatMap((row) => row.examples).slice(0, 24),
     traitCounts: Object.fromEntries(data.traitTable.map((row) => [row.category, row.count])),
     rarityWeights: data.rarityTable,
@@ -529,16 +622,16 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     assetProvider: data.assetProvider,
     finalProductionReady: data.finalProductionReady,
     warnings: data.warnings,
-    avatar: data.avatarPreviewSpec?.uri ?? "",
-    banner: data.bannerPreviewSpec?.uri ?? "",
-    samples: data.samples.slice(0, 5).map((sample, index) => ({
+    avatar: safeImage(data.avatarPreviewSpec?.uri, brandAssets.factionMark),
+    banner: safeImage(data.bannerPreviewSpec?.uri, brandAssets.launchHero),
+    samples: normalizedSamples(data.samples.slice(0, 5).map((sample, index) => ({
       id: `preview-${index}`,
       name: sample.label,
       image: sample.uri,
       rarity: String(sample.metadata.rarity ?? "Rare"),
-      role: asArray(data.brandDna.roleLanguage)[index] ?? "Founder",
+      role: roles[index] ?? "Founder",
       traits: [sample.metadata.headgear, sample.metadata.aura, sample.metadata.accessory].filter(Boolean).map(String)
-    })),
+    }))),
     quality: {
       previewQualityScore: data.quality.previewQualityScore,
       uniquenessScore: data.quality.uniquenessScore,
@@ -559,6 +652,26 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     },
     tenKReadiness: data.tenKReadiness
   };
+}
+
+function normalizedSamples(samples: CollectionGeneratorPreview["samples"]) {
+  const curated = fallbackPreview("", "", "", "").samples;
+  const merged = samples.length ? samples : curated;
+  return merged.slice(0, 5).map((sample, index) => ({
+    ...sample,
+    image: safeImage(sample.image, brandAssets.nftVaults[index % brandAssets.nftVaults.length])
+  }));
+}
+
+function safeImage(src: string | undefined | null, fallback: string) {
+  if (!src) return fallback;
+  const value = src.toLowerCase();
+  if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink") || value.includes("data:image/svg")) return fallback;
+  return src;
+}
+
+function splitList(value: string) {
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
 function selectedPresetName(presets: Preset[], id: string) {

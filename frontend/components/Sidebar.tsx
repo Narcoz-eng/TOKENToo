@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  BarChart3,
   Bell,
   Boxes,
   Coins,
@@ -49,9 +48,9 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
   const tvl = typeof stats?.tvlUsd === "number" ? `$${stats.tvlUsd.toLocaleString()}` : "—";
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-vault-line bg-[#020806]/95 shadow-[18px_0_50px_rgba(0,0,0,0.28)] backdrop-blur-xl lg:block">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-vault-cyan/15 bg-[#020806]/96 shadow-[18px_0_60px_rgba(0,0,0,0.4)] backdrop-blur-xl lg:block">
       <div className="flex h-full flex-col">
-        <Link href="/home" className="flex h-20 items-center gap-3 border-b border-vault-line px-6">
+        <Link href="/home" className="flex h-20 items-center gap-3 border-b border-vault-cyan/15 px-6">
           <BrandLogo />
         </Link>
 
@@ -64,10 +63,11 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "group flex items-center gap-3 rounded-md border border-transparent px-3 py-3 text-sm font-semibold text-slate-400 transition hover:border-vault-cyan/25 hover:bg-vault-cyan/5 hover:text-white",
-                  selected && "neon-border border-vault-green/30 bg-vault-green/10 text-white"
+                  "group relative flex items-center gap-3 rounded-md border border-transparent px-3 py-3 text-sm font-semibold text-slate-400 transition hover:border-vault-cyan/25 hover:bg-vault-cyan/5 hover:text-white",
+                  selected && "border-vault-green/45 bg-vault-green/12 text-white shadow-green"
                 )}
               >
+                {selected ? <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r bg-vault-green shadow-green" /> : null}
                 <Icon className={cn("size-4 transition group-hover:text-vault-green", selected ? "text-vault-green" : "text-slate-500")} />
                 <span>{item.label}</span>
               </Link>
@@ -76,30 +76,31 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
         </nav>
 
         <div className="space-y-3 p-4">
-          <div className="phew-panel relative rounded-lg p-3">
-            <p className="relative text-xs font-black uppercase text-slate-400">Wallet Relay</p>
-            <div className="relative mt-3 flex items-center gap-3 rounded-md border border-vault-line bg-black/30 p-3">
-              <div className="flex size-10 items-center justify-center rounded-md bg-vault-green/10 text-vault-green shadow-green">
+          <div className="relative overflow-hidden rounded-lg border border-vault-cyan/15 bg-black/35 p-3">
+            <div className="absolute inset-0 bg-gradient-to-br from-vault-green/8 via-transparent to-vault-cyan/8" />
+            <p className="relative text-xs font-black uppercase text-slate-400">Wallet</p>
+            <div className="relative mt-3 flex items-center gap-3 rounded-md border border-vault-line bg-black/35 p-3">
+              <div className="flex size-10 items-center justify-center rounded-md border border-vault-green/25 bg-vault-green/10 text-vault-green shadow-green">
                 <Coins className="size-5" />
               </div>
               <div className="min-w-0 text-sm">
                 <p className="truncate">{wallet.connected ? wallet.label : "Wallet disconnected"}</p>
-                <p className="text-slate-400">{wallet.connected && wallet.balanceSol !== null ? `${wallet.balanceSol.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL` : wallet.connected ? "Balance unavailable" : "Connect wallet to view balance"}</p>
+                <p className="truncate text-slate-400">{wallet.connected && wallet.balanceSol !== null ? `${wallet.balanceSol.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL` : wallet.connected ? "Balance unavailable" : "Connect to view balance"}</p>
               </div>
             </div>
           </div>
-          <div className="phew-panel relative rounded-lg p-3">
+          <div className="relative overflow-hidden rounded-lg border border-vault-cyan/15 bg-black/35 p-3">
             <p className="relative text-xs font-black uppercase text-slate-400">Faction Stats</p>
-            <div className="relative mt-3 space-y-3 text-sm">
-              <SidebarMetric label="Total Value Locked" value={tvl} />
-              <SidebarMetric label="Total Vaults" value={totalVaults} />
-              <SidebarMetric label="Communities" value={communities} />
+            <div className="relative mt-3 grid grid-cols-3 gap-2 text-sm">
+              <SidebarMetric label="TVL" value={tvl} />
+              <SidebarMetric label="Vaults" value={totalVaults} />
+              <SidebarMetric label="Factions" value={communities} />
             </div>
-            <Link href="/admin/risk" className="phew-button phew-button-primary relative mt-4 flex h-10 items-center justify-center rounded-md text-sm font-black text-black">
-              Analytics
+            <Link href="/create-collection" className="phew-button phew-button-primary relative mt-4 flex h-10 items-center justify-center rounded-md text-sm font-black text-black">
+              Create
             </Link>
           </div>
-          <div className="flex items-center justify-between rounded-md border border-vault-line bg-black/25 px-4 py-3 text-slate-500">
+          <div className="flex items-center justify-between rounded-md border border-vault-line bg-black/30 px-4 py-3 text-slate-500">
             <Bell className="size-4" />
             <Search className="size-4" />
             <Trophy className="size-4" />
@@ -113,9 +114,9 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
 
 function SidebarMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-slate-500">{label}</p>
-      <p className="font-bold text-white">{value}</p>
+    <div className="min-w-0 rounded-md border border-white/5 bg-white/[0.03] p-2">
+      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className="mt-1 truncate font-bold text-white">{value}</p>
     </div>
   );
 }

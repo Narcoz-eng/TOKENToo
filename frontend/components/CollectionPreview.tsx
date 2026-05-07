@@ -1,211 +1,182 @@
-import { AlertTriangle, BadgeCheck, Crown, Gem, Palette, ShieldCheck, Sparkles, Wand2 } from "lucide-react";
+import { BadgeCheck, Crown, Gem, Layers3, LockKeyhole, Palette, ShieldCheck, Sparkles, Swords } from "lucide-react";
 import type { CollectionGeneratorPreview } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
 import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
-import { ChestOpenAnimation, LegendaryRevealAnimation, MintRevealAnimation } from "./animations";
+import { ChestOpenAnimation, MintRevealAnimation, RewardBurstAnimation } from "./animations";
 import { brandAssets } from "@/lib/brand-assets";
+import { cn } from "@/lib/utils";
 
-export function CollectionPreview({ preview }: { preview: CollectionGeneratorPreview }) {
+export function CollectionPreview({ preview, compact = false }: { preview: CollectionGeneratorPreview; compact?: boolean }) {
+  const samples = preview.samples.length ? preview.samples : fallbackSamples();
+
   return (
     <div className="space-y-5">
-      <SectionCard title="Approval Preview">
-        <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
-          <div>
-            <img src={preview.avatar || brandAssets.emptyVault} alt={preview.collection} className="aspect-square w-full rounded-lg object-cover shadow-glow" />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <StatusPill accent={preview.quality.tier === "Basic" ? "gold" : "purple"}>{preview.quality.tier}</StatusPill>
-              <StatusPill accent={preview.quality.passed ? "green" : "red"}>{preview.quality.passed ? "Quality Passed" : "Needs Regen"}</StatusPill>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div className="relative min-h-64 overflow-hidden rounded-lg border border-vault-line bg-black/25 p-5">
-              <img src={preview.banner || brandAssets.vaultHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
-              <div className="absolute inset-0 bg-gradient-to-r from-vault-ink via-vault-ink/80 to-transparent" />
-              <div className="relative max-w-2xl">
-                <p className="text-sm font-black uppercase text-vault-green">{preview.preset}</p>
-                <h2 className="mt-2 text-4xl font-black">{preview.collection}</h2>
-                <p className="mt-2 text-vault-green">{preview.mascot} / {preview.artStyle}</p>
-                <p className="mt-4 text-sm leading-6 text-slate-300">{preview.lore}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {preview.assetProvider ? <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.assetProvider}</StatusPill> : null}
-                  <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : "Preview only"}</StatusPill>
+      <SectionCard title={compact ? "Review Preview" : "Collection Detail Preview"} className="overflow-hidden p-0">
+        <div className="relative min-h-[420px]">
+          <img src={safeImage(preview.banner, brandAssets.launchHero)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-60" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/90 to-[#020806]/35" />
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#020806] to-transparent" />
+          <div className="relative p-6 lg:p-7">
+            <div className="grid gap-6 lg:grid-cols-[128px_minmax(0,1fr)_300px]">
+              <img src={safeImage(preview.avatar, brandAssets.factionMark)} alt={preview.collection} className="aspect-square rounded-lg border border-vault-green/40 object-cover shadow-green" />
+              <div className="min-w-0">
+                <div className="flex flex-wrap gap-2">
+                  <StatusPill accent={preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
+                  <StatusPill accent="cyan">{preview.theme}</StatusPill>
+                  <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Ready" : "Draft"}</StatusPill>
+                </div>
+                <h2 className="mt-4 text-4xl font-black leading-tight lg:text-5xl">{preview.collection}</h2>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{preview.lore}</p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {["Overview", "Vault NFTs", "Staking", "Raids", "Traits"].map((tab, index) => (
+                    <span key={tab} className={cn("rounded-md border px-3 py-2 text-xs font-bold", index === 0 ? "border-vault-green bg-vault-green/12 text-vault-green" : "border-vault-line bg-black/30 text-slate-400")}>{tab}</span>
+                  ))}
                 </div>
               </div>
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <PreviewMetric label="Vault supply" value="10,000" />
+                <PreviewMetric label="Trait layers" value={String(Object.keys(preview.traitCounts).length || 5)} />
+                <PreviewMetric label="Readiness" value={preview.quality.passed ? "Pass" : "Draft"} />
+              </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
-              <Info icon={Palette} label="Theme" value={preview.theme} />
-              <Info icon={Sparkles} label="World" value={preview.backgroundWorld} />
-              <Info icon={ShieldCheck} label="Raid Theme" value={preview.raidTheme} />
+
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              <FeatureTile icon={LockKeyhole} title="Vault NFTs" body="Token-backed identity cards with redeem and marketplace hooks." />
+              <FeatureTile icon={Swords} title="Raid Rooms" body={preview.raidTheme || "Faction raids activate after launch."} />
+              <FeatureTile icon={Sparkles} title="Staking" body="Reward hooks and role progression are ready for collection rules." />
             </div>
           </div>
         </div>
       </SectionCard>
 
-      {preview.warnings?.length ? (
-        <SectionCard title="Preview-Only Setup Warning">
-          <div className="flex gap-3 rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-4 text-sm text-slate-200">
-            <AlertTriangle className="size-5 shrink-0 text-vault-gold" />
-            <div className="space-y-1">
-              {preview.warnings.map((warning) => <p key={warning}>{warning}</p>)}
-            </div>
-          </div>
-        </SectionCard>
-      ) : null}
-
-      <SectionCard title="NFT Preview Set">
-        <div className="grid gap-4 md:grid-cols-5">
-          {preview.samples.map((sample) => (
-            <article key={sample.id} className="overflow-hidden rounded-lg border border-vault-line bg-black/25">
-              <div className="relative aspect-square">
-                <img src={sample.image} alt={sample.name} className="h-full w-full object-cover" />
-                <div className="absolute left-2 top-2">
-                  <StatusPill accent={sample.rarity === "Legendary" || sample.rarity === "Mythic" ? "gold" : sample.rarity === "Epic" ? "purple" : "green"}>{sample.rarity}</StatusPill>
-                </div>
-              </div>
-              <div className="p-3">
-                <p className="font-bold">{sample.name}</p>
-                <p className="mt-1 text-xs text-vault-purple">{sample.role}</p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {sample.traits.slice(0, 2).map((trait) => (
-                    <span key={trait} className="rounded bg-white/5 px-2 py-1 text-[10px] text-slate-300">{trait}</span>
-                  ))}
-                </div>
-              </div>
-            </article>
+      <SectionCard title="Vault NFT Preview Set">
+        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+          {samples.slice(0, compact ? 3 : 5).map((sample, index) => (
+            <PreviewNftCard key={sample.id} sample={sample} index={index} />
           ))}
         </div>
       </SectionCard>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <SectionCard title="Trait Table">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {Object.entries(preview.traitCounts).map(([category, count]) => (
-              <div key={category} className="rounded-lg border border-vault-line bg-black/25 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold capitalize">{category.replace(/([A-Z])/g, " $1")}</p>
-                  <span className="text-vault-green">{count}</span>
-                </div>
-              </div>
-            ))}
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <SectionCard title="Launch Review">
+          <div className="grid gap-3 md:grid-cols-2">
+            <ReviewItem icon={BadgeCheck} label="Brand kit" value={preview.preset || "PHEW curated"} />
+            <ReviewItem icon={Palette} label="Visual system" value={preview.artStyle} />
+            <ReviewItem icon={Layers3} label="Trait depth" value={`${Object.values(preview.traitCounts).reduce((sum, value) => sum + Number(value), 0)} traits`} />
+            <ReviewItem icon={ShieldCheck} label="Quality" value={`${preview.quality.previewQualityScore}% preview score`} />
           </div>
           <div className="mt-4 grid gap-2">
             {preview.traitLanguage.slice(0, 8).map((trait) => (
-              <StatusPill key={trait} accent="purple">{trait}</StatusPill>
+              <span key={trait} className="rounded-md border border-vault-cyan/20 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">{trait}</span>
             ))}
           </div>
         </SectionCard>
 
         <SectionCard title="Rarity Table">
-          <div className="space-y-3">
-            {Object.entries(preview.rarityWeights).map(([rarity, weight]) => (
+          <div className="space-y-4">
+            {Object.entries(preview.rarityWeights).slice(0, 5).map(([rarity, weight]) => (
               <div key={rarity}>
                 <div className="mb-1 flex justify-between text-sm">
-                  <span className="text-slate-300">{rarity}</span>
-                  <span className="text-vault-green">{weight} bps</span>
+                  <span className="font-bold text-slate-200">{rarity}</span>
+                  <span className={rarity === "Legendary" || rarity === "Mythic" ? "text-vault-gold" : "text-vault-green"}>{formatWeight(weight)}</span>
                 </div>
-                <ProgressBar value={weight} max={10000} color={rarity === "Legendary" || rarity === "Mythic" ? "gold" : rarity === "Epic" ? "purple" : "green"} />
+                <ProgressBar value={Number(weight)} max={10000} color={rarity === "Legendary" || rarity === "Mythic" ? "gold" : rarity === "Epic" ? "purple" : "green"} />
               </div>
             ))}
           </div>
         </SectionCard>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <SectionCard title="Quality Gates">
-          <Score label="Preview Quality" value={preview.quality.previewQualityScore} />
-          <Score label="10k Uniqueness" value={preview.quality.uniquenessScore} />
-          <Score label="Color Harmony" value={preview.quality.colorHarmonyScore} />
-          <Score label="Duplicate Risk" value={preview.quality.duplicateRiskScore} />
-          <Score label="Compatibility" value={preview.quality.compatibilityScore} />
-          <div className="mt-4 rounded-lg border border-vault-green/30 bg-vault-green/10 p-3 text-sm text-vault-green">
-            Only Premium and Legendary-ready collections can be featured on the homepage.
-          </div>
-        </SectionCard>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        <SectionCard title="Distinctiveness Score">
-          <Score label="Silhouette" value={preview.distinctiveness.silhouetteUniqueness} />
-          <Score label="Palette" value={preview.distinctiveness.paletteUniqueness} />
-          <Score label="Mascot" value={preview.distinctiveness.mascotUniqueness} />
-          <Score label="Background World" value={preview.distinctiveness.backgroundWorldUniqueness} />
-          <Score label="Trait Language" value={preview.distinctiveness.traitLanguageUniqueness} />
-        </SectionCard>
-
-        <SectionCard title="10k Readiness">
-          {preview.tenKReadiness ? (
-            <div className="space-y-4">
-              <StatusPill accent={preview.tenKReadiness.estimated10kFeasible ? "green" : "gold"}>{preview.tenKReadiness.estimated10kFeasible ? "10k feasible" : "Needs production review"}</StatusPill>
-              <Score label="Visual Diversity" value={preview.tenKReadiness.visualDiversityScore} />
-              <div className="rounded-lg border border-vault-line bg-black/25 p-3 text-sm">
-                <p className="text-slate-400">Possible unique combinations</p>
-                <p className="mt-1 font-bold text-white">{preview.tenKReadiness.possibleUniqueCombinations}</p>
-              </div>
-              <div className="rounded-lg border border-vault-line bg-black/25 p-3 text-sm">
-                <p className="text-slate-400">Duplicate risk</p>
-                <p className="mt-1 font-bold text-white">{preview.tenKReadiness.duplicateRisk}</p>
-              </div>
-              {preview.tenKReadiness.blockers.length ? (
-                <div className="rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-3 text-sm text-slate-200">
-                  {preview.tenKReadiness.blockers.map((blocker) => <p key={blocker}>{blocker}</p>)}
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400">10k readiness is available on preview-only generation responses.</p>
-          )}
-        </SectionCard>
-      </div>
-
-      <SectionCard title="Animation Direction">
-        <div className="grid gap-4 md:grid-cols-3">
-          <MintRevealAnimation rarity="Rare" label="Mint reveal" />
-          <ChestOpenAnimation rarity="Epic" label="Chest open" />
-          <LegendaryRevealAnimation rarity="Legendary" label="Legendary reveal" />
+      {!compact ? (
+        <div className="grid gap-5 xl:grid-cols-3">
+          <SectionCard title="Mint Motion">
+            <MintRevealAnimation rarity="Epic" label="Mint Vault" />
+          </SectionCard>
+          <SectionCard title="Stake Motion">
+            <RewardBurstAnimation rarity="Rare" label="Stake Rewards" />
+          </SectionCard>
+          <SectionCard title="Raid Motion">
+            <ChestOpenAnimation rarity="Legendary" label="Raid Chest" />
+          </SectionCard>
         </div>
-      </SectionCard>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        <SectionCard title="Approval Checklist">
-          <div className="space-y-3 text-sm">
-            {[
-              ["Avatar and banner reviewed", BadgeCheck],
-              ["5 NFT previews reviewed", Gem],
-              ["Trait language is community-specific", Wand2],
-              ["Legendary direction is visually obvious", Crown],
-              ["Raid theme and role names approved", ShieldCheck]
-            ].map(([label, Icon]) => (
-              <div key={label as string} className="flex items-center gap-3 rounded-lg bg-black/25 p-3">
-                <Icon className="size-5 text-vault-green" />
-                <span>{label as string}</span>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      </div>
+      ) : null}
     </div>
   );
 }
 
-function Info({ icon: Icon, label, value }: { icon: typeof Palette; label: string; value: string }) {
+function PreviewNftCard({ sample, index }: { sample: CollectionGeneratorPreview["samples"][number]; index: number }) {
+  const rarityAccent = sample.rarity === "Legendary" || sample.rarity === "Mythic" ? "gold" : sample.rarity === "Epic" ? "cyan" : "green";
   return (
-    <div className="rounded-lg border border-vault-line bg-black/25 p-3">
-      <Icon className="mb-2 size-5 text-vault-purple" />
+    <article className="phew-card-hover overflow-hidden rounded-lg border border-vault-line bg-black/35">
+      <div className="relative aspect-[4/5] overflow-hidden">
+        <img src={safeImage(sample.image, brandAssets.nftVaults[index % brandAssets.nftVaults.length])} alt={sample.name} className="h-full w-full object-cover transition duration-300 hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/10" />
+        <div className="absolute left-3 top-3">
+          <StatusPill accent={rarityAccent}>{sample.rarity}</StatusPill>
+        </div>
+        <div className="absolute bottom-3 left-3 right-3">
+          <p className="text-sm font-black text-white">{sample.name}</p>
+          <p className="mt-1 text-xs font-bold text-vault-green">{sample.role}</p>
+        </div>
+      </div>
+      <div className="grid gap-2 p-3">
+        {sample.traits.slice(0, 2).map((trait) => (
+          <span key={trait} className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-300">{trait}</span>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function FeatureTile({ icon: Icon, title, body }: { icon: typeof LockKeyhole; title: string; body: string }) {
+  return (
+    <div className="rounded-md border border-vault-line bg-black/35 p-4">
+      <Icon className="mb-3 size-6 text-vault-green" />
+      <p className="font-black">{title}</p>
+      <p className="mt-1 text-sm text-slate-400">{body}</p>
+    </div>
+  );
+}
+
+function ReviewItem({ icon: Icon, label, value }: { icon: typeof BadgeCheck; label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-vault-line bg-black/25 p-4">
+      <Icon className="mb-3 size-5 text-vault-green" />
       <p className="text-xs uppercase text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
+      <p className="mt-1 font-bold text-white">{value}</p>
     </div>
   );
 }
 
-function Score({ label, value }: { label: string; value: number }) {
+function PreviewMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mb-3">
-      <div className="mb-1 flex justify-between text-sm">
-        <span className="text-slate-300">{label}</span>
-        <span className={value >= 80 ? "text-vault-green" : "text-vault-gold"}>{value}%</span>
-      </div>
-      <ProgressBar value={value} color={value >= 80 ? "green" : "purple"} />
+    <div className="rounded-md border border-vault-line bg-black/40 p-3">
+      <p className="text-xs uppercase text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-black">{value}</p>
     </div>
   );
+}
+
+function fallbackSamples(): CollectionGeneratorPreview["samples"] {
+  return brandAssets.nftVaults.map((image, index) => ({
+    id: `fallback-${index}`,
+    name: [`Vault Relic #001`, `Vault Key #014`, `Founder Crown #077`][index],
+    image,
+    rarity: ["Rare", "Epic", "Legendary"][index],
+    role: ["Vault Raider", "Key Bearer", "Founder Guard"][index],
+    traits: [["Lime core", "Obsidian frame"], ["Cyan charge", "Key relic"], ["Gold seal", "Legendary crown"]][index]
+  }));
+}
+
+function safeImage(src: string | undefined | null, fallback: string) {
+  if (!src) return fallback;
+  const value = src.toLowerCase();
+  if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink") || value.includes("data:image/svg")) return fallback;
+  return src;
+}
+
+function formatWeight(value: number) {
+  if (value > 100) return `${(value / 100).toFixed(value % 100 === 0 ? 0 : 1)}%`;
+  return `${value}%`;
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { brandAssets } from "@/lib/brand-assets";
+
 type AnimationProps = {
   active?: boolean;
   rarity?: "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Mythic";
@@ -65,6 +67,8 @@ export function LegendaryRevealAnimation(props: AnimationProps) {
 function MomentFrame({ active = true, rarity = "Rare", label, mode }: AnimationProps & { mode: string }) {
   return (
     <div className={`relative aspect-[4/3] overflow-hidden rounded-lg border border-vault-line bg-black/30 phew-moment phew-${mode}`} data-active={active}>
+      <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-0 h-full w-full object-cover opacity-28 mix-blend-screen" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-vault-panel/45 to-black/80" />
       <div className="absolute inset-6 rounded-lg border border-vault-cyan/35 bg-vault-panel/60 shadow-glow" />
       <div className="absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-vault-green/60 bg-vault-green/10 phew-card-core" />
       <AuraPulseOverlay active={active} />

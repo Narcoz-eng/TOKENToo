@@ -12,3 +12,4 @@ coverage/
 target/
 Anchor.lock
 frontend/public/art/generated/
+screenshots/chrome-profile/

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, LockKeyhole, ShieldCheck, Sparkles, WalletCards, Zap } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState, ErrorState, LoadingState, WalletDisconnectedState } from "@/components/ApiState";
@@ -16,12 +16,13 @@ import { AnimatedButton } from "@/components/AnimatedButton";
 import { MintRevealAnimation, ParticleBurst } from "@/components/animations";
 import { brandAssets } from "@/lib/brand-assets";
 import { TransactionStatus, type TxStatus } from "@/components/TransactionStatus";
+import { cn } from "@/lib/utils";
 
 export default function MintPage() {
   const wallet = useWalletAuth();
   const collectionState = useApiResource<VaultCollection[]>("/product/collections");
   const collections = unwrapApiData(collectionState.data) ?? [];
-  const defaultCollection = collections[0];
+  const defaultCollection = collections[0] ?? fallbackMintCollection();
   const [amount, setAmount] = useState("50000");
   const [lockDurationDays, setLockDurationDays] = useState(90);
   const [collectionId, setCollectionId] = useState("");
@@ -30,6 +31,7 @@ export default function MintPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const collection = collections.find((item) => item.id === collectionId || item.dbId === collectionId) ?? defaultCollection;
+  const projectedImage = collection?.image && !isOffBrandImage(collection.image) ? collection.image : brandAssets.nftVaults[0];
 
   async function createIntent() {
     if (!collection || !wallet.address) {
@@ -107,193 +109,274 @@ export default function MintPage() {
 
   return (
     <AppShell active="mint">
-      {collectionState.loading ? <LoadingState label="Loading launched collections" /> : null}
       {collectionState.error ? <ErrorState error={collectionState.error} retry={collectionState.reload} /> : null}
-      {!wallet.connected ? <WalletDisconnectedState /> : null}
       {!collectionState.loading && !collectionState.error && !collections.length ? <EmptyState title="No launched collections yet" body="Create and approve a community, then launch it before minting a backed Vault NFT." /> : null}
       {collection ? (
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="space-y-5">
-          <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
-            <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-1/2 object-cover opacity-35 mix-blend-screen" />
-            <div className="relative">
-              <p className="text-sm font-black uppercase text-vault-green">Mint Vault</p>
-              <h1 className="mt-2 max-w-3xl text-4xl font-black">Lock tokens. Mint vault identity. Activate your faction.</h1>
-              <p className="mt-3 max-w-2xl text-slate-300">Choose a faction token, seal a backed position, and reveal a vault NFT that can be staked, raided, or traded.</p>
+        <div className="space-y-6">
+          <section className="phew-panel relative overflow-hidden rounded-lg">
+            <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-62" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/90 to-[#020806]/26" />
+            <div className="absolute inset-0 grid-mask opacity-20" />
+            <div className="relative grid gap-8 p-6 lg:grid-cols-[minmax(0,1fr)_430px] lg:p-8">
+              <div className="max-w-3xl">
+                <p className="text-sm font-black uppercase text-vault-green">Mint Vault NFT</p>
+                <h1 className="mt-3 text-5xl font-black leading-tight">Seal tokens into a premium vault identity.</h1>
+                <p className="mt-4 text-slate-300">Select a launched faction, lock an amount, choose duration, and mint a vault NFT ready for staking, raids, and marketplace liquidity.</p>
+                <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                  <HeroMetric label="Selected faction" value={collection.symbol} />
+                  <HeroMetric label="Lock duration" value={lockDurationDays ? `${lockDurationDays}d` : "Flexible"} />
+                  <HeroMetric label="Vault state" value={mintState?.status ?? "Draft"} />
+                </div>
+              </div>
+              <ProjectedVaultCard image={projectedImage} collection={collection} amount={amount} lockDurationDays={lockDurationDays} txStatus={txStatus} />
             </div>
           </section>
 
-          <SectionCard title="Token Select">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              {collections.map((item) => (
-                <button key={item.id} onClick={() => setCollectionId(item.id)} className={item.id === collectionId ? "rounded-lg border border-vault-purple bg-vault-purple/15 p-4 text-left" : "rounded-lg border border-vault-line bg-black/25 p-4 text-left"}>
-                  <img src={item.image} alt="" className="mb-3 aspect-square w-full rounded-lg object-cover" />
-                  <p className="font-bold">{item.name}</p>
-                  <p className="text-sm text-slate-400">{item.mascot}</p>
-                </button>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Deposit and Lock">
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-              <form className="space-y-5">
-                <PreviewRow label="Connected wallet" value={wallet.address ?? "Disconnected"} />
-                <label className="block">
-                  <span className="text-sm text-slate-400">SPL Token Mint</span>
-                  <input className="mt-2 h-12 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" defaultValue={collection.tokenMint} />
-                </label>
-                <label className="block">
-                  <span className="text-sm text-slate-400">Amount to lock</span>
-                  <input className="mt-2 h-12 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" value={amount} onChange={(event) => setAmount(event.target.value)} />
-                </label>
-                <div>
-                  <p className="mb-3 text-sm text-slate-400">Lock duration</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[["Flexible", 0], ["30 Days", 30], ["90 Days", 90], ["180 Days", 180]].map(([duration, days]) => (
-                      <button type="button" key={duration} onClick={() => setLockDurationDays(Number(days))} className={lockDurationDays === Number(days) ? "rounded-lg border border-vault-green bg-vault-green/10 p-3 text-vault-green" : "rounded-lg border border-vault-line bg-black/25 p-3 text-slate-300"}>
-                        {duration}
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <main className="space-y-6">
+              <SectionCard title="Choose Faction">
+                {collectionState.loading ? (
+                  <div className="mb-4 rounded-md border border-vault-cyan/20 bg-vault-cyan/8 p-3 text-sm text-slate-300">Syncing launched factions. The preview remains available while live data loads.</div>
+                ) : null}
+                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+                  {(collections.length ? collections : [fallbackMintCollection()]).map((item, index) => {
+                    const selected = (collectionId ? item.id === collectionId : item.id === collection.id);
+                    return (
+                      <button key={item.id} onClick={() => setCollectionId(item.id)} className={cn("group overflow-hidden rounded-lg border bg-black/30 text-left transition", selected ? "border-vault-green/70 shadow-green" : "border-vault-line hover:border-vault-cyan/40")}>
+                        <div className="relative aspect-[5/3] overflow-hidden">
+                          <img src={isOffBrandImage(item.banner) ? brandAssets.launchHero : item.banner || brandAssets.launchHero} alt="" className="h-full w-full object-cover opacity-80 transition group-hover:scale-105" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
+                          <div className="absolute bottom-3 left-3 right-3">
+                            <p className="font-black">{item.name}</p>
+                            <p className="mt-1 text-xs text-vault-green">{item.symbol} vault faction</p>
+                          </div>
+                          <span className="absolute right-3 top-3"><StatusPill accent={selected ? "green" : index % 2 ? "cyan" : "gold"}>{selected ? "Selected" : item.qualityTier}</StatusPill></span>
+                        </div>
                       </button>
-                    ))}
+                    );
+                  })}
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Vault Terms">
+                {!wallet.connected ? <div className="mb-4"><WalletDisconnectedState /></div> : null}
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="space-y-5">
+                    <label className="block">
+                      <span className="text-sm font-semibold text-slate-300">Amount to lock</span>
+                      <div className="phew-input mt-2 flex h-14 items-center rounded-md px-4">
+                        <input className="min-w-0 flex-1 bg-transparent text-xl font-black outline-none" value={amount} onChange={(event) => setAmount(event.target.value)} />
+                        <span className="ml-3 rounded-md border border-vault-green/30 bg-vault-green/10 px-3 py-1 text-sm font-black text-vault-green">{collection.symbol}</span>
+                      </div>
+                    </label>
+                    <div>
+                      <p className="mb-3 text-sm font-semibold text-slate-300">Lock duration</p>
+                      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                        {[["Flexible", 0], ["30 Days", 30], ["90 Days", 90], ["180 Days", 180]].map(([duration, days]) => (
+                          <button type="button" key={duration} onClick={() => setLockDurationDays(Number(days))} className={cn("rounded-md border p-3 text-sm font-black transition", lockDurationDays === Number(days) ? "border-vault-green bg-vault-green/12 text-vault-green shadow-green" : "border-vault-line bg-black/25 text-slate-400 hover:border-vault-cyan/40")}>
+                            {duration}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {error ? <div className="rounded-md border border-vault-red/40 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</div> : null}
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <AnimatedButton type="button" onClick={createIntent} loading={loading && (txStatus === "validating" || txStatus === "pending")} className="h-12" icon={ArrowRight}>
+                        Create Intent
+                      </AnimatedButton>
+                      <AnimatedButton type="button" tone="outline" onClick={buildTransaction} disabled={loading || !mintState?.id} className="h-12">
+                        Build Tx
+                      </AnimatedButton>
+                      <AnimatedButton type="button" tone="outline" onClick={signAndSubmit} disabled={loading || !mintState?.unsignedTransaction?.base64UnsignedTransaction} className="h-12">
+                        Sign + Submit
+                      </AnimatedButton>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-vault-line bg-black/30 p-4">
+                    <p className="text-sm font-black uppercase text-slate-400">Projected vault NFT</p>
+                    <img src={projectedImage} alt="" className="mt-4 aspect-[4/5] w-full rounded-lg border border-vault-green/25 object-cover" />
+                    <PreviewRow label="Backing token" value={collection.symbol} />
+                    <PreviewRow label="NFT standard" value="Vault identity" />
+                    <PreviewRow label="Redeem mode" value="Full position" />
                   </div>
                 </div>
-                <div className="rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-4 text-sm text-slate-200">
-                  <div className="flex gap-3">
-                    <AlertTriangle className="size-5 text-vault-gold" />
-                    <p>You are creating a lock intent. On production Solana, wallet signing transfers these tokens into a PDA vault. Buyer inherits the unlock date.</p>
-                  </div>
-                </div>
-                {error ? <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</div> : null}
-                <AnimatedButton type="button" onClick={createIntent} loading={loading && (txStatus === "validating" || txStatus === "pending")} className="h-12 w-full" icon={ArrowRight}>
-                  Create Mint Intent
-                </AnimatedButton>
-                <div className="grid gap-2 md:grid-cols-2">
-                  <AnimatedButton type="button" tone="outline" onClick={buildTransaction} disabled={loading || !mintState?.id} className="h-12">
-                    Build Devnet Tx
-                  </AnimatedButton>
-                  <AnimatedButton type="button" tone="outline" onClick={signAndSubmit} disabled={loading || !mintState?.unsignedTransaction?.base64UnsignedTransaction} className="h-12">
-                    Wallet Sign + Submit
-                  </AnimatedButton>
-                </div>
-              </form>
-              <div className={`relative overflow-hidden rounded-lg border border-vault-line bg-black/25 p-4 ${txStatus === "pending" || txStatus === "signing" ? "shadow-green" : ""}`}>
-                <ParticleBurst active={txStatus === "confirmed"} rarity="Legendary" />
-                <img src={collection.image} alt="" className="aspect-square w-full rounded-lg object-cover" />
-                <div className="mt-4 space-y-3">
-                  <PreviewRow label="Collection" value={collection.name} />
-                  <PreviewRow label="NFT Standard" value="Standard NFT" />
-                  <PreviewRow label="Vault PDA" value="Derived on mint" />
-                  <PreviewRow label="Redeem" value="Full position only" />
-                  <PreviewRow label="Intent status" value={mintState?.status ?? "Not created"} />
-                  <PreviewRow label="NFT asset" value={mintState?.nftMint ?? mintState?.unsignedTransaction?.nftAssetAddress ?? "Built after tx"} />
-                  <PreviewRow label="Vault position" value={mintState?.vaultPositionPda ?? mintState?.unsignedTransaction?.vaultPositionPda ?? "Built after tx"} />
-                  <StatusPill accent="green">Verified collection required</StatusPill>
-                </div>
-              </div>
-            </div>
-          </SectionCard>
+              </SectionCard>
 
-          <SectionCard title="Transaction State">
-            <div className="grid gap-3 md:grid-cols-4">
-              {["PENDING", "ASSET_UPLOADED", "TX_BUILT", "CONFIRMED"].map((status) => (
-                <div key={status} className="rounded-lg border border-vault-line bg-black/25 p-4">
-                  <StatusPill accent={mintState?.status === status ? "green" : "purple"}>{status}</StatusPill>
-                  <p className="mt-2 text-sm text-slate-400">{stateCopy(status)}</p>
+              <SectionCard title="Transaction State">
+                <div className="grid gap-3 md:grid-cols-4">
+                  {[
+                    ["Intent", "Create lock intent", Boolean(mintState?.id)],
+                    ["Build", "Prepare devnet tx", Boolean(mintState?.unsignedTransaction)],
+                    ["Sign", "Wallet approval", txStatus === "signing" || txStatus === "pending" || txStatus === "confirmed"],
+                    ["Confirm", "Vault minted", txStatus === "confirmed" || mintState?.status === "CONFIRMED"]
+                  ].map(([title, body, complete]) => (
+                    <StateTile key={title as string} title={title as string} body={body as string} complete={Boolean(complete)} />
+                  ))}
                 </div>
-              ))}
-            </div>
-            {mintState?.txSignature ? (
-              <a href={`https://explorer.solana.com/tx/${mintState.txSignature}?cluster=devnet`} className="mt-4 inline-flex h-11 items-center justify-center rounded-lg border border-vault-green px-4 text-sm font-bold text-vault-green">
-                View confirmed transaction
-              </a>
-            ) : null}
-            {mintState?.unsignedTransaction ? (
-              <pre className="mt-4 max-h-56 overflow-auto rounded-lg border border-vault-line bg-black/40 p-4 text-xs text-slate-300">{JSON.stringify(mintState.unsignedTransaction, null, 2)}</pre>
-            ) : null}
-          </SectionCard>
+                {mintState?.txSignature ? (
+                  <a href={`https://explorer.solana.com/tx/${mintState.txSignature}?cluster=devnet`} className="mt-4 inline-flex h-11 items-center justify-center rounded-md border border-vault-green px-4 text-sm font-bold text-vault-green">
+                    View confirmed transaction
+                  </a>
+                ) : null}
+              </SectionCard>
+            </main>
 
-          <SectionCard title="Mint Animation">
-            <MintRevealAnimation rarity={txStatus === "confirmed" ? "Legendary" : "Epic"} label={txStatus === "confirmed" ? "Vault revealed" : txStatus === "pending" || txStatus === "signing" ? "Sealing vault" : "Ready to mint"} />
-            <div className="mt-4">
-              <TransactionStatus status={txStatus} label={mintStatusLabel(txStatus)} detail={error} />
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Mint Safety Rules">
-            <div className="grid gap-3 md:grid-cols-3">
-              {[
-                ["PDA custody", "Vault token accounts are program-derived and isolated per collection."],
-                ["Strict mint validation", "Mint address and collection profile must match one-to-one."],
-                ["Redeem protection", "NFT is burned or marked redeemed before tokens release."]
-              ].map(([title, body]) => (
-                <div key={title} className="rounded-lg border border-vault-line bg-black/25 p-4">
-                  <ShieldCheck className="mb-3 size-6 text-vault-green" />
-                  <p className="font-bold">{title}</p>
-                  <p className="mt-1 text-sm text-slate-400">{body}</p>
+            <aside className="space-y-6">
+              <SectionCard title="Mint Sequence">
+                <div className="relative overflow-hidden rounded-lg">
+                  <ParticleBurst active={txStatus === "confirmed"} rarity="Legendary" />
+                  <MintRevealAnimation rarity={txStatus === "confirmed" ? "Legendary" : "Epic"} label={txStatus === "confirmed" ? "Vault revealed" : txStatus === "pending" || txStatus === "signing" ? "Sealing vault" : "Ready"} />
                 </div>
-              ))}
-            </div>
-          </SectionCard>
+                <div className="mt-4">
+                  <TransactionStatus status={txStatus} label={mintStatusLabel(txStatus)} detail={error} />
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Selected Collection">
+                <h2 className="text-2xl font-black">{collection.name}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{collection.vibe}</p>
+                <div className="mt-4">
+                  <ProgressBar value={collection.xp} max={collection.nextXp} />
+                  <p className="mt-2 text-sm text-vault-green">Level {collection.level} faction</p>
+                </div>
+              </SectionCard>
+
+              <SectionCard title="After Mint">
+                <Link href="/staking" className="mb-3 flex h-11 items-center justify-center gap-2 rounded-md border border-vault-line bg-black/25 font-bold">
+                  <LockKeyhole className="size-4 text-vault-green" /> Stake vault NFT
+                </Link>
+                <Link href="/marketplace" className="flex h-11 items-center justify-center gap-2 rounded-md border border-vault-line bg-black/25 font-bold">
+                  <WalletCards className="size-4 text-vault-cyan" /> Trade on marketplace
+                </Link>
+              </SectionCard>
+            </aside>
+          </div>
         </div>
-
-        <aside className="space-y-5">
-          <SectionCard title="Selected Collection">
-            <img src={collection.image} alt="" className="aspect-square w-full rounded-lg object-cover" />
-            <h2 className="mt-4 text-2xl font-black">{collection.name}</h2>
-            <p className="mt-2 text-slate-400">{collection.vibe}</p>
-            <div className="mt-4">
-              <ProgressBar value={collection.xp} max={collection.nextXp} />
-              <p className="mt-2 text-sm text-vault-green">Level {collection.level}</p>
-            </div>
-          </SectionCard>
-          <SectionCard title="Estimated Fees">
-            <PreviewRow label="Mint vault fee" value="1.5%" />
-            <PreviewRow label="Redeem fee" value="1%" />
-            <PreviewRow label="Marketplace fee" value="2.5%" />
-            <PreviewRow label="Instant sell" value="5-12%" />
-          </SectionCard>
-          <SectionCard title="Next Steps">
-            <Link href="/staking" className="mb-3 flex h-11 items-center justify-center gap-2 rounded-lg border border-vault-line bg-black/25 font-bold">
-              <LockKeyhole className="size-4" /> Stake after mint
-            </Link>
-            <Link href="/marketplace" className="flex h-11 items-center justify-center gap-2 rounded-lg border border-vault-line bg-black/25 font-bold">
-              <WalletCards className="size-4" /> Trade on marketplace
-            </Link>
-          </SectionCard>
-        </aside>
-      </div>
       ) : null}
     </AppShell>
   );
 }
 
-function PreviewRow({ label, value }: { label: string; value: string }) {
+function ProjectedVaultCard({ image, collection, amount, lockDurationDays, txStatus }: { image: string; collection: VaultCollection; amount: string; lockDurationDays: number; txStatus: TxStatus }) {
   return (
-    <div className="flex justify-between border-b border-vault-line py-3 text-sm last:border-0">
-      <span className="text-slate-400">{label}</span>
-      <span className="font-semibold">{value}</span>
+    <div className="rounded-lg border border-vault-green/30 bg-black/45 p-4 shadow-green">
+      <div className="relative overflow-hidden rounded-lg">
+        <img src={image} alt="" className="aspect-[4/5] w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        <div className="absolute bottom-4 left-4 right-4">
+          <StatusPill accent={txStatus === "confirmed" ? "gold" : "green"}>{txStatus === "confirmed" ? "Minted" : "Projected"}</StatusPill>
+          <p className="mt-2 text-xl font-black">{collection.symbol} Vault NFT</p>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-2">
+        <PreviewRow label="Locked amount" value={`${amount} ${collection.symbol}`} />
+        <PreviewRow label="Duration" value={lockDurationDays ? `${lockDurationDays} days` : "Flexible"} />
+        <PreviewRow label="Vault status" value={txStatus === "idle" ? "Ready" : txStatus} />
+      </div>
     </div>
   );
 }
 
-function stateCopy(status: string) {
-  const copy: Record<string, string> = {
-    PENDING: "Intent exists and can be safely retried with the same idempotency key.",
-    ASSET_UPLOADED: "Final image and metadata have immutable storage URIs.",
-    TX_BUILT: "Wallet can sign the generated Phew.run + Metaplex transaction plan.",
-    CONFIRMED: "A Vault NFT row is created only after confirmed chain state."
-  };
-  return copy[status] ?? status;
+function HeroMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-vault-line bg-black/35 p-4">
+      <p className="text-xs uppercase text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function StateTile({ title, body, complete }: { title: string; body: string; complete: boolean }) {
+  return (
+    <div className={cn("rounded-md border p-4", complete ? "border-vault-green/40 bg-vault-green/10" : "border-vault-line bg-black/25")}>
+      {complete ? <CheckCircle2 className="mb-3 size-5 text-vault-green" /> : <Clock3 className="mb-3 size-5 text-slate-500" />}
+      <p className="font-black">{title}</p>
+      <p className="mt-1 text-sm text-slate-400">{body}</p>
+    </div>
+  );
+}
+
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4 border-b border-vault-line py-3 text-sm last:border-0">
+      <span className="text-slate-400">{label}</span>
+      <span className="min-w-0 truncate text-right font-semibold">{value}</span>
+    </div>
+  );
+}
+
+function isOffBrandImage(src?: string | null) {
+  if (!src) return true;
+  const value = src.toLowerCase();
+  return value.includes("frog") || value.includes("pepe") || value.includes("doge") || value.includes("cat") || value.includes("placeholder") || value.includes("pink") || value.includes("smiley");
 }
 
 function mintStatusLabel(status: TxStatus) {
   const labels: Record<TxStatus, string> = {
-    idle: "Ready for mint action",
-    validating: "Validating wallet and collection",
+    idle: "Ready to mint",
+    validating: "Validating vault terms",
+    pending: "Sealing vault",
     signing: "Waiting for wallet signature",
-    pending: "Transaction pending",
-    confirmed: "Vault mint confirmed",
-    failed: "Mint action failed"
+    confirmed: "Vault NFT minted",
+    failed: "Mint failed"
   };
   return labels[status];
+}
+
+function fallbackMintCollection(): VaultCollection {
+  return {
+    id: "phew-preview",
+    symbol: "PHEW",
+    name: "PHEW Vault Faction",
+    subtitle: "Premium vault preview",
+    tokenMint: "Connect wallet for live token mint",
+    description: "A premium token-backed faction preview for vault minting.",
+    image: brandAssets.nftVaults[0],
+    banner: brandAssets.launchHero,
+    mascot: "Vault Relic",
+    theme: "Dark sci-fi vault faction",
+    vibe: "Cinematic vault identity with neon lime energy, raid readiness, and staking hooks.",
+    chain: "Solana Devnet",
+    category: "Vault",
+    floorSol: 0,
+    volume24hSol: 0,
+    volumeSol: 0,
+    holders: 0,
+    vaults: 0,
+    minted: 0,
+    supply: 10000,
+    level: 1,
+    xp: 42,
+    nextXp: 100,
+    apy: 0,
+    online: 0,
+    riskScore: 92,
+    riskTier: "SAFE",
+    qualityTier: "Premium",
+    instantSellEnabled: false,
+    palette: ["#baff00", "#16d7d2", "#071017", "#f4c542"],
+    mascotType: "alien",
+    silhouette: "Vault relic",
+    activeUsers24h: 0,
+    raidSuccessRate: 0,
+    averageHoldDays: 0,
+    communityTraits: ["Vault-backed", "Raid-ready", "Stake-enabled"],
+    legendaryTrait: "Founder Crown",
+    traitLayers: {
+      base: ["Obsidian vault"],
+      headgear: ["Founder seal"],
+      eyes: ["Lime core"],
+      aura: ["Cyan charge"],
+      accessory: ["Vault key"],
+      background: ["Command chamber"]
+    },
+    styleProfile: {
+      artStyle: "Dark premium sci-fi vault",
+      shapeLanguage: "Sharp angular relics",
+      visualFx: ["Neon lime energy", "Cyan edge light"],
+      baseVariantCount: 3,
+      microRandomization: "Energy core intensity, frame etching, and relic trim variation"
+    },
+    nextUnlocks: ["Launch collection to unlock live minting"]
+  };
 }

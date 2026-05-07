@@ -97,16 +97,20 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
     <AppShell active={active} stats={data?.stats}>
       <div className="space-y-5">
         {active === "home" ? <FounderStatusPanel status={capabilityState.data} /> : null}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-black uppercase text-vault-green">PHEW.DEVNET / Faction OS</p>
-            <h1 className="mt-2 text-4xl font-black">{title}</h1>
-            <p className="mt-2 max-w-3xl text-slate-400">{data?.subtitle ?? "Launch faction vaults, coordinate raids, and reward holders on Solana."}</p>
+        <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
+          <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-y-0 right-0 hidden h-full w-3/5 object-cover opacity-30 mix-blend-screen lg:block" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/35" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-black uppercase text-vault-green">PHEW.DEVNET / Faction OS</p>
+              <h1 className="mt-2 max-w-4xl text-4xl font-black leading-tight">{title}</h1>
+              <p className="mt-2 max-w-3xl text-slate-300">{data?.subtitle ?? "Launch faction vaults, coordinate raids, and reward holders on Solana."}</p>
+            </div>
+            <Link href="/create-collection" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
+              <UserPlus className="size-4" /> Create Community
+            </Link>
           </div>
-          <Link href="/create-collection" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-            <UserPlus className="size-4" /> Create Community
-          </Link>
-        </div>
+        </section>
 
         {blockedByWallet ? <WalletDisconnectedState /> : null}
         <SetupWarning warnings={warnings} />
