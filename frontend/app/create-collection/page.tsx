@@ -11,6 +11,7 @@ import { apiFetch } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { CollectionGeneratorPreview } from "@/lib/types";
+import { brandAssets } from "@/lib/brand-assets";
 
 type Preset = { id: string; name: string; artStyle: string; mood: string };
 type GeneratorRun = {
@@ -263,11 +264,21 @@ export default function CreateCollectionPage() {
         {!walletAuth.connected ? <WalletDisconnectedState /> : null}
         <SetupWarning warnings={previewOnly?.warnings} />
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div>
-            <p className="text-sm font-bold uppercase text-vault-purple">Premium NFT Generator</p>
-            <h1 className="mt-2 max-w-4xl text-4xl font-black">Create a premium Phew.run community identity.</h1>
-            <p className="mt-3 max-w-3xl text-slate-400">Preview works without DB, OpenAI, or Pinata. Persist and launch only unlock when founder setup is complete.</p>
-          </div>
+          <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
+            <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-1/2 object-cover opacity-30 mix-blend-screen" />
+            <div className="relative">
+              <p className="text-sm font-black uppercase text-vault-green">Create Community</p>
+              <h1 className="mt-2 max-w-4xl text-4xl font-black">Forge a faction identity for token-backed vault NFTs.</h1>
+              <p className="mt-3 max-w-3xl text-slate-300">Set the token, define the brand DNA, generate a vault-ready collection system, then review the launch preview before approval.</p>
+              <div className="mt-6 grid gap-2 md:grid-cols-4">
+                {["Basics", "Branding", "Collection", "Review"].map((step, index) => (
+                  <div key={step} className={`rounded-md border p-3 text-sm font-black ${index === 0 ? "border-vault-green bg-vault-green/15 text-vault-green" : "border-vault-line bg-black/30 text-slate-400"}`}>
+                    <span className="mr-2 text-xs">0{index + 1}</span>{step}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
           <SectionCard title="Persistence Status">
             <div className="space-y-3">
               <StatusPill accent={run?.status === "APPROVED" ? "green" : run ? "purple" : "gold"}>{run?.status ?? "No Run Yet"}</StatusPill>
@@ -308,7 +319,7 @@ export default function CreateCollectionPage() {
                 <Field label="Logo URL" value={logoUri} onChange={setLogoUri} icon={Upload} />
                 <label className="block">
                   <span className="text-sm text-slate-400">Short description / vibe</span>
-                  <textarea className="mt-2 min-h-24 w-full rounded-lg border border-vault-line bg-black/25 px-4 py-3 text-sm outline-none focus:border-vault-purple" value={description} onChange={(event) => setDescription(event.target.value)} />
+                  <textarea className="phew-input mt-2 min-h-24 w-full rounded-md px-4 py-3 text-sm" value={description} onChange={(event) => setDescription(event.target.value)} />
                 </label>
               </div>
             </SectionCard>
@@ -357,10 +368,10 @@ export default function CreateCollectionPage() {
             </SectionCard>
 
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={generatePreview} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow disabled:opacity-60">
+              <button type="button" onClick={generatePreview} disabled={loading} className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
                 {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate Preview
               </button>
-              <button type="button" onClick={createRun} disabled={loading || !walletAuth.connected || !capabilityState.data?.capabilities?.databaseAvailable} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-50">
+              <button type="button" onClick={createRun} disabled={loading || !walletAuth.connected || !capabilityState.data?.capabilities?.databaseAvailable} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-50">
                 {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Save Run
               </button>
               <button type="button" onClick={() => mutateRun("regenerate-style")} disabled={!run || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-purple/50 bg-vault-purple/10 px-4 text-sm font-bold text-vault-purple disabled:opacity-50">
@@ -372,7 +383,7 @@ export default function CreateCollectionPage() {
               <button type="button" onClick={approveRun} disabled={!canApprove || loading} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-green/50 bg-vault-green/10 px-4 text-sm font-bold text-vault-green disabled:opacity-50">
                 <ShieldCheck className="size-4" /> Approve Version
               </button>
-              <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !capabilityState.data?.capabilities?.productionStorageAvailable} className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-green px-4 text-sm font-bold text-black disabled:opacity-50">
+              <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !capabilityState.data?.capabilities?.productionStorageAvailable} className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-4 text-sm font-black text-black disabled:opacity-50">
                 <Check className="size-4" /> Launch Collection
               </button>
             </div>
@@ -416,7 +427,7 @@ function Field({ label, value, onChange, icon: Icon }: { label: string; value: s
       <span className="text-sm text-slate-400">{label}</span>
       <div className="relative mt-2">
         {Icon ? <Icon className="absolute left-3 top-3 size-4 text-vault-purple" /> : null}
-        <input className={`h-11 w-full rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple ${Icon ? "pl-10" : ""}`} value={value} onChange={(event) => onChange(event.target.value)} />
+        <input className={`phew-input h-11 w-full rounded-md px-4 text-sm ${Icon ? "pl-10" : ""}`} value={value} onChange={(event) => onChange(event.target.value)} />
       </div>
     </label>
   );

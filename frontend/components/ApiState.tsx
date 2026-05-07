@@ -3,6 +3,7 @@
 import { AlertTriangle, CheckCircle2, Loader2, RefreshCcw, Wallet, XCircle } from "lucide-react";
 import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
+import { brandAssets } from "@/lib/brand-assets";
 
 export function LoadingState({ label = "Loading Phew.run data" }: { label?: string }) {
   return (
@@ -27,7 +28,7 @@ export function ErrorState({ error, retry }: { error: string; retry?: () => void
           </div>
         </div>
         {retry ? (
-          <button onClick={retry} className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg border border-vault-line bg-black/25 px-4 text-sm font-bold">
+          <button onClick={retry} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold">
             <RefreshCcw className="size-4" /> Retry
           </button>
         ) : null}
@@ -39,10 +40,13 @@ export function ErrorState({ error, retry }: { error: string; retry?: () => void
 export function EmptyState({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {
   return (
     <SectionCard>
-      <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-8 text-center">
-        <p className="text-xl font-black">{title}</p>
-        <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-400">{body}</p>
-        {action ? <div className="mt-5">{action}</div> : null}
+      <div className="phew-scanline grid gap-6 rounded-lg border border-dashed border-vault-green/35 bg-vault-green/5 p-6 text-left md:grid-cols-[180px_minmax(0,1fr)] md:items-center">
+        <img src={brandAssets.emptyVault} alt="" className="mx-auto aspect-square w-40 rounded-lg object-cover opacity-90 shadow-green" />
+        <div>
+          <p className="text-xl font-black">{title}</p>
+          <p className="mt-2 max-w-2xl text-sm text-slate-400">{body}</p>
+          {action ? <div className="mt-5">{action}</div> : null}
+        </div>
       </div>
     </SectionCard>
   );
@@ -51,9 +55,9 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
 export function WalletDisconnectedState({ action }: { action?: React.ReactNode }) {
   return (
     <SectionCard>
-      <div className="rounded-lg border border-vault-purple/40 bg-vault-purple/10 p-6">
+      <div className="rounded-lg border border-vault-green/35 bg-vault-green/10 p-6">
         <div className="flex items-start gap-3">
-          <Wallet className="size-6 text-vault-purple" />
+          <Wallet className="size-6 text-vault-green" />
           <div>
             <p className="text-xl font-black">Connect your wallet</p>
             <p className="mt-2 text-sm text-slate-300">This view is wallet-specific. Connect and authenticate your wallet to see owned vaults, staking, listings, claims, and mint intents.</p>

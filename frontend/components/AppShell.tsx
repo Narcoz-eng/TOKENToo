@@ -10,11 +10,11 @@ type AppShellStats = {
 
 export function AppShell({ children, active, stats }: { children: React.ReactNode; active: string; stats?: AppShellStats }) {
   return (
-    <div className="min-h-screen bg-vault-radial text-white">
+    <div className="phew-app-bg min-h-screen bg-vault-radial text-white">
       <Sidebar active={active} stats={stats} />
-      <div className="min-h-screen lg:pl-64">
+      <div className="relative min-h-screen lg:pl-64">
         <TopBar />
-        <main className="mx-auto w-full max-w-[1780px] px-4 py-5 sm:px-6 lg:px-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1780px] px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>
   );

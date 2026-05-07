@@ -14,14 +14,14 @@ export function SectionCard({
   action?: React.ReactNode;
 }) {
   return (
-    <section id={id} className={cn("glass rounded-lg p-4", className)}>
+    <section id={id} className={cn("phew-panel relative rounded-lg p-4", className)}>
       {(title || action) && (
-        <div className="mb-4 flex items-center justify-between gap-4">
-          {title ? <h2 className="text-sm font-bold uppercase text-white">{title}</h2> : <div />}
+        <div className="relative mb-4 flex items-center justify-between gap-4">
+          {title ? <h2 className="text-sm font-black uppercase text-white">{title}</h2> : <div />}
           {action}
         </div>
       )}
-      {children}
+      <div className="relative">{children}</div>
     </section>
   );
 }

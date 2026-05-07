@@ -22,10 +22,9 @@ export function ProgressBar({
   return (
     <div>
       {label ? <div className="mb-2 text-xs text-slate-400">{label}</div> : null}
-      <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-        <div className={cn("h-full rounded-full", fill)} style={{ width: `${percent}%` }} />
+      <div className="h-2 overflow-hidden rounded-full border border-vault-line bg-black/45">
+        <div className={cn("h-full rounded-full transition-all duration-500", fill)} style={{ width: `${percent}%` }} />
       </div>
     </div>
   );
 }
-

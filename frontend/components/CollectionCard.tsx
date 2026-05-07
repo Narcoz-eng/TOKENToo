@@ -14,18 +14,20 @@ export function CollectionCard({ collection }: { collection: VaultCollection }) 
   } satisfies CSSProperties;
 
   return (
-    <Link href={`/collections/${collection.id}`} className="group glass block overflow-hidden rounded-lg transition hover:-translate-y-0.5" style={collectionStyle}>
+    <Link href={`/collections/${collection.id}`} className="group phew-panel phew-card-hover phew-scanline relative block overflow-hidden rounded-lg" style={collectionStyle}>
       <div className="relative aspect-square overflow-hidden">
         <img src={collection.image} alt={collection.name} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
         <div className="absolute left-3 top-3 flex gap-2">
           <StatusPill accent={riskAccent(collection.riskTier)}>{collection.riskTier}</StatusPill>
         </div>
+        <div className="absolute bottom-3 right-3 rounded-md border border-vault-green/40 bg-black/55 px-2 py-1 text-xs font-black text-vault-green">{collection.vaults.toLocaleString()} vaults</div>
       </div>
-      <div className="space-y-3 p-4">
+      <div className="relative space-y-3 p-4">
         <div>
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-white">{collection.name}</h3>
-            <BadgeCheck className="size-4 text-vault-purple" />
+            <BadgeCheck className="size-4 text-vault-green" />
           </div>
           <p className="text-sm text-slate-400">{collection.subtitle}</p>
           <p className="mt-2 text-xs text-vault-green">{collection.mascot} / {collection.mascotType}</p>
@@ -41,7 +43,7 @@ export function CollectionCard({ collection }: { collection: VaultCollection }) 
             <p className="font-semibold">{collection.floorSol} SOL</p>
           </div>
           <div>
-            <p className="text-slate-500">Vol 24h</p>
+            <p className="text-slate-500">Raid TVL</p>
             <p className="font-semibold">{collection.volume24hSol.toLocaleString()} SOL</p>
           </div>
         </div>

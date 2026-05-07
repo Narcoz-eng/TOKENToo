@@ -4,6 +4,7 @@ import { ProgressBar } from "./ProgressBar";
 import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
 import { ChestOpenAnimation, LegendaryRevealAnimation, MintRevealAnimation } from "./animations";
+import { brandAssets } from "@/lib/brand-assets";
 
 export function CollectionPreview({ preview }: { preview: CollectionGeneratorPreview }) {
   return (
@@ -11,7 +12,7 @@ export function CollectionPreview({ preview }: { preview: CollectionGeneratorPre
       <SectionCard title="Approval Preview">
         <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
           <div>
-            <img src={preview.avatar} alt={preview.collection} className="aspect-square w-full rounded-lg object-cover shadow-glow" />
+            <img src={preview.avatar || brandAssets.emptyVault} alt={preview.collection} className="aspect-square w-full rounded-lg object-cover shadow-glow" />
             <div className="mt-3 flex flex-wrap gap-2">
               <StatusPill accent={preview.quality.tier === "Basic" ? "gold" : "purple"}>{preview.quality.tier}</StatusPill>
               <StatusPill accent={preview.quality.passed ? "green" : "red"}>{preview.quality.passed ? "Quality Passed" : "Needs Regen"}</StatusPill>
@@ -19,10 +20,10 @@ export function CollectionPreview({ preview }: { preview: CollectionGeneratorPre
           </div>
           <div className="space-y-4">
             <div className="relative min-h-64 overflow-hidden rounded-lg border border-vault-line bg-black/25 p-5">
-              <img src={preview.banner} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
+              <img src={preview.banner || brandAssets.vaultHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
               <div className="absolute inset-0 bg-gradient-to-r from-vault-ink via-vault-ink/80 to-transparent" />
               <div className="relative max-w-2xl">
-                <p className="text-sm font-bold uppercase text-vault-purple">{preview.preset}</p>
+                <p className="text-sm font-black uppercase text-vault-green">{preview.preset}</p>
                 <h2 className="mt-2 text-4xl font-black">{preview.collection}</h2>
                 <p className="mt-2 text-vault-green">{preview.mascot} / {preview.artStyle}</p>
                 <p className="mt-4 text-sm leading-6 text-slate-300">{preview.lore}</p>

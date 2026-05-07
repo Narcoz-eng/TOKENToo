@@ -11,9 +11,8 @@ const tones: Record<Accent, string> = {
 
 export function StatusPill({ children, accent = "purple" }: { children: React.ReactNode; accent?: Accent }) {
   return (
-    <span className={cn("inline-flex items-center rounded-md border px-2 py-1 text-xs font-semibold", tones[accent])}>
+    <span className={cn("inline-flex items-center rounded-md border px-2 py-1 text-xs font-black uppercase", tones[accent])}>
       {children}
     </span>
   );
 }
-

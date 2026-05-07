@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Loader2, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
+import { AlertTriangle, ArrowRight, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState, ErrorState, LoadingState, WalletDisconnectedState } from "@/components/ApiState";
@@ -12,6 +12,9 @@ import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { unwrapApiData } from "@/lib/api";
 import type { VaultCollection } from "@/lib/types";
+import { AnimatedButton } from "@/components/AnimatedButton";
+import { MintRevealAnimation, ParticleBurst } from "@/components/animations";
+import { brandAssets } from "@/lib/brand-assets";
 
 export default function MintPage() {
   const wallet = useWalletAuth();
@@ -22,6 +25,7 @@ export default function MintPage() {
   const [lockDurationDays, setLockDurationDays] = useState(90);
   const [collectionId, setCollectionId] = useState("");
   const [mintState, setMintState] = useState<any>(null);
+  const [visualState, setVisualState] = useState<"idle" | "pending" | "built" | "success">("idle");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const collection = collections.find((item) => item.id === collectionId || item.dbId === collectionId) ?? defaultCollection;
@@ -32,6 +36,7 @@ export default function MintPage() {
       return;
     }
     setLoading(true);
+    setVisualState("pending");
     setError(null);
     try {
       const data = await wallet.authFetch<any>("/vault/mint/intents", {
@@ -45,6 +50,7 @@ export default function MintPage() {
         })
       });
       setMintState(data);
+      setVisualState("built");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Mint intent failed");
     } finally {
@@ -55,9 +61,11 @@ export default function MintPage() {
   async function buildTransaction() {
     if (!mintState?.id) return setError("Create a mint intent first.");
     setLoading(true);
+    setVisualState("pending");
     setError(null);
     try {
       setMintState(await wallet.authFetch<any>(`/vault/mint/transactions/${mintState.id}/build`, { method: "POST" }));
+      setVisualState("built");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Transaction build failed");
     } finally {
@@ -70,6 +78,7 @@ export default function MintPage() {
     const base64 = mintState.unsignedTransaction?.base64UnsignedTransaction;
     if (!base64) return setError("The backend did not return a signable devnet transaction.");
     setLoading(true);
+    setVisualState("pending");
     setError(null);
     try {
       const signedTransactionBase64 = await wallet.signTransactionBase64(base64);
@@ -79,6 +88,7 @@ export default function MintPage() {
           body: JSON.stringify({ signedTransactionBase64 })
         })
       );
+      setVisualState("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Wallet signing or submission failed");
     } finally {
@@ -95,11 +105,14 @@ export default function MintPage() {
       {collection ? (
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-5">
-          <div>
-            <p className="text-sm font-bold uppercase text-vault-purple">Mint Vault</p>
-            <h1 className="mt-2 text-4xl font-black">Deposit tokens and mint a backed Vault NFT.</h1>
-            <p className="mt-2 max-w-2xl text-slate-400">V1 mints one standard NFT per full locked position. Partial redeem is disabled.</p>
-          </div>
+          <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
+            <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-1/2 object-cover opacity-35 mix-blend-screen" />
+            <div className="relative">
+              <p className="text-sm font-black uppercase text-vault-green">Mint Vault</p>
+              <h1 className="mt-2 max-w-3xl text-4xl font-black">Lock tokens. Mint vault identity. Activate your faction.</h1>
+              <p className="mt-3 max-w-2xl text-slate-300">Choose a faction token, seal a backed position, and reveal a vault NFT that can be staked, raided, or traded.</p>
+            </div>
+          </section>
 
           <SectionCard title="Token Select">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -142,19 +155,20 @@ export default function MintPage() {
                   </div>
                 </div>
                 {error ? <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</div> : null}
-                <button type="button" onClick={createIntent} disabled={loading} className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-vault-purple font-bold shadow-glow disabled:opacity-60">
-                  {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />} Create Mint Intent
-                </button>
+                <AnimatedButton type="button" onClick={createIntent} loading={loading && visualState === "pending"} className="h-12 w-full" icon={ArrowRight}>
+                  Create Mint Intent
+                </AnimatedButton>
                 <div className="grid gap-2 md:grid-cols-2">
-                  <button type="button" onClick={buildTransaction} disabled={loading || !mintState?.id} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-vault-purple bg-vault-purple/10 font-bold text-vault-purple disabled:opacity-50">
+                  <AnimatedButton type="button" tone="outline" onClick={buildTransaction} disabled={loading || !mintState?.id} className="h-12">
                     Build Devnet Tx
-                  </button>
-                  <button type="button" onClick={signAndSubmit} disabled={loading || !mintState?.unsignedTransaction?.base64UnsignedTransaction} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-vault-green bg-vault-green/10 font-bold text-vault-green disabled:opacity-50">
+                  </AnimatedButton>
+                  <AnimatedButton type="button" tone="outline" onClick={signAndSubmit} disabled={loading || !mintState?.unsignedTransaction?.base64UnsignedTransaction} className="h-12">
                     Wallet Sign + Submit
-                  </button>
+                  </AnimatedButton>
                 </div>
               </form>
-              <div className="rounded-lg border border-vault-line bg-black/25 p-4">
+              <div className={`relative overflow-hidden rounded-lg border border-vault-line bg-black/25 p-4 ${visualState === "pending" ? "shadow-green" : ""}`}>
+                <ParticleBurst active={visualState === "success"} rarity="Legendary" />
                 <img src={collection.image} alt="" className="aspect-square w-full rounded-lg object-cover" />
                 <div className="mt-4 space-y-3">
                   <PreviewRow label="Collection" value={collection.name} />
@@ -187,6 +201,10 @@ export default function MintPage() {
             {mintState?.unsignedTransaction ? (
               <pre className="mt-4 max-h-56 overflow-auto rounded-lg border border-vault-line bg-black/40 p-4 text-xs text-slate-300">{JSON.stringify(mintState.unsignedTransaction, null, 2)}</pre>
             ) : null}
+          </SectionCard>
+
+          <SectionCard title="Mint Animation">
+            <MintRevealAnimation rarity={visualState === "success" ? "Legendary" : "Epic"} label={visualState === "success" ? "Vault revealed" : visualState === "pending" ? "Sealing vault" : "Ready to mint"} />
           </SectionCard>
 
           <SectionCard title="Mint Safety Rules">

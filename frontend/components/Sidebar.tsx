@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import {
   BarChart3,
   Bell,
@@ -21,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWalletDisplay } from "@/hooks/useWalletDisplay";
+import { BrandLogo } from "./BrandLogo";
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home, key: "home" },
@@ -49,10 +49,10 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
   const tvl = typeof stats?.tvlUsd === "number" ? `$${stats.tvlUsd.toLocaleString()}` : "—";
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-vault-line bg-[#050912]/95 lg:block">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-vault-line bg-[#020806]/95 shadow-[18px_0_50px_rgba(0,0,0,0.28)] backdrop-blur-xl lg:block">
       <div className="flex h-full flex-col">
         <Link href="/home" className="flex h-20 items-center gap-3 border-b border-vault-line px-6">
-          <Image src="/brand/phew-run-logo.svg" alt="Phew.run" width={136} height={46} className="h-12 w-auto object-contain" priority />
+          <BrandLogo />
         </Link>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-5">
@@ -64,11 +64,11 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-3 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white",
-                  selected && "bg-vault-purple/25 text-white neon-border"
+                  "group flex items-center gap-3 rounded-md border border-transparent px-3 py-3 text-sm font-semibold text-slate-400 transition hover:border-vault-cyan/25 hover:bg-vault-cyan/5 hover:text-white",
+                  selected && "neon-border border-vault-green/30 bg-vault-green/10 text-white"
                 )}
               >
-                <Icon className="size-4" />
+                <Icon className={cn("size-4 transition group-hover:text-vault-green", selected ? "text-vault-green" : "text-slate-500")} />
                 <span>{item.label}</span>
               </Link>
             );
@@ -76,11 +76,11 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
         </nav>
 
         <div className="space-y-3 p-4">
-          <div className="glass rounded-lg p-3">
-            <p className="text-xs uppercase text-slate-400">Your Wallet</p>
-            <div className="mt-3 flex items-center gap-3 rounded-lg border border-vault-line bg-black/25 p-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-vault-green to-vault-purple">
-                <Coins className="size-5 text-white" />
+          <div className="phew-panel relative rounded-lg p-3">
+            <p className="relative text-xs font-black uppercase text-slate-400">Wallet Relay</p>
+            <div className="relative mt-3 flex items-center gap-3 rounded-md border border-vault-line bg-black/30 p-3">
+              <div className="flex size-10 items-center justify-center rounded-md bg-vault-green/10 text-vault-green shadow-green">
+                <Coins className="size-5" />
               </div>
               <div className="min-w-0 text-sm">
                 <p className="truncate">{wallet.connected ? wallet.label : "Wallet disconnected"}</p>
@@ -88,18 +88,18 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
               </div>
             </div>
           </div>
-          <div className="glass rounded-lg p-3">
-            <p className="text-xs uppercase text-slate-400">Platform Stats</p>
-            <div className="mt-3 space-y-3 text-sm">
+          <div className="phew-panel relative rounded-lg p-3">
+            <p className="relative text-xs font-black uppercase text-slate-400">Faction Stats</p>
+            <div className="relative mt-3 space-y-3 text-sm">
               <SidebarMetric label="Total Value Locked" value={tvl} />
               <SidebarMetric label="Total Vaults" value={totalVaults} />
               <SidebarMetric label="Communities" value={communities} />
             </div>
-            <Link href="/admin/risk" className="mt-4 flex h-10 items-center justify-center rounded-lg bg-vault-purple text-sm font-semibold">
-              View Analytics
+            <Link href="/admin/risk" className="phew-button phew-button-primary relative mt-4 flex h-10 items-center justify-center rounded-md text-sm font-black text-black">
+              Analytics
             </Link>
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-vault-line bg-black/20 px-4 py-3 text-slate-400">
+          <div className="flex items-center justify-between rounded-md border border-vault-line bg-black/25 px-4 py-3 text-slate-500">
             <Bell className="size-4" />
             <Search className="size-4" />
             <Trophy className="size-4" />

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
   BadgeDollarSign,
@@ -14,7 +13,6 @@ import {
   Search,
   Shield,
   ShieldAlert,
-  SlidersHorizontal,
   Sparkles,
   Swords,
   Trophy,
@@ -27,17 +25,20 @@ import { useWalletDisplay } from "@/hooks/useWalletDisplay";
 import { useApiResource } from "@/hooks/useApiResource";
 import type { VaultCollection, VaultNft, RaidRoom } from "@/lib/types";
 import { AppShell } from "./AppShell";
-import { CollectionCard } from "./CollectionCard";
 import { EmptyState, ErrorState, FounderStatusPanel, LoadingState, SetupWarning, WalletDisconnectedState } from "./ApiState";
 import { MarketplaceGrid } from "./MarketplaceGrid";
 import { RaidCard } from "./RaidCard";
 import { SectionCard } from "./SectionCard";
 import { StatCard } from "./StatCard";
-import { NFTCard } from "./NFTCard";
 import { apiWarnings, unwrapApiData } from "@/lib/api";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
-import { ChestOpenAnimation, LegendaryRevealAnimation, RewardBurstAnimation, StakeAnimation, VaultLockAnimation } from "./animations";
+import { ChestOpenAnimation, LegendaryRevealAnimation, RewardBurstAnimation, StakeAnimation } from "./animations";
+import { brandAssets } from "@/lib/brand-assets";
+import { ActionCard } from "./ActionCard";
+import { CollectionGrid } from "./CollectionGrid";
+import { MetricGrid, PageLayout } from "./PageLayout";
+import { StakeFlow, UnstakeFlow, ClaimRewardsFlow } from "./StakingFlows";
 
 type ProductData = {
   title?: string;
@@ -75,7 +76,13 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
     const filtered = collections.filter((collection) => {
       const text = `${collection.name} ${collection.symbol} ${collection.theme} ${collection.mascot}`.toLowerCase();
       const matchesQuery = !query.trim() || text.includes(query.trim().toLowerCase());
-      const matchesFilter = filter === "all" || collection.qualityTier.toLowerCase().includes(filter) || collection.riskTier.toLowerCase().includes(filter);
+      const matchesFilter =
+        filter === "all" ||
+        (filter === "live" && collection.vaults > 0) ||
+        (filter === "upcoming" && collection.vaults === 0) ||
+        (filter === "partnered" && collection.qualityTier !== "Basic") ||
+        collection.qualityTier.toLowerCase().includes(filter) ||
+        collection.riskTier.toLowerCase().includes(filter);
       return matchesQuery && matchesFilter;
     });
     return [...filtered].sort((a, b) => {
@@ -91,20 +98,20 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
         {active === "home" ? <FounderStatusPanel status={capabilityState.data} /> : null}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase text-vault-purple">API-backed</p>
+            <p className="text-sm font-black uppercase text-vault-green">PHEW.DEVNET / Faction OS</p>
             <h1 className="mt-2 text-4xl font-black">{title}</h1>
-            <p className="mt-2 max-w-3xl text-slate-400">{data?.subtitle ?? "Real token-backed vault NFTs, communities, raids, and liquidity tools on Solana."}</p>
+            <p className="mt-2 max-w-3xl text-slate-400">{data?.subtitle ?? "Launch faction vaults, coordinate raids, and reward holders on Solana."}</p>
           </div>
-          <Link href="/create-collection" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-vault-purple px-5 text-sm font-bold shadow-glow">
+          <Link href="/create-collection" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
             <UserPlus className="size-4" /> Create Community
           </Link>
         </div>
 
         {blockedByWallet ? <WalletDisconnectedState /> : null}
         <SetupWarning warnings={warnings} />
-        {!blockedByWallet && state.loading ? <LoadingState /> : null}
-        {!blockedByWallet && state.error ? <ErrorState error={state.error} retry={state.reload} /> : null}
-        {!blockedByWallet && !state.loading && !state.error && data
+        {state.loading ? <LoadingState /> : null}
+        {!state.loading && state.error ? <ErrorState error={state.error} retry={state.reload} /> : null}
+        {!state.loading && !state.error && !blockedByWallet && data
           ? children
             ? children(data)
             : renderProductView(endpoint, data, { query, setQuery, filter, setFilter, sort, setSort, visibleCollections, walletConnected: wallet.connected, walletAddress: wallet.address })
@@ -124,20 +131,18 @@ export function DefaultProductView({ data }: { data: ProductData }) {
   }
 
   return (
-    <div className="space-y-5">
+    <PageLayout>
       {data.stats ? (
-        <div className="grid gap-4 md:grid-cols-3">
+        <MetricGrid className="md:grid-cols-3">
           <StatCard icon={Shield} label="Collections" value={String(data.stats.collections ?? collections.length)} />
           <StatCard icon={LockKeyhole} label="Vault NFTs" value={String(data.stats.nfts ?? nfts.length)} accent="green" />
           <StatCard icon={Swords} label="Raids" value={String(data.stats.raids ?? raids.length)} accent="purple" />
-        </div>
+        </MetricGrid>
       ) : null}
 
       {collections.length ? (
         <SectionCard title="Collections">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            {collections.map((collection) => <CollectionCard key={collection.id} collection={collection} />)}
-          </div>
+          <CollectionGrid collections={collections} />
         </SectionCard>
       ) : null}
 
@@ -162,7 +167,7 @@ export function DefaultProductView({ data }: { data: ProductData }) {
           <Link href="/raids" className="rounded-lg border border-vault-line bg-black/25 p-4 font-bold">Open raids <ArrowRight className="mt-3 size-4 text-vault-gold" /></Link>
         </div>
       </SectionCard>
-    </div>
+    </PageLayout>
   );
 }
 
@@ -199,38 +204,38 @@ function HomeDashboardView({ data }: { data: ProductData }) {
   const stats = data.stats ?? {};
   return (
     <div className="space-y-5">
-      <section className="glass relative overflow-hidden rounded-lg p-6">
+      <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
+        <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-45 mix-blend-screen xl:w-3/5" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/28" />
         <div className="absolute inset-0 grid-mask opacity-40" />
         <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div>
-            <StatusPill accent="green">Founder mode</StatusPill>
+            <StatusPill accent="green">Live on Devnet</StatusPill>
             <h2 className="mt-4 max-w-3xl text-5xl font-black leading-tight">Command center for token-backed gaming communities.</h2>
-            <p className="mt-4 max-w-2xl text-slate-300">Monitor launched communities, vault supply, raids, and setup readiness without showing invented production numbers.</p>
+            <p className="mt-4 max-w-2xl text-slate-300">Launch faction vaults, coordinate raids, and reward holders with Solana-native NFT identity.</p>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <HeroAction href="/mint" icon={LockKeyhole} title="Mint Vault" body="Lock a token position into a vault NFT." />
-              <HeroAction href="/raids" icon={Swords} title="Join Raids" body="Coordinate faction activity and rewards." />
-              <HeroAction href="/staking" icon={Sparkles} title="Stake NFTs" body="Activate reward hooks when configured." />
+              <ActionCard href="/mint" icon={LockKeyhole} title="Mint Vault" body="Lock tokens. Mint vault identity." />
+              <ActionCard href="/raids" icon={Swords} title="Join Raids" body="Activate faction campaigns." />
+              <ActionCard href="/staking" icon={Sparkles} title="Stake NFTs" body="Unlock reward hooks." />
             </div>
           </div>
           <LegendaryRevealAnimation rarity="Legendary" label="Legendary reveal" />
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <MetricGrid>
         <StatCard icon={Boxes} label="Communities" value={formatMetric(stats.collections)} />
         <StatCard icon={LockKeyhole} label="Vault NFTs" value={formatMetric(stats.nfts)} accent="green" />
         <StatCard icon={Swords} label="Raids" value={formatMetric(stats.raids)} accent="cyan" />
         <StatCard icon={BadgeDollarSign} label="TVL" value={formatCurrency(stats.tvlUsd)} accent="gold" />
-      </div>
+      </MetricGrid>
 
       {collections.length ? (
         <SectionCard title="Top Communities" action={<Link href="/collections" className="text-sm font-bold text-vault-green">View all</Link>}>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {collections.slice(0, 4).map((collection) => <CollectionCard key={collection.id} collection={collection} />)}
-          </div>
+          <CollectionGrid collections={collections.slice(0, 4)} />
         </SectionCard>
       ) : (
-        <EmptyState title="No launched communities yet" body="Create a community preview, connect the required providers, then launch a real collection before this dashboard shows community cards." action={<Link href="/create-collection" className="inline-flex h-11 items-center justify-center rounded-lg bg-vault-green px-5 text-sm font-bold text-black">Create Community</Link>} />
+        <EmptyState title="No launched communities yet" body="Launch the first faction vault to populate this command center with real communities, vaults, raids, and staking activity." action={<Link href="/create-collection" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center rounded-md px-5 text-sm font-black text-black">Create Community</Link>} />
       )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -257,22 +262,20 @@ function HomeDashboardView({ data }: { data: ProductData }) {
 function CollectionsView({ controls }: { data: ProductData; controls: { query: string; setQuery: (value: string) => void; filter: string; setFilter: (value: string) => void; sort: string; setSort: (value: string) => void; visibleCollections: VaultCollection[] } }) {
   return (
     <div className="space-y-5">
-      <SectionCard>
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
+      <SectionCard title="Faction Directory">
+        <div className="mb-4 flex flex-wrap gap-2">
+          {[["all", "All"], ["live", "Live"], ["upcoming", "Upcoming"], ["partnered", "Partnered"]].map(([value, label]) => (
+            <button key={value} onClick={() => controls.setFilter(value)} className={`rounded-md border px-4 py-2 text-sm font-black transition ${controls.filter === value ? "border-vault-green bg-vault-green/15 text-vault-green" : "border-vault-line bg-black/25 text-slate-400 hover:border-vault-cyan/50 hover:text-white"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <input value={controls.query} onChange={(event) => controls.setQuery(event.target.value)} className="h-12 w-full rounded-lg border border-vault-line bg-black/25 pl-11 pr-4 text-sm outline-none focus:border-vault-purple" placeholder="Search communities" />
+            <input value={controls.query} onChange={(event) => controls.setQuery(event.target.value)} className="phew-input h-12 w-full rounded-md pl-11 pr-4 text-sm" placeholder="Search communities" />
           </label>
-          <label className="relative block">
-            <SlidersHorizontal className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <select value={controls.filter} onChange={(event) => controls.setFilter(event.target.value)} className="h-12 w-full rounded-lg border border-vault-line bg-black/25 pl-11 pr-4 text-sm outline-none focus:border-vault-purple">
-              <option value="all">All tiers</option>
-              <option value="premium">Premium</option>
-              <option value="legendary">Legendary-ready</option>
-              <option value="safe">Safe risk</option>
-            </select>
-          </label>
-          <select value={controls.sort} onChange={(event) => controls.setSort(event.target.value)} className="h-12 rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple">
+          <select value={controls.sort} onChange={(event) => controls.setSort(event.target.value)} className="phew-input h-12 rounded-md px-4 text-sm">
             <option value="level">Sort: Level</option>
             <option value="vaults">Sort: Vaults</option>
             <option value="risk">Sort: Risk</option>
@@ -281,9 +284,7 @@ function CollectionsView({ controls }: { data: ProductData; controls: { query: s
       </SectionCard>
 
       {controls.visibleCollections.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
-          {controls.visibleCollections.map((collection) => <CollectionCard key={collection.id} collection={collection} />)}
-        </div>
+        <CollectionGrid collections={controls.visibleCollections} />
       ) : (
         <EmptyState title="No matching communities" body="No launched community matches the current search and filter. Clear filters or create the first real community." action={<Link href="/create-collection" className="inline-flex h-11 items-center justify-center rounded-lg bg-vault-green px-5 text-sm font-bold text-black">Create Community</Link>} />
       )}
@@ -298,7 +299,7 @@ function CollectionDetailView({ data }: { data: ProductData }) {
   if (!collection) return <EmptyState title="Collection unavailable" body="This collection was not found, or the database is not available. Public reads return a safe empty state." />;
   return (
     <div className="space-y-5">
-      <section className="glass relative overflow-hidden rounded-lg">
+      <section className="phew-panel relative overflow-hidden rounded-lg">
         <img src={collection.banner} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
         <div className="absolute inset-0 bg-gradient-to-r from-vault-ink via-vault-ink/90 to-vault-ink/20" />
         <div className="relative grid gap-5 p-6 xl:grid-cols-[180px_minmax(0,1fr)_360px]">
@@ -376,10 +377,27 @@ function MarketplaceView({ data }: { data: ProductData }) {
   const nfts = data.nfts ?? [];
   return (
     <div className="space-y-5">
+      <SectionCard title="Vault Exchange">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-vault-green" />
+            <input className="phew-input h-12 w-full rounded-md pl-11 pr-4 text-sm" placeholder="Search vault NFTs" />
+          </label>
+          <select className="phew-input h-12 rounded-md px-4 text-sm" defaultValue="all">
+            <option value="all">All factions</option>
+            {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
+          </select>
+          <select className="phew-input h-12 rounded-md px-4 text-sm" defaultValue="recent">
+            <option value="recent">Recently listed</option>
+            <option value="price">Price low to high</option>
+            <option value="rarity">Rarity</option>
+          </select>
+        </div>
+      </SectionCard>
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard icon={WalletCards} label="Active listings" value={formatMetric((data.listings ?? []).length || nfts.length)} />
         <StatCard icon={Shield} label="Backed inventory" value={formatMetric(nfts.length)} accent="green" />
-        <StatCard icon={AlertTriangle} label="Displayed prices" value="Live data only" accent="gold" />
+        <StatCard icon={AlertTriangle} label="Price source" value={(data.listings ?? []).length ? "Live listings" : "No listings"} accent="gold" />
       </div>
       {nfts.length ? <MarketplaceGrid items={nfts} collections={collections} /> : <EmptyState title="No marketplace listings" body="Listings appear only after real active listings or vault NFTs are returned by the API. No production prices are invented." />}
     </div>
@@ -407,7 +425,7 @@ function RaidsView({ data }: { data: ProductData }) {
       <aside className="space-y-5">
         <SectionCard title="Reward Panel">
           <RewardBurstAnimation rarity="Legendary" label="Raid rewards" />
-          <p className="mt-4 text-sm text-slate-300">Reward values are shown only when configured by a real raid room.</p>
+          <p className="mt-4 text-sm text-slate-300">Rewards and contributor rows appear from real raid mission and claim data. Join actions stay pending or error until a supported backend route confirms them.</p>
         </SectionCard>
       </aside>
     </div>
@@ -419,17 +437,22 @@ function StakingView({ data }: { data: ProductData }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <StatCard icon={LockKeyhole} label="Staked vaults" value={formatMetric(positions.length)} />
-          <StatCard icon={Sparkles} label="Pending rewards" value="From API only" accent="green" />
-          <StatCard icon={Shield} label="APY" value="Not configured" accent="gold" />
+          <StatCard icon={Sparkles} label="Pending rewards" value="API required" accent="green" />
+          <StatCard icon={Shield} label="APR" value="Collection-set" accent="gold" />
+          <StatCard icon={Boxes} label="Total staked" value="API required" accent="cyan" />
         </div>
         <SectionCard title="My Staked Vaults">
-          {positions.length ? <pre className="max-h-96 overflow-auto rounded-lg border border-vault-line bg-black/35 p-4 text-xs text-slate-300">{JSON.stringify(positions, null, 2)}</pre> : <EmptyBlock title="No staked vaults" body="Stake a confirmed vault NFT before reward rows appear. APY is hidden until configured by real staking data." />}
+          {positions.length ? <pre className="max-h-96 overflow-auto rounded-lg border border-vault-line bg-black/35 p-4 text-xs text-slate-300">{JSON.stringify(positions, null, 2)}</pre> : <EmptyBlock title="No staked vaults" body="Stake a confirmed vault NFT before reward rows appear. This page will not invent staking positions or rewards." />}
         </SectionCard>
       </div>
-      <SectionCard title="Stake Animation">
-        <VaultLockAnimation rarity="Epic" label="Vault seals" />
+      <SectionCard title="Transaction Flows">
+        <div className="space-y-5">
+          <StakeFlow />
+          <UnstakeFlow />
+          <ClaimRewardsFlow />
+        </div>
       </SectionCard>
     </div>
   );
@@ -511,16 +534,6 @@ function RiskAdminView({ data }: { data: ProductData }) {
         )}
       </SectionCard>
     </div>
-  );
-}
-
-function HeroAction({ href, icon: Icon, title, body }: { href: string; icon: typeof LockKeyhole; title: string; body: string }) {
-  return (
-    <Link href={href} className="group rounded-lg border border-vault-line bg-black/30 p-4 transition hover:-translate-y-0.5 hover:border-vault-green/60 hover:bg-vault-green/10">
-      <Icon className="size-6 text-vault-green transition group-hover:scale-110" />
-      <p className="mt-3 font-black">{title}</p>
-      <p className="mt-1 text-sm text-slate-400">{body}</p>
-    </Link>
   );
 }
 
