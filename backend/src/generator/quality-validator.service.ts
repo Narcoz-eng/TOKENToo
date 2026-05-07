@@ -19,6 +19,10 @@ export class QualityValidatorService {
     if (distinctiveness.score < 72) issues.push("Collection identity is too similar to an existing style profile.");
     if (duplicateRiskScore < 85) issues.push("Trait space is too small for reliable 10k uniqueness.");
     if (compatibilityScore < 80) issues.push("Compatibility coverage is too thin.");
+    if (!style.brandDna) issues.push("Brand DNA is required before approval.");
+    if (!style.tenKReadiness?.pass) issues.push("10k collection readiness validation failed.");
+    if (style.artSource === "PROCEDURAL_FALLBACK") issues.push("Procedural SVG fallback art cannot be approved for production launch.");
+    if (this.hasGenericTraitNames(style, pack)) issues.push("Trait names are too generic for premium collection identity.");
 
     const tierScore = average([previewQualityScore, uniquenessScore, colorHarmonyScore, rarityDistributionScore, duplicateRiskScore, compatibilityScore, distinctiveness.score]);
     const tier = tierScore >= 92 && distinctiveness.score >= 86 ? "LEGENDARY_READY" : tierScore >= 80 && previewQualityScore >= 78 ? "PREMIUM" : "BASIC";
@@ -99,5 +103,10 @@ export class QualityValidatorService {
       pack.categories.auraEffect.length;
     return combinationSpace > 10_000_000_000 ? 98 : combinationSpace > 1_000_000 ? 86 : 64;
   }
-}
 
+  private hasGenericTraitNames(style: GeneratedStyleProfile, pack: TraitPackPlan) {
+    const names = [...style.traitLanguage, ...pack.traits.slice(0, 80).map((trait) => trait.name)];
+    const generic = /^(green|red|blue|yellow|purple|black|white)\s+(hat|background|aura|eyes|shirt|crown)$|^(hat|background|aura|eyes|shirt|crown)$/i;
+    return names.some((name) => generic.test(name.trim()));
+  }
+}

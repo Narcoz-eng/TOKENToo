@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { WalletAddress } from "../auth/wallet-address.decorator";
 import { WalletAuthGuard } from "../auth/wallet-auth.guard";
-import type { ApproveGenerationRunInput, CreateGenerationRunInput, LaunchCollectionInput } from "./generator.types";
+import type { ApproveGenerationRunInput, CreateGenerationRunInput, LaunchCollectionInput, SubmitCollectionLaunchInput } from "./generator.types";
 import { GeneratorService } from "./generator.service";
 
 const runSchema = z.object({
@@ -25,6 +25,12 @@ const launchSchema = z.object({
   slug: z.string().optional(),
   collectionAssetAddress: z.string().optional(),
   metadataUri: z.string().optional()
+});
+
+const submitLaunchSchema = z.object({
+  signedTransactionBase64: z.string().optional(),
+  signedTransaction: z.string().optional(),
+  txSignature: z.string().optional()
 });
 
 @Controller("generator")
@@ -70,6 +76,23 @@ export class GeneratorController {
   @UseGuards(WalletAuthGuard)
   launchCollection(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
     return this.generator.launchCollection(id, { ...(launchSchema.parse(body) as LaunchCollectionInput), walletAddress });
+  }
+
+  @Post("runs/:id/launch-collection/build")
+  @UseGuards(WalletAuthGuard)
+  buildCollectionLaunch(@Param("id") id: string, @WalletAddress() walletAddress: string) {
+    return this.generator.buildCollectionLaunch(id, walletAddress);
+  }
+
+  @Post("runs/:id/launch-collection/submit")
+  @UseGuards(WalletAuthGuard)
+  submitCollectionLaunch(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    const parsed = submitLaunchSchema.parse(body);
+    return this.generator.submitCollectionLaunch(id, {
+      ...(parsed as SubmitCollectionLaunchInput),
+      signedTransaction: parsed.signedTransaction ?? parsed.signedTransactionBase64,
+      walletAddress
+    });
   }
 
   @Post("runs/:id/sample-metadata")

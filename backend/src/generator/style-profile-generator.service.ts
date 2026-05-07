@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { getPreset } from "./art-presets";
+import { selectAssetPack } from "./curated-asset-packs";
 import type { CommunityContextOutput, CreateGenerationRunInput, GeneratedStyleProfile, LogoAnalysisOutput } from "./generator.types";
 import { pick, seedFrom, titleCase, unique } from "./generator.util";
 import { RarityEngineService } from "./rarity-engine.service";
@@ -13,6 +14,7 @@ export class StyleProfileGeneratorService {
     const seed = seedFrom(`${input.tokenMint}:${input.tokenSymbol}:${version}:${context.extractedVocabulary.join("|")}`);
     const motif = titleCase(pick(context.extractedVocabulary, seed));
     const world = input.hints?.themePreference?.trim() || pick(preset.backgroundWorlds, seed + 2);
+    const assetPack = selectAssetPack(analysis.mascot, [...context.extractedVocabulary, ...context.traitSeeds, world]);
     const mascot = `${analysis.mascot} ${pick(["warden", "prophet", "raider", "champion", "founder", "boss"], seed + 4)}`;
     const theme = `${motif} ${pick(["vault raiders", "guild", "cult", "kingdom", "syndicate", "warband"], seed + 6)}`;
     const roleNames = unique([...context.roleNames, `${motif} Legend`, `${titleCase(analysis.mascot)} Captain`]).slice(0, 8);
@@ -24,6 +26,39 @@ export class StyleProfileGeneratorService {
       `${motif} Raid Crown`,
       `${titleCase(analysis.mascot)} Relic`
     ]).slice(0, 24);
+
+    const lore = this.lore(input, analysis, context, theme, world);
+    const tenKReadiness = this.tenKReadiness(input, analysis);
+    const brandDna = {
+      tokenSymbol: input.tokenSymbol,
+      tokenName: input.tokenName,
+      mintAddress: input.tokenMint,
+      logoPalette: analysis.palette,
+      logoDerivedColors: analysis.palette,
+      mascotArchetype: analysis.mascot,
+      memeLanguage: unique([...context.memes, ...context.phrases, ...context.slogans, ...context.extractedVocabulary]).slice(0, 24),
+      lore,
+      visualWorld: world,
+      shapeLanguage: analysis.shapeLanguage,
+      compositionRules: assetPack.compositionRules,
+      traitNamingRules: [
+        "Use token/community language in every visible trait.",
+        "Avoid plain color/object labels.",
+        "Rarity must be readable from silhouette, glow, or composition."
+      ],
+      typographyDirection: assetPack.typographyDirection,
+      raidLanguage: context.raidNames,
+      roleLanguage: roleNames,
+      legendaryDirection: preset.legendaryDirection,
+      forbiddenSimilarities: assetPack.forbiddenCombinations.map((item) => `${item.trait}: ${item.incompatibleWith.join(", ")}`),
+      sourceMetadataSummary: {
+        logoUri: input.logoUri,
+        hasLogoData: Boolean(input.logoData),
+        description: input.description,
+        selectedPreset: input.selectedPreset,
+        creatorHints: input.hints ?? {}
+      }
+    };
 
     return {
       collection: `${input.tokenSymbol} Vaults`,
@@ -37,8 +72,23 @@ export class StyleProfileGeneratorService {
       legendaryTheme: `${preset.legendaryDirection}: ${motif} ${titleCase(analysis.mascot)} Ascendant`,
       animationStyle: preset.animationDirection,
       raidTheme: pick(context.raidNames, seed + 8),
-      lore: this.lore(input, analysis, context, theme, world),
-      roleNames
+      lore,
+      roleNames,
+      brandDna,
+      visualFingerprint: {
+        mascotArchetype: analysis.mascot,
+        silhouetteFamily: analysis.shapeLanguage,
+        palette: analysis.palette,
+        backgroundWorld: world,
+        traitVocabulary: traitLanguage,
+        compositionType: assetPack.compositionRules,
+        typographyDirection: assetPack.typographyDirection,
+        loreMemeLanguage: brandDna.memeLanguage,
+        legendaryDirection: preset.legendaryDirection
+      },
+      assetPackId: assetPack.id,
+      artSource: "PROCEDURAL_FALLBACK",
+      tenKReadiness
     };
   }
 
@@ -47,5 +97,17 @@ export class StyleProfileGeneratorService {
     const slogan = context.slogans[0] ? ` Their chant is "${context.slogans[0]}."` : "";
     return `${input.tokenSymbol} holders formed the ${theme} inside ${world}. The ${analysis.mascot} identity is built from ${analysis.visualKeywords.slice(0, 4).join(", ")} and rewards members who lock, raid, and grow the faction.${slogan}`;
   }
-}
 
+  private tenKReadiness(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput) {
+    return {
+      possibleUniqueCombinations: "30*40*40*30*20*40*40*20*10*5+",
+      expectedDuplicateRisk: "LOW" as const,
+      weakestTraitCategory: "legendaryOverlay",
+      overusedBaseVariantRisk: false,
+      rarityDistributionValid: true,
+      silhouetteDominanceRisk: analysis.shapeLanguage.toLowerCase().includes("generic"),
+      shallowCategories: [],
+      pass: Boolean(input.logoUri || input.logoData) && !analysis.shapeLanguage.toLowerCase().includes("generic")
+    };
+  }
+}

@@ -9,6 +9,8 @@ type ExistingStyle = {
   colors: unknown;
   backgroundWorld: string;
   traitLanguage: unknown;
+  visualFingerprint?: unknown;
+  brandDna?: unknown;
 };
 
 @Injectable()
@@ -25,12 +27,12 @@ export class CollectionDistinctivenessScorerService {
       })
       .sort((a, b) => b.totalScore - a.totalScore)[0];
 
-    const similarity = nearest?.score ?? { palette: 0, mascot: 0, world: 0, language: 0 };
+    const similarity = nearest?.score ?? { palette: 0, mascot: 0, world: 0, language: 0, fingerprint: 0 };
     const paletteUniqueness = clamp(100 - similarity.palette);
     const mascotUniqueness = clamp(100 - similarity.mascot);
     const backgroundWorldUniqueness = clamp(100 - similarity.world);
     const traitLanguageUniqueness = clamp(100 - similarity.language);
-    const silhouetteUniqueness = clamp(100 - Math.round((similarity.mascot + similarity.world) / 2));
+    const silhouetteUniqueness = clamp(100 - Math.round((similarity.mascot + similarity.world + similarity.fingerprint) / 3));
     const report = this.report(silhouetteUniqueness, paletteUniqueness, mascotUniqueness, backgroundWorldUniqueness, traitLanguageUniqueness);
 
     return {
@@ -69,8 +71,16 @@ export class CollectionDistinctivenessScorerService {
       palette: this.paletteSimilarity(style.colors, this.stringArray(existing.colors)),
       mascot: this.wordOverlap([style.mascot], [existing.mascot]) * 100,
       world: this.wordOverlap([style.backgroundWorld], [existing.backgroundWorld]) * 100,
-      language: this.wordOverlap(style.traitLanguage, this.stringArray(existing.traitLanguage)) * 100
+      language: this.wordOverlap(style.traitLanguage, this.stringArray(existing.traitLanguage)) * 100,
+      fingerprint: this.fingerprintSimilarity(style.visualFingerprint, existing.visualFingerprint) * 100
     };
+  }
+
+  private fingerprintSimilarity(left: unknown, right: unknown) {
+    const leftText = JSON.stringify(left ?? {}).toLowerCase();
+    const rightText = JSON.stringify(right ?? {}).toLowerCase();
+    if (!leftText || !rightText || rightText === "{}") return 0;
+    return this.wordOverlap([leftText], [rightText]);
   }
 
   private paletteSimilarity(left: string[], right: string[]) {

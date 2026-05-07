@@ -2,18 +2,28 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
+import { AssetProductionLayerService } from "./asset-production-layer.service";
 import { AssetStorageService } from "./asset-storage.service";
 import { artPresets } from "./art-presets";
 import { CollectionDistinctivenessScorerService } from "./collection-distinctiveness-scorer.service";
 import { CommunityContextService } from "./community-context.service";
 import { CompatibilityEngineService } from "./compatibility-engine.service";
-import type { ApproveGenerationRunInput, CreateGenerationRunInput, GeneratedStyleProfile, LaunchCollectionInput, PreviewAssetPlan, TraitPackPlan } from "./generator.types";
+import type {
+  ApproveGenerationRunInput,
+  CreateGenerationRunInput,
+  GeneratedStyleProfile,
+  LaunchCollectionInput,
+  PreviewAssetPlan,
+  SubmitCollectionLaunchInput,
+  TraitPackPlan
+} from "./generator.types";
 import { seedFrom } from "./generator.util";
 import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
 import { QualityValidatorService } from "./quality-validator.service";
 import { StyleProfileGeneratorService } from "./style-profile-generator.service";
 import { TraitPackGeneratorService } from "./trait-pack-generator.service";
+import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
 
 @Injectable()
 export class GeneratorService {
@@ -25,10 +35,12 @@ export class GeneratorService {
     private readonly traitPacks: TraitPackGeneratorService,
     private readonly compatibility: CompatibilityEngineService,
     private readonly previews: ArtPreviewGeneratorService,
+    private readonly assetProduction: AssetProductionLayerService,
     private readonly assetStorage: AssetStorageService,
     private readonly distinctiveness: CollectionDistinctivenessScorerService,
     private readonly quality: QualityValidatorService,
-    private readonly metadata: MetadataGeneratorService
+    private readonly metadata: MetadataGeneratorService,
+    private readonly solana: SolanaTransactionAdapterService
   ) {}
 
   presets() {
@@ -159,10 +171,14 @@ export class GeneratorService {
     const report = latest?.qualityReports[0];
     const distinctiveness = latest?.distinctivenessReports[0];
     if (!latest || !report) throw new NotFoundException("Generation run has no preview to approve");
+    const pack = latest.traitPack ? this.packFromRecord(latest.traitPack) : null;
+    const readiness = pack ? this.assetProduction.manifest(this.styleFromRecord(latest), pack, report.tier).readinessReport : null;
     if (input.acceptedVersion && input.acceptedVersion !== latest.version) throw new ConflictException("The accepted version is no longer the latest generated version.");
     if (!input.explicitConfirmation) throw new BadRequestException("Explicit creator confirmation is required before approval.");
     if (!report.passed || report.tier === "BASIC") throw new BadRequestException("Only Premium or Legendary-ready generator outputs can be approved.");
     if (!distinctiveness?.passed || distinctiveness.score < 72) throw new BadRequestException("Collection distinctiveness score is below the approval threshold.");
+    if (latest.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Procedural fallback art can be saved as a draft but cannot be approved for launch.");
+    if (!readiness?.canProduce10kPremiumOutputs) throw new BadRequestException("Asset provider readiness report does not allow 10k premium output approval.");
 
     await this.prisma.styleProfile.updateMany({ where: { generationRunId: id }, data: { isApproved: false } });
     await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { isApproved: true } });
@@ -201,6 +217,7 @@ export class GeneratorService {
     if (!profile?.traitPack || !report?.passed || report.tier === "BASIC" || !distinctiveness?.passed) {
       throw new BadRequestException("Approved run no longer satisfies launch quality gates.");
     }
+    if (profile.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Collection launch requires curated, handmade, or AI-assisted production assets.");
 
     const slug = this.slug(input.slug ?? profile.collection);
     return this.prisma.$transaction(async (tx) => {
@@ -238,6 +255,8 @@ export class GeneratorService {
           traitPackVersion: profile.version,
           metadataSchemaVersion: "vaultx-v1",
           collectionAssetAddress: input.collectionAssetAddress,
+          collectionMetadataUri: input.metadataUri,
+          launchStatus: input.collectionAssetAddress ? "CONFIRMED" : "PENDING",
           metadataUri: input.metadataUri,
           identityLockedAt: new Date(),
           launchedAt: new Date(),
@@ -262,6 +281,8 @@ export class GeneratorService {
           traitPackVersion: profile.version,
           metadataSchemaVersion: "vaultx-v1",
           collectionAssetAddress: input.collectionAssetAddress,
+          collectionMetadataUri: input.metadataUri,
+          launchStatus: input.collectionAssetAddress ? "CONFIRMED" : "PENDING",
           metadataUri: input.metadataUri,
           identityLockedAt: new Date(),
           launchedAt: new Date(),
@@ -279,6 +300,72 @@ export class GeneratorService {
           rarityTable: this.json(profile.rarityStructure ?? {})
         }
       });
+    });
+  }
+
+  async buildCollectionLaunch(id: string, walletAddress: string) {
+    const run = await this.getRunForWallet(id, walletAddress);
+    const profile = run.styleProfiles.find((item) => item.version === run.approvedVersion && item.isApproved);
+    if (!profile) throw new BadRequestException("Approve a collection profile before building launch transaction.");
+    const collection = await this.prisma.collection.findFirst({ where: { approvedGenerationRunId: run.id }, include: { creator: true } });
+    if (!collection) throw new BadRequestException("Create the collection record before building launch transaction.");
+    if (collection.creator.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this collection.");
+    if (collection.launchStatus === "CONFIRMED" && collection.collectionAssetAddress) return collection;
+
+    const metadataUri =
+      collection.collectionMetadataUri ??
+      collection.metadataUri ??
+      (await this.assetStorage.storeFinalNftMetadata(`${collection.id}/collection.json`, {
+        name: profile.collection,
+        description: profile.lore,
+        image: profile.previewAssets.find((asset) => asset.type === "AVATAR")?.uri,
+        banner: profile.previewAssets.find((asset) => asset.type === "BANNER")?.uri,
+        external_url: process.env.NEXT_PUBLIC_APP_URL,
+        properties: {
+          vaultx: {
+            generationRunId: run.id,
+            styleProfileVersion: profile.version,
+            brandDna: profile.brandDna,
+            assetPackId: profile.assetPackId
+          }
+        }
+      }));
+
+    const launchTx = await this.solana.buildCollectionAssetTransaction({
+      walletAddress,
+      name: profile.collection,
+      metadataUri
+    });
+
+    return this.prisma.collection.update({
+      where: { id: collection.id },
+      data: {
+        collectionMetadataUri: metadataUri,
+        metadataUri,
+        collectionAssetAddress: launchTx.collectionAssetAddress,
+        launchUnsignedTransaction: this.json(launchTx),
+        launchStatus: launchTx.base64UnsignedTransaction ? "TX_BUILT" : "PENDING"
+      }
+    });
+  }
+
+  async submitCollectionLaunch(id: string, input: SubmitCollectionLaunchInput) {
+    const run = await this.getRunForWallet(id, input.walletAddress);
+    const collection = await this.prisma.collection.findFirst({ where: { approvedGenerationRunId: run.id }, include: { creator: true } });
+    if (!collection) throw new BadRequestException("Collection launch record not found.");
+    if (collection.creator.walletAddress !== input.walletAddress) throw new ConflictException("Wallet does not own this collection.");
+    const result = await this.solana.submitAndConfirm({
+      transactionId: collection.id,
+      signedTransaction: input.signedTransaction,
+      txSignature: input.txSignature
+    });
+    return this.prisma.collection.update({
+      where: { id: collection.id },
+      data: {
+        launchStatus: result.confirmed ? "CONFIRMED" : result.status,
+        launchTxSignature: result.txSignature,
+        launchedAt: result.confirmed ? new Date() : collection.launchedAt
+      }
     });
   }
 
@@ -310,7 +397,7 @@ export class GeneratorService {
       where: { generationRunId: { not: runId } },
       orderBy: { createdAt: "desc" },
       take: 50,
-      select: { id: true, collection: true, mascot: true, colors: true, backgroundWorld: true, traitLanguage: true }
+      select: { id: true, collection: true, mascot: true, colors: true, backgroundWorld: true, traitLanguage: true, visualFingerprint: true, brandDna: true }
     });
     const distinctiveness = this.distinctiveness.score(style, existing);
     const quality = this.quality.validate(style, pack, compatibilityRules, previews, distinctiveness);
@@ -332,7 +419,12 @@ export class GeneratorService {
         animationStyle: style.animationStyle,
         raidTheme: style.raidTheme,
         lore: style.lore,
-        roleNames: this.json(style.roleNames)
+        roleNames: this.json(style.roleNames),
+        brandDna: this.json(style.brandDna),
+        visualFingerprint: this.json(style.visualFingerprint),
+        assetPackId: style.assetPackId,
+        artSource: style.artSource,
+        tenKReadinessReport: this.json(style.tenKReadiness)
       }
     });
 
@@ -489,7 +581,12 @@ export class GeneratorService {
       animationStyle: record.animationStyle,
       raidTheme: record.raidTheme,
       lore: record.lore,
-      roleNames: this.strings(record.roleNames)
+      roleNames: this.strings(record.roleNames),
+      brandDna: this.record(record.brandDna) as GeneratedStyleProfile["brandDna"],
+      visualFingerprint: this.record(record.visualFingerprint),
+      assetPackId: record.assetPackId ?? "unknown",
+      artSource: record.artSource ?? "PROCEDURAL_FALLBACK",
+      tenKReadiness: this.record(record.tenKReadinessReport) as GeneratedStyleProfile["tenKReadiness"]
     };
   }
 

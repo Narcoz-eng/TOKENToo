@@ -252,6 +252,11 @@ model StyleProfile {
   raidTheme          String
   lore               String
   roleNames          Json
+  brandDna           Json?
+  visualFingerprint  Json?
+  assetPackId        String?
+  artSource          String             @default("PROCEDURAL_FALLBACK")
+  tenKReadinessReport Json?
   isApproved         Boolean                @default(false)
   createdAt          DateTime               @default(now())
   generationRun      GenerationRun          @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
@@ -374,6 +379,10 @@ model Collection {
   traitPackVersion     Int?
   metadataSchemaVersion String              @default("vaultx-v1")
   collectionAssetAddress String?            @unique
+  collectionMetadataUri  String?
+  launchStatus           String             @default("DRAFT")
+  launchTxSignature      String?            @unique
+  launchUnsignedTransaction Json?
   metadataUri          String?
   identityLockedAt     DateTime?
   launchedAt           DateTime?

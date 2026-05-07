@@ -24,6 +24,13 @@ export type LaunchCollectionInput = {
   metadataUri?: string;
 };
 
+export type SubmitCollectionLaunchInput = {
+  walletAddress: string;
+  signedTransactionBase64?: string;
+  signedTransaction?: string;
+  txSignature?: string;
+};
+
 export type CommunityHints = {
   memes?: string[];
   slogans?: string[];
@@ -84,6 +91,43 @@ export type GeneratedStyleProfile = {
   raidTheme: string;
   lore: string;
   roleNames: string[];
+  brandDna: BrandDNA;
+  visualFingerprint: Record<string, unknown>;
+  assetPackId: string;
+  artSource: "PROCEDURAL_FALLBACK" | "CURATED_PACK" | "AI_ASSISTED" | "HANDMADE_PACK";
+  tenKReadiness: TenKReadinessReport;
+};
+
+export type BrandDNA = {
+  tokenSymbol: string;
+  tokenName: string;
+  mintAddress: string;
+  logoPalette: string[];
+  logoDerivedColors: string[];
+  mascotArchetype: string;
+  memeLanguage: string[];
+  lore: string;
+  visualWorld: string;
+  shapeLanguage: string;
+  compositionRules: string[];
+  traitNamingRules: string[];
+  typographyDirection: string;
+  raidLanguage: string[];
+  roleLanguage: string[];
+  legendaryDirection: string;
+  forbiddenSimilarities: string[];
+  sourceMetadataSummary: Record<string, unknown>;
+};
+
+export type TenKReadinessReport = {
+  possibleUniqueCombinations: string;
+  expectedDuplicateRisk: "LOW" | "MEDIUM" | "HIGH";
+  weakestTraitCategory: string;
+  overusedBaseVariantRisk: boolean;
+  rarityDistributionValid: boolean;
+  silhouetteDominanceRisk: boolean;
+  shallowCategories: string[];
+  pass: boolean;
 };
 
 export type TraitDefinitionPlan = {

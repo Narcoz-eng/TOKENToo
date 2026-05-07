@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { PrismaService } from "../db/prisma.service";
+import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
 import { AssetProductionLayerService } from "./asset-production-layer.service";
 import { AssetStorageService } from "./asset-storage.service";
@@ -33,7 +34,8 @@ import { TraitPackGeneratorService } from "./trait-pack-generator.service";
     QualityValidatorService,
     CollectionDistinctivenessScorerService,
     ArtPreviewGeneratorService,
-    MetadataGeneratorService
+    MetadataGeneratorService,
+    SolanaTransactionAdapterService
   ],
   exports: [GeneratorService, AssetProductionLayerService, AssetStorageService, MetadataGeneratorService]
 })

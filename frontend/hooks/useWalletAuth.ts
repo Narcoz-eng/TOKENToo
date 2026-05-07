@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { Transaction } from "@solana/web3.js";
 import bs58 from "bs58";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
@@ -61,7 +62,17 @@ export function useWalletAuth() {
     [login, token]
   );
 
-  return { address, connected: wallet.connected, token, login, authFetch, loading, error };
+  const signTransactionBase64 = useCallback(
+    async (base64UnsignedTransaction: string) => {
+      if (!wallet.signTransaction) throw new Error("Wallet does not support transaction signing");
+      const tx = Transaction.from(Buffer.from(base64UnsignedTransaction, "base64"));
+      const signed = await wallet.signTransaction(tx);
+      return signed.serialize().toString("base64");
+    },
+    [wallet]
+  );
+
+  return { address, connected: wallet.connected, token, login, authFetch, signTransactionBase64, loading, error };
 }
 
 async function postJson<T>(path: string, body: unknown) {

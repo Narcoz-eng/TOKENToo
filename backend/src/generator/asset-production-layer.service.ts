@@ -13,6 +13,23 @@ export class AssetProductionLayerService {
     const layerProvider = this.provider(process.env.LAYER_PACK_PROVIDER ?? process.env.DESIGN_MODEL_PROVIDER);
     const legendaryProvider = this.provider(process.env.LEGENDARY_ASSET_PROVIDER ?? process.env.DESIGN_MODEL_PROVIDER);
     const productionReady = [designProvider, layerProvider, legendaryProvider].every((provider) => provider !== "mock") && qualityTier !== "BASIC";
+    const availableTraitLayers =
+      pack.categories.headgear.length +
+      pack.categories.eyes.length +
+      pack.categories.mouthExpression.length +
+      pack.categories.outfitBody.length +
+      pack.categories.accessories.length +
+      pack.categories.auraEffect.length +
+      pack.categories.borderFrame.length;
+    const readinessReport = {
+      selectedAssetPack: style.assetPackId,
+      availableBaseVariants: pack.categories.baseCharacter.length,
+      availableBackgrounds: pack.categories.backgrounds.length,
+      availableTraitLayers,
+      availableLegendaryOverlays: pack.categories.legendaryOverlay.length,
+      canProduce10kPremiumOutputs: productionReady && style.tenKReadiness.pass,
+      reasonIfNo: productionReady && style.tenKReadiness.pass ? undefined : "Production asset providers are mock/procedural or 10k readiness failed."
+    };
 
     return {
       collection: style.collection,
@@ -31,6 +48,7 @@ export class AssetProductionLayerService {
         ...pack.categories.borderFrame
       ], "Premium trait layers must be handmade, curated, or generated from the approved art direction."),
       legendaryAssets: this.layerSet(legendaryProvider, pack.categories.legendaryOverlay, "Legendary and mythic traits require visibly premium composition and optional animation."),
+      readinessReport,
       warnings: productionReady
         ? []
         : ["Production mint art is not enabled. Current asset output uses the deterministic SVG fallback and must not be used for public launch."]

@@ -26,8 +26,13 @@
 
 - `VaultMintOrchestrator` now creates idempotent mint transactions and persists generated asset URIs, metadata URIs, transaction plans, status, retries, and errors.
 - `SOLANA_TRANSACTION_PROVIDER=devnet` can submit a base64 signed transaction to the configured Solana RPC and confirm it.
-- Real unsigned Anchor + Metaplex Core transaction construction is still not complete.
-- Metaplex Core collection asset creation and Vault NFT Core asset creation are still blockers.
+- Real unsigned Anchor + Metaplex Core transaction construction now exists for devnet mint transactions:
+  - creates owner/vault associated token accounts idempotently
+  - invokes `deposit_and_mint_vault_nft`
+  - creates a Metaplex Core asset in the launched collection
+  - returns base64 unsigned transaction, required signers, blockhash, Core asset address, and vault position PDA
+- The Core collection asset must already be confirmed and stored on the launched collection before mint build.
+- Token Metadata fallback remains planned, not implemented.
 
 ## Final NFT Storage
 
@@ -56,6 +61,8 @@ Result:
 - The identity system generates distinct trait language, lore, role names, rarity tiers, and quality/distinctiveness reports.
 - Several samples pass Premium or Legendary-ready scoring.
 - Production readiness is still blocked because current preview art is deterministic SVG fallback output, not top-tier NFT studio art.
+- Brand DNA and visual fingerprint fields are now generated and persisted on style profiles.
+- Approval now fails for procedural fallback-only art, Basic quality, failed distinctiveness, failed 10k readiness, and generic trait names.
 
 Hard rule:
 
@@ -77,8 +84,8 @@ Key blockers:
 ## Public Launch Blockers
 
 - Real Anchor deposit/redeem program implementation.
-- Real Metaplex Core unsigned transaction builder.
-- Real collection asset creation and verification.
+- Full Anchor test execution and deployed devnet program validation.
+- Backend collection asset transaction confirmation flow.
 - Production-quality asset provider for mascots, backgrounds, trait packs, and legendary/animated assets.
 - Full marketplace execution and fee ledger chain settlement.
 - Raid anti-abuse persistence and enforcement at payout time.

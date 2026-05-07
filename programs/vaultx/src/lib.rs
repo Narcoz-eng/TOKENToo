@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenAccount};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 declare_id!("11111111111111111111111111111111");
 
@@ -118,8 +118,20 @@ pub mod vaultx {
         position.staked = false;
         position.bump = ctx.bumps.vault_position;
 
-        // TODO: CPI transfer from owner token account into PDA token vault.
-        // TODO: CPI mint a standard NFT through Token Metadata/Core and verify collection.
+        let decimals = ctx.accounts.token_mint.decimals;
+        token_interface::transfer_checked(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.owner_token_account.to_account_info(),
+                    mint: ctx.accounts.token_mint.to_account_info(),
+                    to: ctx.accounts.vault_token_account.to_account_info(),
+                    authority: ctx.accounts.owner.to_account_info(),
+                },
+            ),
+            amount,
+            decimals,
+        )?;
 
         emit!(VaultDeposited {
             collection: collection.key(),
@@ -140,12 +152,37 @@ pub mod vaultx {
         require!(now >= position.unlock_ts, VaultXError::VaultStillLocked);
         require_keys_eq!(position.nft_mint, ctx.accounts.nft_mint.key(), VaultXError::InvalidNft);
 
+        require_keys_eq!(position.collection, ctx.accounts.collection_profile.key(), VaultXError::InvalidCollection);
+        require_keys_eq!(position.token_mint, ctx.accounts.token_mint.key(), VaultXError::InvalidMint);
+        require_keys_eq!(ctx.accounts.collection_profile.token_mint, ctx.accounts.token_mint.key(), VaultXError::InvalidMint);
+        require_keys_eq!(ctx.accounts.vault_token_account.mint, ctx.accounts.token_mint.key(), VaultXError::InvalidMint);
+        require_keys_eq!(ctx.accounts.vault_token_account.owner, ctx.accounts.token_vault_authority.key(), VaultXError::InvalidVaultAuthority);
+        require_keys_eq!(ctx.accounts.owner_token_account.mint, ctx.accounts.token_mint.key(), VaultXError::InvalidMint);
+        require_keys_eq!(ctx.accounts.owner_token_account.owner, ctx.accounts.owner.key(), VaultXError::Unauthorized);
         // Mark before releasing custody. V1 has no partial redeem.
         position.redeemed = true;
 
-        // TODO: Validate NFT collection and verified creator.
-        // TODO: Burn the Vault NFT or mark it redeemed in metadata.
-        // TODO: CPI transfer full token amount from PDA token vault to redeemer.
+        let collection_key = ctx.accounts.collection_profile.key();
+        let signer_seeds: &[&[u8]] = &[
+            b"token-vault-authority",
+            collection_key.as_ref(),
+            &[ctx.bumps.token_vault_authority],
+        ];
+
+        token_interface::transfer_checked(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.vault_token_account.to_account_info(),
+                    mint: ctx.accounts.token_mint.to_account_info(),
+                    to: ctx.accounts.owner_token_account.to_account_info(),
+                    authority: ctx.accounts.token_vault_authority.to_account_info(),
+                },
+                &[signer_seeds],
+            ),
+            position.amount,
+            ctx.accounts.token_mint.decimals,
+        )?;
 
         emit!(VaultRedeemed {
             collection: position.collection,
@@ -342,9 +379,26 @@ pub struct DepositAndMintVaultNft<'info> {
     )]
     pub vault_position: Account<'info, VaultPosition>,
     pub token_mint: InterfaceAccount<'info, Mint>,
-    pub nft_mint: InterfaceAccount<'info, Mint>,
+    /// CHECK: Metaplex Core asset address or Token Metadata mint address recorded for this position.
+    pub nft_mint: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        constraint = owner_token_account.mint == token_mint.key() @ VaultXError::InvalidMint,
+        constraint = owner_token_account.owner == owner.key() @ VaultXError::Unauthorized
+    )]
+    pub owner_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = vault_token_account.mint == token_mint.key() @ VaultXError::InvalidMint,
+        constraint = vault_token_account.owner == token_vault_authority.key() @ VaultXError::InvalidVaultAuthority
+    )]
+    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
+    /// CHECK: PDA authority for SPL token custody.
+    #[account(seeds = [b"token-vault-authority", collection_profile.key().as_ref()], bump)]
+    pub token_vault_authority: UncheckedAccount<'info>,
     #[account(mut)]
     pub owner: Signer<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
 
@@ -352,9 +406,32 @@ pub struct DepositAndMintVaultNft<'info> {
 pub struct RedeemVaultNft<'info> {
     #[account(mut, seeds = [b"position", nft_mint.key().as_ref()], bump = vault_position.bump)]
     pub vault_position: Account<'info, VaultPosition>,
-    pub nft_mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        seeds = [b"collection", token_mint.key().as_ref()],
+        bump = collection_profile.bump
+    )]
+    pub collection_profile: Account<'info, CollectionProfile>,
+    pub token_mint: InterfaceAccount<'info, Mint>,
+    /// CHECK: Metaplex Core asset address or Token Metadata mint address recorded for this position.
+    pub nft_mint: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        constraint = vault_token_account.mint == token_mint.key() @ VaultXError::InvalidMint,
+        constraint = vault_token_account.owner == token_vault_authority.key() @ VaultXError::InvalidVaultAuthority
+    )]
+    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = owner_token_account.mint == token_mint.key() @ VaultXError::InvalidMint,
+        constraint = owner_token_account.owner == owner.key() @ VaultXError::Unauthorized
+    )]
+    pub owner_token_account: InterfaceAccount<'info, TokenAccount>,
+    /// CHECK: PDA authority for SPL token custody.
+    #[account(seeds = [b"token-vault-authority", collection_profile.key().as_ref()], bump)]
+    pub token_vault_authority: UncheckedAccount<'info>,
     #[account(mut, address = vault_position.owner @ VaultXError::Unauthorized)]
     pub owner: Signer<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 #[derive(Accounts)]
@@ -371,7 +448,8 @@ pub struct StakeVaultNft<'info> {
         bump
     )]
     pub staking_position: Account<'info, StakingPosition>,
-    pub nft_mint: InterfaceAccount<'info, Mint>,
+    /// CHECK: Metaplex Core asset address or Token Metadata mint address recorded for this position.
+    pub nft_mint: UncheckedAccount<'info>,
     #[account(mut, address = vault_position.owner @ VaultXError::Unauthorized)]
     pub owner: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -603,6 +681,10 @@ pub enum VaultXError {
     InvalidMint,
     #[msg("Invalid NFT mint")]
     InvalidNft,
+    #[msg("Invalid collection")]
+    InvalidCollection,
+    #[msg("Invalid vault token authority")]
+    InvalidVaultAuthority,
     #[msg("Invalid amount")]
     InvalidAmount,
     #[msg("Invalid lock duration")]
@@ -624,4 +706,3 @@ pub enum VaultXError {
     #[msg("Invalid treasury")]
     InvalidTreasury,
 }
-

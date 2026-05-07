@@ -5,20 +5,19 @@ Current file: `programs/vaultx/src/lib.rs`
 ## Launch Blockers
 
 - `declare_id!("11111111111111111111111111111111")` is still a placeholder and must be replaced before devnet testing.
-- `deposit_and_mint_vault_nft` creates `VaultPosition` state but does not transfer SPL tokens into custody.
-- `deposit_and_mint_vault_nft` does not mint or verify a Metaplex Core/Token Metadata NFT.
-- `redeem_vault_nft` marks the position redeemed before the token release TODOs are implemented.
-- `redeem_vault_nft` does not validate NFT ownership, collection membership, or verified creator/update authority.
-- `redeem_vault_nft` does not burn the NFT or permanently mark metadata redeemed before releasing tokens.
-- `redeem_vault_nft` does not transfer SPL tokens from the PDA vault to the redeemer.
+- `deposit_and_mint_vault_nft` now transfers SPL tokens into PDA custody and creates `VaultPosition` state.
+- `deposit_and_mint_vault_nft` records the Metaplex Core asset address, but Core asset creation/collection verification happens in the backend-built transaction.
+- `redeem_vault_nft` now validates owner/unlock/not-staked/not-redeemed/collection/token vault state and transfers SPL tokens back from PDA custody.
+- `redeem_vault_nft` does not yet burn or invalidate the Metaplex Core asset.
+- `redeem_vault_nft` does not yet parse Metaplex Core collection/owner state on-chain.
 - `stake_vault_nft` does not validate holder ownership and does not freeze/escrow/custody the NFT.
 - `claim_rewards` does not calculate or transfer staking/raid rewards.
 
 ## Required Implementation Checklist
 
 - SPL custody:
-  - Add user source token account and PDA-owned destination token account to `DepositAndMintVaultNft`.
-  - Add token program CPI transfer from user to PDA vault.
+  - User source token account and PDA-owned destination token account have been added to `DepositAndMintVaultNft`.
+  - Token program CPI transfer from user to PDA vault has been added.
   - Validate source account owner, mint, amount, and token decimals.
 - PDA vault authority:
   - Keep `token_vault_authority` PDA seed tied to `CollectionProfile`.
@@ -31,15 +30,15 @@ Current file: `programs/vaultx/src/lib.rs`
   - Add explicit lock/unlock validation and immutable amount/duration.
 - Deposit instruction:
   - Validate collection active state.
-  - Transfer tokens first or make state changes atomic with transfer.
-  - Mint/verify Vault NFT through the selected Metaplex path.
+  - Transfer tokens into PDA custody atomically with position creation.
+  - Mint/verify Vault NFT through the selected Metaplex path in the same client-built transaction.
   - Emit tx data needed by backend indexer.
 - Redeem instruction:
-  - Validate current NFT owner.
-  - Validate NFT belongs to collection and is not forged.
+  - Validate current NFT owner through Metaplex Core account parsing or plugin authority.
+  - Validate NFT belongs to collection and is not forged through Metaplex Core/Token Metadata.
   - Validate unlock date, not staked, not redeemed.
-  - Burn/invalidate NFT before token release.
-  - Transfer full amount from PDA vault to redeemer.
+  - Burn/invalidate NFT before or atomically with token release.
+  - Transfer full amount from PDA vault to redeemer. Implemented for SPL custody.
   - No partial redeem in V1.
 - Staking:
   - Validate NFT owner.

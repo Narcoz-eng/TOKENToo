@@ -32,14 +32,17 @@ export class VaultMintOrchestratorService {
     if (!collection.identityLockedAt || !collection.approvedGenerationRunId || !collection.styleProfileVersion) {
       throw new BadRequestException("Collection must be launched from an approved immutable generator profile before minting.");
     }
+    if (collection.launchStatus !== "CONFIRMED" || !collection.collectionAssetAddress) {
+      throw new BadRequestException("Collection Core asset launch must be confirmed before minting Vault NFTs.");
+    }
     if (collection.status !== "ACTIVE" || collection.emergencyFlag || collection.instantSellDisabled) {
       throw new BadRequestException("Collection is paused, risk disabled, or under emergency controls.");
     }
     if (collection.token.mint !== normalized.tokenMint) throw new BadRequestException("Token mint does not match the collection profile.");
-    if (process.env.NODE_ENV === "production" && (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") === "mock") {
+    if (this.productionMintRequested() && (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") === "mock") {
       throw new BadRequestException("Production minting is blocked until FINAL_ASSET_STORAGE_PROVIDER is immutable storage.");
     }
-    if (process.env.NODE_ENV === "production" && (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "mock") {
+    if (this.productionMintRequested() && (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "mock") {
       throw new BadRequestException("Production minting is blocked until SOLANA_TRANSACTION_PROVIDER is real devnet/mainnet adapter.");
     }
 
@@ -77,16 +80,45 @@ export class VaultMintOrchestratorService {
     const assetUri = await this.storage.storeFinalNftAsset(`${mintTx.id}/image.svg`, finalAsset.imageDataUri);
     const metadata = { ...finalAsset.metadata, image: assetUri, assetProduction: finalAsset.manifest };
     const metadataUri = await this.storage.storeFinalNftMetadata(`${mintTx.id}/metadata.json`, metadata);
-    const unsignedTransaction = this.solana.buildVaultMintTransaction({ ...normalized, metadataUri });
-
     return this.prisma.mintTransaction.update({
       where: { id: mintTx.id },
       data: {
         assetUri,
         metadataUri,
-        unsignedTransaction: this.json(unsignedTransaction),
-        status: "TX_BUILT",
+        status: "ASSET_UPLOADED",
         retries: existing ? { increment: 1 } : 0,
+        errorCode: null,
+        errorMessage: null
+      }
+    });
+  }
+
+  async buildMintTransaction(id: string, walletAddress?: string) {
+    const tx = await this.prisma.mintTransaction.findUnique({ where: { id }, include: { collection: true } });
+    if (!tx) throw new NotFoundException("Mint transaction not found");
+    if (tx.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this mint transaction.");
+    if (!tx.metadataUri) throw new BadRequestException("Mint transaction has no uploaded metadata URI.");
+    if (!["ASSET_UPLOADED", "TX_BUILT", "FAILED"].includes(tx.status)) throw new ConflictException(`Mint transaction cannot be built from ${tx.status}`);
+
+    const unsignedTransaction = await this.solana.buildVaultMintTransaction({
+      transactionId: tx.id,
+      walletAddress: tx.walletAddress,
+      collectionId: tx.collectionId,
+      tokenMint: tx.tokenMint,
+      amount: tx.amount.toString(),
+      lockDurationDays: tx.lockDuration,
+      metadataUri: tx.metadataUri,
+      collectionName: tx.collection.name,
+      collectionAssetAddress: tx.collection.collectionAssetAddress
+    });
+
+    return this.prisma.mintTransaction.update({
+      where: { id: tx.id },
+      data: {
+        unsignedTransaction: this.json(unsignedTransaction),
+        nftMint: unsignedTransaction.nftAssetAddress ?? tx.nftMint,
+        vaultPositionPda: unsignedTransaction.vaultPositionPda ?? tx.vaultPositionPda,
+        status: "TX_BUILT",
         errorCode: null,
         errorMessage: null
       }
@@ -106,14 +138,18 @@ export class VaultMintOrchestratorService {
     if (tx.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this mint transaction.");
     if (!["TX_BUILT", "SUBMITTED", "FAILED"].includes(tx.status)) throw new ConflictException(`Mint transaction cannot be submitted from ${tx.status}`);
 
-    const result = await this.solana.submitAndConfirm({ transactionId: id, txSignature: input.txSignature ?? undefined, signedTransaction: input.signedTransaction, confirmMock: input.confirmMock });
+    const result = await this.solana.submitAndConfirm({ transactionId: id, txSignature: input.txSignature ?? undefined, signedTransaction: input.signedTransaction, confirmMock: this.mockMintEnabled() ? input.confirmMock : false });
+    const mockOutputRequested = !tx.nftMint || !tx.vaultPositionPda;
+    if (result.confirmed && mockOutputRequested && !this.mockMintEnabled()) {
+      throw new BadRequestException("Confirmed mint cannot finalize without real nftMint/coreAssetAddress and vaultPositionPda from the built transaction.");
+    }
     const updated = await this.prisma.mintTransaction.update({
       where: { id },
       data: {
         status: result.status,
         txSignature: result.txSignature,
-        nftMint: input.nftMint ?? tx.nftMint ?? (result.confirmed ? `mock_nft_${id.replace(/-/g, "").slice(0, 32)}` : undefined),
-        vaultPositionPda: input.vaultPositionPda ?? tx.vaultPositionPda ?? (result.confirmed ? `mock_position_${id.replace(/-/g, "").slice(0, 32)}` : undefined),
+        nftMint: input.nftMint ?? tx.nftMint ?? (result.confirmed && this.mockMintEnabled() ? `mock_nft_${id.replace(/-/g, "").slice(0, 32)}` : undefined),
+        vaultPositionPda: input.vaultPositionPda ?? tx.vaultPositionPda ?? (result.confirmed && this.mockMintEnabled() ? `mock_position_${id.replace(/-/g, "").slice(0, 32)}` : undefined),
         confirmedAt: result.confirmed ? new Date() : undefined
       }
     });
@@ -140,7 +176,7 @@ export class VaultMintOrchestratorService {
       }
     });
 
-    return this.getMintTransaction(id);
+    return this.getMintTransaction(id, walletAddress);
   }
 
   private async approvedProfile(generationRunId: string, version: number) {
@@ -192,7 +228,12 @@ export class VaultMintOrchestratorService {
       animationStyle: record.animationStyle,
       raidTheme: record.raidTheme,
       lore: record.lore,
-      roleNames: this.strings(record.roleNames)
+      roleNames: this.strings(record.roleNames),
+      brandDna: this.record(record.brandDna) as GeneratedStyleProfile["brandDna"],
+      visualFingerprint: this.record(record.visualFingerprint),
+      assetPackId: record.assetPackId ?? "unknown",
+      artSource: record.artSource ?? "PROCEDURAL_FALLBACK",
+      tenKReadiness: this.record(record.tenKReadinessReport) as GeneratedStyleProfile["tenKReadiness"]
     };
   }
 
@@ -225,5 +266,13 @@ export class VaultMintOrchestratorService {
 
   private record(value: unknown) {
     return (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
+  }
+
+  private mockMintEnabled() {
+    return (process.env.ENABLE_MOCK_MINT ?? "true") === "true" && (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") !== "production";
+  }
+
+  private productionMintRequested() {
+    return (process.env.APP_ENV ?? process.env.NODE_ENV) === "production" || process.env.ENABLE_PRODUCTION_MINT === "true";
   }
 }

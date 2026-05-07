@@ -51,6 +51,40 @@ export default function MintPage() {
     }
   }
 
+  async function buildTransaction() {
+    if (!mintState?.id) return setError("Create a mint intent first.");
+    setLoading(true);
+    setError(null);
+    try {
+      setMintState(await wallet.authFetch<any>(`/vault/mint/transactions/${mintState.id}/build`, { method: "POST" }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Transaction build failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function signAndSubmit() {
+    if (!mintState?.id) return setError("Build a transaction first.");
+    const base64 = mintState.unsignedTransaction?.base64UnsignedTransaction;
+    if (!base64) return setError("The backend did not return a signable devnet transaction.");
+    setLoading(true);
+    setError(null);
+    try {
+      const signedTransactionBase64 = await wallet.signTransactionBase64(base64);
+      setMintState(
+        await wallet.authFetch<any>(`/vault/mint/transactions/${mintState.id}/submit`, {
+          method: "POST",
+          body: JSON.stringify({ signedTransactionBase64 })
+        })
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Wallet signing or submission failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <AppShell active="mint">
       {collectionState.loading ? <LoadingState label="Loading launched collections" /> : null}
@@ -110,6 +144,14 @@ export default function MintPage() {
                 <button type="button" onClick={createIntent} disabled={loading} className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-vault-purple font-bold shadow-glow disabled:opacity-60">
                   {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />} Create Mint Intent
                 </button>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <button type="button" onClick={buildTransaction} disabled={loading || !mintState?.id} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-vault-purple bg-vault-purple/10 font-bold text-vault-purple disabled:opacity-50">
+                    Build Devnet Tx
+                  </button>
+                  <button type="button" onClick={signAndSubmit} disabled={loading || !mintState?.unsignedTransaction?.base64UnsignedTransaction} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-vault-green bg-vault-green/10 font-bold text-vault-green disabled:opacity-50">
+                    Wallet Sign + Submit
+                  </button>
+                </div>
               </form>
               <div className="rounded-lg border border-vault-line bg-black/25 p-4">
                 <img src={collection.image} alt="" className="aspect-square w-full rounded-lg object-cover" />
@@ -119,6 +161,8 @@ export default function MintPage() {
                   <PreviewRow label="Vault PDA" value="Derived on mint" />
                   <PreviewRow label="Redeem" value="Full position only" />
                   <PreviewRow label="Intent status" value={mintState?.status ?? "Not created"} />
+                  <PreviewRow label="NFT asset" value={mintState?.nftMint ?? mintState?.unsignedTransaction?.nftAssetAddress ?? "Built after tx"} />
+                  <PreviewRow label="Vault position" value={mintState?.vaultPositionPda ?? mintState?.unsignedTransaction?.vaultPositionPda ?? "Built after tx"} />
                   <StatusPill accent="green">Verified collection required</StatusPill>
                 </div>
               </div>
@@ -134,6 +178,11 @@ export default function MintPage() {
                 </div>
               ))}
             </div>
+            {mintState?.txSignature ? (
+              <a href={`https://explorer.solana.com/tx/${mintState.txSignature}?cluster=devnet`} className="mt-4 inline-flex h-11 items-center justify-center rounded-lg border border-vault-green px-4 text-sm font-bold text-vault-green">
+                View confirmed transaction
+              </a>
+            ) : null}
             {mintState?.unsignedTransaction ? (
               <pre className="mt-4 max-h-56 overflow-auto rounded-lg border border-vault-line bg-black/40 p-4 text-xs text-slate-300">{JSON.stringify(mintState.unsignedTransaction, null, 2)}</pre>
             ) : null}

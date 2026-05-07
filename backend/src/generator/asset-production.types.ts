@@ -20,6 +20,17 @@ export type AssetProductionManifest = {
   premiumTraits: ProducedLayerSet;
   legendaryAssets: ProducedLayerSet;
   warnings: string[];
+  readinessReport: AssetProviderReadinessReport;
+};
+
+export type AssetProviderReadinessReport = {
+  selectedAssetPack: string;
+  availableBaseVariants: number;
+  availableBackgrounds: number;
+  availableTraitLayers: number;
+  availableLegendaryOverlays: number;
+  canProduce10kPremiumOutputs: boolean;
+  reasonIfNo?: string;
 };
 
 export type FinalVaultAssetInput = {
