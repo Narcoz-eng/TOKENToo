@@ -24,7 +24,7 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
                 <div className="flex flex-wrap gap-2">
                   <StatusPill accent={preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
                   <StatusPill accent="cyan">{preview.theme}</StatusPill>
-                  <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Ready" : "Draft"}</StatusPill>
+                  <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : "Concept preview"}</StatusPill>
                 </div>
                 <h2 className="mt-4 text-4xl font-black leading-tight lg:text-5xl">{preview.collection}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{preview.lore}</p>
@@ -37,7 +37,7 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
               <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
                 <PreviewMetric label="Vault supply" value="10,000" />
                 <PreviewMetric label="Trait layers" value={String(Object.keys(preview.traitCounts).length || 5)} />
-                <PreviewMetric label="Readiness" value={preview.quality.passed ? "Pass" : "Draft"} />
+                <PreviewMetric label="Readiness" value={preview.finalProductionReady ? "Production" : "Concept"} />
               </div>
             </div>
 
@@ -51,8 +51,8 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
       </SectionCard>
 
       <SectionCard title="Vault NFT Preview Set">
-        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
-          {samples.slice(0, compact ? 3 : 5).map((sample, index) => (
+        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+          {samples.slice(0, compact ? 3 : 6).map((sample, index) => (
             <PreviewNftCard key={sample.id} sample={sample} index={index} />
           ))}
         </div>
@@ -172,7 +172,7 @@ function fallbackSamples(): CollectionGeneratorPreview["samples"] {
 function safeImage(src: string | undefined | null, fallback: string) {
   if (!src) return fallback;
   const value = src.toLowerCase();
-  if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink") || value.includes("data:image/svg")) return fallback;
+  if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink")) return fallback;
   return src;
 }
 

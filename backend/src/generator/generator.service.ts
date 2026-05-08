@@ -26,6 +26,14 @@ import { StyleProfileGeneratorService } from "./style-profile-generator.service"
 import { TraitPackGeneratorService } from "./trait-pack-generator.service";
 import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
 
+type NormalizedGenerationRunInput = CreateGenerationRunInput & {
+  tokenName: string;
+  tokenSymbol: string;
+  tokenMint: string;
+  description: string;
+  selectedPreset: string;
+};
+
 @Injectable()
 export class GeneratorService {
   constructor(
@@ -582,23 +590,31 @@ export class GeneratorService {
     });
   }
 
-  private normalize(input: CreateGenerationRunInput): CreateGenerationRunInput {
-    if (!input.tokenName?.trim()) throw new Error("tokenName is required");
-    if (!input.tokenSymbol?.trim()) throw new Error("tokenSymbol is required");
+  private normalize(input: CreateGenerationRunInput): NormalizedGenerationRunInput {
     if (!input.tokenMint?.trim()) throw new Error("tokenMint is required");
-    if (!input.description?.trim()) throw new Error("description is required");
+    const source = input.hints?.sourceMetadata;
+    const override = input.hints?.overrides;
+    const tokenName = input.tokenName?.trim() || override?.tokenName?.trim() || source?.name?.trim() || "Resolved Token";
+    const tokenSymbol = input.tokenSymbol?.trim() || override?.tokenSymbol?.trim() || source?.symbol?.trim() || "TOKEN";
+    const description =
+      input.description?.trim() ||
+      override?.description?.trim() ||
+      source?.description?.trim() ||
+      `${tokenName} holder community generated from Solana token metadata.`;
+    const logoUri = input.logoUri?.trim() || override?.logoUri?.trim() || source?.imageUri || source?.logoUri;
     return {
       ...input,
-      tokenName: input.tokenName.trim(),
-      tokenSymbol: input.tokenSymbol.trim().startsWith("$") ? input.tokenSymbol.trim() : `$${input.tokenSymbol.trim()}`,
+      tokenName,
+      tokenSymbol: tokenSymbol.startsWith("$") ? tokenSymbol : `$${tokenSymbol}`,
       tokenMint: input.tokenMint.trim(),
-      description: input.description.trim(),
+      logoUri,
+      description,
       selectedPreset: input.selectedPreset ?? process.env.GENERATOR_DEFAULT_PRESET ?? "mystic-pixel-cult"
     };
   }
 
-  private normalizePreviewInput(input: CreateGenerationRunInput): CreateGenerationRunInput {
-    const description = input.description?.trim() || input.hints?.lore?.trim() || `${input.tokenName || "Token"} founder community on Phew.run`;
+  private normalizePreviewInput(input: CreateGenerationRunInput): NormalizedGenerationRunInput {
+    const description = input.description?.trim() || input.hints?.sourceMetadata?.description?.trim() || input.hints?.lore?.trim() || `${input.tokenName || input.hints?.sourceMetadata?.name || "Token"} founder community on Phew.run`;
     return this.normalize({ ...input, description });
   }
 

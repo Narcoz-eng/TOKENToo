@@ -23,7 +23,11 @@ export class QualityValidatorService {
     if (!style.tenKReadiness?.pass) issues.push("10k collection readiness validation failed.");
     if (style.artSource === "PROCEDURAL_FALLBACK") issues.push("Procedural SVG fallback art cannot be approved for production launch.");
     if (this.hasGenericTraitNames(style, pack)) issues.push("Trait names are too generic for premium collection identity.");
+    if (this.usesPlatformPalette(style)) issues.push("Collection identity reuses the platform palette instead of a token-derived palette.");
+    if (this.hasForbiddenGenericIdentity(style, pack)) issues.push("Collection repeats a forbidden generic AI prompt pattern.");
+    if (this.poseReuse(previews) > 0.55) issues.push("Too many sample NFTs reuse the same pose; rarity ladder needs visible composition changes.");
     issues.push(...this.rarityVisualIssues(previews));
+    issues.push(...this.traitCollisionIssues(previews));
 
     const tierScore = average([previewQualityScore, uniquenessScore, colorHarmonyScore, rarityDistributionScore, duplicateRiskScore, compatibilityScore, distinctiveness.score]);
     const tier = tierScore >= 92 && distinctiveness.score >= 86 ? "LEGENDARY_READY" : tierScore >= 80 && previewQualityScore >= 78 ? "PREMIUM" : "BASIC";
@@ -118,13 +122,66 @@ export class QualityValidatorService {
     const issues: string[] = [];
     for (const preview of previews.filter((item) => item.type === "SAMPLE_NFT")) {
       const rarity = String(preview.metadata.rarity ?? "");
-      const values = ["headgear", "outfit", "accessory", "neckChestAccessory", "aura", "frame", "legendaryOverlay"].map((key) => preview.metadata[key]);
-      const visibleTraitCount = values.filter((value) => typeof value === "string" && value !== "None" && value !== "Standard frame" && value !== "Base pose").length;
-      if (rarity === "Common" && visibleTraitCount > 2) issues.push(`${preview.label} is Common but has too many premium visible traits.`);
+      const visibleTraitCount = Number(preview.metadata.traitCount ?? 0);
+      const rule = preview.metadata.complexityRule as { minTraits?: number; maxTraits?: number } | undefined;
+      if (rule?.minTraits && visibleTraitCount < rule.minTraits) issues.push(`${preview.label} has ${visibleTraitCount} visible traits but ${rarity} requires at least ${rule.minTraits}.`);
+      if (rule?.maxTraits && visibleTraitCount > rule.maxTraits) issues.push(`${preview.label} has ${visibleTraitCount} visible traits but ${rarity} allows at most ${rule.maxTraits}.`);
+      if (rarity === "Common" && (preview.metadata.aura !== "None" || preview.metadata.frame !== "None" || /premium|legendary|unique/i.test(String(preview.metadata.scene)))) {
+        issues.push(`${preview.label} is Common but includes premium aura/frame/scene language.`);
+      }
+      if (rarity === "Epic" && (preview.metadata.aura === "None" || /simple/i.test(String(preview.metadata.scene)))) {
+        issues.push(`${preview.label} is Epic but lacks aura or a premium background.`);
+      }
       if ((rarity === "Legendary" || rarity === "Mythic") && (preview.metadata.pose === "base pose" || preview.metadata.legendaryOverlay === "None")) {
         issues.push(`${preview.label} is ${rarity} but lacks a unique pose/scene/overlay.`);
       }
+      if ((rarity === "Legendary" || rarity === "Mythic") && preview.metadata.compositionCategory !== "signature-scene" && preview.metadata.compositionCategory !== "near-1-of-1") {
+        issues.push(`${preview.label} is ${rarity} but does not declare a unique composition category.`);
+      }
     }
     return issues;
+  }
+
+  private traitCollisionIssues(previews: PreviewAssetPlan[]) {
+    const issues: string[] = [];
+    for (const preview of previews.filter((item) => item.type === "SAMPLE_NFT")) {
+      const hasFullHead = preview.metadata.headgear !== "None" && /Mask|Helm|Kabuto|Hood/i.test(String(preview.metadata.headgear));
+      const hasVisor = /Visor|Scanner/i.test(String(preview.metadata.eyes));
+      const hasHeavyAura = preview.metadata.aura !== "None" && /Mist|Glow|Flame|Pulse|Static/i.test(String(preview.metadata.aura));
+      const hasBusyBackground = /Mist|Glow|Flame|Pulse|Static/i.test(String(preview.metadata.background));
+      if (hasFullHead && hasVisor) issues.push(`${preview.label} stacks full headgear with visor/eye hardware.`);
+      if (hasHeavyAura && hasBusyBackground && String(preview.metadata.rarity) !== "Mythic") issues.push(`${preview.label} risks unreadable aura/background collision.`);
+    }
+    return issues;
+  }
+
+  private usesPlatformPalette(style: GeneratedStyleProfile) {
+    const platform = new Set(["#baff00", "#16d7d2", "#f4c542"]);
+    const palette = [
+      ...style.colors,
+      ...style.brandDna.colorSystem.primaryColors,
+      ...style.brandDna.colorSystem.secondaryColors,
+      ...style.brandDna.colorSystem.accentColors
+    ].map((color) => color.toLowerCase());
+    return palette.filter((color) => platform.has(color)).length >= 3;
+  }
+
+  private hasForbiddenGenericIdentity(style: GeneratedStyleProfile, pack: TraitPackPlan) {
+    const text = [
+      style.collection,
+      style.theme,
+      style.mascot,
+      style.backgroundWorld,
+      ...style.traitLanguage,
+      ...pack.traits.slice(0, 40).map((trait) => trait.name)
+    ].join(" ").toLowerCase();
+    return /neon cyber frog/.test(text) || /gold .*(common|base).*legendary/.test(text) || /random unrelated/.test(text);
+  }
+
+  private poseReuse(previews: PreviewAssetPlan[]) {
+    const poses = previews.filter((item) => item.type === "SAMPLE_NFT").map((preview) => String(preview.metadata.pose ?? ""));
+    const counts = new Map<string, number>();
+    poses.forEach((pose) => counts.set(pose, (counts.get(pose) ?? 0) + 1));
+    return Math.max(0, ...counts.values()) / Math.max(1, poses.length);
   }
 }

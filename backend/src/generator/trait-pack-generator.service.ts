@@ -25,7 +25,7 @@ export class TraitPackGeneratorService {
   generate(style: GeneratedStyleProfile): TraitPackPlan {
     const seed = seedFrom(`${style.collection}:${style.theme}:${style.backgroundWorld}`);
     const categories = {
-      baseCharacter: this.names(style, seed, categoryTargets.baseCharacter, ["Stance", "Silhouette", "Pose", "Champion", "Warden"]),
+      baseCharacter: unique([...style.brandDna.baseArchetypes, ...this.names(style, seed, categoryTargets.baseCharacter, ["Stance", "Silhouette", "Pose", "Champion", "Warden"])]).slice(0, categoryTargets.baseCharacter),
       backgrounds: this.names(style, seed + 11, categoryTargets.backgrounds, ["Temple", "War Room", "Gate", "District", "Shrine", "Arena"]),
       headgear: this.names(style, seed + 23, categoryTargets.headgear, ["Hood", "Crown", "Helm", "Mask", "Halo", "Kabuto"]),
       eyes: this.names(style, seed + 37, categoryTargets.eyes, ["Eyes", "Visor", "Gaze", "Glare", "Scanner"]),
@@ -93,16 +93,33 @@ export class TraitPackGeneratorService {
 
   private names(style: GeneratedStyleProfile, seed: number, count: number, nouns: string[]) {
     const language = style.traitLanguage.length ? style.traitLanguage : [style.theme, style.backgroundWorld, style.mascot];
+    const sourceLanguage = [
+      ...style.brandDna.memeLanguage,
+      ...style.brandDna.roleLanguage,
+      style.brandDna.backgroundWorld,
+      style.brandDna.mascotSilhouette
+    ];
     const motifs = unique([
       ...language.flatMap((entry) => entry.split(/\s+/).filter((word) => word.length > 3)),
+      ...sourceLanguage.flatMap((entry) => entry.split(/\s+/).filter((word) => word.length > 3)),
       ...style.backgroundWorld.split(/\s+/),
       ...style.theme.split(/\s+/)
-    ]).map(titleCase);
+    ]).filter((word) => !/^(neon|cyber|ancient|mythic|royal|toxic|green|gold|blue)$/i.test(word)).map(titleCase);
+    const modifiers = unique([
+      ...style.brandDna.memeLanguage.slice(0, 8).map(titleCase),
+      ...style.brandDna.roleLanguage.slice(0, 4).map((role) => titleCase(role.split(/\s+/)[0] ?? role)),
+      ...style.brandDna.backgroundWorld.split(/\s+/).filter((word) => word.length > 4).map(titleCase),
+      "Origin",
+      "Holder",
+      "Signal",
+      "Liquidity",
+      "Raid"
+    ]);
 
     return Array.from({ length: count }, (_, index) => {
       const motif = pick(motifs, seed + index * 5);
       const noun = pick(nouns, seed + index * 7);
-      const modifier = pick(["Ancient", "Neon", "Raid", "Mythic", "Vault", "Moon", "Toxic", "Royal", "Signal", "Cursed"], seed + index * 11);
+      const modifier = pick(modifiers, seed + index * 11);
       return `${modifier} ${motif} ${noun}`;
     });
   }
@@ -117,7 +134,7 @@ export class TraitPackGeneratorService {
         weightBps: this.rarity.weightForRarity(rarity),
         unlockLevel: this.unlockLevel(category, rarity),
         compatibilityTags: this.tags(category, name),
-        visualDescription: `${name} rendered in ${style.artStyle} with ${style.colors[0]} and ${style.colors[1]} accents.`
+        visualDescription: `${name} rendered in ${style.artStyle}; it must remain readable inside the ${style.brandDna.backgroundWorld} world and follow ${style.brandDna.mascotSilhouette} silhouette rules.`
       };
     });
   }

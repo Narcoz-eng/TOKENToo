@@ -194,13 +194,15 @@ export default function CreateCollectionPage() {
       const data = await walletAuth.authFetch<GeneratorRun>("/generator/runs", {
         method: "POST",
         body: JSON.stringify({
-          tokenName: effectiveTokenName,
-          tokenSymbol: effectiveTokenSymbol,
+          tokenName: tokenName.trim() || undefined,
+          tokenSymbol: tokenSymbol.trim() || undefined,
           tokenMint,
-          logoUri: effectiveLogoUri,
-          description: effectiveDescription,
+          logoUri: logoUri.trim() || undefined,
+          description: description.trim() || undefined,
           selectedPreset,
           hints: {
+            sourceMetadata: scan ? sourceMetadataFromScan(scan) : undefined,
+            overrides: overridePayload(scan, tokenName, tokenSymbol, description, logoUri),
             memes: splitList(memes),
             phrases: splitList(phrases),
             slogans: ["join the faction"],
@@ -282,13 +284,15 @@ export default function CreateCollectionPage() {
 
   function previewPayload() {
     return {
-      tokenName: effectiveTokenName,
-      tokenSymbol: effectiveTokenSymbol,
+      tokenName: tokenName.trim() || undefined,
+      tokenSymbol: tokenSymbol.trim() || undefined,
       tokenMint,
-      logoUri: effectiveLogoUri,
-      description: effectiveDescription,
+      logoUri: logoUri.trim() || undefined,
+      description: description.trim() || undefined,
       selectedPreset,
       hints: {
+        sourceMetadata: scan ? sourceMetadataFromScan(scan) : undefined,
+        overrides: overridePayload(scan, tokenName, tokenSymbol, description, logoUri),
         memes: splitList(memes),
         phrases: splitList(phrases),
         slogans: ["join the faction"],
@@ -462,7 +466,7 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
             <StatusPill accent="green">{preview.preset || "PHEW Launch Studio"}</StatusPill>
-            <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : "Preview mode"}</StatusPill>
+            <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : "Concept preview"}</StatusPill>
             {launchResult ? <StatusPill accent="cyan">Launched</StatusPill> : null}
           </div>
           <h2 className="mt-4 text-4xl font-black leading-tight">{preview.collection}</h2>
@@ -475,8 +479,8 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
         </div>
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
           <LaunchStat label="Vault supply" value="10,000" />
-          <LaunchStat label="Rarity tiers" value="4" />
-          <LaunchStat label="Readiness" value={preview.quality.passed ? "Pass" : "Draft"} />
+          <LaunchStat label="Rarity tiers" value="6" />
+          <LaunchStat label="Readiness" value={preview.finalProductionReady ? "Production" : "Concept"} />
         </div>
       </div>
     </section>
@@ -626,7 +630,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
   const profile = run.styleProfiles[0];
   const categories = asRecord<string[]>(profile.traitPack?.categories);
   const previews = profile.previewAssets;
-  const samples = previews.filter((asset) => asset.type === "SAMPLE_NFT").slice(-5);
+  const samples = previews.filter((asset) => asset.type === "SAMPLE_NFT").slice(-6);
   const quality = profile.qualityReports[0];
   const distinctiveness = profile.distinctivenessReports[0];
   const roles = asArray(profile.roleNames);
@@ -648,7 +652,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     rarityWeights: asRecord<number>(profile.traitPack?.rarityWeights ?? profile.rarityStructure),
     unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
     assetProvider: "persisted-generator-run",
-    finalProductionReady: quality?.passed && quality.tier !== "BASIC",
+    finalProductionReady: false,
     avatar: safeImage(previews.find((asset) => asset.type === "AVATAR")?.uri, brandAssets.factionMark),
     banner: safeImage(previews.find((asset) => asset.type === "BANNER")?.uri, brandAssets.launchHero),
     samples: normalizedSamples(samples.map((asset, index) => {
@@ -706,7 +710,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     warnings: data.warnings,
     avatar: safeImage(data.avatarPreviewSpec?.uri, brandAssets.factionMark),
     banner: safeImage(data.bannerPreviewSpec?.uri, brandAssets.launchHero),
-    samples: normalizedSamples(data.samples.slice(0, 5).map((sample, index) => ({
+    samples: normalizedSamples(data.samples.slice(0, 6).map((sample, index) => ({
       id: `preview-${index}`,
       name: sample.label,
       image: sample.uri,
@@ -739,7 +743,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
 function normalizedSamples(samples: CollectionGeneratorPreview["samples"]) {
   const curated = fallbackPreview("", "", "", "").samples;
   const merged = samples.length ? samples : curated;
-  return merged.slice(0, 5).map((sample, index) => ({
+  return merged.slice(0, 6).map((sample, index) => ({
     ...sample,
     image: safeImage(sample.image, brandAssets.nftVaults[index % brandAssets.nftVaults.length])
   }));
@@ -748,8 +752,36 @@ function normalizedSamples(samples: CollectionGeneratorPreview["samples"]) {
 function safeImage(src: string | undefined | null, fallback: string) {
   if (!src) return fallback;
   const value = src.toLowerCase();
-  if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink") || value.includes("data:image/svg")) return fallback;
+  if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink")) return fallback;
   return src;
+}
+
+function sourceMetadataFromScan(scan: TokenScan) {
+  return {
+    mint: scan.mint,
+    name: scan.name,
+    symbol: scan.symbol,
+    description: scan.description,
+    metadataUri: scan.metadataUri,
+    imageUri: scan.imageUri,
+    logoUri: scan.logoUri,
+    externalUrl: scan.externalUrl,
+    socialLinks: scan.socialLinks,
+    extensions: scan.extensions,
+    decimals: scan.decimals,
+    supply: scan.supply,
+    riskNotes: scan.riskNotes
+  };
+}
+
+function overridePayload(scan: TokenScan | null, tokenName: string, tokenSymbol: string, description: string, logoUri: string) {
+  if (!scan) return undefined;
+  return {
+    tokenName: tokenName.trim() || undefined,
+    tokenSymbol: tokenSymbol.trim() || undefined,
+    description: description.trim() || undefined,
+    logoUri: logoUri.trim() || undefined
+  };
 }
 
 function splitList(value: string) {

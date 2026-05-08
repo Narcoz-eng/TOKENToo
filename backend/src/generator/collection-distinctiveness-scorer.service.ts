@@ -62,7 +62,7 @@ export class CollectionDistinctivenessScorerService {
       backgroundWorldUniqueness,
       traitLanguageUniqueness,
       score,
-      passed: score >= 72 && paletteUniqueness >= 72
+      passed: score >= 72
     };
   }
 
@@ -80,10 +80,25 @@ export class CollectionDistinctivenessScorerService {
   }
 
   private fingerprintSimilarity(left: unknown, right: unknown) {
-    const leftText = JSON.stringify(left ?? {}).toLowerCase();
-    const rightText = JSON.stringify(right ?? {}).toLowerCase();
+    const leftText = this.semanticFingerprint(left);
+    const rightText = this.semanticFingerprint(right);
     if (!leftText || !rightText || rightText === "{}") return 0;
     return this.wordOverlap([leftText], [rightText]);
+  }
+
+  private semanticFingerprint(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+    const record = value as Record<string, unknown>;
+    return [
+      record.mascotArchetype,
+      record.silhouetteFamily,
+      record.backgroundWorld,
+      record.legendaryDirection,
+      record.sourceSymbol,
+      ...(this.stringArray(record.traitVocabulary).slice(0, 16)),
+      ...(this.stringArray(record.loreMemeLanguage).slice(0, 12)),
+      ...(this.stringArray(record.palette).slice(0, 8))
+    ].flat().join(" ").toLowerCase();
   }
 
   private paletteSimilarity(left: string[], right: string[]) {
@@ -105,10 +120,42 @@ export class CollectionDistinctivenessScorerService {
   }
 
   private wordOverlap(left: string[], right: string[]) {
-    const leftWords = new Set(left.join(" ").toLowerCase().split(/\s+/).filter(Boolean));
-    const rightWords = new Set(right.join(" ").toLowerCase().split(/\s+/).filter(Boolean));
+    const leftWords = new Set(this.significantWords(left));
+    const rightWords = new Set(this.significantWords(right));
     const shared = [...leftWords].filter((word) => rightWords.has(word)).length;
     return shared / Math.max(1, Math.min(leftWords.size, rightWords.size));
+  }
+
+  private significantWords(values: string[]) {
+    const stop = new Set([
+      "with",
+      "from",
+      "that",
+      "this",
+      "into",
+      "token",
+      "holder",
+      "holders",
+      "raid",
+      "raids",
+      "vault",
+      "vaults",
+      "scene",
+      "mark",
+      "sigil",
+      "emblem",
+      "trade",
+      "https",
+      "com",
+      "twitter",
+      "discord",
+      "telegram"
+    ]);
+    return values
+      .join(" ")
+      .toLowerCase()
+      .split(/[^a-z0-9#]+/)
+      .filter((word) => word.length > 3 && !stop.has(word));
   }
 
   private stringArray(value: unknown) {

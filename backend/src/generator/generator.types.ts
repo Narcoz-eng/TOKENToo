@@ -1,12 +1,12 @@
 export type GeneratorMood = "funny" | "aggressive" | "luxury" | "dark" | "cute" | "chaotic" | "cyber" | "fantasy";
 
 export type CreateGenerationRunInput = {
-  tokenName: string;
-  tokenSymbol: string;
+  tokenName?: string;
+  tokenSymbol?: string;
   tokenMint: string;
   logoUri?: string;
   logoData?: string;
-  description: string;
+  description?: string;
   selectedPreset?: string;
   hints?: CommunityHints;
 };
@@ -40,6 +40,29 @@ export type CommunityHints = {
   themePreference?: string;
   colorPreference?: string;
   mood?: GeneratorMood;
+  sourceMetadata?: TokenSourceMetadata;
+  overrides?: {
+    tokenName?: string;
+    tokenSymbol?: string;
+    description?: string;
+    logoUri?: string;
+  };
+};
+
+export type TokenSourceMetadata = {
+  mint: string;
+  name?: string;
+  symbol?: string;
+  description?: string;
+  metadataUri?: string;
+  imageUri?: string;
+  logoUri?: string;
+  externalUrl?: string;
+  socialLinks?: Record<string, string>;
+  extensions?: Record<string, unknown>;
+  decimals?: number;
+  supply?: string;
+  riskNotes?: string[];
 };
 
 export type LogoAnalysisOutput = {
@@ -116,8 +139,22 @@ export type BrandDNA = {
   raidLanguage: string[];
   roleLanguage: string[];
   legendaryDirection: string;
+  mascotSilhouette: string;
+  backgroundWorld: string;
+  baseArchetypes: string[];
+  rarityVisualRules: Record<string, RarityComplexityRule>;
   forbiddenSimilarities: string[];
   sourceMetadataSummary: Record<string, unknown>;
+};
+
+export type RarityComplexityRule = {
+  minTraits: number;
+  maxTraits: number;
+  pose: string;
+  background: string;
+  aura: "none" | "mild" | "strong" | "signature";
+  frame: "none" | "standard" | "special" | "mythic";
+  composition: string;
 };
 
 export type CollectionColorSystem = {

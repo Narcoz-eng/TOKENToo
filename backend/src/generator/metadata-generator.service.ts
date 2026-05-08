@@ -17,11 +17,19 @@ export class MetadataGeneratorService {
       { trait_type: "Base Character", value: this.trait(visual.base, pick(pack.categories.baseCharacter, seed + 3)) },
       { trait_type: "Headgear", value: this.trait(visual.headgear, pick(pack.categories.headgear, seed + 4)) },
       { trait_type: "Eyes", value: this.trait(visual.eyes, pick(pack.categories.eyes, seed + 5)) },
+      { trait_type: "Mouth Expression", value: this.trait(visual.mouthExpression, "Base expression") },
       { trait_type: "Outfit", value: this.trait(visual.outfit, pick(pack.categories.outfitBody, seed + 6)) },
       { trait_type: "Aura", value: this.trait(visual.aura, pick(pack.categories.auraEffect, seed + 7)) },
       { trait_type: "Accessory", value: this.trait(visual.accessory, pick(pack.categories.accessories, seed + 8)) },
+      { trait_type: "Neck/Chest Accessory", value: this.trait(visual.neckChestAccessory, "None") },
       { trait_type: "Frame/Border", value: this.trait(visual.frame, "Standard frame") },
       { trait_type: "Pose", value: this.trait(visual.pose, "base pose") },
+      { trait_type: "Scene", value: this.trait(visual.scene, "simple background") },
+      { trait_type: "Legendary Overlay", value: this.trait(visual.legendaryOverlay, "None") },
+      { trait_type: "Animation Overlay", value: this.trait(visual.animationOverlay, "Static Still") },
+      { trait_type: "Composition Category", value: this.trait(visual.compositionCategory, "standard-composition") },
+      { trait_type: "Special Metadata Flag", value: this.trait(visual.specialMetadataFlag, "NONE") },
+      { trait_type: "Trait Count", value: String(visual.traitCount ?? "0") },
       { trait_type: "Rarity", value: this.trait(visual.rarity, pick(["Rare", "Epic", "Legendary"], seed + 9)) }
     ];
 
@@ -30,7 +38,12 @@ export class MetadataGeneratorService {
       collection: style.collection,
       description: `A backed Vault NFT from the ${style.collection} community. ${style.lore}`,
       image: preview?.uri ?? "ipfs://phew/preview.png",
-      attributes
+      attributes,
+      properties: {
+        category: "image",
+        renderedTraitKeys: Array.isArray(visual.renderedTraitKeys) ? visual.renderedTraitKeys : [],
+        conceptPreviewOnly: true
+      }
     };
   }
 

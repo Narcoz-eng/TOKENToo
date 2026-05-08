@@ -17,7 +17,25 @@ const fallbackPalettes = [
 @Injectable()
 export class LogoAnalysisService {
   analyze(input: CreateGenerationRunInput): LogoAnalysisOutput {
-    const raw = `${input.tokenName} ${input.tokenSymbol} ${input.description} ${input.logoUri ?? ""} ${input.logoData ?? ""} ${JSON.stringify(input.hints ?? {})}`;
+    const source = input.hints?.sourceMetadata;
+    const raw = [
+      input.tokenName,
+      input.tokenSymbol,
+      input.description,
+      input.logoUri,
+      input.logoData,
+      source?.name,
+      source?.symbol,
+      source?.description,
+      source?.externalUrl ? "external community site" : "",
+      source?.socialLinks ? Object.keys(source.socialLinks).join(" ") : "",
+      input.hints?.memes?.join(" "),
+      input.hints?.slogans?.join(" "),
+      input.hints?.phrases?.join(" "),
+      input.hints?.mascotPreference,
+      input.hints?.themePreference,
+      input.hints?.mood
+    ].filter(Boolean).join(" ");
     const words = slugWords(raw);
     const seed = seedFrom(raw);
     const mascot = this.mascot(input, words, seed);
@@ -41,11 +59,12 @@ export class LogoAnalysisService {
     const preference = input.hints?.mascotPreference?.trim().toLowerCase();
     if (preference) return preference;
     const source = words.join(" ");
-    if (/frog|toad|pepe|bog|swamp/.test(source)) return source.includes("pepe") ? "alien" : "frog";
+    if (/frog|toad|pepe|bog|swamp/.test(source)) return "frog";
     if (/dog|doge|shib|inu|kennel|bark/.test(source)) return source.includes("shib") ? "samurai dog" : "dog";
     if (/cat|kitty|meow|claw/.test(source)) return "cat";
-    if (/robot|bot|mech|ai|machine/.test(source)) return "robot";
+    if (/robot|bot|mech|agent|(^|\W)ai(\W|$)|machine/.test(source)) return "robot";
     if (/skull|bone|dead|reaper/.test(source)) return "skull";
+    if (/degen|pump|casino|jackpot|candle|liquidity|chart/.test(source)) return "alien";
     if (/coin|gold|cash|bank|vault/.test(source)) return "coin mascot";
     if (/wizard|mage|spell|magic/.test(source)) return "wizard";
     return pick(["frog", "dog", "cat", "alien", "robot", "wizard", "skull", "coin mascot"], seed);
@@ -57,6 +76,12 @@ export class LogoAnalysisService {
     if (matches?.length) {
       return [matches[0], matches[1] ?? "#7a35ff", matches[2] ?? "#090916"];
     }
+    const source = `${input.tokenName ?? ""} ${input.tokenSymbol ?? ""} ${input.description ?? ""} ${JSON.stringify(input.hints?.sourceMetadata ?? {})}`.toLowerCase();
+    if (/pepe|frog|swamp|bog|ribbit|pond/.test(source)) return ["#2bd66f", "#6b3f20", "#071509"];
+    if (/dog|doge|shib|inu|kennel|bark|bone/.test(source)) return ["#f3a43b", "#6d3a12", "#110b06"];
+    if (/cat|kitty|meow|claw|alley/.test(source)) return ["#ff5fc8", "#2ac7d8", "#111019"];
+    if (/(^|\W)(ai|bot)(\W|$)|robot|agent|neural|compute|machine/.test(source)) return ["#6fe7ff", "#5967ff", "#06111a"];
+    if (/degen|pump|casino|jackpot|candle|liquidity|chart/.test(source)) return ["#ff7a1a", "#7f38ff", "#120817"];
     return fallbackPalettes[seed % fallbackPalettes.length] as string[];
   }
 
@@ -99,4 +124,3 @@ export class LogoAnalysisService {
     return "mystic-pixel-cult";
   }
 }
-

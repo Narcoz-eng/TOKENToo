@@ -6,12 +6,12 @@ import type { ApproveGenerationRunInput, CreateGenerationRunInput, LaunchCollect
 import { GeneratorService } from "./generator.service";
 
 const runSchema = z.object({
-  tokenName: z.string().min(1),
-  tokenSymbol: z.string().min(1),
+  tokenName: z.string().min(1).optional(),
+  tokenSymbol: z.string().min(1).optional(),
   tokenMint: z.string().min(20),
   logoUri: z.string().optional(),
   logoData: z.string().optional(),
-  description: z.string().min(1),
+  description: z.string().min(1).optional(),
   selectedPreset: z.string().optional(),
   hints: z.record(z.string(), z.unknown()).optional()
 });
@@ -50,7 +50,7 @@ export class GeneratorController {
 
   @Post("preview")
   preview(@Body() body: unknown) {
-    const parsed = runSchema.extend({ description: z.string().optional() }).parse(body);
+    const parsed = runSchema.parse(body);
     return this.generator.preview(parsed as CreateGenerationRunInput);
   }
 

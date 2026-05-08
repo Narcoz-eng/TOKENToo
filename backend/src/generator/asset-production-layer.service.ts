@@ -12,7 +12,9 @@ export class AssetProductionLayerService {
     const designProvider = this.provider(process.env.DESIGN_MODEL_PROVIDER);
     const layerProvider = this.provider(process.env.LAYER_PACK_PROVIDER ?? process.env.DESIGN_MODEL_PROVIDER);
     const legendaryProvider = this.provider(process.env.LEGENDARY_ASSET_PROVIDER ?? process.env.DESIGN_MODEL_PROVIDER);
-    const productionReady = [designProvider, layerProvider, legendaryProvider].every((provider) => provider !== "mock") && qualityTier !== "BASIC";
+    const storageIssue = this.storageIssue();
+    const providerIssue = this.providerIssue(designProvider, layerProvider, legendaryProvider);
+    const productionReady = !providerIssue && !storageIssue && qualityTier !== "BASIC";
     const availableTraitLayers =
       pack.categories.headgear.length +
       pack.categories.eyes.length +
@@ -30,7 +32,7 @@ export class AssetProductionLayerService {
       availableTraitLayers,
       availableLegendaryOverlays: pack.categories.legendaryOverlay.length,
       canProduce10kPremiumOutputs: productionReady && style.tenKReadiness.pass,
-      reasonIfNo: productionReady && style.tenKReadiness.pass ? undefined : "Production asset providers are mock/procedural or 10k readiness failed."
+      reasonIfNo: productionReady && style.tenKReadiness.pass ? undefined : [providerIssue, storageIssue, style.tenKReadiness.pass ? undefined : "10k readiness failed."].filter(Boolean).join(" ")
     };
 
     return {
@@ -55,7 +57,12 @@ export class AssetProductionLayerService {
       readinessReport,
       warnings: productionReady
         ? [this.royaltyPolicy().note]
-        : ["Production mint art is not enabled. Current asset output uses the deterministic SVG fallback and must not be used for public launch.", this.royaltyPolicy().note]
+        : [
+            "Concept preview only. Current preview output is deterministic SVG direction art and must not be sold as final production art.",
+            providerIssue ?? "Asset providers are configured.",
+            storageIssue ?? "Permanent storage is configured.",
+            this.royaltyPolicy().note
+          ].filter(Boolean)
     };
   }
 
@@ -122,6 +129,24 @@ export class AssetProductionLayerService {
   private provider(value?: string): ProducedLayerSet["provider"] {
     if (value === "ai" || value === "curated" || value === "handmade") return value;
     return "mock";
+  }
+
+  private providerIssue(design: ProducedLayerSet["provider"], layer: ProducedLayerSet["provider"], legendary: ProducedLayerSet["provider"]) {
+    const missing: string[] = [];
+    if (design === "mock") missing.push("DESIGN_MODEL_PROVIDER");
+    if (layer === "mock") missing.push("LAYER_PACK_PROVIDER");
+    if (legendary === "mock") missing.push("LEGENDARY_ASSET_PROVIDER");
+    return missing.length ? `Real asset provider missing: configure ${missing.join(", ")} as ai, curated, or handmade.` : undefined;
+  }
+
+  private storageIssue() {
+    const provider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
+    if (provider === "mock") return "Permanent storage missing: set FINAL_ASSET_STORAGE_PROVIDER to pinata, arweave, or irys.";
+    if (provider === "pinata" && !process.env.PINATA_JWT) return "PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata.";
+    if ((provider === "arweave" || provider === "irys") && !(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY)) {
+      return `${provider} final storage requires IRYS_PRIVATE_KEY or ARWEAVE_KEY.`;
+    }
+    return undefined;
   }
 
   private royaltyPolicy() {
