@@ -30,11 +30,13 @@ export class QualityValidatorService {
     if (this.hasGenericMoodCulture(style)) issues.push("Mood culture uses generic global emotions instead of community-native states.");
     if (this.hasGenericTaxonomy(style)) issues.push("Trait taxonomy still reads like a shared headgear/eyes/armor/aura/frame engine.");
     if (!style.creativeUniverse?.creativeDna || !style.creativeUniverse?.signalProfile) issues.push("Generated Creative DNA and signal profile are required.");
+    if (this.hasIncompleteVisualSystem(style)) issues.push("Creative DNA must include body, head, eye, mouth, rendering, composition, lighting, rarity, and legendary visual systems.");
     if (this.usesFixedArchetypeTemplate(style)) issues.push("Generator still exposes a fixed archetype template instead of dynamic Creative DNA.");
     if (!style.productionAssetPolicy || style.productionAssetPolicy.launchClassification !== "CONCEPT_PREVIEW") issues.push("Production asset policy must distinguish concept previews from final approved assets.");
     if (style.productionAssetPolicy?.aiFinalImageAllowed !== false) issues.push("Production policy must not allow fully AI-generated final NFT images.");
     if (this.poseReuse(previews) > 0.55) issues.push("Too many sample NFTs reuse the same pose; rarity ladder needs visible composition changes.");
     if (this.sameBaseAcrossRarities(previews)) issues.push("All rarity previews share the same base/face language.");
+    if (this.sameVisualCompositionAcrossRarities(previews)) issues.push("Rarity previews reuse the same visual composition system without visible progression.");
     if (this.commonUncommonEmpty(previews)) issues.push("Common/uncommon previews must use real visible traits, not empty None placeholders.");
     if (!this.tokenIdentityPresent(style, pack)) issues.push("Token identity is not present in trait names.");
     if (this.sparseMetadataGenericFallback(style, pack)) issues.push("Sparse metadata fell back to generic robot/crown/vault traits.");
@@ -244,6 +246,34 @@ export class QualityValidatorService {
     if (labels.length < 10) return true;
     const genericHits = labels.filter((label) => /^(headgear|eyes|mouth|outfit|accessories|aura|frame|backgrounds|base character)$/.test(label)).length;
     return genericHits >= 3;
+  }
+
+  private hasIncompleteVisualSystem(style: GeneratedStyleProfile) {
+    const visual = style.creativeUniverse?.creativeDna?.visualSystem;
+    if (!visual) return true;
+    return [
+      visual.rendererFamily,
+      visual.bodySystem,
+      visual.headShape,
+      visual.eyeSystem,
+      visual.mouthSystem,
+      visual.compositionStyle,
+      visual.cameraFraming,
+      visual.lightingModel,
+      visual.environmentSystem,
+      visual.emotionalRendering,
+      visual.rarityProgression,
+      visual.legendaryPhilosophy,
+      visual.cardStructure
+    ].some((value) => !String(value ?? "").trim());
+  }
+
+  private sameVisualCompositionAcrossRarities(previews: PreviewAssetPlan[]) {
+    const samples = previews.filter((item) => item.type === "SAMPLE_NFT");
+    const poses = new Set(samples.map((preview) => String(preview.metadata.pose ?? "")));
+    const scenes = new Set(samples.map((preview) => String(preview.metadata.scene ?? "")));
+    const rendered = new Set(samples.map((preview) => `${preview.metadata.rendererFamily}:${preview.metadata.compositionCategory}:${preview.metadata.lightingModel}`));
+    return samples.length >= 4 && (poses.size < 4 || scenes.size < 4 || rendered.size < 3);
   }
 
   private usesFixedArchetypeTemplate(style: GeneratedStyleProfile) {

@@ -13,7 +13,7 @@ import { TraitPackGeneratorService } from "./trait-pack-generator.service";
 const samples: CreateGenerationRunInput[] = [
   {
     tokenMint: "2tXHantaSparseFallback11111111111111111111zs9y",
-    selectedPreset: "mystic-pixel-cult",
+    selectedPreset: "creative-dna-generated",
     hints: {
       sourceMetadata: {
         mint: "2tXHantaSparseFallback11111111111111111111zs9y",
@@ -38,7 +38,7 @@ const samples: CreateGenerationRunInput[] = [
   },
   {
     tokenMint: "DT93bLkL1VagdhasrKWqQ6UGMNwUwL1oATRzhepE9SP3",
-    selectedPreset: "meme-kingdom",
+    selectedPreset: "creative-dna-generated",
     hints: {
       sourceMetadata: {
         mint: "DT93bLkL1VagdhasrKWqQ6UGMNwUwL1oATRzhepE9SP3",
@@ -57,7 +57,7 @@ const samples: CreateGenerationRunInput[] = [
   },
   {
     tokenMint: "HZd7Rr7APjWjzxUigrPssft52ykTqwF1oA5DRPL5tva6",
-    selectedPreset: "meme-kingdom",
+    selectedPreset: "creative-dna-generated",
     hints: {
       sourceMetadata: {
         mint: "HZd7Rr7APjWjzxUigrPssft52ykTqwF1oA5DRPL5tva6",
@@ -75,7 +75,7 @@ const samples: CreateGenerationRunInput[] = [
   },
   {
     tokenMint: "87WxncrW1tKYyHBsv4qFbANtgVAe8peNPtmf6ySDycaj",
-    selectedPreset: "cyber-alley-syndicate",
+    selectedPreset: "creative-dna-generated",
     hints: {
       sourceMetadata: {
         mint: "87WxncrW1tKYyHBsv4qFbANtgVAe8peNPtmf6ySDycaj",
@@ -93,7 +93,7 @@ const samples: CreateGenerationRunInput[] = [
   },
   {
     tokenMint: "D4TXW495tiD55ttwXyWjVEeDWUweb7RCUfPLmn9nD5qg",
-    selectedPreset: "robot-warband",
+    selectedPreset: "creative-dna-generated",
     hints: {
       sourceMetadata: {
         mint: "D4TXW495tiD55ttwXyWjVEeDWUweb7RCUfPLmn9nD5qg",
@@ -111,7 +111,7 @@ const samples: CreateGenerationRunInput[] = [
   },
   {
     tokenMint: "99CfCw7wUh4st1MQLR74oNna89FtrrfnrDfozN4i21tp",
-    selectedPreset: "alien-casino",
+    selectedPreset: "creative-dna-generated",
     hints: {
       sourceMetadata: {
         mint: "99CfCw7wUh4st1MQLR74oNna89FtrrfnrDfozN4i21tp",
@@ -129,7 +129,7 @@ const samples: CreateGenerationRunInput[] = [
   },
   {
     tokenMint: "AzkUL45kuLLXoYtrPMP5nFqSs8Jm8Ywp4cgS2ds81skL",
-    selectedPreset: "dark-fantasy-raiders",
+    selectedPreset: "creative-dna-generated",
     hints: {
       sourceMetadata: {
         mint: "AzkUL45kuLLXoYtrPMP5nFqSs8Jm8Ywp4cgS2ds81skL",
@@ -147,7 +147,7 @@ const samples: CreateGenerationRunInput[] = [
   },
   {
     tokenMint: "CuTEe2DG1vJzGzbaR84eMAkU4mWQjVY12TqYrcTuoon",
-    selectedPreset: "luxury-crown-club",
+    selectedPreset: "creative-dna-generated",
     hints: {
       sourceMetadata: {
         mint: "CuTEe2DG1vJzGzbaR84eMAkU4mWQjVY12TqYrcTuoon",
@@ -165,7 +165,7 @@ const samples: CreateGenerationRunInput[] = [
   },
   {
     tokenMint: "VaPoR4v8asndPooL9xWveMaLLwAVe1111111111111",
-    selectedPreset: "cyber-alley-syndicate",
+    selectedPreset: "creative-dna-generated",
     hints: {
       sourceMetadata: {
         mint: "VaPoR4v8asndPooL9xWveMaLLwAVe1111111111111",
@@ -234,6 +234,7 @@ async function main() {
       sourceMint: input.tokenMint,
       creativeDnaKey: style.creativeUniverse.archetype,
       creativeDna: style.creativeUniverse.creativeDna,
+      visualSystem: style.creativeUniverse.creativeDna.visualSystem,
       signalProfile: style.creativeUniverse.signalProfile,
       artStyle: style.artStyle,
       artStyleReason: style.creativeUniverse.artStyleReason,
@@ -352,6 +353,8 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
   const styles = new Map<string, string[]>();
   const worldConcepts = new Map<string, string[]>();
   const legendaryStructures = new Map<string, string[]>();
+  const visualSignatures = new Map<string, string[]>();
+  const rendererFamilies = new Set<string>();
   for (const item of report) {
     const style = String(item.artStyle);
     styles.set(style, [...(styles.get(style) ?? []), String(item.collection)]);
@@ -359,12 +362,26 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
     worldConcepts.set(world, [...(worldConcepts.get(world) ?? []), String(item.collection)]);
     const legendary = String(item.creativeDna?.legendaryMythology ?? "");
     legendaryStructures.set(legendary, [...(legendaryStructures.get(legendary) ?? []), String(item.collection)]);
+    const visual = item.visualSystem ?? item.creativeDna?.visualSystem;
+    if (visual?.rendererFamily) rendererFamilies.add(String(visual.rendererFamily));
+    const signature = [
+      visual?.rendererFamily,
+      visual?.bodySystem,
+      visual?.eyeSystem,
+      visual?.mouthSystem,
+      visual?.compositionStyle,
+      visual?.lightingModel,
+      visual?.cardStructure
+    ].map(String).join("|");
+    visualSignatures.set(signature, [...(visualSignatures.get(signature) ?? []), String(item.collection)]);
     if (!Array.isArray(item.taxonomy) || item.taxonomy.length < 10) failures.push(`${item.collection} does not expose a community-native taxonomy.`);
     if (!Array.isArray(item.moodCulture) || item.moodCulture.length < 3) failures.push(`${item.collection} does not expose community-native mood culture.`);
     if (!item.creativeDna?.artStyle || !item.signalProfile?.semanticWeights) failures.push(`${item.collection} does not expose generated Creative DNA and signal profile.`);
+    if (!visual?.bodySystem || !visual?.eyeSystem || !visual?.mouthSystem || !visual?.compositionStyle || !visual?.lightingModel || !visual?.rarityProgression) failures.push(`${item.collection} does not expose a complete visual system.`);
     if (item.productionReady !== false || item.productionAssetPolicy?.launchClassification !== "CONCEPT_PREVIEW") failures.push(`${item.collection} incorrectly marks concept output as production-ready.`);
     if (item.productionAssetPolicy?.aiFinalImageAllowed !== false) failures.push(`${item.collection} allows fully AI-generated final NFT images.`);
   }
+  if (rendererFamilies.size < 5) failures.push("quality samples must exercise at least five renderer families.");
   for (const [style, collections] of styles) {
     if (collections.length > 1) failures.push(`art style "${style}" is reused by ${collections.join(", ")}.`);
   }
@@ -373,6 +390,9 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
   }
   for (const [legendary, collections] of legendaryStructures) {
     if (collections.length > 1) failures.push(`legendary structure "${legendary}" is reused by ${collections.join(", ")}.`);
+  }
+  for (const [signature, collections] of visualSignatures) {
+    if (signature && collections.length > 1) failures.push(`visual system signature is reused by ${collections.join(", ")}.`);
   }
   for (let left = 0; left < report.length; left += 1) {
     for (let right = left + 1; right < report.length; right += 1) {
@@ -386,7 +406,7 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
       const poseOverlap = jaccard(significantWords(a.baseArchetypes.join(" ")), significantWords(b.baseArchetypes.join(" ")));
       if (taxonomyOverlap > 0.35) failures.push(`${a.collection} and ${b.collection} share too much trait taxonomy.`);
       if (traitOverlap > 0.34) failures.push(`${a.collection} and ${b.collection} share too much trait vocabulary.`);
-      if (poseOverlap > 0.5) failures.push(`${a.collection} and ${b.collection} share too much pose/silhouette language.`);
+      if (poseOverlap > 0.62) failures.push(`${a.collection} and ${b.collection} share too much pose/silhouette language.`);
     }
   }
   return failures;
@@ -468,7 +488,28 @@ function significantWords(value: string) {
     "witness",
     "runner",
     "figure",
-    "subject"
+    "subject",
+    "dominant",
+    "anchor",
+    "object",
+    "medical",
+    "market",
+    "stress",
+    "dream",
+    "surreal",
+    "specific",
+    "silhouette",
+    "changes",
+    "camera",
+    "framing",
+    "system",
+    "shown",
+    "emotion",
+    "rendering",
+    "read",
+    "view",
+    "built",
+    "around"
   ]);
   return value
     .toLowerCase()

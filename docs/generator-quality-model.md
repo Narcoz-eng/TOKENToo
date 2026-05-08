@@ -10,23 +10,24 @@ Each generated collection stores Brand DNA and generated Creative DNA:
 - logo-derived palette and collection color system
 - extracted signal profile: entities, objects, animals, emotions, colors, visual shapes, meme language, cultural words, cue weights, and world/style references
 - generated art style, world concept, mascot or subject, camera framing, palette, texture language, and base silhouette rules
+- generated visual design system: body system, head shape, eye system, mouth system, proportions, rendering family, composition style, lighting model, environment system, emotional rendering, rarity progression, legendary philosophy, and card structure
 - role language and trait vocabulary
 - dynamic trait taxonomy and mood culture for the collection
 - rarity philosophy, legendary mythology, animation language, and forbidden similarities
 - visual fingerprint for distinctiveness scoring
 
-The generator avoids platform palette reuse, generic prompt patterns, and fixed archetype templates. Social links can influence community context, but raw URLs must not become visible trait names.
+The generator avoids platform palette reuse, generic prompt patterns, fixed archetype templates, and static brand-kit cards. Social links can influence community context, but raw URLs must not become visible trait names.
 
 ## Rarity Rules
 
 Preview generation produces one concept NFT per rarity tier so the ladder can be audited.
 
-- Common: simple background, base pose, 2-4 visible traits, no aura, no frame, no premium scene.
-- Uncommon: slight variation, 3-5 visible traits, one modest accessory, mild expression/eyes change.
-- Rare: 5-7 visible traits, stronger expression, better outfit/accessory, richer background.
-- Epic: 7-9 visible traits, aura/effect, premium body detail, stronger silhouette, more complex background.
-- Legendary: 9-11 visible traits, unique pose or scene, special frame, unique background, strong FX, never just a recolor.
-- Mythic: 10-12 visible traits, near 1/1 composition, unique silhouette/scene, and `MYTHIC_CURATED_COMPOSITION` metadata.
+- Common: low-density read in the collection's own renderer, 2-4 visible traits, no premium event treatment.
+- Uncommon: visible expression, posture, camera, prop, or environment variation.
+- Rare: stronger emotional acting, clearer face/body system, richer environment.
+- Epic: stronger visual storytelling with composition, lighting, anatomy, environment, or FX escalation.
+- Legendary: 9-11 visible traits, unique scene or event frame, visible new camera/anatomy/face/environment, never just a recolor.
+- Mythic: 10-12 visible traits, near 1/1 emotional snapshot, unique silhouette/scene, and `MYTHIC_CURATED_COMPOSITION` metadata.
 
 Rendered preview metadata records `renderedTraitKeys`, `traitCount`, `compositionCategory`, and `specialMetadataFlag`. Metadata attributes must match those rendered traits exactly.
 
@@ -45,6 +46,8 @@ The validator rejects:
 - missing Creative DNA or missing signal profile
 - sparse metadata falling back to generic robot/crown/vault traits
 - collections whose visual fingerprint is too close to previous generated collections
+- missing visual design system fields
+- rarity previews that reuse the same face, silhouette, framing, composition, lighting, or card structure without visible progression
 
 ## Production Readiness
 

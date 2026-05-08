@@ -1,6 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import { getPreset } from "./art-presets";
-import { selectAssetPack } from "./curated-asset-packs";
 import type {
   AnimationReadinessPlan,
   BaseSilhouettePlan,
@@ -15,7 +13,8 @@ import type {
   ProductionAssetPolicy,
   RarityComplexityRule,
   TraitCategoryPlan,
-  TraitCategoryRole
+  TraitCategoryRole,
+  VisualDesignSystem
 } from "./generator.types";
 import { pick, seedFrom, titleCase, unique } from "./generator.util";
 import { RarityEngineService } from "./rarity-engine.service";
@@ -38,17 +37,15 @@ export class StyleProfileGeneratorService {
   constructor(private readonly rarity: RarityEngineService) {}
 
   generate(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput, context: CommunityContextOutput, version = 1): GeneratedStyleProfile {
-    const preset = getPreset(input.selectedPreset);
     const seed = seedFrom(`${input.tokenMint}:${input.tokenSymbol}:${version}:${context.extractedVocabulary.join("|")}`);
     const source = input.hints?.sourceMetadata;
     const tokenName = input.tokenName ?? source?.name ?? "Token";
     const tokenSymbol = input.tokenSymbol ?? source?.symbol ?? "$TOKEN";
     const sourceWords = unique([...context.extractedVocabulary, ...this.sourceWords(input), ...analysis.visualKeywords]).filter((word) => !this.genericWord(word));
     const motif = this.primaryMotif(tokenName, tokenSymbol, sourceWords, context.extractedVocabulary, seed);
-    const seedWorld = input.hints?.themePreference?.trim() || this.visualWorld(sourceWords, preset.backgroundWorlds, seed + 2);
-    const universe = this.creativeUniverse(input, analysis, context, sourceWords, motif, seedWorld, seed, preset);
+    const seedWorld = input.hints?.themePreference?.trim() || this.visualWorld(sourceWords, seed + 2);
+    const universe = this.creativeUniverse(input, analysis, context, sourceWords, motif, seedWorld, seed);
     const world = universe.creativeDna.worldConcept;
-    const assetPack = selectAssetPack(analysis.mascot, [...sourceWords, ...context.traitSeeds, world, ...universe.signalProfile.objects]);
     const silhouette = universe.creativeDna.baseSilhouetteRules[0] ?? this.silhouette(analysis, sourceWords, seed);
     const mascot = universe.creativeDna.mascotOrSubject;
     const theme = `${motif} ${pick(["holder house", "signal crew", "meme order", "liquidity guild", "origin circle", "raid studio"], seed + 6)}`;
@@ -64,7 +61,10 @@ export class StyleProfileGeneratorService {
     const lore = this.lore(input, analysis, context, theme, world);
     const tenKReadiness = this.tenKReadiness(input, analysis);
     const colorSystem = this.collectionColorSystem(universe.creativeDna.palette, input.hints?.colorPreference);
-    const rarityVisualRules = this.rarityVisualRules(motif, world, silhouette);
+    const rarityVisualRules = this.rarityVisualRules(motif, world, silhouette, universe.creativeDna.visualSystem);
+    const compositionRules = this.visualCompositionRules(universe.creativeDna.visualSystem);
+    const typographyDirection = this.visualTypographyDirection(universe.creativeDna.visualSystem);
+    const compatibilityHints = this.visualCompatibilityHints(universe.creativeDna.visualSystem);
     const baseArchetypes = universe.baseSilhouettes.map((item) => `${item.name}: ${item.bodyShape}, ${item.poseLanguage}, ${item.cameraFraming}`);
     const brandDna = {
       tokenSymbol,
@@ -78,13 +78,13 @@ export class StyleProfileGeneratorService {
       lore,
       visualWorld: world,
       shapeLanguage: analysis.shapeLanguage,
-      compositionRules: assetPack.compositionRules,
+      compositionRules,
       traitNamingRules: [
         "Use generated Creative DNA language in every visible trait.",
         "Avoid fixed archetype labels and plain color/object names.",
         "Rarity must be readable from silhouette, glow, or composition."
       ],
-      typographyDirection: assetPack.typographyDirection,
+      typographyDirection,
       raidLanguage: context.raidNames,
       roleLanguage: roleNames,
       legendaryDirection: universe.creativeDna.legendaryMythology,
@@ -98,7 +98,7 @@ export class StyleProfileGeneratorService {
       traitTaxonomy: universe.taxonomy,
       rarityVisualRules,
       forbiddenSimilarities: [
-        ...assetPack.forbiddenCombinations.map((item) => `${item.trait}: ${item.incompatibleWith.join(", ")}`),
+        ...compatibilityHints,
         ...universe.creativeDna.forbiddenSimilarities,
         ...universe.antiGenericRules
       ],
@@ -142,6 +142,7 @@ export class StyleProfileGeneratorService {
       visualFingerprint: {
         archetype: universe.archetype,
         creativeDna: universe.creativeDna,
+        visualSystem: universe.creativeDna.visualSystem,
         signalWeights: universe.signalProfile.semanticWeights,
         mascotArchetype: mascot,
         silhouetteFamily: silhouette,
@@ -150,17 +151,22 @@ export class StyleProfileGeneratorService {
         traitVocabulary: traitLanguage,
         traitTaxonomy: universe.taxonomy.map((category) => `${category.role}:${category.label}`),
         artStyle: universe.artStyle,
+        rendererFamily: universe.creativeDna.visualSystem.rendererFamily,
+        bodySystem: universe.creativeDna.visualSystem.bodySystem,
+        eyeSystem: universe.creativeDna.visualSystem.eyeSystem,
+        compositionStyle: universe.creativeDna.visualSystem.compositionStyle,
+        lightingModel: universe.creativeDna.visualSystem.lightingModel,
         poseLanguage: universe.baseSilhouettes.map((base) => base.poseLanguage),
         moodCulture: universe.moodCulture.map((mood) => mood.name),
-        compositionType: assetPack.compositionRules,
-        typographyDirection: assetPack.typographyDirection,
+        compositionType: compositionRules,
+        typographyDirection,
         loreMemeLanguage: brandDna.memeLanguage,
         legendaryDirection: brandDna.legendaryDirection,
         sourceMint: input.tokenMint,
         sourceSymbol: tokenSymbol,
         antiGenericRules: brandDna.forbiddenSimilarities
       },
-      assetPackId: assetPack.id,
+      assetPackId: `creative-dna-${this.categoryId(`${motif}-${universe.creativeDna.visualSystem.rendererFamily}`)}`,
       artSource: "PROCEDURAL_FALLBACK",
       tenKReadiness,
       creativeUniverse: universe,
@@ -207,6 +213,43 @@ export class StyleProfileGeneratorService {
     };
   }
 
+  private visualCompositionRules(visual: VisualDesignSystem) {
+    return [
+      visual.compositionStyle,
+      visual.cameraFraming,
+      visual.bodySystem,
+      visual.eyeSystem,
+      visual.mouthSystem,
+      visual.environmentSystem,
+      visual.rarityProgression,
+      visual.legendaryPhilosophy,
+      "Mood must alter visible face, posture, framing, or lighting rather than metadata text only.",
+      "Legendary and mythic outputs must become scenes, incidents, or emotional snapshots."
+    ];
+  }
+
+  private visualTypographyDirection(visual: VisualDesignSystem) {
+    const directions: Record<VisualDesignSystem["rendererFamily"], string> = {
+      "pixel-topdown": "pixel HUD labels, tiny map captions, no luxury serif badges",
+      "anime-portrait": "cinematic poster type with asymmetric title placement",
+      "clay-toy": "soft toy packaging labels with small handmade captions",
+      "biohazard-horror": "specimen-file labeling, warning tape, surveillance timestamps",
+      "terminal-brutalist": "monospace terminal UI, receipt rows, command-line captions",
+      "surreal-collage": "cut-paper captions, album-cover labels, displaced text fragments"
+    };
+    return directions[visual.rendererFamily];
+  }
+
+  private visualCompatibilityHints(visual: VisualDesignSystem) {
+    return [
+      `${visual.eyeSystem}: do not combine with head traits that hide the generated eye system.`,
+      `${visual.mouthSystem}: do not combine with masks or props that erase the generated emotional mouth read.`,
+      `${visual.bodySystem}: body traits must preserve the generated proportion and silhouette language.`,
+      `${visual.compositionStyle}: frame, aura, and background traits must not collapse into a generic centered card.`,
+      `${visual.legendaryPhilosophy}: legendary traits must change scene logic, not just add a label or badge.`
+    ];
+  }
+
   private sourceWords(input: CreateGenerationRunInput) {
     const source = input.hints?.sourceMetadata;
     const links = source?.socialLinks ? Object.keys(source.socialLinks) : [];
@@ -222,10 +265,10 @@ export class StyleProfileGeneratorService {
     ].map((word) => word.toLowerCase()).filter((word) => word.length > 2)).slice(0, 60);
   }
 
-  private visualWorld(words: string[], fallbackWorlds: string[], seed: number) {
+  private visualWorld(words: string[], seed: number) {
     const hints = this.topHints(this.semanticWeights(words.join(" "))).flatMap((hint) => hint.worlds);
     const anchor = titleCase(pick(words.length ? words : ["origin"], seed + 3));
-    const selected = hints.length ? pick(hints, seed + 5) : pick(fallbackWorlds, seed);
+    const selected = hints.length ? pick(hints, seed + 5) : pick(["source-code room", "holder alley", "logo-color habitat", "social-feed district", "symbol shrine", "market rumor map"], seed);
     const frame = pick(["district", "room", "map", "altar", "market", "theater", "habitat", "archive"], seed + 9);
     return `${anchor} ${selected} ${frame}`.toLowerCase();
   }
@@ -266,15 +309,14 @@ export class StyleProfileGeneratorService {
     words: string[],
     motif: string,
     world: string,
-    seed: number,
-    preset: { artStyle: string; animationDirection: string }
+    seed: number
   ): CommunityCreativeUniverse {
     const signalProfile = this.extractSignals(input, analysis, context, words, seed);
-    const creativeDna = this.generateCreativeDna(input, analysis, signalProfile, motif, world, seed, preset);
+    const creativeDna = this.generateCreativeDna(input, analysis, signalProfile, motif, world, seed);
     const taxonomy = this.dynamicTaxonomy(creativeDna, signalProfile, motif, seed);
     const moodCulture = this.dynamicMoodCulture(creativeDna, signalProfile, motif, seed);
     const baseSilhouettes = this.dynamicBaseSilhouettes(creativeDna, signalProfile, analysis.shapeLanguage, seed);
-    const animationReadiness = this.dynamicAnimationReadiness(creativeDna, signalProfile, moodCulture, preset.animationDirection, seed);
+    const animationReadiness = this.dynamicAnimationReadiness(creativeDna, signalProfile, moodCulture, `${creativeDna.visualSystem.rendererFamily} ${creativeDna.visualSystem.emotionalRendering}`, seed);
     const archetype = this.dynamicIdentityKey(motif, signalProfile, seed);
     const productionAssetPolicy = this.productionAssetPolicy();
     return {
@@ -305,7 +347,7 @@ export class StyleProfileGeneratorService {
     const hints = this.topHints(weights);
     const significant = this.significantWords(sourceText);
     const cue = (pattern: RegExp) => pattern.test(sourceText) ? 90 : hints.some((hint) => pattern.test(hint.key)) ? 64 : 24;
-    const styleRefs = unique([...hints.flatMap((hint) => hint.styles), analysis.style, input.selectedPreset ?? ""]).filter(Boolean);
+    const styleRefs = unique([...hints.flatMap((hint) => hint.styles), analysis.style]).filter(Boolean);
     const worldRefs = unique([...hints.flatMap((hint) => hint.worlds), ...context.backgroundNames, input.hints?.themePreference ?? ""]).filter(Boolean);
     const objects = unique([...hints.flatMap((hint) => hint.objects), ...context.traitSeeds, ...significant.slice(0, 8)]).slice(0, 36);
     const animals = significant.filter((word) => /frog|toad|dog|doge|shib|inu|cat|kitty|meow|skull|alien|hanta|mouse|bear|bull|ape/.test(word)).slice(0, 8);
@@ -340,20 +382,21 @@ export class StyleProfileGeneratorService {
     };
   }
 
-  private generateCreativeDna(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput, signals: CreativeSignalProfile, motif: string, seedWorld: string, seed: number, preset: { artStyle: string; animationDirection: string }): CreativeDNA {
+  private generateCreativeDna(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput, signals: CreativeSignalProfile, motif: string, seedWorld: string, seed: number): CreativeDNA {
     const hints = this.topHints(signals.semanticWeights);
     const primary = hints[0];
     const secondary = hints[1] ?? primary;
-    const texture = pick(unique([...hints.flatMap((hint) => hint.textures), "inked grain", "cut-paper shadows", "sticker gloss", "screenprint noise"]), seed + 23);
-    const styleBase = pick(unique([...hints.flatMap((hint) => hint.styles), preset.artStyle, "cinematic collectible poster", "community mascot cartoon"]), seed + 29);
+    const visualSystem = this.generateVisualSystem(signals, motif, seed);
+    const texture = pick(unique([visualSystem.lightingModel, ...hints.flatMap((hint) => hint.textures), "inked grain", "cut-paper shadows", "sticker gloss", "screenprint noise"]), seed + 23);
+    const styleBase = `${visualSystem.rendererFamily.replace(/-/g, " ")} ${visualSystem.compositionStyle}`;
     const worldCore = pick(unique([...signals.worldReferences, ...hints.flatMap((hint) => hint.worlds), seedWorld]), seed + 31);
     const worldConcept = `${motif} ${worldCore} ${pick(["micro-world", "signal district", "holder habitat", "myth room", "ritual market", "dream map"], seed + 37)}`.toLowerCase();
     const subjectWord = pick(unique([...signals.entities, analysis.mascot, motif]).filter(Boolean), seed + 41);
     const mascotOrSubject = `${motif} ${pick([...primary.silhouettes, ...secondary.silhouettes, analysis.mascot], seed + 43)} ${titleCase(subjectWord)}`.toLowerCase();
     const baseSilhouetteRules = unique([
-      `${analysis.shapeLanguage} ${pick(primary.silhouettes, seed + 47)}`,
-      `${pick(secondary.silhouettes, seed + 53)} with ${pick(signals.objects.length ? signals.objects : [motif], seed + 59)} readability`,
-      `${pick(["front-readable", "three-quarter", "low-angle", "sticker-flat", "poster-cropped"], seed + 61)} pose family with rarity-specific silhouette changes`
+      `${visualSystem.bodySystem}; ${visualSystem.proportionSystem}; ${analysis.shapeLanguage} ${pick(primary.silhouettes, seed + 47)}`,
+      `${visualSystem.headShape}; ${visualSystem.eyeSystem}; ${pick(secondary.silhouettes, seed + 53)} with ${pick(signals.objects.length ? signals.objects : [motif], seed + 59)} readability`,
+      `${visualSystem.compositionStyle}; ${visualSystem.cameraFraming}; rarity-specific silhouette changes`
     ]);
     const moodCulture = unique([...signals.emotions, ...hints.flatMap((hint) => hint.expressions)]).slice(0, 8);
     const expressionLanguage = unique([
@@ -367,22 +410,150 @@ export class StyleProfileGeneratorService {
       worldConcept,
       mascotOrSubject,
       baseSilhouetteRules,
-      cameraFraming: pick(["tight collectible bust", "three-quarter poster crop", "full-body sticker crop", "low-angle myth portrait", "orthographic trait-readable card"], seed + 79),
+      cameraFraming: visualSystem.cameraFraming,
       palette: this.paletteFromSignals(analysis.palette, signals, seed),
       textureLanguage: texture,
+      visualSystem,
       moodCulture,
       expressionLanguage,
       traitCategories,
-      rarityPhilosophy: `${motif} rarity escalates through silhouette, scene density, signal-specific objects, and myth composition rather than recolors.`,
-      legendaryMythology: `${motif} ${pick(signals.worldReferences.length ? signals.worldReferences : [worldConcept], seed + 83)} becomes a one-off myth where ${pick(signals.objects.length ? signals.objects : [motif], seed + 89)} changes the pose, frame, FX, and background logic.`,
-      animationLanguage: `${motif} ${pick([...hints.flatMap((hint) => hint.expressions), preset.animationDirection], seed + 97)} loops with ${texture} motion.`,
+      rarityPhilosophy: `${motif} rarity follows ${visualSystem.rarityProgression}; silhouette, environment, posture, lighting, and emotional rendering must all change.`,
+      legendaryMythology: `${motif} ${pick(signals.worldReferences.length ? signals.worldReferences : [worldConcept], seed + 83)} becomes ${visualSystem.legendaryPhilosophy}, where ${pick(signals.objects.length ? signals.objects : [motif], seed + 89)} changes the scene, camera, anatomy, lighting, and emotional snapshot.`,
+      animationLanguage: `${motif} ${visualSystem.emotionalRendering} loops with ${texture} motion.`,
       forbiddenSimilarities: [
         "No fixed frog, dog, cat, robot, trader, or virus template selection.",
+        "No shared circular face, centered portrait, neon glow, rarity badge, card frame, or background layout across collections.",
         "No generic vault/crown/robot fallback when metadata is sparse.",
-        "No repeated world concept, art style, base pose ladder, mood vocabulary, or legendary scene structure.",
+        "No repeated world concept, rendering family, body system, eye system, base pose ladder, mood vocabulary, or legendary structure.",
         `Do not reuse the ${motif} Creative DNA for unrelated communities.`
       ]
     };
+  }
+
+  private generateVisualSystem(signals: CreativeSignalProfile, motif: string, seed: number): VisualDesignSystem {
+    const weights = signals.semanticWeights;
+    const topKey = this.topWeightKeys(weights)[0] ?? "";
+    const family = this.rendererFamily(signals, seed);
+    const object = pick(signals.objects.length ? signals.objects : [motif], seed + 11);
+    const world = pick(signals.worldReferences.length ? signals.worldReferences : ["origin room"], seed + 13);
+    const systems: Record<VisualDesignSystem["rendererFamily"], VisualDesignSystem> = {
+      "pixel-topdown": {
+        rendererFamily: "pixel-topdown",
+        bodySystem: `${motif} tiny tile sprites with square-foot walk cycles`,
+        headShape: "block head or tiny icon head, never circular portrait",
+        eyeSystem: "two-to-four pixel eyes, blink frames, panic dots, sideways glances",
+        mouthSystem: "single-pixel grimace, open shout tile, or missing-mouth deadpan",
+        proportionSystem: "tiny bodies, oversized object readability, top-down limbs",
+        compositionStyle: "top-down arcade map with diagonal chaos lanes",
+        cameraFraming: "orthographic top-down board view",
+        lightingModel: "flat arcade color ramps with blinking hazard tiles",
+        environmentSystem: `${world} as playable tile map with obstacles and moving clutter`,
+        emotionalRendering: "emotion shown by sprite lean, shake frames, eye pixels, and collision posture",
+        rarityProgression: "map complexity, sprite mutation, obstacle density, and event tiles",
+        legendaryPhilosophy: "a full playable incident map frozen at the decisive frame",
+        cardStructure: "edge-to-edge pixel map, no centered portrait frame"
+      },
+      "anime-portrait": {
+        rendererFamily: "anime-portrait",
+        bodySystem: `${motif} shoulder-up character acting with hair/cloth silhouette breaks`,
+        headShape: "angular portrait head with jawline, cheek planes, and non-circular crop",
+        eyeSystem: "large cinematic eyes with highlights, tears, glare cuts, and blink layers",
+        mouthSystem: "asymmetric lips, clenched teeth, whisper mouth, or trembling expression",
+        proportionSystem: "portrait proportions, visible shoulders, dramatic neck and hand gesture",
+        compositionStyle: "cinematic portrait with off-center gaze and foreground object",
+        cameraFraming: "shoulder-up emotional close-up",
+        lightingModel: "dramatic key light, rim shadow, and mood-specific color temperature",
+        environmentSystem: `${world} as blurred emotional set dressing behind the face`,
+        emotionalRendering: "emotion shown through eye shape, brow tilt, mouth asymmetry, hand tension, and lighting",
+        rarityProgression: "acting intensity, lighting contrast, hand/prop staging, and background story",
+        legendaryPhilosophy: "a cinematic reaction shot at the exact community myth moment",
+        cardStructure: "poster frame with asymmetrical title space, no rarity badge plate"
+      },
+      "clay-toy": {
+        rendererFamily: "clay-toy",
+        bodySystem: `${motif} handmade toy bodies with squash, fingerprints, and poseable limbs`,
+        headShape: "soft sculpted head, bean or plush form, not a perfect circle",
+        eyeSystem: "inset bead eyes, sleepy lids, lopsided buttons, blink dents",
+        mouthSystem: "pressed clay smile, tiny worried notch, or raised smug bead",
+        proportionSystem: "short rounded limbs, tactile chunky silhouette, toy shelf scale",
+        compositionStyle: "small diorama scene with props at table height",
+        cameraFraming: "low macro toy photography",
+        lightingModel: "softbox shadows, ambient bounce, cozy practical lights",
+        environmentSystem: `${world} as tactile miniature set with handmade props`,
+        emotionalRendering: "emotion shown by slumped clay posture, bead-eye angle, head tilt, and tiny hands",
+        rarityProgression: "materials, set depth, sculpt complexity, and prop storytelling",
+        legendaryPhilosophy: "a handmade diorama event with one-off sculpt and set",
+        cardStructure: "photographic diorama crop, no graphic card border"
+      },
+      "biohazard-horror": {
+        rendererFamily: "biohazard-horror",
+        bodySystem: `${motif} mutated anatomy with infection growths and uneven limb mass`,
+        headShape: "asymmetric specimen skull, swollen jaw, cracked mask, or parasite crown",
+        eyeSystem: "mismatched pupils, fever glare, one sealed eye, microscope stare",
+        mouthSystem: "crooked infected grin, cough gape, split-mouth snarl, or surgical seam",
+        proportionSystem: "unbalanced torso, one oversized limb, visible growth stages",
+        compositionStyle: "containment incident scene with unstable subject placement",
+        cameraFraming: "surveillance close-up or low horror specimen crop",
+        lightingModel: "sick fluorescent horror, warning red, and contaminated green-blue spill",
+        environmentSystem: `${world} as lab accident space with stains, tape, glass, and warning UI`,
+        emotionalRendering: "emotion shown by asymmetric face, infected posture, tremor lines, and paranoid eye direction",
+        rarityProgression: "infection stage, anatomy distortion, containment failure, and lab incident severity",
+        legendaryPhilosophy: "a containment breach event where the subject changes form and scene logic",
+        cardStructure: "specimen file or surveillance capture, no centered mascot card"
+      },
+      "terminal-brutalist": {
+        rendererFamily: "terminal-brutalist",
+        bodySystem: `${motif} reduced avatar made of terminal panels, desk posture, and dead UI blocks`,
+        headShape: "rectangle screen, receipt strip, or cropped human silhouette",
+        eyeSystem: "flat exhausted eye bars, cursor pupils, red wick stare, or empty sockets",
+        mouthSystem: "one-line deadpan, error glyph, clenched dash, or no-mouth silence",
+        proportionSystem: "minimal body, hunched shoulders, big desk/screen dominance",
+        compositionStyle: "brutalist terminal layout with charts and negative space",
+        cameraFraming: "wide terminal screen or desk-cam crop",
+        lightingModel: "low-color monitor glow with harsh flat shadows",
+        environmentSystem: `${world} as screen stack, orderbook, receipt, or command-line room`,
+        emotionalRendering: "emotion shown by posture collapse, screen glare, cursor eyes, and chart pressure",
+        rarityProgression: "layout density, screen count, market scars, and emotional collapse",
+        legendaryPhilosophy: "a market/system event screen captured at the irreversible moment",
+        cardStructure: "brutalist UI panel, no glow aura or collectible badge"
+      },
+      "surreal-collage": {
+        rendererFamily: "surreal-collage",
+        bodySystem: `${motif} collage body with cutout layers, warped objects, and scale contradictions`,
+        headShape: "mask, window, object-head, or melting silhouette",
+        eyeSystem: "floating eyes, sticker pupils, VHS offsets, or hidden face fragments",
+        mouthSystem: "cut-paper mouth, silent void, smile sticker, or displaced caption",
+        proportionSystem: "dream scale shifts, elongated limbs, object-body hybrids",
+        compositionStyle: "asymmetric collage scene with impossible perspective",
+        cameraFraming: "album-cover surreal crop",
+        lightingModel: "flat collage shadows, VHS bloom, or impossible sunset wash",
+        environmentSystem: `${world} as layered dream set with props floating across depth planes`,
+        emotionalRendering: "emotion shown by object placement, scale, off-axis eyes, and unsettling negative space",
+        rarityProgression: "layer count, impossible perspective, object transformation, and dream logic",
+        legendaryPhilosophy: "a mythic dream tableau where the world and subject swap roles",
+        cardStructure: "edge-to-edge collage canvas, no standard NFT card frame"
+      }
+    };
+    const system = systems[family];
+    return {
+      ...system,
+      bodySystem: `${system.bodySystem}; dominant signal ${topKey || "token-native"}; anchor object ${object}`,
+      environmentSystem: system.environmentSystem,
+      legendaryPhilosophy: `${system.legendaryPhilosophy}; built around ${object}`
+    };
+  }
+
+  private rendererFamily(signals: CreativeSignalProfile, seed: number): VisualDesignSystem["rendererFamily"] {
+    const weights = signals.semanticWeights;
+    if ((weights["medical-contamination"] ?? 0) >= 70) return "biohazard-horror";
+    if ((weights["market-stress"] ?? 0) >= 82 && (weights["dream-surreal"] ?? 0) < 90) return "terminal-brutalist";
+    if ((weights["machine-intelligence"] ?? 0) >= 72) return "terminal-brutalist";
+    if ((weights["canine-pack"] ?? 0) >= 70 && signals.animals.some((animal) => /dog|doge|shib|inu/.test(animal))) return "anime-portrait";
+    if ((weights["soft-play"] ?? 0) >= 70 || signals.cueDial.cozy >= 70) return "clay-toy";
+    if ((weights["dream-surreal"] ?? 0) >= 78) return "surreal-collage";
+    if ((weights["feline-chaos"] ?? 0) >= 72 || (weights["amphibian-meme"] ?? 0) >= 72 || signals.cueDial.chaos >= 80) return "pixel-topdown";
+    if (signals.cueDial.aggressive >= 70 || signals.cueDial.luxury >= 70) return "anime-portrait";
+    return pick(["pixel-topdown", "anime-portrait", "clay-toy", "terminal-brutalist", "surreal-collage"], seed + 17) as VisualDesignSystem["rendererFamily"];
   }
 
   private dynamicTaxonomy(dna: CreativeDNA, signals: CreativeSignalProfile, motif: string, seed: number): TraitCategoryPlan[] {
@@ -403,14 +574,39 @@ export class StyleProfileGeneratorService {
 
   private dynamicBaseSilhouettes(dna: CreativeDNA, signals: CreativeSignalProfile, shapeLanguage: string, seed: number): BaseSilhouettePlan[] {
     const objects = signals.objects.length ? signals.objects : ["signal", "relic", "badge"];
+    const visual = dna.visualSystem;
+    const family = visual.rendererFamily;
+    const poseVerbs: Record<VisualDesignSystem["rendererFamily"], string[]> = {
+      "pixel-topdown": ["tile-dashing", "corner-camping", "item-carrying", "hazard-dodging", "crowd-bumping"],
+      "anime-portrait": ["over-shoulder glaring", "hand-clenched reacting", "tearline holding", "jaw-tight turning", "foreground-reaching"],
+      "clay-toy": ["slumped tabletop", "tiny-hand waving", "head-tilted wobbling", "squash-foot planted", "prop-hugging"],
+      "biohazard-horror": ["tremor-crouched", "limb-dragging", "glass-pressed", "warning-lit recoiling", "growth-burst twisting"],
+      "terminal-brutalist": ["desk-collapsing", "screen-hunched", "cursor-staring", "receipt-folded", "chart-lit frozen"],
+      "surreal-collage": ["scale-slipping", "object-swapping", "cutout-drifting", "mask-displaced", "perspective-falling"]
+    };
+    const frames: Record<VisualDesignSystem["rendererFamily"], string[]> = {
+      "pixel-topdown": ["orthographic tile viewport", "mini-map crowd read", visual.cameraFraming],
+      "anime-portrait": ["off-center shoulder portrait", "foreground hand crop", visual.cameraFraming],
+      "clay-toy": ["macro tabletop crop", "toy shelf diorama crop", visual.cameraFraming],
+      "biohazard-horror": ["surveillance specimen crop", "low containment angle", visual.cameraFraming],
+      "terminal-brutalist": ["desk-cam layout", "wide terminal viewport", visual.cameraFraming],
+      "surreal-collage": ["album-cover crop", "layered paper stage", visual.cameraFraming]
+    };
+    const roles: Record<VisualDesignSystem["rendererFamily"], string[]> = {
+      "pixel-topdown": ["Sprite", "NPC", "Map Event", "Pickup"],
+      "anime-portrait": ["Lead", "Witness", "Rival", "Closeup"],
+      "clay-toy": ["Figurine", "Shelf Friend", "Miniature", "Plush"],
+      "biohazard-horror": ["Specimen", "Patient", "Carrier", "Incident"],
+      "terminal-brutalist": ["Operator", "Screen", "Desk Ghost", "Terminal"],
+      "surreal-collage": ["Cutout", "Mask", "Dream Body", "Fragment"]
+    };
     return Array.from({ length: 3 }, (_, index) => {
-      const rule = dna.baseSilhouetteRules[index % dna.baseSilhouetteRules.length] ?? shapeLanguage;
       return {
-        name: `${titleCase(pick(signals.entities.length ? signals.entities : ["Origin"], seed + index * 11))} ${pick(["Carrier", "Witness", "Scout", "Idol", "Runner"], seed + index * 13)}`,
-        bodyShape: `${shapeLanguage}; ${rule}`,
-        poseLanguage: `${pick(["crouched", "floating", "leaning", "front-facing", "side-stepping", "braced"], seed + index * 17)} ${pick(objects, seed + index * 19)} pose`,
-        proportions: `${pick(["oversized head", "compact torso", "long gesture limbs", "wide readable shoulders", "asymmetric profile"], seed + index * 23)} with ${pick(signals.visualShapes.length ? signals.visualShapes : ["clear"], seed + index * 29)} shape cues`,
-        cameraFraming: index === 2 ? dna.cameraFraming : pick(["tight portrait crop", "waist-up trait crop", "full-body sticker crop", dna.cameraFraming], seed + index * 31),
+        name: `${titleCase(pick(signals.entities.length ? signals.entities : ["Origin"], seed + index * 11))} ${pick(roles[family], seed + index * 13)}`,
+        bodyShape: `${family}; ${visual.bodySystem}; ${visual.headShape}; ${pick(signals.visualShapes.length ? signals.visualShapes : [shapeLanguage], seed + index * 7)}`,
+        poseLanguage: `${pick(poseVerbs[family], seed + index * 17)} with ${pick(objects, seed + index * 19)}; ${visual.emotionalRendering}`,
+        proportions: `${visual.proportionSystem}; ${pick(signals.visualShapes.length ? signals.visualShapes : ["clear"], seed + index * 29)} shape cues`,
+        cameraFraming: index === 2 ? visual.cameraFraming : pick(frames[family], seed + index * 31),
         rarityUpgradePath: index === 0 ? "Common-Uncommon base read" : index === 1 ? "Rare-Epic stronger object and expression read" : "Legendary-Mythic unique pose, scene, frame, and FX"
       };
     });
@@ -768,14 +964,15 @@ export class StyleProfileGeneratorService {
     return label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 48);
   }
 
-  private rarityVisualRules(motif: string, world: string, silhouette: string): Record<string, RarityComplexityRule> {
+  private rarityVisualRules(motif: string, world: string, silhouette: string, visual: VisualDesignSystem): Record<string, RarityComplexityRule> {
+    const progress = visual.rarityProgression;
     return {
-      Common: { minTraits: 2, maxTraits: 4, pose: "base pose", background: "simple flat world hint", aura: "none", frame: "none", composition: `${motif} base holder in ${world}` },
-      Uncommon: { minTraits: 3, maxTraits: 5, pose: "base pose with expression shift", background: "slight world variation", aura: "none", frame: "standard", composition: "one modest accessory and readable eyes" },
-      Rare: { minTraits: 5, maxTraits: 7, pose: "stronger expression", background: "richer token world", aura: "mild", frame: "standard", composition: "better outfit/accessory without overload" },
-      Epic: { minTraits: 7, maxTraits: 9, pose: "premium action pose", background: "complex world scene", aura: "strong", frame: "special", composition: `${silhouette} with aura, premium outfit, stronger silhouette` },
-      Legendary: { minTraits: 9, maxTraits: 11, pose: "unique scene pose", background: "unique background", aura: "signature", frame: "special", composition: "unique pose/scene/frame/FX; never a recolor" },
-      Mythic: { minTraits: 10, maxTraits: 12, pose: "near 1/1 curated pose", background: "hand-directed one-off scene", aura: "signature", frame: "mythic", composition: "near 1/1 curated composition with special metadata flag" }
+      Common: { minTraits: 2, maxTraits: 4, pose: `${visual.cameraFraming} intro pose`, background: `simple ${visual.environmentSystem}`, aura: "none", frame: "none", composition: `${motif} ${visual.compositionStyle} common read` },
+      Uncommon: { minTraits: 3, maxTraits: 5, pose: `${visual.emotionalRendering} variation`, background: `small ${visual.environmentSystem} shift`, aura: "none", frame: "standard", composition: `first ${progress} step` },
+      Rare: { minTraits: 5, maxTraits: 7, pose: `${visual.bodySystem} stronger acting beat`, background: `richer ${world}`, aura: "mild", frame: "standard", composition: `${visual.eyeSystem} and ${visual.mouthSystem} become visible` },
+      Epic: { minTraits: 7, maxTraits: 9, pose: `${visual.compositionStyle} event pose`, background: `complex ${visual.environmentSystem}`, aura: "strong", frame: "special", composition: `${silhouette}; ${progress}; lighting changes through ${visual.lightingModel}` },
+      Legendary: { minTraits: 9, maxTraits: 11, pose: `${visual.legendaryPhilosophy} scene pose`, background: `${visual.legendaryPhilosophy} background`, aura: "signature", frame: "special", composition: `${visual.legendaryPhilosophy}; new camera, anatomy, face, and environment` },
+      Mythic: { minTraits: 10, maxTraits: 12, pose: `near 1/1 ${visual.rendererFamily} curated moment`, background: `one-off ${visual.environmentSystem}`, aura: "signature", frame: "mythic", composition: `near 1/1 ${visual.cardStructure}; ${visual.legendaryPhilosophy}` }
     };
   }
 

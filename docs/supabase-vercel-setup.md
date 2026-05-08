@@ -50,7 +50,7 @@ NEXT_PUBLIC_APP_URL="https://your-vercel-domain"
 FRONTEND_ORIGIN="https://your-vercel-domain"
 NODE_ENV=production
 GENERATOR_SEED_SALT="<random-secret>"
-GENERATOR_DEFAULT_PRESET="mystic-pixel-cult"
+GENERATOR_DEFAULT_PRESET="creative-dna-generated"
 DESIGN_MODEL_PROVIDER=mock
 ASSET_STORAGE_PROVIDER=supabase
 ```
@@ -98,4 +98,3 @@ NEXT_PUBLIC_API_BASE_URL="http://localhost:4000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 FRONTEND_ORIGIN="http://localhost:3000"
 ```
-

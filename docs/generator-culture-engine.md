@@ -18,7 +18,9 @@ The generator must never fall back to a mock community identity when metadata ex
 
 Art style is collection-specific. The engine extracts open-ended signals from metadata, logo analysis, creator hints, socials, and fallback market/profile text, then generates Creative DNA. Animal, medical, market, machine, cozy, luxury, aggressive, chaotic, and surreal words are low-level semantic weights only; they are not final templates.
 
-Creative DNA includes art style, world concept, mascot or subject, base silhouette rules, camera framing, palette, texture language, mood culture, expression language, trait category labels, rarity philosophy, legendary mythology, animation language, and forbidden similarities.
+Creative DNA includes art style, world concept, mascot or subject, base silhouette rules, camera framing, palette, texture language, mood culture, expression language, trait category labels, rarity philosophy, legendary mythology, animation language, forbidden similarities, and a generated visual design system.
+
+The visual design system is the art bible for the collection. It must specify body system, head shape, eye system, mouth system, proportions, renderer family, composition style, camera framing, lighting model, environment system, emotional rendering, rarity progression, legendary philosophy, and card structure. These fields are generated from signals. They are not selected from static brand cards such as Mystic Pixel Cult, Meme Kingdom, Neon Samurai, robot, frog, cat, trader, or virus templates.
 
 The generated style is stored with a reason so reviewers can tell which metadata and signal weights produced that direction.
 
@@ -46,7 +48,7 @@ Each collection receives named mood states with:
 - aura behavior
 - animation state
 
-These are not global emotion names. They are generated from the same Creative DNA and signal profile as the taxonomy. Future animation systems can consume these states directly.
+These are not global emotion names. They are generated from the same Creative DNA and signal profile as the taxonomy. The preview renderer must turn them into visible identity: blinking or mismatched eyes, asymmetric mouths, posture changes, paranoid stance, exhausted body language, smug expression, chaotic framing, or emotional lighting. Future animation systems can consume these states directly.
 
 ## Rarity Complexity Rules
 
@@ -59,7 +61,7 @@ Rarity rules are consistent, but visual execution is collection-specific.
 - Legendary: unique pose or scene, special composition, unique emotional state, special background
 - Mythic: near 1/1 curated identity snapshot with explicit `MYTHIC_CURATED_COMPOSITION`
 
-Legendary and mythic outputs must not be recolors. They need new composition language.
+Legendary and mythic outputs must not be recolors or the same character with extra labels. They need scene, event, camera, anatomy, face, lighting, environment, or emotional-story changes that read as cinematic moments.
 
 ## Anti-Generic Validation
 
@@ -68,7 +70,9 @@ Generation must fail or block approval when:
 - two collections share too many trait names
 - two collections share the same trait taxonomy structure
 - two collections share the same world concept
+- two collections share the same visual design system structure
 - the same art style repeats too often
+- the same body, head, eye, mouth, composition, lighting, or card structure repeats too often
 - pose or silhouette language repeats too much
 - mood vocabulary repeats too much
 - legendary structure repeats too much

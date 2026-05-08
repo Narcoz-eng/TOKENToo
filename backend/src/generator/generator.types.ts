@@ -86,20 +86,6 @@ export type CommunityContextOutput = {
   backgroundNames: string[];
 };
 
-export type ArtPreset = {
-  id: string;
-  name: string;
-  artStyle: string;
-  mood: string;
-  shapeLanguage: string;
-  visualFx: string[];
-  mascotBias: string[];
-  backgroundWorlds: string[];
-  traitNouns: string[];
-  legendaryDirection: string;
-  animationDirection: string;
-};
-
 export type TraitCategoryRole =
   | "base"
   | "background"
@@ -191,6 +177,7 @@ export type CreativeDNA = {
   cameraFraming: string;
   palette: string[];
   textureLanguage: string;
+  visualSystem: VisualDesignSystem;
   moodCulture: string[];
   expressionLanguage: string[];
   traitCategories: string[];
@@ -198,6 +185,23 @@ export type CreativeDNA = {
   legendaryMythology: string;
   animationLanguage: string;
   forbiddenSimilarities: string[];
+};
+
+export type VisualDesignSystem = {
+  rendererFamily: "pixel-topdown" | "anime-portrait" | "clay-toy" | "biohazard-horror" | "terminal-brutalist" | "surreal-collage";
+  bodySystem: string;
+  headShape: string;
+  eyeSystem: string;
+  mouthSystem: string;
+  proportionSystem: string;
+  compositionStyle: string;
+  cameraFraming: string;
+  lightingModel: string;
+  environmentSystem: string;
+  emotionalRendering: string;
+  rarityProgression: string;
+  legendaryPhilosophy: string;
+  cardStructure: string;
 };
 
 export type CommunityCreativeUniverse = {

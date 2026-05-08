@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import { artPresets, getPreset } from "./art-presets";
 import type { CreateGenerationRunInput, LogoAnalysisOutput } from "./generator.types";
 import { pick, seedFrom, slugWords } from "./generator.util";
 
@@ -41,17 +40,16 @@ export class LogoAnalysisService {
     const words = slugWords(raw);
     const seed = seedFrom(raw);
     const mascot = this.mascot(input, words, seed);
-    const preset = getPreset(input.selectedPreset ?? this.presetFromMascot(mascot));
     const palette = this.palette(input, seed);
-    const mood = input.hints?.mood ?? this.mood(words, preset.mood, seed);
-    const shapeLanguage = this.shapeLanguage(words, preset.shapeLanguage, seed);
-    const visualKeywords = this.keywords(words, mascot, preset, seed);
+    const mood = input.hints?.mood ?? this.mood(words, seed);
+    const shapeLanguage = this.shapeLanguage(words, seed);
+    const visualKeywords = this.keywords(words, mascot, seed);
 
     return {
       palette,
       mascot,
-      style: `${mood} ${preset.artStyle}`,
-      mood: `${mood} ${pick(["cult", "guild", "kingdom", "syndicate", "raiders"], seed + 7)}`,
+      style: `${mood} ${this.styleLanguage(words, mascot, shapeLanguage, seed)}`,
+      mood: `${mood} ${this.cultureForm(words, seed)}`,
       shapeLanguage,
       visualKeywords
     };
@@ -63,15 +61,15 @@ export class LogoAnalysisService {
     const source = words.join(" ");
     if (viralPattern.test(source)) return "infected lab mascot";
     if (/vapor|vaporwave|surreal|liminal|synth|mall|pool|vhs/.test(source)) return "abstract mascot";
-    if (/cute|baby|toy|toast|sticker|soft|candy|breakfast/.test(source)) return "cute mascot";
-    if (/frog|toad|pepe|bog|swamp/.test(source)) return "frog";
-    if (/dog|doge|shib|inu|kennel|bark/.test(source)) return source.includes("shib") ? "samurai dog" : "dog";
-    if (/cat|kitty|meow|claw/.test(source)) return "cat";
-    if (/robot|bot|mech|agent|(^|\W)ai(\W|$)|machine/.test(source)) return "robot";
-    if (/skull|bone|dead|reaper/.test(source)) return "skull";
-    if (/degen|pump|casino|jackpot|candle|liquidity|chart/.test(source)) return "alien";
-    if (/coin|gold|cash|bank|vault/.test(source)) return "coin mascot";
-    if (/wizard|mage|spell|magic/.test(source)) return "wizard";
+    if (/cute|baby|toy|toast|sticker|soft|candy|breakfast/.test(source)) return "soft-play object subject";
+    if (/frog|toad|pepe|bog|swamp/.test(source)) return "amphibian meme subject";
+    if (/dog|doge|shib|inu|kennel|bark/.test(source)) return "pack animal subject";
+    if (/cat|kitty|meow|claw/.test(source)) return "feline chaos subject";
+    if (/robot|bot|mech|agent|(^|\W)ai(\W|$)|machine/.test(source)) return "machine intelligence subject";
+    if (/skull|bone|dead|reaper/.test(source)) return "dark relic subject";
+    if (/degen|pump|casino|jackpot|candle|liquidity|chart/.test(source)) return "market stress subject";
+    if (/coin|gold|cash|bank|vault/.test(source)) return "value-symbol subject";
+    if (/wizard|mage|spell|magic/.test(source)) return "ritual magic subject";
     const subject = pick(words.filter((word) => !/token|coin|official|metadata|image|website|twitter|discord|telegram/.test(word)).length ? words : ["origin", "signal", "holder"], seed);
     return `${subject} token-native subject`;
   }
@@ -92,17 +90,17 @@ export class LogoAnalysisService {
     return fallbackPalettes[seed % fallbackPalettes.length] as string[];
   }
 
-  private shapeLanguage(words: string[], fallback: string, seed: number) {
+  private shapeLanguage(words: string[], seed: number) {
     const source = words.join(" ");
     if (viralPattern.test(source)) return "organic microscopic hazard";
     if (/blade|samurai|war|fang|skull|aggressive/.test(source)) return "sharp armored";
     if (/robot|mech|coin|machine/.test(source)) return "geometric mechanical";
     if (/cyber|glitch|neon|hacker/.test(source)) return "sharp glitch";
     if (/frog|dog|cat|cute|meme/.test(source)) return "rounded character";
-    return fallback || pick(["rounded organic", "sharp glitch", "geometric armored", "clean ornate"], seed + 3);
+    return pick(["rounded organic", "sharp glitch", "geometric armored", "clean ornate", "flat symbolic", "asymmetric collage"], seed + 3);
   }
 
-  private mood(words: string[], fallback: string, seed: number) {
+  private mood(words: string[], seed: number) {
     const source = words.join(" ");
     if (viralPattern.test(source)) return "toxic";
     if (/luxury|vip|gold|premium|crown/.test(source)) return "premium";
@@ -110,27 +108,38 @@ export class LogoAnalysisService {
     if (/chaos|degen|wild|bonk/.test(source)) return "chaotic";
     if (/war|raid|fight|angry/.test(source)) return "aggressive";
     if (/cute|soft|baby/.test(source)) return "playful";
-    return fallback.split(",")[0] ?? pick(["playful", "mysterious", "chaotic", "premium", "aggressive"], seed + 5);
+    return pick(["playful", "mysterious", "chaotic", "premium", "aggressive", "deadpan", "dreamy"], seed + 5);
   }
 
-  private keywords(words: string[], mascot: string, preset: (typeof artPresets)[number], seed: number) {
-    const fromInput = words.slice(0, 5);
-    const fromPreset = [
-      pick(preset.backgroundWorlds, seed + 1),
-      pick(preset.traitNouns, seed + 2),
-      pick(preset.visualFx, seed + 3)
-    ];
-    return [...new Set([mascot, ...fromInput, ...fromPreset].map((word) => word.toLowerCase()))].slice(0, 10);
+  private styleLanguage(words: string[], mascot: string, shapeLanguage: string, seed: number) {
+    const source = words.join(" ");
+    if (viralPattern.test(source)) return "contaminated specimen art";
+    if (/terminal|chart|liquidation|market|compute|agent|machine/.test(source)) return "screen-native graphic system";
+    if (/vapor|dream|liminal|surreal|abstract|vhs/.test(source)) return "surreal layered poster";
+    if (/cute|toy|toast|soft|sticker|breakfast/.test(source)) return "tactile toy illustration";
+    if (/skull|crypt|ritual|dark|bone/.test(source)) return "dark storybook collectible";
+    return `${shapeLanguage} ${pick(["community poster", "symbolic collectible", "meme-native illustration", "source-derived character art"], seed + mascot.length)}`;
   }
 
-  private presetFromMascot(mascot: string) {
-    if (/infected|lab|virus|biohazard/.test(mascot)) return "dark-fantasy-raiders";
-    if (/cat/.test(mascot)) return "cyber-alley-syndicate";
-    if (/dog|coin/.test(mascot)) return "meme-kingdom";
-    if (/samurai/.test(mascot)) return "neon-samurai";
-    if (/robot/.test(mascot)) return "robot-warband";
-    if (/alien/.test(mascot)) return "alien-casino";
-    if (/skull/.test(mascot)) return "dark-fantasy-raiders";
-    return "mystic-pixel-cult";
+  private cultureForm(words: string[], seed: number) {
+    const source = words.join(" ");
+    if (/terminal|chart|market|liquidation|compute|agent/.test(source)) return "desk";
+    if (/cute|toy|toast|soft|breakfast|kennel|blanket/.test(source)) return "room";
+    if (/virus|lab|quarantine|hanta|biohazard/.test(source)) return "ward";
+    if (/dream|vapor|liminal|mall|pool/.test(source)) return "loop";
+    return pick(["circle", "feed", "room", "archive", "crew", "ritual"], seed + 7);
+  }
+
+  private keywords(words: string[], mascot: string, seed: number) {
+    const source = words.join(" ");
+    const semantic = [
+      viralPattern.test(source) ? ["quarantine", "specimen", "fever", "containment"] : [],
+      /dog|doge|shib|inu|kennel|blanket|lofi/.test(source) ? ["blanket", "kennel", "nap", "pack"] : [],
+      /toast|breakfast|juice|sticker|toy|soft/.test(source) ? ["breakfast", "sticker", "juice", "toy"] : [],
+      /cat|meow|claw|alley/.test(source) ? ["alley", "claw", "chat", "milk"] : [],
+      /terminal|chart|candle|market|liquidity|degen/.test(source) ? ["terminal", "candle", "orderbook", "stress"] : [],
+      /vapor|dream|liminal|vhs|pool|mall/.test(source) ? ["vhs", "mall", "pool", "dream"] : []
+    ].flat();
+    return [...new Set([mascot, ...words.slice(0, 8), ...semantic].map((word) => word.toLowerCase()))].slice(0, 12);
   }
 }

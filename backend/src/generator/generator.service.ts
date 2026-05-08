@@ -5,7 +5,6 @@ import { requireDbForWrite } from "../db/db-safety";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
 import { AssetProductionLayerService } from "./asset-production-layer.service";
 import { AssetStorageService } from "./asset-storage.service";
-import { artPresets } from "./art-presets";
 import { CollectionDistinctivenessScorerService } from "./collection-distinctiveness-scorer.service";
 import { CommunityContextService } from "./community-context.service";
 import { CompatibilityEngineService } from "./compatibility-engine.service";
@@ -53,7 +52,21 @@ export class GeneratorService {
   ) {}
 
   presets() {
-    return artPresets;
+    return [
+      {
+        id: "creative-dna-generated",
+        name: "Creative DNA Generated",
+        artStyle: "Generated from token metadata, logo analysis, socials, creator hints, and fallback market/social text.",
+        mood: "Generated per collection.",
+        shapeLanguage: "Generated per collection.",
+        visualFx: ["dynamic visual design system", "metadata-derived rendering language", "rarity scene progression"],
+        mascotBias: ["metadata-derived subject"],
+        backgroundWorlds: ["metadata-derived world concept"],
+        traitNouns: ["dynamic community taxonomy"],
+        legendaryDirection: "Generated as a scene, event, or emotional snapshot.",
+        animationDirection: "Generated from the collection mood and visual system."
+      }
+    ];
   }
 
   async preview(input: CreateGenerationRunInput) {
@@ -615,7 +628,7 @@ export class GeneratorService {
       tokenMint: input.tokenMint.trim(),
       logoUri,
       description,
-      selectedPreset: input.selectedPreset ?? process.env.GENERATOR_DEFAULT_PRESET ?? "mystic-pixel-cult"
+      selectedPreset: input.selectedPreset ?? process.env.GENERATOR_DEFAULT_PRESET ?? "creative-dna-generated"
     };
   }
 

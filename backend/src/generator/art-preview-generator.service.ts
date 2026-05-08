@@ -94,6 +94,14 @@ export class ArtPreviewGeneratorService {
       renderedTraitKeys,
       renderedTraits,
       animationReadiness: style.creativeUniverse.animationReadiness,
+      visualSystem: style.creativeUniverse.creativeDna.visualSystem,
+      rendererFamily: style.creativeUniverse.creativeDna.visualSystem.rendererFamily,
+      bodySystem: style.creativeUniverse.creativeDna.visualSystem.bodySystem,
+      headShape: style.creativeUniverse.creativeDna.visualSystem.headShape,
+      eyeSystem: style.creativeUniverse.creativeDna.visualSystem.eyeSystem,
+      mouthSystem: style.creativeUniverse.creativeDna.visualSystem.mouthSystem,
+      compositionStyle: style.creativeUniverse.creativeDna.visualSystem.compositionStyle,
+      lightingModel: style.creativeUniverse.creativeDna.visualSystem.lightingModel,
       artProductionStatus: style.productionAssetPolicy.launchClassification,
       complexityRule: {
         minTraits: rule.minTraits,
@@ -161,50 +169,175 @@ export class ArtPreviewGeneratorService {
       traits?: Record<string, unknown>;
     }
   ) {
-    const [primary, secondary, ink] = style.colors;
+    const visual = style.creativeUniverse?.creativeDna?.visualSystem;
+    const [primary = "#79f2ff", secondary = "#111827", ink = "#050712", accent = "#f4f7fb"] = style.colors;
     const w = options.width;
     const h = options.height;
-    const cx = options.mode === "banner" ? Math.round(w * 0.68) : Math.round(w * 0.5);
-    const cy = options.mode === "banner" ? Math.round(h * 0.55) : Math.round(h * 0.48);
-    const scale = options.mode === "banner" ? 0.82 : options.mode === "nft" ? 1.05 : 1;
-    const mascot = this.mascotShape(style.mascot, cx, cy, scale, primary, secondary, ink, options.seed, options.traits);
-    const landmarks = this.landmarks(style, w, h, options.seed);
-    const texture = this.texture(w, h, options.seed);
     const rarity = String(options.traits?.rarity ?? "");
-    const glow = options.fx === "legendary" ? 0.95 : options.fx === "epic" ? 0.65 : rarity === "Common" ? 0.12 : 0.3;
-    const titleX = options.mode === "banner" ? 86 : 56;
-    const titleY = options.mode === "banner" ? 116 : h - 135;
-    const showLandmarks = options.mode !== "nft" || !["Common", "Uncommon"].includes(rarity);
-    const frameWidth = options.fx === "legendary" ? 8 : rarity === "Common" ? 1 : 3;
-    const mascotScale = rarity === "Legendary" ? scale * 1.12 : rarity === "Mythic" ? scale * 1.2 : scale;
-    const sceneBadge = options.mode === "nft" && (rarity === "Legendary" || rarity === "Mythic")
-      ? `<path d="M${w - 190} 70 l50 -34 l88 18 l28 72 l-62 66 l-90 -12 l-38 -68z" fill="url(#frame)" opacity="0.78"/><text x="${w - 167}" y="130" fill="#020806" font-size="20" font-weight="900">${rarity.toUpperCase()}</text>`
-      : "";
+    const intensity = this.rarityIntensity(rarity || "Rare");
+    const mood = String(options.traits?.mood ?? "");
+    const family = visual?.rendererFamily ?? "surreal-collage";
+    const titleX = family === "terminal-brutalist" ? 42 : options.mode === "banner" ? 80 : 48;
+    const titleY = options.mode === "banner" ? 106 : family === "pixel-topdown" ? 62 : h - 132;
+    const background = this.visualBackground(family, style, w, h, options.seed, intensity, options.mode);
+    const subject = this.visualSubject(family, style, w, h, options.seed, intensity, options.traits);
+    const story = this.visualStoryOverlay(family, style, w, h, options.seed, intensity, options.traits);
+    const surface = this.cardSurface(family, w, h, intensity, primary, secondary, ink, options.mode);
+    const texture = this.visualTexture(family, w, h, options.seed, intensity);
+    const titleColor = family === "terminal-brutalist" ? primary : family === "clay-toy" ? ink : "#ffffff";
+    const subtitleColor = family === "terminal-brutalist" ? accent : primary;
+    const caption = options.traits
+      ? `${this.escape(rarity)} / ${this.escape(mood).slice(0, 30)}`
+      : this.escape(visual?.compositionStyle ?? style.backgroundWorld).slice(0, 58);
 
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <defs>
-    <radialGradient id="bg" cx="55%" cy="40%" r="75%">
-      <stop offset="0%" stop-color="${secondary}" stop-opacity="0.9"/>
-      <stop offset="42%" stop-color="${primary}" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="${ink}" stop-opacity="1"/>
-    </radialGradient>
-    <filter id="premiumGlow"><feGaussianBlur stdDeviation="${18 + glow * 22}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="premiumGlow"><feGaussianBlur stdDeviation="${family === "clay-toy" ? 8 : family === "terminal-brutalist" ? 2 : 16}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="softShadow"><feDropShadow dx="0" dy="${family === "clay-toy" ? 18 : 8}" stdDeviation="${family === "clay-toy" ? 16 : 6}" flood-color="#000" flood-opacity="${family === "clay-toy" ? 0.28 : 0.45}"/></filter>
     <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" seed="${options.seed % 997}"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.16"/></feComponentTransfer></filter>
-    <linearGradient id="frame" x1="0" x2="1"><stop stop-color="${primary}"/><stop offset="0.55" stop-color="${secondary}"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+    <linearGradient id="light" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${primary}"/><stop offset="0.55" stop-color="${secondary}"/><stop offset="1" stop-color="${accent}"/></linearGradient>
   </defs>
-  <rect width="${w}" height="${h}" fill="url(#bg)"/>
-  ${showLandmarks ? landmarks : ""}
-  <g opacity="${rarity === "Common" ? "0.18" : "0.55"}">${texture}</g>
-  <circle cx="${cx}" cy="${cy}" r="${Math.round(250 * scale)}" fill="${primary}" opacity="${0.11 + glow * 0.12}" filter="url(#premiumGlow)"/>
-  ${this.mascotShape(style.mascot, cx, cy, mascotScale, primary, secondary, ink, options.seed, options.traits)}
-  ${sceneBadge}
-  <rect x="18" y="18" width="${w - 36}" height="${h - 36}" rx="${rarity === "Common" ? 12 : 34}" fill="none" stroke="url(#frame)" stroke-width="${frameWidth}" opacity="${rarity === "Common" ? "0.34" : "0.78"}"/>
+  ${background}
+  ${texture}
+  ${surface}
+  ${subject}
+  ${story}
   <g font-family="Inter, Arial, sans-serif">
-    <text x="${titleX}" y="${titleY}" fill="#fff" font-size="${options.mode === "banner" ? 58 : 38}" font-weight="900">${this.escape(options.title).slice(0, 42)}</text>
-    <text x="${titleX}" y="${titleY + 42}" fill="${primary}" font-size="${options.mode === "banner" ? 26 : 22}" font-weight="800">${this.escape(options.subtitle).slice(0, 58)}</text>
-    ${options.traits ? `<text x="${titleX}" y="${titleY + 78}" fill="#d8dee9" font-size="18">${this.escape(String(options.traits.rarity))} / ${this.escape(String(options.traits.mood)).slice(0, 28)}</text><text x="${titleX}" y="${titleY + 108}" fill="#d8dee9" font-size="16">${this.escape(String(options.traits.accessory)).slice(0, 34)}</text>` : ""}
+    <text x="${titleX}" y="${titleY}" fill="${titleColor}" font-size="${options.mode === "banner" ? 54 : family === "terminal-brutalist" ? 28 : 34}" font-weight="${family === "terminal-brutalist" ? 700 : 900}" letter-spacing="0">${this.escape(options.title).slice(0, 42)}</text>
+    <text x="${titleX}" y="${titleY + (options.mode === "banner" ? 42 : 34)}" fill="${subtitleColor}" font-size="${options.mode === "banner" ? 24 : 18}" font-weight="800">${caption}</text>
+    ${options.traits && family !== "pixel-topdown" ? `<text x="${titleX}" y="${titleY + 68}" fill="${family === "terminal-brutalist" ? primary : "#d8dee9"}" font-size="15">${this.escape(String(options.traits.expression ?? options.traits.accessory)).slice(0, 52)}</text>` : ""}
   </g>
 </svg>`;
+  }
+
+  private visualBackground(family: string, style: GeneratedStyleProfile, w: number, h: number, seed: number, intensity: number, mode: string) {
+    const [primary = "#79f2ff", secondary = "#111827", ink = "#050712", accent = "#f4f7fb"] = style.colors;
+    if (family === "pixel-topdown") {
+      const tile = mode === "banner" ? 64 : 56;
+      const cols = Math.ceil(w / tile);
+      const rows = Math.ceil(h / tile);
+      const cells = Array.from({ length: cols * rows }, (_, index) => {
+        const x = (index % cols) * tile;
+        const y = Math.floor(index / cols) * tile;
+        const hit = (seed + index * 17) % Math.max(2, 8 - intensity) === 0;
+        const fill = hit ? (index % 3 ? primary : accent) : (index + seed) % 2 ? secondary : ink;
+        return `<rect x="${x}" y="${y}" width="${tile - 2}" height="${tile - 2}" fill="${fill}" opacity="${hit ? 0.55 : 0.95}"/>`;
+      }).join("");
+      return `<rect width="${w}" height="${h}" fill="${ink}"/><g>${cells}</g>`;
+    }
+    if (family === "terminal-brutalist") {
+      const panels = Array.from({ length: 8 + intensity * 3 }, (_, index) => {
+        const x = 32 + ((seed + index * 151) % Math.max(1, w - 220));
+        const y = 42 + ((seed + index * 83) % Math.max(1, h - 260));
+        const ww = 140 + ((seed + index * 29) % 220);
+        const hh = 58 + ((seed + index * 31) % 140);
+        return `<rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="${index % 2 ? ink : "#0b0f14"}" stroke="${primary}" stroke-width="2" opacity="${0.35 + intensity * 0.06}"/><path d="M${x + 12} ${y + 22} h${ww - 24} M${x + 12} ${y + 42} h${Math.round((ww - 24) * ((index % 5) + 1) / 5)}" stroke="${index % 3 ? secondary : accent}" stroke-width="4" opacity="0.7"/>`;
+      }).join("");
+      return `<rect width="${w}" height="${h}" fill="#050608"/><g>${panels}</g>`;
+    }
+    if (family === "clay-toy") {
+      return `<rect width="${w}" height="${h}" fill="${accent}"/><ellipse cx="${w * 0.5}" cy="${h * 0.75}" rx="${w * 0.44}" ry="${h * 0.14}" fill="${secondary}" opacity="0.22"/><rect x="0" y="${h * 0.62}" width="${w}" height="${h * 0.38}" fill="${primary}" opacity="0.18"/>`;
+    }
+    if (family === "biohazard-horror") {
+      return `<rect width="${w}" height="${h}" fill="${ink}"/><path d="M0 ${h * 0.18} C${w * 0.22} ${h * 0.06} ${w * 0.4} ${h * 0.34} ${w} ${h * 0.12} V${h} H0Z" fill="${secondary}" opacity="0.4"/><g stroke="${primary}" stroke-width="7" opacity="${0.22 + intensity * 0.05}">${Array.from({ length: 8 + intensity }, (_, i) => `<path d="M${(seed + i * 91) % w} 0 L${(seed + i * 157) % w} ${h}"/>`).join("")}</g>`;
+    }
+    if (family === "anime-portrait") {
+      return `<rect width="${w}" height="${h}" fill="${ink}"/><path d="M0 0 H${w} V${h} H0Z" fill="url(#light)" opacity="0.26"/><path d="M${w * 0.64} 0 L${w} 0 L${w * 0.55} ${h}" fill="${primary}" opacity="${0.18 + intensity * 0.04}"/><circle cx="${w * 0.28}" cy="${h * 0.2}" r="${180 + intensity * 28}" fill="${secondary}" opacity="0.2"/>`;
+    }
+    return `<rect width="${w}" height="${h}" fill="${ink}"/><path d="M${w * 0.05} ${h * 0.22} C${w * 0.38} ${h * 0.02} ${w * 0.42} ${h * 0.52} ${w * 0.92} ${h * 0.2} L${w} ${h} H0Z" fill="${secondary}" opacity="0.55"/><circle cx="${w * 0.72}" cy="${h * 0.28}" r="${130 + intensity * 22}" fill="${primary}" opacity="0.22"/><rect x="${w * 0.12}" y="${h * 0.18}" width="${w * 0.28}" height="${h * 0.36}" fill="${accent}" opacity="0.18" transform="rotate(${(seed % 20) - 10} ${w * 0.26} ${h * 0.36})"/>`;
+  }
+
+  private visualSubject(family: string, style: GeneratedStyleProfile, w: number, h: number, seed: number, intensity: number, traits?: Record<string, unknown>) {
+    const [primary = "#79f2ff", secondary = "#111827", ink = "#050712", accent = "#f4f7fb"] = style.colors;
+    const mood = `${traits?.mood ?? ""} ${traits?.expression ?? ""} ${traits?.stance ?? ""}`.toLowerCase();
+    const lean = (seed % 29) - 14;
+    const eyeTilt = /panic|paranoid|rage|containment|liquidation|dead|exhausted/.test(mood) ? 16 : /smug|wealthy|locked/.test(mood) ? -8 : 0;
+    const mouthCurve = /panic|gasp|rage|snarl|cough/.test(mood) ? "open" : /dead|flat|calm|empty/.test(mood) ? "flat" : /smug|grin|amused/.test(mood) ? "smirk" : "soft";
+    if (family === "pixel-topdown") return this.pixelSubject(w, h, seed, intensity, primary, secondary, ink, accent, eyeTilt, mouthCurve);
+    if (family === "terminal-brutalist") return this.terminalSubject(w, h, seed, intensity, primary, secondary, ink, accent, eyeTilt, mouthCurve);
+    if (family === "clay-toy") return this.claySubject(w, h, seed, intensity, primary, secondary, ink, accent, lean, eyeTilt, mouthCurve);
+    if (family === "biohazard-horror") return this.biohazardSubject(w, h, seed, intensity, primary, secondary, ink, accent, lean, eyeTilt, mouthCurve);
+    if (family === "anime-portrait") return this.animeSubject(w, h, seed, intensity, primary, secondary, ink, accent, lean, eyeTilt, mouthCurve);
+    return this.collageSubject(w, h, seed, intensity, primary, secondary, ink, accent, lean, eyeTilt, mouthCurve);
+  }
+
+  private pixelSubject(w: number, h: number, seed: number, intensity: number, primary: string, secondary: string, ink: string, accent: string, eyeTilt: number, mouth: string) {
+    const size = 42 + intensity * 8;
+    const count = intensity >= 5 ? 5 : intensity >= 3 ? 3 : 1;
+    return `<g shape-rendering="crispEdges">${Array.from({ length: count }, (_, index) => {
+      const x = Math.round(w * (0.28 + index * 0.12 + ((seed + index) % 3) * 0.02));
+      const y = Math.round(h * (0.38 + ((seed + index * 7) % 24) / 100));
+      return `<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="${primary}" stroke="${ink}" stroke-width="6"/><rect x="${x - size * 0.25}" y="${y + size * 0.85}" width="${size * 1.5}" height="${size * 0.8}" fill="${secondary}" stroke="${ink}" stroke-width="5"/><rect x="${x + size * 0.2}" y="${y + size * 0.3}" width="8" height="${eyeTilt > 0 ? 16 : 8}" fill="${ink}"/><rect x="${x + size * 0.62}" y="${y + size * 0.3 + eyeTilt / 4}" width="8" height="${eyeTilt > 0 ? 16 : 8}" fill="${ink}"/><rect x="${x + size * 0.28}" y="${y + size * 0.66}" width="${mouth === "open" ? 22 : 30}" height="${mouth === "flat" ? 5 : 10}" fill="${accent}"/>`;
+    }).join("")}</g>`;
+  }
+
+  private terminalSubject(w: number, h: number, seed: number, intensity: number, primary: string, secondary: string, ink: string, accent: string, eyeTilt: number, mouth: string) {
+    const x = Math.round(w * 0.52);
+    const y = Math.round(h * 0.25);
+    const ww = Math.round(w * (0.32 + intensity * 0.025));
+    const hh = Math.round(h * (0.28 + intensity * 0.02));
+    return `<g><rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="#090b0f" stroke="${primary}" stroke-width="${2 + intensity}"/><rect x="${x + 24}" y="${y + 32}" width="${ww - 48}" height="38" fill="${secondary}" opacity="0.7"/><path d="M${x + 50} ${y + 100 + eyeTilt / 3} h70 M${x + ww - 122} ${y + 100 - eyeTilt / 3} h70" stroke="${accent}" stroke-width="10"/><path d="${mouth === "open" ? `M${x + ww * 0.43} ${y + 160} h${ww * 0.15} v28 h-${ww * 0.15}Z` : `M${x + ww * 0.38} ${y + 168} h${ww * 0.26}`}" stroke="${primary}" stroke-width="8" fill="${mouth === "open" ? primary : "none"}"/><path d="M${x - 70} ${y + hh + 28} C${x + 40} ${y + hh - 36} ${x + ww - 30} ${y + hh - 32} ${x + ww + 94} ${y + hh + 30}" stroke="${secondary}" stroke-width="34" fill="none"/></g>`;
+  }
+
+  private claySubject(w: number, h: number, seed: number, intensity: number, primary: string, secondary: string, ink: string, accent: string, lean: number, eyeTilt: number, mouth: string) {
+    const cx = Math.round(w * 0.5);
+    const cy = Math.round(h * 0.46);
+    const headRx = 105 + intensity * 11;
+    const headRy = 92 + intensity * 8;
+    return `<g transform="rotate(${lean / 3} ${cx} ${cy})" filter="url(#softShadow)"><ellipse cx="${cx}" cy="${cy + 170}" rx="${130 + intensity * 16}" ry="${118 + intensity * 10}" fill="${secondary}"/><ellipse cx="${cx}" cy="${cy}" rx="${headRx}" ry="${headRy}" fill="${primary}"/><ellipse cx="${cx - 46}" cy="${cy - 16}" rx="${18 + intensity}" ry="${mouth === "open" ? 25 : 14}" fill="${ink}"/><ellipse cx="${cx + 50}" cy="${cy - 14 + eyeTilt / 4}" rx="${18 + intensity}" ry="${mouth === "open" ? 25 : 14}" fill="${ink}"/><path d="${mouth === "smirk" ? `M${cx - 35} ${cy + 44} Q${cx + 20} ${cy + 70} ${cx + 66} ${cy + 34}` : mouth === "open" ? `M${cx - 30} ${cy + 42} Q${cx} ${cy + 84} ${cx + 34} ${cy + 42} Q${cx} ${cy + 60} ${cx - 30} ${cy + 42}` : `M${cx - 40} ${cy + 48} Q${cx} ${cy + 54} ${cx + 42} ${cy + 48}`}" stroke="${ink}" stroke-width="10" fill="${mouth === "open" ? accent : "none"}" stroke-linecap="round"/><path d="M${cx - 122} ${cy + 160} q-76 42 -94 122 M${cx + 122} ${cy + 160} q86 42 102 122" stroke="${primary}" stroke-width="34" fill="none" stroke-linecap="round"/></g>`;
+  }
+
+  private biohazardSubject(w: number, h: number, seed: number, intensity: number, primary: string, secondary: string, ink: string, accent: string, lean: number, eyeTilt: number, mouth: string) {
+    const cx = Math.round(w * 0.5 + lean * 3);
+    const cy = Math.round(h * 0.47);
+    const growths = Array.from({ length: 4 + intensity }, (_, i) => `<circle cx="${cx + ((seed + i * 47) % 260) - 130}" cy="${cy + ((seed + i * 61) % 360) - 210}" r="${14 + ((seed + i) % 28)}" fill="${i % 2 ? accent : primary}" opacity="0.72" stroke="${ink}" stroke-width="5"/>`).join("");
+    return `<g transform="rotate(${lean / 2} ${cx} ${cy})" filter="url(#premiumGlow)">${growths}<path d="M${cx - 140} ${cy - 210} C${cx - 250} ${cy - 70} ${cx - 160} ${cy + 190} ${cx - 20} ${cy + 230} C${cx + 190} ${cy + 290} ${cx + 250} ${cy + 35} ${cx + 130} ${cy - 140} C${cx + 70} ${cy - 250} ${cx - 60} ${cy - 270} ${cx - 140} ${cy - 210}Z" fill="${secondary}" stroke="${primary}" stroke-width="${10 + intensity}"/><ellipse cx="${cx - 62}" cy="${cy - 45}" rx="${46 + intensity * 4}" ry="${28 + Math.max(0, eyeTilt)}" fill="${accent}" stroke="${ink}" stroke-width="9"/><ellipse cx="${cx + 74}" cy="${cy - 34}" rx="${26 + intensity * 2}" ry="${46}" fill="${accent}" stroke="${ink}" stroke-width="8"/><path d="${mouth === "open" ? `M${cx - 78} ${cy + 92} C${cx - 10} ${cy + 150} ${cx + 82} ${cy + 120} ${cx + 98} ${cy + 74}` : `M${cx - 86} ${cy + 92} Q${cx - 6} ${cy + 132} ${cx + 92} ${cy + 72}`}" stroke="${ink}" stroke-width="16" fill="none" stroke-linecap="round"/><path d="M${cx + 132} ${cy - 210} l50 -80 l38 96 M${cx - 184} ${cy + 92} l-70 86 l88 -16" stroke="${primary}" stroke-width="18" fill="none" stroke-linecap="round"/></g>`;
+  }
+
+  private animeSubject(w: number, h: number, seed: number, intensity: number, primary: string, secondary: string, ink: string, accent: string, lean: number, eyeTilt: number, mouth: string) {
+    const cx = Math.round(w * 0.48);
+    const cy = Math.round(h * 0.42);
+    return `<g transform="rotate(${lean / 5} ${cx} ${cy})"><path d="M${cx - 190} ${cy + 360} C${cx - 120} ${cy + 120} ${cx + 130} ${cy + 110} ${cx + 210} ${cy + 360}Z" fill="${secondary}" filter="url(#softShadow)"/><path d="M${cx - 132} ${cy - 172} Q${cx + 4} ${cy - 252} ${cx + 142} ${cy - 156} Q${cx + 180} ${cy + 12} ${cx + 66} ${cy + 142} Q${cx - 40} ${cy + 208} ${cx - 126} ${cy + 102} Q${cx - 204} ${cy - 12} ${cx - 132} ${cy - 172}Z" fill="${primary}" stroke="${ink}" stroke-width="8"/><path d="M${cx - 194} ${cy - 150} C${cx - 78} ${cy - 280} ${cx + 122} ${cy - 245} ${cx + 204} ${cy - 95} C${cx + 60} ${cy - 140} ${cx - 24} ${cy - 152} ${cx - 194} ${cy - 150}Z" fill="${secondary}" opacity="0.85"/><ellipse cx="${cx - 60}" cy="${cy - 20 + eyeTilt / 5}" rx="44" ry="${28 + intensity * 3}" fill="${accent}" stroke="${ink}" stroke-width="7"/><ellipse cx="${cx + 76}" cy="${cy - 18 - eyeTilt / 5}" rx="44" ry="${28 + intensity * 3}" fill="${accent}" stroke="${ink}" stroke-width="7"/><circle cx="${cx - 48}" cy="${cy - 20}" r="12" fill="${ink}"/><circle cx="${cx + 62}" cy="${cy - 18}" r="12" fill="${ink}"/><path d="${mouth === "open" ? `M${cx - 28} ${cy + 78} q34 42 76 0` : mouth === "smirk" ? `M${cx - 38} ${cy + 78} q52 28 98 -10` : `M${cx - 34} ${cy + 82} h80`}" stroke="${ink}" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M${cx + 184} ${cy + 54} q90 ${intensity * 12} 118 -86" stroke="${accent}" stroke-width="20" fill="none" opacity="0.8"/></g>`;
+  }
+
+  private collageSubject(w: number, h: number, seed: number, intensity: number, primary: string, secondary: string, ink: string, accent: string, lean: number, eyeTilt: number, mouth: string) {
+    const cx = Math.round(w * 0.52);
+    const cy = Math.round(h * 0.46);
+    const pieces = Array.from({ length: 5 + intensity }, (_, i) => {
+      const x = cx + ((seed + i * 67) % 300) - 150;
+      const y = cy + ((seed + i * 43) % 360) - 180;
+      return `<rect x="${x}" y="${y}" width="${70 + i * 9}" height="${90 + (i % 3) * 34}" fill="${i % 2 ? primary : secondary}" opacity="0.72" transform="rotate(${((seed + i * 13) % 54) - 27} ${x} ${y})"/>`;
+    }).join("");
+    return `<g filter="url(#softShadow)">${pieces}<path d="M${cx - 110} ${cy - 140} C${cx + 40} ${cy - 230} ${cx + 170} ${cy - 60} ${cx + 88} ${cy + 108} C${cx - 34} ${cy + 190} ${cx - 190} ${cy + 70} ${cx - 110} ${cy - 140}Z" fill="${accent}" opacity="0.72"/><circle cx="${cx - 62}" cy="${cy - 26 + eyeTilt / 4}" r="34" fill="${ink}"/><circle cx="${cx + 70}" cy="${cy - 56 - eyeTilt / 4}" r="24" fill="${ink}"/><path d="${mouth === "open" ? `M${cx - 18} ${cy + 74} l68 24 l-56 48z` : `M${cx - 42} ${cy + 92} l112 -18`}" stroke="${ink}" stroke-width="11" fill="${mouth === "open" ? primary : "none"}"/></g>`;
+  }
+
+  private visualStoryOverlay(family: string, style: GeneratedStyleProfile, w: number, h: number, seed: number, intensity: number, traits?: Record<string, unknown>) {
+    if (!traits || intensity < 4) return "";
+    const [primary = "#79f2ff", secondary = "#111827", ink = "#050712", accent = "#f4f7fb"] = style.colors;
+    const legendary = intensity >= 5;
+    if (family === "terminal-brutalist") return `<g font-family="ui-monospace, Consolas, monospace" opacity="0.92"><text x="44" y="${h - 74}" fill="${legendary ? accent : primary}" font-size="22">${this.escape(String(traits.legendaryOverlay ?? traits.visualRule)).slice(0, 48)}</text><path d="M40 ${h - 52} H${w - 40}" stroke="${legendary ? accent : primary}" stroke-width="${legendary ? 8 : 3}"/></g>`;
+    if (family === "pixel-topdown") return `<g shape-rendering="crispEdges">${Array.from({ length: legendary ? 18 : 9 }, (_, i) => `<rect x="${(seed + i * 89) % w}" y="${(seed + i * 53) % h}" width="28" height="28" fill="${i % 2 ? accent : primary}" opacity="0.8"/>`).join("")}</g>`;
+    if (family === "biohazard-horror") return `<g opacity="${legendary ? 0.9 : 0.55}"><path d="M70 86 H${w - 70} M70 ${h - 86} H${w - 70}" stroke="${legendary ? accent : primary}" stroke-width="${legendary ? 18 : 8}" stroke-dasharray="40 24"/><text x="86" y="132" fill="${accent}" font-size="24" font-weight="900">CONTAINMENT ${legendary ? "BREACH" : "WARNING"}</text></g>`;
+    if (family === "clay-toy") return `<g opacity="0.86"><ellipse cx="${w - 150}" cy="${h - 190}" rx="${legendary ? 92 : 54}" ry="${legendary ? 72 : 42}" fill="${accent}" filter="url(#softShadow)"/><circle cx="${w - 180}" cy="${h - 208}" r="8" fill="${ink}"/><circle cx="${w - 124}" cy="${h - 208}" r="8" fill="${ink}"/></g>`;
+    if (family === "anime-portrait") return `<g opacity="0.9"><path d="M${w * 0.1} ${h * 0.18} C${w * 0.42} ${h * 0.05} ${w * 0.64} ${h * 0.13} ${w * 0.92} ${h * 0.08}" stroke="${legendary ? accent : primary}" stroke-width="${legendary ? 18 : 8}" fill="none"/><text x="${w * 0.58}" y="${h * 0.16}" fill="${accent}" font-size="20" font-weight="900">${legendary ? "EVENT FRAME" : "DRAMA"}</text></g>`;
+    return `<g opacity="0.78"><circle cx="${w * 0.18}" cy="${h * 0.28}" r="${legendary ? 88 : 48}" fill="${accent}"/><path d="M${w * 0.12} ${h * 0.78} C${w * 0.44} ${h * 0.58} ${w * 0.6} ${h * 0.96} ${w * 0.88} ${h * 0.68}" stroke="${primary}" stroke-width="${legendary ? 20 : 9}" fill="none"/></g>`;
+  }
+
+  private cardSurface(family: string, w: number, h: number, intensity: number, primary: string, secondary: string, ink: string, mode: string) {
+    if (mode === "banner") return "";
+    if (family === "terminal-brutalist") return `<rect x="24" y="24" width="${w - 48}" height="${h - 48}" fill="none" stroke="${primary}" stroke-width="2" opacity="0.7"/>`;
+    if (family === "pixel-topdown") return "";
+    if (family === "clay-toy") return `<rect x="0" y="0" width="${w}" height="${h}" fill="none"/>`;
+    if (family === "biohazard-horror") return `<rect x="34" y="34" width="${w - 68}" height="${h - 68}" fill="none" stroke="${primary}" stroke-width="${intensity >= 5 ? 10 : 4}" stroke-dasharray="${intensity >= 5 ? "34 18" : "14 14"}" opacity="0.65"/>`;
+    if (family === "anime-portrait") return `<path d="M36 ${h - 48} H${w - 40}" stroke="${primary}" stroke-width="${intensity >= 5 ? 12 : 4}" opacity="0.75"/>`;
+    return "";
+  }
+
+  private visualTexture(family: string, w: number, h: number, seed: number, intensity: number) {
+    if (family === "terminal-brutalist") return `<g opacity="0.22">${Array.from({ length: 28 }, (_, i) => `<text x="${(seed + i * 97) % w}" y="${(seed + i * 61) % h}" fill="#fff" font-size="11" font-family="monospace">${(seed + i * 13).toString(16).slice(0, 4)}</text>`).join("")}</g>`;
+    if (family === "pixel-topdown") return "";
+    if (family === "clay-toy") return `<g opacity="0.16" filter="url(#grain)"><rect width="${w}" height="${h}" fill="#000"/></g>`;
+    return `<g opacity="${0.08 + intensity * 0.025}">${this.texture(w, h, seed)}</g>`;
   }
 
   private mascotShape(mascot: string, cx: number, cy: number, scale: number, primary: string, secondary: string, ink: string, seed: number, traits?: Record<string, unknown>) {
