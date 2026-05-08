@@ -1,8 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
 import { PrismaService } from "../db/prisma.service";
 import { isDatabaseSetupError } from "../db/database-errors";
 import { loadedLocalEnvFiles } from "../env/load-local-env";
+import { startupState } from "../env/startup-state";
 
 export type SystemCapabilities = {
   databaseAvailable: boolean;
@@ -25,7 +26,67 @@ const PLACEHOLDER_PROGRAM_ID = "11111111111111111111111111111111";
 
 @Injectable()
 export class CapabilitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  async health() {
+    const boot = startupState();
+    return {
+      ok: boot.bootstrapped,
+      success: true,
+      service: "phew-run-backend",
+      boot: {
+        bootstrapped: boot.bootstrapped,
+        ready: boot.ready,
+        degraded: boot.degraded,
+        startedAt: boot.startedAt,
+        completedAt: boot.completedAt,
+        lastError: boot.lastError
+      }
+    };
+  }
+
+  async ready() {
+    const [databaseAvailable, heliusReachable, programAccount] = await Promise.all([
+      this.databaseAvailable(),
+      this.heliusReachable(),
+      this.programAccountStatus()
+    ]);
+    const heliusConfigured = Boolean(process.env.HELIUS_API_KEY);
+    const boot = startupState();
+    const checks = {
+      bootComplete: boot.ready,
+      dbConnectivity: databaseAvailable,
+      heliusConfigured,
+      heliusReachable,
+      rpcConfigured: this.solanaAvailable(),
+      programIdConfigured: this.devnetProgramConfigured(),
+      programAccountExists: programAccount.exists,
+      programAccountExecutable: programAccount.executable,
+      envValidationValid: boot.validation.valid
+    };
+    return {
+      ok: boot.ready && boot.validation.valid,
+      success: true,
+      degraded: !databaseAvailable || !heliusReachable || !programAccount.executable,
+      checks,
+      warnings: this.warnings({
+        databaseAvailable,
+        heliusConfigured,
+        heliusReachable,
+        heliusAvailable: heliusConfigured && heliusReachable,
+        openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
+        pinataAvailable: Boolean(process.env.PINATA_JWT),
+        solanaAvailable: this.solanaAvailable(),
+        walletConfigured: Boolean(process.env.DEVNET_TEST_WALLET_PUBLIC_KEY || process.env.ANCHOR_WALLET),
+        devnetProgramConfigured: this.devnetProgramConfigured(),
+        programAccountExists: programAccount.exists,
+        programAccountExecutable: programAccount.executable,
+        aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+        productionStorageAvailable: this.productionStorageAvailable(),
+        tokenMetadataAvailable: this.tokenMetadataAvailable(heliusConfigured && heliusReachable, programAccount.executable)
+      })
+    };
+  }
 
   async status() {
     const [databaseAvailable, heliusReachable, programAccount] = await Promise.all([
@@ -66,8 +127,11 @@ export class CapabilitiesService {
 
   async diagnostics() {
     const status = await this.status();
+    const ready = await this.ready();
     return {
       ok: true,
+      boot: startupState(),
+      ready,
       env: {
         filesLoaded: loadedLocalEnvFiles(),
         present: Object.fromEntries(this.diagnosticEnvKeys().map((key) => [key, Boolean(process.env[key])])),
