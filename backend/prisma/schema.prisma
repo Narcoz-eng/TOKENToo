@@ -328,6 +328,8 @@ model GeneratorTraitPack {
   styleProfileId   String                    @unique @db.Uuid
   collectionSize   Int                       @default(10000)
   categories       Json
+  categoryRoles    Json                      @default("{}")
+  categoryLabels   Json                      @default("{}")
   rarityWeights    Json
   unlockSchedule   Json
   uniquenessRules  Json

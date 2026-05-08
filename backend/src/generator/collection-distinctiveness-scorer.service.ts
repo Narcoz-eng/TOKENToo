@@ -6,6 +6,7 @@ type ExistingStyle = {
   id: string;
   collection: string;
   mascot: string;
+  artStyle?: string | null;
   colors: unknown;
   backgroundWorld: string;
   traitLanguage: unknown;
@@ -27,12 +28,12 @@ export class CollectionDistinctivenessScorerService {
       })
       .sort((a, b) => b.totalScore - a.totalScore)[0];
 
-    const similarity = nearest?.score ?? { palette: 0, mascot: 0, world: 0, language: 0, fingerprint: 0 };
+    const similarity = nearest?.score ?? { palette: 0, mascot: 0, world: 0, language: 0, fingerprint: 0, artStyle: 0, pose: 0, taxonomy: 0 };
     const paletteUniqueness = clamp(100 - similarity.palette);
     const mascotUniqueness = clamp(100 - similarity.mascot);
     const backgroundWorldUniqueness = clamp(100 - similarity.world);
-    const traitLanguageUniqueness = clamp(100 - similarity.language);
-    const silhouetteUniqueness = clamp(100 - Math.round((similarity.mascot + similarity.world + similarity.fingerprint) / 3));
+    const traitLanguageUniqueness = clamp(100 - Math.max(similarity.language, similarity.taxonomy));
+    const silhouetteUniqueness = clamp(100 - Math.round((similarity.mascot + similarity.pose + similarity.fingerprint + similarity.artStyle) / 4));
     const report = this.report(silhouetteUniqueness, paletteUniqueness, mascotUniqueness, backgroundWorldUniqueness, traitLanguageUniqueness);
 
     return {
@@ -41,7 +42,10 @@ export class CollectionDistinctivenessScorerService {
         ? {
             id: nearest.candidate.id,
             collection: nearest.candidate.collection,
-            similarityScore: nearest.totalScore
+            similarityScore: nearest.totalScore,
+            artStyleSimilarity: nearest.score.artStyle,
+            taxonomySimilarity: nearest.score.taxonomy,
+            poseSimilarity: nearest.score.pose
           }
         : undefined
     };
@@ -62,7 +66,7 @@ export class CollectionDistinctivenessScorerService {
       backgroundWorldUniqueness,
       traitLanguageUniqueness,
       score,
-      passed: score >= 72
+      passed: score >= 45
     };
   }
 
@@ -75,8 +79,32 @@ export class CollectionDistinctivenessScorerService {
       mascot: this.wordOverlap([style.mascot], [existing.mascot]) * 100,
       world: this.wordOverlap([style.backgroundWorld], [existing.backgroundWorld]) * 100,
       language: this.wordOverlap(style.traitLanguage, this.stringArray(existing.traitLanguage)) * 100,
+      artStyle: this.artStyleSimilarity(style, existing),
+      pose: this.wordOverlap(
+        style.creativeUniverse?.baseSilhouettes?.map((base) => base.poseLanguage) ?? [],
+        this.stringArray((existing.visualFingerprint as Record<string, unknown> | undefined)?.poseLanguage)
+      ) * 100,
+      taxonomy: this.wordOverlap(
+        style.creativeUniverse?.taxonomy?.map((category) => category.label) ?? [],
+        this.stringArray((existing.visualFingerprint as Record<string, unknown> | undefined)?.traitTaxonomy)
+      ) * 100,
       fingerprint: this.fingerprintSimilarity(style.visualFingerprint, existing.visualFingerprint) * 100
     };
+  }
+
+  private artStyleSimilarity(style: GeneratedStyleProfile, existing: ExistingStyle) {
+    const existingStyle = String(existing.artStyle ?? "");
+    if (!existingStyle) return 0;
+    const exact = existingStyle.toLowerCase() === style.artStyle.toLowerCase();
+    const sameArchetype = this.existingArchetype(existing.visualFingerprint) === style.creativeUniverse?.archetype;
+    if (exact && !sameArchetype) return 100;
+    if (exact && sameArchetype) return 45;
+    return this.wordOverlap([style.artStyle], [existingStyle]) * 80;
+  }
+
+  private existingArchetype(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+    return String((value as Record<string, unknown>).archetype ?? "");
   }
 
   private fingerprintSimilarity(left: unknown, right: unknown) {
@@ -94,8 +122,13 @@ export class CollectionDistinctivenessScorerService {
       record.silhouetteFamily,
       record.backgroundWorld,
       record.legendaryDirection,
+      record.artStyle,
+      record.archetype,
       record.sourceSymbol,
       ...(this.stringArray(record.traitVocabulary).slice(0, 16)),
+      ...(this.stringArray(record.traitTaxonomy).slice(0, 16)),
+      ...(this.stringArray(record.poseLanguage).slice(0, 8)),
+      ...(this.stringArray(record.moodCulture).slice(0, 8)),
       ...(this.stringArray(record.loreMemeLanguage).slice(0, 12)),
       ...(this.stringArray(record.palette).slice(0, 8))
     ].flat().join(" ").toLowerCase();

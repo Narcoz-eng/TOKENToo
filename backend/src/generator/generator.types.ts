@@ -100,6 +100,83 @@ export type ArtPreset = {
   animationDirection: string;
 };
 
+export type TraitCategoryRole =
+  | "base"
+  | "background"
+  | "head"
+  | "eyes"
+  | "mouth"
+  | "body"
+  | "prop"
+  | "neck"
+  | "aura"
+  | "frame"
+  | "legendary"
+  | "animation";
+
+export type TraitCategoryPlan = {
+  id: string;
+  label: string;
+  role: TraitCategoryRole;
+  description: string;
+  targetCount: number;
+  nouns: string[];
+  forbiddenConcepts: string[];
+};
+
+export type BaseSilhouettePlan = {
+  name: string;
+  bodyShape: string;
+  poseLanguage: string;
+  proportions: string;
+  cameraFraming: string;
+  rarityUpgradePath: string;
+};
+
+export type MoodExpressionPlan = {
+  name: string;
+  expression: string;
+  eyeLanguage: string;
+  mouthLanguage: string;
+  stance: string;
+  gesture: string;
+  auraBehavior: string;
+  animationState: string;
+};
+
+export type AnimationReadinessPlan = {
+  blinkLayers: string[];
+  mouthLayers: string[];
+  eyeVariants: string[];
+  auraLoops: string[];
+  fxLoops: string[];
+  emotionalTransitions: string[];
+  idleStates: string[];
+  reactionStates: Record<"mint" | "redeem" | "stake" | "unstake" | "receiveNft" | "levelUp" | "raidSuccess" | "rewards", string>;
+};
+
+export type ProductionAssetPolicy = {
+  launchClassification: "CONCEPT_PREVIEW" | "AI_ASSISTED_DRAFT" | "CURATED_PRODUCTION_READY" | "ARTIST_APPROVED_FINAL";
+  commonToRareSource: "approved_layer_pack_required";
+  epicLegendaryMythicSource: "curated_composition_required";
+  aiFinalImageAllowed: false;
+  artistReviewRequiredFor: string[];
+  productionReadyRequires: string[];
+};
+
+export type CommunityCreativeUniverse = {
+  archetype: string;
+  inferredCommunityLanguage: string[];
+  artStyle: string;
+  artStyleReason: string;
+  taxonomy: TraitCategoryPlan[];
+  baseSilhouettes: BaseSilhouettePlan[];
+  moodCulture: MoodExpressionPlan[];
+  animationReadiness: AnimationReadinessPlan;
+  productionAssetPolicy: ProductionAssetPolicy;
+  antiGenericRules: string[];
+};
+
 export type GeneratedStyleProfile = {
   collection: string;
   theme: string;
@@ -119,6 +196,8 @@ export type GeneratedStyleProfile = {
   assetPackId: string;
   artSource: "PROCEDURAL_FALLBACK" | "CURATED_PACK" | "AI_ASSISTED" | "HANDMADE_PACK";
   tenKReadiness: TenKReadinessReport;
+  creativeUniverse: CommunityCreativeUniverse;
+  productionAssetPolicy: ProductionAssetPolicy;
 };
 
 export type BrandDNA = {
@@ -142,6 +221,11 @@ export type BrandDNA = {
   mascotSilhouette: string;
   backgroundWorld: string;
   baseArchetypes: string[];
+  baseSilhouettes: BaseSilhouettePlan[];
+  moodCulture: MoodExpressionPlan[];
+  animationReadiness: AnimationReadinessPlan;
+  productionAssetPolicy: ProductionAssetPolicy;
+  traitTaxonomy: TraitCategoryPlan[];
   rarityVisualRules: Record<string, RarityComplexityRule>;
   forbiddenSimilarities: string[];
   sourceMetadataSummary: Record<string, unknown>;
@@ -191,6 +275,8 @@ export type TraitDefinitionPlan = {
 export type TraitPackPlan = {
   collectionSize: number;
   categories: Record<string, string[]>;
+  categoryRoles: Record<TraitCategoryRole, string>;
+  categoryLabels: Record<string, string>;
   rarityWeights: Record<string, number>;
   unlockSchedule: Record<string, string[]>;
   uniquenessRules: {

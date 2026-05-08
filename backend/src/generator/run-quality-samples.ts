@@ -32,20 +32,20 @@ const samples: CreateGenerationRunInput[] = [
   },
   {
     tokenMint: "HZd7Rr7APjWjzxUigrPssft52ykTqwF1oA5DRPL5tva6",
-    selectedPreset: "neon-samurai",
+    selectedPreset: "meme-kingdom",
     hints: {
       sourceMetadata: {
         mint: "HZd7Rr7APjWjzxUigrPssft52ykTqwF1oA5DRPL5tva6",
-        name: "Shib Moon Guard",
-        symbol: "SHIBG",
-        description: "A Shib pack with moon kennel rituals, kabuto raids, bone banners, and diamond paw holders.",
+        name: "Cozy Shib",
+        symbol: "COZY",
+        description: "A cozy Shib pack with blanket naps, lofi kennel rooms, tennis balls, snack raids, and soft diamond paw holders.",
         imageUri: "https://metadata.example/shib-guard.png",
         metadataUri: "https://metadata.example/shib-guard.json",
         socialLinks: { twitter: "https://x.com/shibguard", discord: "https://discord.gg/shibguard" },
-        extensions: { community: "moon kennel dojo" }
+        extensions: { community: "lofi kennel couch" }
       },
-      memes: ["diamond paws", "bone brigade"],
-      mood: "aggressive"
+      memes: ["diamond paws", "blanket gang"],
+      mood: "cute"
     }
   },
   {
@@ -101,10 +101,64 @@ const samples: CreateGenerationRunInput[] = [
       memes: ["send the candle", "liquidity ritual"],
       mood: "chaotic"
     }
+  },
+  {
+    tokenMint: "AzkUL45kuLLXoYtrPMP5nFqSs8Jm8Ywp4cgS2ds81skL",
+    selectedPreset: "dark-fantasy-raiders",
+    hints: {
+      sourceMetadata: {
+        mint: "AzkUL45kuLLXoYtrPMP5nFqSs8Jm8Ywp4cgS2ds81skL",
+        name: "Skull Ledger",
+        symbol: "SKULL",
+        description: "Dark fantasy skull holders writing cursed ledgers, crypt raids, bone receipts, black moon rituals, and ash market lore.",
+        imageUri: "https://metadata.example/skull-ledger.png",
+        metadataUri: "https://metadata.example/skull-ledger.json",
+        socialLinks: { twitter: "https://x.com/skulledger", discord: "https://discord.gg/skulledger" },
+        extensions: { realm: "black moon crypt", chant: "debt follows the dead" }
+      },
+      memes: ["bone receipts", "black moon"],
+      mood: "dark"
+    }
+  },
+  {
+    tokenMint: "CuTEe2DG1vJzGzbaR84eMAkU4mWQjVY12TqYrcTuoon",
+    selectedPreset: "luxury-crown-club",
+    hints: {
+      sourceMetadata: {
+        mint: "CuTEe2DG1vJzGzbaR84eMAkU4mWQjVY12TqYrcTuoon",
+        name: "Tiny Toast",
+        symbol: "TOAST",
+        description: "A cute cartoon mascot community with tiny breakfast heroes, sticker friends, sunny play rooms, juice boxes, and soft reward quests.",
+        imageUri: "https://metadata.example/tiny-toast.png",
+        metadataUri: "https://metadata.example/tiny-toast.json",
+        socialLinks: { twitter: "https://x.com/tinytoast" },
+        extensions: { style: "cute toy cartoon", phrase: "tiny but toasted" }
+      },
+      memes: ["tiny but toasted", "sticker friends"],
+      mood: "cute"
+    }
+  },
+  {
+    tokenMint: "VaPoR4v8asndPooL9xWveMaLLwAVe1111111111111",
+    selectedPreset: "cyber-alley-syndicate",
+    hints: {
+      sourceMetadata: {
+        mint: "VaPoR4v8asndPooL9xWveMaLLwAVe1111111111111",
+        name: "Liminal Wave",
+        symbol: "VAPR",
+        description: "Abstract vaporwave token for empty mall dreams, VHS sunsets, pool tile prophecies, palm grid rituals, and surreal arcade holders.",
+        imageUri: "https://metadata.example/liminal-wave.png",
+        metadataUri: "https://metadata.example/liminal-wave.json",
+        socialLinks: { twitter: "https://x.com/liminalwave", website: "https://vapr.example" },
+        extensions: { aesthetic: "vaporwave surreal abstract", phrase: "mall never closes" }
+      },
+      memes: ["mall never closes", "VHS oracle"],
+      mood: "cyber"
+    }
   }
 ];
 
-type ExistingStyle = { id: string; collection: string; mascot: string; colors: unknown; backgroundWorld: string; traitLanguage: unknown; visualFingerprint?: unknown; brandDna?: unknown };
+type ExistingStyle = { id: string; collection: string; mascot: string; artStyle?: string; colors: unknown; backgroundWorld: string; traitLanguage: unknown; visualFingerprint?: unknown; brandDna?: unknown };
 
 async function main() {
   const logo = new LogoAnalysisService();
@@ -143,6 +197,7 @@ async function main() {
       id: input.tokenMint,
       collection: style.collection,
       mascot: style.mascot,
+      artStyle: style.artStyle,
       colors: style.colors,
       backgroundWorld: style.backgroundWorld,
       traitLanguage: style.traitLanguage,
@@ -152,10 +207,17 @@ async function main() {
     return {
       collection: style.collection,
       sourceMint: input.tokenMint,
+      archetype: style.creativeUniverse.archetype,
+      artStyle: style.artStyle,
+      artStyleReason: style.creativeUniverse.artStyleReason,
       mascot: style.mascot,
       world: style.backgroundWorld,
       silhouette: style.brandDna.mascotSilhouette,
       baseArchetypes: style.brandDna.baseArchetypes.slice(0, 3),
+      taxonomy: style.creativeUniverse.taxonomy.map((category) => ({ role: category.role, label: category.label, examples: category.nouns.slice(0, 3) })),
+      moodCulture: style.creativeUniverse.moodCulture.map((mood) => ({ name: mood.name, eyes: mood.eyeLanguage, mouth: mood.mouthLanguage, animationState: mood.animationState })),
+      animationReadiness: style.creativeUniverse.animationReadiness,
+      productionAssetPolicy: style.productionAssetPolicy,
       sampleNfts: generatedPreviews.filter((item) => item.type === "SAMPLE_NFT").map((item) => ({
         label: item.label,
         rarity: item.metadata.rarity,
@@ -171,10 +233,11 @@ async function main() {
       compatibilityPassed: compatibilityResult.passed,
       traitExamples: style.traitLanguage.slice(0, 8),
       productionReady: false,
-      blocker: "Concept preview only. Launch requires real asset providers and permanent storage."
+      blocker: "Concept preview only. Launch requires curated/handmade layer packs, stronger curation for epic+, artist review where required, and permanent storage."
     };
   });
 
+  failures.push(...verifyCollectionSet(report));
   console.log(JSON.stringify({ generatedAt: new Date().toISOString(), failures, samples: report }, null, 2));
   if (failures.length) {
     throw new Error(`Generator quality sample failures: ${failures.join("; ")}`);
@@ -227,6 +290,56 @@ function verifySample(
   if (!distinctivenessPassed) failures.push("distinctiveness score did not pass.");
   if (!compatibilityPassed) failures.push("compatibility rules did not pass.");
   return failures;
+}
+
+function verifyCollectionSet(report: Array<Record<string, any>>) {
+  const failures: string[] = [];
+  if (report.length < 8) failures.push("quality samples must include at least 8 metadata examples.");
+  const archetypes = new Set(report.map((item) => item.archetype));
+  if (archetypes.size < 8) failures.push("quality samples must cover 8 different community archetypes.");
+  const styles = new Map<string, string[]>();
+  for (const item of report) {
+    const style = String(item.artStyle);
+    styles.set(style, [...(styles.get(style) ?? []), String(item.collection)]);
+    if (!Array.isArray(item.taxonomy) || item.taxonomy.length < 10) failures.push(`${item.collection} does not expose a community-native taxonomy.`);
+    if (!Array.isArray(item.moodCulture) || item.moodCulture.length < 3) failures.push(`${item.collection} does not expose community-native mood culture.`);
+    if (item.productionReady !== false || item.productionAssetPolicy?.launchClassification !== "CONCEPT_PREVIEW") failures.push(`${item.collection} incorrectly marks concept output as production-ready.`);
+    if (item.productionAssetPolicy?.aiFinalImageAllowed !== false) failures.push(`${item.collection} allows fully AI-generated final NFT images.`);
+  }
+  for (const [style, collections] of styles) {
+    if (collections.length > 1) failures.push(`art style "${style}" is reused by ${collections.join(", ")} without a collection-specific override.`);
+  }
+  for (let left = 0; left < report.length; left += 1) {
+    for (let right = left + 1; right < report.length; right += 1) {
+      const a = report[left];
+      const b = report[right];
+      const taxonomyOverlap = jaccard(
+        a.taxonomy.flatMap((category: { label: string }) => significantWords(category.label)),
+        b.taxonomy.flatMap((category: { label: string }) => significantWords(category.label))
+      );
+      const traitOverlap = jaccard(significantWords(a.traitExamples.join(" ")), significantWords(b.traitExamples.join(" ")));
+      const poseOverlap = jaccard(significantWords(a.baseArchetypes.join(" ")), significantWords(b.baseArchetypes.join(" ")));
+      if (taxonomyOverlap > 0.35) failures.push(`${a.collection} and ${b.collection} share too much trait taxonomy.`);
+      if (traitOverlap > 0.34) failures.push(`${a.collection} and ${b.collection} share too much trait vocabulary.`);
+      if (poseOverlap > 0.34) failures.push(`${a.collection} and ${b.collection} share too much pose/silhouette language.`);
+    }
+  }
+  return failures;
+}
+
+function significantWords(value: string) {
+  const stop = new Set(["with", "from", "that", "this", "into", "token", "holder", "holders", "raid", "raids", "vault", "vaults", "scene", "mark", "sigil", "emblem", "trade", "community", "base"]);
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length > 3 && !stop.has(word));
+}
+
+function jaccard(left: string[], right: string[]) {
+  const a = new Set(left);
+  const b = new Set(right);
+  const shared = [...a].filter((word) => b.has(word)).length;
+  return shared / Math.max(1, new Set([...a, ...b]).size);
 }
 
 main().catch((error) => {

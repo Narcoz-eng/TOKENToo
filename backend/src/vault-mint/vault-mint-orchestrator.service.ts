@@ -239,6 +239,28 @@ export class VaultMintOrchestratorService {
   }
 
   private styleFromRecord(record: any): GeneratedStyleProfile {
+    const brandDna = this.record(record.brandDna) as GeneratedStyleProfile["brandDna"];
+    const productionAssetPolicy =
+      brandDna.productionAssetPolicy ?? {
+        launchClassification: "CONCEPT_PREVIEW",
+        commonToRareSource: "approved_layer_pack_required",
+        epicLegendaryMythicSource: "curated_composition_required",
+        aiFinalImageAllowed: false,
+        artistReviewRequiredFor: ["Epic", "Legendary", "Mythic"],
+        productionReadyRequires: ["approved layer pack", "curated final assets"]
+      };
+    const creativeUniverse = {
+      archetype: String((record.visualFingerprint as Record<string, unknown> | undefined)?.archetype ?? "legacy"),
+      inferredCommunityLanguage: this.strings((record.visualFingerprint as Record<string, unknown> | undefined)?.loreMemeLanguage),
+      artStyle: record.artStyle,
+      artStyleReason: "Loaded from saved style profile.",
+      taxonomy: Array.isArray(brandDna.traitTaxonomy) ? brandDna.traitTaxonomy : [],
+      baseSilhouettes: Array.isArray(brandDna.baseSilhouettes) ? brandDna.baseSilhouettes : [],
+      moodCulture: Array.isArray(brandDna.moodCulture) ? brandDna.moodCulture : [],
+      animationReadiness: brandDna.animationReadiness,
+      productionAssetPolicy,
+      antiGenericRules: this.strings(brandDna.forbiddenSimilarities)
+    } as GeneratedStyleProfile["creativeUniverse"];
     return {
       collection: record.collection,
       theme: record.theme,
@@ -253,11 +275,13 @@ export class VaultMintOrchestratorService {
       raidTheme: record.raidTheme,
       lore: record.lore,
       roleNames: this.strings(record.roleNames),
-      brandDna: this.record(record.brandDna) as GeneratedStyleProfile["brandDna"],
+      brandDna,
       visualFingerprint: this.record(record.visualFingerprint),
       assetPackId: record.assetPackId ?? "unknown",
       artSource: record.artSource ?? "PROCEDURAL_FALLBACK",
-      tenKReadiness: this.record(record.tenKReadinessReport) as GeneratedStyleProfile["tenKReadiness"]
+      tenKReadiness: this.record(record.tenKReadinessReport) as GeneratedStyleProfile["tenKReadiness"],
+      creativeUniverse,
+      productionAssetPolicy: productionAssetPolicy as GeneratedStyleProfile["productionAssetPolicy"]
     };
   }
 
@@ -265,6 +289,8 @@ export class VaultMintOrchestratorService {
     return {
       collectionSize: record.collectionSize,
       categories: this.record(record.categories) as Record<string, string[]>,
+      categoryRoles: this.record(record.categoryRoles) as TraitPackPlan["categoryRoles"],
+      categoryLabels: this.record(record.categoryLabels) as TraitPackPlan["categoryLabels"],
       rarityWeights: this.record(record.rarityWeights) as Record<string, number>,
       unlockSchedule: this.record(record.unlockSchedule) as Record<string, string[]>,
       uniquenessRules: this.record(record.uniquenessRules) as unknown as TraitPackPlan["uniquenessRules"],

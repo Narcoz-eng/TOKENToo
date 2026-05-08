@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { GeneratedStyleProfile, PreviewAssetPlan, TraitPackPlan } from "./generator.types";
+import type { GeneratedStyleProfile, PreviewAssetPlan, TraitCategoryRole, TraitPackPlan } from "./generator.types";
 import { pick, seedFrom } from "./generator.util";
 
 @Injectable()
@@ -29,33 +29,63 @@ export class ArtPreviewGeneratorService {
     const fallbackRule = this.rarityVisualRulePlan(rarity);
     const rule = style.brandDna?.rarityVisualRules?.[rarity] ?? style.brandDna?.rarityVisualRules?.Common ?? fallbackRule;
     const compositionCategory = rarity === "Mythic" ? "near-1-of-1" : rarity === "Legendary" ? "signature-scene" : rarity === "Epic" ? "premium-composition" : "standard-composition";
-    const headgear = intensity >= 3 ? pick(pack.categories.headgear, seed + 2) : "None";
-    const eyePool = headgear !== "None" && /Mask|Helm|Kabuto|Hood/i.test(headgear) ? pack.categories.eyes.filter((eye) => !/Visor|Scanner/i.test(eye)) : pack.categories.eyes;
+    const baseCategory = this.categoryFor(pack, "base");
+    const backgroundCategory = this.categoryFor(pack, "background");
+    const headCategory = this.categoryFor(pack, "head");
+    const eyesCategory = this.categoryFor(pack, "eyes");
+    const mouthCategory = this.categoryFor(pack, "mouth");
+    const bodyCategory = this.categoryFor(pack, "body");
+    const propCategory = this.categoryFor(pack, "prop");
+    const neckCategory = this.categoryFor(pack, "neck");
+    const auraCategory = this.categoryFor(pack, "aura");
+    const frameCategory = this.categoryFor(pack, "frame");
+    const legendaryCategory = this.categoryFor(pack, "legendary");
+    const animationCategory = this.categoryFor(pack, "animation");
+    const headgear = intensity >= 3 ? pick(headCategory.values, seed + 2) : "None";
+    const eyePool = headgear !== "None" && /Mask|Helm|Kabuto|Hood|Shell/i.test(headgear) ? eyesCategory.values.filter((eye) => !/Visor|Scanner|Screen/i.test(eye)) : eyesCategory.values;
     const traits = {
-      base: pick(pack.categories.baseCharacter, seed),
-      background: intensity >= 4 ? pick(pack.categories.backgrounds.slice(20), seed + 1) : intensity >= 3 ? pick(pack.categories.backgrounds.slice(8, 34), seed + 1) : pick(pack.categories.backgrounds.slice(0, 12), seed + 1),
+      base: pick(baseCategory.values, seed),
+      background: intensity >= 4 ? pick(backgroundCategory.values.slice(20), seed + 1) : intensity >= 3 ? pick(backgroundCategory.values.slice(8, 34), seed + 1) : pick(backgroundCategory.values.slice(0, 12), seed + 1),
       headgear,
-      eyes: intensity >= 1 ? pick(eyePool.length ? eyePool : pack.categories.eyes, seed + 3) : "Base eyes",
-      mouthExpression: intensity >= 2 ? pick(pack.categories.mouthExpression, seed + 10) : "Base expression",
-      outfit: intensity >= 3 ? pick(pack.categories.outfitBody, seed + 4) : "Base pose",
-      accessory: intensity >= 2 ? pick(pack.categories.accessories, seed + 5) : "None",
-      neckChestAccessory: intensity >= 4 ? pick(pack.categories.neckChestAccessory ?? ["Vault Sigil"], seed + 6) : "None",
-      aura: intensity >= 4 ? pick(pack.categories.auraEffect, seed + 6) : "None",
-      frame: intensity >= 5 ? pick(pack.categories.borderFrame, seed + 7) : intensity >= 2 ? "Standard frame" : "None",
-      legendaryOverlay: intensity >= 5 ? pick(pack.categories.legendaryOverlay, seed + 9) : "None",
-      animationOverlay: intensity >= 5 ? pick(pack.categories.animationOverlay ?? ["Static Still"], seed + 8) : "Static Still",
+      eyes: intensity >= 1 ? pick(eyePool.length ? eyePool : eyesCategory.values, seed + 3) : "Base eyes",
+      mouthExpression: intensity >= 2 ? pick(mouthCategory.values, seed + 10) : "Base expression",
+      outfit: intensity >= 3 ? pick(bodyCategory.values, seed + 4) : "Base pose",
+      accessory: intensity >= 2 ? pick(propCategory.values, seed + 5) : "None",
+      neckChestAccessory: intensity >= 4 ? pick(neckCategory.values, seed + 6) : "None",
+      aura: intensity >= 4 ? pick(auraCategory.values, seed + 6) : "None",
+      frame: intensity >= 5 ? pick(frameCategory.values, seed + 7) : intensity >= 2 ? "Standard frame" : "None",
+      legendaryOverlay: intensity >= 5 ? pick(legendaryCategory.values, seed + 9) : "None",
+      animationOverlay: intensity >= 5 ? pick(animationCategory.values, seed + 8) : "Static Still",
       pose: rule.pose,
       scene: intensity >= 5 ? style.legendaryTheme : rule.background,
       visualRule: rule.composition,
       rarity,
       compositionCategory,
-      specialMetadataFlag: rarity === "Mythic" ? "MYTHIC_CURATED_COMPOSITION" : rarity === "Legendary" ? "LEGENDARY_SIGNATURE_SCENE" : "NONE"
+      specialMetadataFlag: rarity === "Mythic" ? "MYTHIC_CURATED_COMPOSITION" : rarity === "Legendary" ? "LEGENDARY_SIGNATURE_SCENE" : "NONE",
+      categoryLabels: {
+        base: baseCategory.label,
+        background: backgroundCategory.label,
+        headgear: headCategory.label,
+        eyes: eyesCategory.label,
+        mouthExpression: mouthCategory.label,
+        outfit: bodyCategory.label,
+        accessory: propCategory.label,
+        neckChestAccessory: neckCategory.label,
+        aura: auraCategory.label,
+        frame: frameCategory.label,
+        legendaryOverlay: legendaryCategory.label,
+        animationOverlay: animationCategory.label
+      }
     };
     const renderedTraitKeys = this.renderedTraitKeys(traits);
+    const renderedTraits = this.renderedTraits(traits, pack);
     const metadata = {
       ...traits,
       traitCount: renderedTraitKeys.length,
       renderedTraitKeys,
+      renderedTraits,
+      animationReadiness: style.creativeUniverse.animationReadiness,
+      artProductionStatus: style.productionAssetPolicy.launchClassification,
       complexityRule: {
         minTraits: rule.minTraits,
         maxTraits: rule.maxTraits,
@@ -262,12 +292,52 @@ export class ArtPreviewGeneratorService {
     return rules[rarity] ?? rules.Common;
   }
 
-  private renderedTraitKeys(traits: Record<string, string>) {
+  private renderedTraitKeys(traits: Record<string, unknown>) {
     const visibleKeys = ["base", "background", "eyes", "mouthExpression", "headgear", "outfit", "accessory", "neckChestAccessory", "aura", "frame", "legendaryOverlay"];
     return visibleKeys.filter((key) => {
-      const value = traits[key];
+      const value = String(traits[key] ?? "");
       return value && value !== "None" && value !== "Base pose" && value !== "Base expression" && value !== "Static Still" && value !== "Standard frame";
     });
+  }
+
+  private renderedTraits(traits: Record<string, unknown>, pack: TraitPackPlan) {
+    const mapping: Array<[TraitCategoryRole, string, string]> = [
+      ["base", "base", "Base Character"],
+      ["background", "background", "Background"],
+      ["head", "headgear", "Head"],
+      ["eyes", "eyes", "Eyes"],
+      ["mouth", "mouthExpression", "Mouth/Expression"],
+      ["body", "outfit", "Body/Outfit"],
+      ["prop", "accessory", "Prop"],
+      ["neck", "neckChestAccessory", "Neck/Badge"],
+      ["aura", "aura", "FX/Event"],
+      ["frame", "frame", "Composition Edge"],
+      ["legendary", "legendaryOverlay", "Signature Scene"],
+      ["animation", "animationOverlay", "Animation Layer"]
+    ];
+    return mapping
+      .map(([role, key, fallback]) => {
+        const value = traits[key];
+        const categoryId = pack.categoryRoles?.[role];
+        return {
+          role,
+          key,
+          trait_type: categoryId ? pack.categoryLabels?.[categoryId] ?? fallback : fallback,
+          value
+        };
+      })
+      .filter((trait) => typeof trait.value === "string" && trait.value !== "None" && trait.value !== "Base pose" && trait.value !== "Base expression" && trait.value !== "Static Still" && trait.value !== "Standard frame");
+  }
+
+  private categoryFor(pack: TraitPackPlan, role: TraitCategoryRole) {
+    const categoryId = pack.categoryRoles?.[role];
+    const values = categoryId ? pack.categories[categoryId] ?? [] : [];
+    const fallback = Object.values(pack.categories)[0] ?? ["Missing Trait"];
+    return {
+      id: categoryId ?? role,
+      label: categoryId ? pack.categoryLabels?.[categoryId] ?? categoryId : role,
+      values: values.length ? values : fallback
+    };
   }
 
   private escape(value: string) {

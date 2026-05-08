@@ -1,22 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import type { CompatibilityRulePlan, GeneratedStyleProfile, TraitDefinitionPlan, TraitPackPlan } from "./generator.types";
+import type { CompatibilityRulePlan, GeneratedStyleProfile, TraitDefinitionPlan, TraitPackPlan, TraitCategoryPlan, TraitCategoryRole } from "./generator.types";
 import { pick, seedFrom, titleCase, unique } from "./generator.util";
 import { RarityEngineService } from "./rarity-engine.service";
-
-const categoryTargets = {
-  baseCharacter: 42,
-  backgrounds: 60,
-  headgear: 60,
-  eyes: 44,
-  mouthExpression: 32,
-  outfitBody: 60,
-  accessories: 80,
-  neckChestAccessory: 34,
-  auraEffect: 36,
-  borderFrame: 18,
-  legendaryOverlay: 12,
-  animationOverlay: 10
-};
 
 @Injectable()
 export class TraitPackGeneratorService {
@@ -24,33 +9,30 @@ export class TraitPackGeneratorService {
 
   generate(style: GeneratedStyleProfile): TraitPackPlan {
     const seed = seedFrom(`${style.collection}:${style.theme}:${style.backgroundWorld}`);
-    const categories = {
-      baseCharacter: unique([...style.brandDna.baseArchetypes, ...this.names(style, seed, categoryTargets.baseCharacter, ["Stance", "Silhouette", "Pose", "Champion", "Warden"])]).slice(0, categoryTargets.baseCharacter),
-      backgrounds: this.names(style, seed + 11, categoryTargets.backgrounds, ["Temple", "War Room", "Gate", "District", "Shrine", "Arena"]),
-      headgear: this.names(style, seed + 23, categoryTargets.headgear, ["Hood", "Crown", "Helm", "Mask", "Halo", "Kabuto"]),
-      eyes: this.names(style, seed + 37, categoryTargets.eyes, ["Eyes", "Visor", "Gaze", "Glare", "Scanner"]),
-      mouthExpression: this.names(style, seed + 41, categoryTargets.mouthExpression, ["Grin", "Snarl", "Whisper", "Chant", "Smirk"]),
-      outfitBody: this.names(style, seed + 53, categoryTargets.outfitBody, ["Cloak", "Armor", "Cape", "Jacket", "Robe", "Plate"]),
-      accessories: this.names(style, seed + 67, categoryTargets.accessories, ["Staff", "Blade", "Relic", "Banner", "Orb", "Key", "Scepter"]),
-      neckChestAccessory: this.names(style, seed + 71, categoryTargets.neckChestAccessory, ["Amulet", "Medallion", "Chain", "Collar", "Chest Sigil", "Pendant"]),
-      auraEffect: this.names(style, seed + 79, categoryTargets.auraEffect, ["Aura", "Mist", "Pulse", "Static", "Flame", "Glow"]),
-      borderFrame: this.names(style, seed + 83, categoryTargets.borderFrame, ["Frame", "Seal", "Sigil", "Border", "Insignia"]),
-      legendaryOverlay: this.names(style, seed + 97, categoryTargets.legendaryOverlay, ["Ascension", "Mythic Overlay", "One Of One", "King Scene"]),
-      animationOverlay: this.names(style, seed + 109, categoryTargets.animationOverlay, ["Reveal Burst", "Aura Loop", "Frame Assemble", "Energy Trail", "Level Pulse"])
-    };
+    const taxonomy = style.creativeUniverse?.taxonomy ?? this.fallbackTaxonomy(style);
+    const categories = Object.fromEntries(
+      taxonomy.map((category, index) => {
+        const base = category.role === "base" ? style.brandDna.baseArchetypes : [];
+        return [category.id, unique([...base, ...this.names(style, category, seed + index * 113)]).slice(0, category.targetCount)];
+      })
+    );
+    const categoryRoles = Object.fromEntries(taxonomy.map((category) => [category.role, category.id])) as Record<TraitCategoryRole, string>;
+    const categoryLabels = Object.fromEntries(taxonomy.map((category) => [category.id, category.label]));
 
     const traits = Object.entries(categories).flatMap(([category, names]) => this.definitions(category, names, style));
 
     return {
       collectionSize: 10_000,
       categories,
+      categoryRoles,
+      categoryLabels,
       rarityWeights: this.rarity.weights(),
       unlockSchedule: {
-        level1: ["baseCharacter", "backgrounds", "headgear", "eyes", "mouthExpression", "outfitBody"],
-        level2: categories.backgrounds.slice(0, 10),
-        level3: categories.accessories.slice(0, 10),
-        level4: [...categories.auraEffect.slice(0, 8), ...categories.neckChestAccessory.slice(0, 4)],
-        level5: [...categories.legendaryOverlay.slice(0, 5), ...categories.animationOverlay.slice(0, 3)]
+        level1: ["base", "background", "head", "eyes", "mouth", "body"].map((role) => categoryRoles[role as TraitCategoryRole]).filter(Boolean),
+        level2: this.values(categories, categoryRoles.background).slice(0, 10),
+        level3: this.values(categories, categoryRoles.prop).slice(0, 10),
+        level4: [...this.values(categories, categoryRoles.aura).slice(0, 8), ...this.values(categories, categoryRoles.neck).slice(0, 4)],
+        level5: [...this.values(categories, categoryRoles.legendary).slice(0, 5), ...this.values(categories, categoryRoles.animation).slice(0, 3)]
       },
       uniquenessRules: {
         noDuplicateFullCombinations: true,
@@ -64,34 +46,34 @@ export class TraitPackGeneratorService {
   }
 
   compatibilityRules(pack: TraitPackPlan): CompatibilityRulePlan[] {
-    const first = (category: keyof typeof pack.categories, pattern: RegExp) =>
-      pack.categories[category].find((trait) => pattern.test(trait)) ?? pack.categories[category][0];
+    const roleValues = (role: TraitCategoryRole) => pack.categories[pack.categoryRoles?.[role] ?? ""] ?? [];
+    const first = (role: TraitCategoryRole, pattern: RegExp) => roleValues(role).find((trait) => pattern.test(trait)) ?? roleValues(role)[0] ?? role;
 
     return [
       {
-        trait: first("headgear", /Crown|Halo/),
-        incompatibleWith: pack.categories.headgear.filter((trait) => /Helm|Mask|Kabuto/.test(trait)).slice(0, 8),
-        reason: "Premium headgear must not overlap another full-head silhouette."
+        trait: first("head", /Crown|Halo|Mask|Shell|Hood|Visor|Toppers|Crowns|Signs/i),
+        incompatibleWith: roleValues("head").filter((trait) => /Helm|Mask|Kabuto|Shell|Hood|Crown|Horn/i.test(trait)).slice(0, 8),
+        reason: "Head silhouette layers must not overlap another full-head identity mark."
       },
       {
-        trait: first("eyes", /Visor|Scanner/),
-        incompatibleWith: pack.categories.eyes.filter((trait) => /Eyes|Gaze|Glare/.test(trait)).slice(0, 8),
+        trait: first("eyes", /Visor|Screen|Eyes|Socket|Gaze|Stare|Optics/i),
+        incompatibleWith: roleValues("eyes").filter((trait) => /Eyes|Gaze|Glare|Screen|Socket|Optics|Blink/i.test(trait)).slice(0, 8),
         reason: "Eye layers cannot stack over visor hardware."
       },
       {
-        trait: first("accessories", /Staff|Blade|Scepter/),
-        incompatibleWith: pack.categories.mouthExpression.filter((trait) => /Whisper|Chant/.test(trait)).slice(0, 6),
+        trait: first("prop", /Staff|Blade|Scepter|Banner|Cup|Phone|Cable|Scroll|Relic/i),
+        incompatibleWith: roleValues("mouth").filter((trait) => /Whisper|Chant|Mouth|Smile|Grin|Gasp|Scream|Bark|Croak/i.test(trait)).slice(0, 6),
         reason: "Large foreground props must not cover readable expression traits."
       },
       {
-        trait: first("auraEffect", /Mist|Glow|Flame/),
-        incompatibleWith: pack.categories.backgrounds.filter((trait) => /Mist|Glow|Flame/.test(trait)).slice(0, 6),
-        reason: "Aura and background must keep the mascot readable."
+        trait: first("aura", /Mist|Glow|Flame|Static|Rain|Smoke|FX|Spark|Weather/i),
+        incompatibleWith: roleValues("background").filter((trait) => /Mist|Glow|Flame|Static|Rain|Smoke|Spark|Weather/i.test(trait)).slice(0, 6),
+        reason: "FX/weather layers and background must keep the mascot readable."
       }
-    ];
+    ].filter((rule) => rule.trait);
   }
 
-  private names(style: GeneratedStyleProfile, seed: number, count: number, nouns: string[]) {
+  private names(style: GeneratedStyleProfile, category: TraitCategoryPlan, seed: number) {
     const language = style.traitLanguage.length ? style.traitLanguage : [style.theme, style.backgroundWorld, style.mascot];
     const sourceLanguage = [
       ...style.brandDna.memeLanguage,
@@ -116,11 +98,13 @@ export class TraitPackGeneratorService {
       "Raid"
     ]);
 
-    return Array.from({ length: count }, (_, index) => {
+    const forbidden = new RegExp(category.forbiddenConcepts.length ? category.forbiddenConcepts.join("|") : "$.^", "i");
+    return Array.from({ length: category.targetCount }, (_, index) => {
       const motif = pick(motifs, seed + index * 5);
-      const noun = pick(nouns, seed + index * 7);
+      const noun = pick(category.nouns, seed + index * 7);
       const modifier = pick(modifiers, seed + index * 11);
-      return `${modifier} ${motif} ${noun}`;
+      const name = `${modifier} ${motif} ${noun}`;
+      return forbidden.test(name) ? `${modifier} ${motif} ${category.label}` : name;
     });
   }
 
@@ -134,27 +118,58 @@ export class TraitPackGeneratorService {
         weightBps: this.rarity.weightForRarity(rarity),
         unlockLevel: this.unlockLevel(category, rarity),
         compatibilityTags: this.tags(category, name),
-        visualDescription: `${name} rendered in ${style.artStyle}; it must remain readable inside the ${style.brandDna.backgroundWorld} world and follow ${style.brandDna.mascotSilhouette} silhouette rules.`
+        visualDescription: `${name} rendered in ${style.artStyle}; it belongs to ${style.brandDna.traitTaxonomy.find((item) => item.id === category)?.label ?? category}, must remain readable inside the ${style.brandDna.backgroundWorld} world, and must follow ${style.brandDna.mascotSilhouette} silhouette rules.`
       };
     });
   }
 
   private unlockLevel(category: string, rarity: string) {
-    if (rarity === "Legendary" || rarity === "Mythic" || category === "legendaryOverlay") return 5;
-    if (category === "auraEffect") return 4;
-    if (category === "neckChestAccessory") return 4;
-    if (category === "animationOverlay") return 5;
-    if (category === "accessories") return 3;
-    if (category === "backgrounds") return 2;
+    if (rarity === "Legendary" || rarity === "Mythic" || /legendary|scene|prophecy|moment|takeover|incident/i.test(category)) return 5;
+    if (/aura|mist|glow|fx|weather|curse|volatility/i.test(category)) return 4;
+    if (/neck|collar|charm|badge|token|tag/i.test(category)) return 4;
+    if (/animation|loop/i.test(category)) return 5;
+    if (/prop|object|relic|comfort|desk|claw/i.test(category)) return 3;
+    if (/background|world|room|screen|weather|location/i.test(category)) return 2;
     return 1;
   }
 
   private tags(category: string, name: string) {
     const tags = [category];
-    if (/Crown|Helm|Hood|Mask|Halo|Kabuto/.test(name)) tags.push("head-occupies");
-    if (/Visor|Scanner|Eyes|Gaze|Glare/.test(name)) tags.push("eye-occupies");
-    if (/Staff|Blade|Scepter|Banner/.test(name)) tags.push("foreground-prop");
-    if (/Mist|Glow|Flame|Aura|Pulse/.test(name)) tags.push("visibility-risk");
+    if (/Crown|Helm|Hood|Mask|Halo|Kabuto|Shell|Horn|Cap|Hat|Toppers/.test(name)) tags.push("head-occupies");
+    if (/Visor|Scanner|Eyes|Gaze|Glare|Socket|Screen|Optic|Blink|Stare/.test(name)) tags.push("eye-occupies");
+    if (/Staff|Blade|Scepter|Banner|Cup|Phone|Cable|Scroll|Relic|Token|Wand/.test(name)) tags.push("foreground-prop");
+    if (/Mist|Glow|Flame|Aura|Pulse|Static|Rain|Smoke|Spark|Weather/.test(name)) tags.push("visibility-risk");
     return tags;
+  }
+
+  private values(categories: Record<string, string[]>, category?: string) {
+    return category ? categories[category] ?? [] : [];
+  }
+
+  private fallbackTaxonomy(style: GeneratedStyleProfile): TraitCategoryPlan[] {
+    const id = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    const build = (role: TraitCategoryRole, label: string, targetCount: number, nouns: string[]): TraitCategoryPlan => ({
+      id: id(label),
+      label,
+      role,
+      targetCount,
+      nouns,
+      description: `${label} for ${style.collection}`,
+      forbiddenConcepts: []
+    });
+    return [
+      build("base", "Community Bases", 42, ["Base", "Pose", "Silhouette"]),
+      build("background", "Community Worlds", 60, ["Room", "Gate", "Scene"]),
+      build("head", "Head Marks", 30, ["Cap", "Mark"]),
+      build("eyes", "Eye States", 36, ["Eyes", "Gaze"]),
+      build("mouth", "Reactions", 28, ["Smile", "Gasp"]),
+      build("body", "Fits", 44, ["Jacket", "Wrap"]),
+      build("prop", "Objects", 70, ["Prop", "Banner"]),
+      build("neck", "Charms", 24, ["Tag", "Charm"]),
+      build("aura", "Events", 24, ["Glow", "Spark"]),
+      build("frame", "Borders", 12, ["Frame", "Seal"]),
+      build("legendary", "Scenes", 10, ["Scene", "Moment"]),
+      build("animation", "Loops", 10, ["Blink", "Pulse"])
+    ];
   }
 }

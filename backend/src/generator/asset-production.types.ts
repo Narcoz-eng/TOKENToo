@@ -5,6 +5,7 @@ export type AssetProviderKind = "mock" | "ai" | "curated" | "handmade";
 export type ProducedLayerSet = {
   provider: AssetProviderKind;
   productionReady: boolean;
+  classification: "concept preview" | "AI-assisted draft" | "curated production-ready asset" | "artist-approved final asset";
   count: number;
   examples: string[];
   notes: string;
@@ -19,6 +20,7 @@ export type AssetProductionManifest = {
   backgrounds: ProducedLayerSet;
   premiumTraits: ProducedLayerSet;
   legendaryAssets: ProducedLayerSet;
+  productionAssetPolicy: GeneratedStyleProfile["productionAssetPolicy"];
   warnings: string[];
   royaltyPolicy: RoyaltyPolicy;
   readinessReport: AssetProviderReadinessReport;

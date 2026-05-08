@@ -76,6 +76,8 @@ export class GeneratorService {
       assetProvider: "premium-fallback-preview",
       finalProductionReady: false,
       brandDna: style.brandDna,
+      creativeUniverse: style.creativeUniverse,
+      productionAssetPolicy: style.productionAssetPolicy,
       collection: {
         name: style.collection,
         palette: style.colors,
@@ -94,6 +96,7 @@ export class GeneratorService {
       traitTable: this.traitTable(pack),
       rarityTable: pack.rarityWeights,
       animationMoments: this.animationMoments(style),
+      animationMetadata: style.creativeUniverse.animationReadiness,
       quality: {
         ...quality,
         issues: [...quality.issues, "Fallback preview is concept-only and cannot be approved for public production launch."]
@@ -112,7 +115,8 @@ export class GeneratorService {
       },
       warnings: [
         "Preview generated without DB persistence.",
-        "Fallback assets are premium concept previews; final launch requires OpenAI/curated production assets and permanent storage."
+        "Fallback assets are concept previews; final launch requires curated or handmade production assets and permanent storage.",
+        "AI image generation may support concept drafts only and is not a final NFT production dependency."
       ]
     };
   }
@@ -473,7 +477,7 @@ export class GeneratorService {
       where: { generationRunId: { not: runId } },
       orderBy: { createdAt: "desc" },
       take: 50,
-      select: { id: true, collection: true, mascot: true, colors: true, backgroundWorld: true, traitLanguage: true, visualFingerprint: true, brandDna: true }
+      select: { id: true, collection: true, mascot: true, artStyle: true, colors: true, backgroundWorld: true, traitLanguage: true, visualFingerprint: true, brandDna: true }
     });
     const distinctiveness = this.distinctiveness.score(style, existing);
     const quality = this.quality.validate(style, pack, compatibilityRules, previews, distinctiveness);
@@ -509,6 +513,8 @@ export class GeneratorService {
         styleProfileId: profile.id,
         collectionSize: pack.collectionSize,
         categories: this.json(pack.categories),
+        categoryRoles: this.json(pack.categoryRoles),
+        categoryLabels: this.json(pack.categoryLabels),
         rarityWeights: this.json(pack.rarityWeights),
         unlockSchedule: this.json(pack.unlockSchedule),
         uniquenessRules: this.json(pack.uniquenessRules)
@@ -619,18 +625,9 @@ export class GeneratorService {
   }
 
   private traitTable(pack: TraitPackPlan) {
-    const labels: Record<string, string> = {
-      baseCharacter: "base body",
-      backgrounds: "background",
-      mouthExpression: "mouth/expression",
-      outfitBody: "outfit/armor",
-      accessories: "handheld/accessory",
-      auraEffect: "aura/effect",
-      borderFrame: "frame/border",
-      legendaryOverlay: "legendary/mythic overlay"
-    };
     return Object.entries(pack.categories).map(([category, values]) => ({
-      category: labels[category] ?? category,
+      category: pack.categoryLabels?.[category] ?? category,
+      role: Object.entries(pack.categoryRoles ?? {}).find(([, id]) => id === category)?.[0] ?? "custom",
       count: values.length,
       examples: values.slice(0, 8),
       productionReady: false,
@@ -656,15 +653,15 @@ export class GeneratorService {
 
   private tenKReadinessReport(pack: TraitPackPlan, style: GeneratedStyleProfile, quality: { duplicateRiskScore: number; rarityDistributionScore: number; issues: string[] }) {
     const possible =
-      BigInt(pack.categories.baseCharacter.length) *
-      BigInt(pack.categories.backgrounds.length) *
-      BigInt(pack.categories.headgear.length) *
-      BigInt(pack.categories.eyes.length) *
-      BigInt(pack.categories.mouthExpression.length) *
-      BigInt(pack.categories.outfitBody.length) *
-      BigInt(pack.categories.accessories.length) *
-      BigInt(pack.categories.auraEffect.length) *
-      BigInt(pack.categories.borderFrame.length);
+      BigInt(this.roleValues(pack, "base").length) *
+      BigInt(this.roleValues(pack, "background").length) *
+      BigInt(this.roleValues(pack, "head").length) *
+      BigInt(this.roleValues(pack, "eyes").length) *
+      BigInt(this.roleValues(pack, "mouth").length) *
+      BigInt(this.roleValues(pack, "body").length) *
+      BigInt(this.roleValues(pack, "prop").length) *
+      BigInt(this.roleValues(pack, "aura").length) *
+      BigInt(this.roleValues(pack, "frame").length);
     const blockers = [
       ...quality.issues,
       ...(style.artSource === "PROCEDURAL_FALLBACK" ? ["Production asset provider is not configured."] : []),
@@ -677,7 +674,7 @@ export class GeneratorService {
       duplicateRisk: quality.duplicateRiskScore >= 90 ? "LOW" : quality.duplicateRiskScore >= 75 ? "MEDIUM" : "HIGH",
       visualDiversityScore: Math.min(98, Math.round((quality.duplicateRiskScore + quality.rarityDistributionScore) / 2)),
       rarityDistributionReport: pack.rarityWeights,
-      backgroundDistributionCorrectness: pack.categories.backgrounds.length >= 40 ? "PASS" : "BLOCKED",
+      backgroundDistributionCorrectness: this.roleValues(pack, "background").length >= 40 ? "PASS" : "BLOCKED",
       legendaryCaps: { maxPct: pack.uniquenessRules.legendaryCapPct, configured: true },
       compatibilityValidated: true,
       blockers
@@ -734,6 +731,29 @@ export class GeneratorService {
   }
 
   private styleFromRecord(record: any): GeneratedStyleProfile {
+    const brandDna = this.record(record.brandDna) as GeneratedStyleProfile["brandDna"];
+    const productionAssetPolicy =
+      brandDna.productionAssetPolicy ??
+      {
+        launchClassification: "CONCEPT_PREVIEW",
+        commonToRareSource: "approved_layer_pack_required",
+        epicLegendaryMythicSource: "curated_composition_required",
+        aiFinalImageAllowed: false,
+        artistReviewRequiredFor: ["Epic", "Legendary", "Mythic"],
+        productionReadyRequires: ["approved layer pack", "curated final assets"]
+      };
+    const creativeUniverse = {
+      archetype: String((record.visualFingerprint as Record<string, unknown> | undefined)?.archetype ?? "legacy"),
+      inferredCommunityLanguage: this.strings((record.visualFingerprint as Record<string, unknown> | undefined)?.loreMemeLanguage),
+      artStyle: record.artStyle,
+      artStyleReason: "Loaded from saved style profile.",
+      taxonomy: Array.isArray(brandDna.traitTaxonomy) ? brandDna.traitTaxonomy : [],
+      baseSilhouettes: Array.isArray(brandDna.baseSilhouettes) ? brandDna.baseSilhouettes : [],
+      moodCulture: Array.isArray(brandDna.moodCulture) ? brandDna.moodCulture : [],
+      animationReadiness: brandDna.animationReadiness,
+      productionAssetPolicy,
+      antiGenericRules: this.strings(brandDna.forbiddenSimilarities)
+    } as GeneratedStyleProfile["creativeUniverse"];
     return {
       collection: record.collection,
       theme: record.theme,
@@ -748,11 +768,13 @@ export class GeneratorService {
       raidTheme: record.raidTheme,
       lore: record.lore,
       roleNames: this.strings(record.roleNames),
-      brandDna: this.record(record.brandDna) as GeneratedStyleProfile["brandDna"],
+      brandDna,
       visualFingerprint: this.record(record.visualFingerprint),
       assetPackId: record.assetPackId ?? "unknown",
       artSource: record.artSource ?? "PROCEDURAL_FALLBACK",
-      tenKReadiness: this.record(record.tenKReadinessReport) as GeneratedStyleProfile["tenKReadiness"]
+      tenKReadiness: this.record(record.tenKReadinessReport) as GeneratedStyleProfile["tenKReadiness"],
+      creativeUniverse,
+      productionAssetPolicy: productionAssetPolicy as GeneratedStyleProfile["productionAssetPolicy"]
     };
   }
 
@@ -760,6 +782,8 @@ export class GeneratorService {
     return {
       collectionSize: record.collectionSize,
       categories: this.record(record.categories) as Record<string, string[]>,
+      categoryRoles: this.record(record.categoryRoles) as TraitPackPlan["categoryRoles"],
+      categoryLabels: this.record(record.categoryLabels) as TraitPackPlan["categoryLabels"],
       rarityWeights: this.record(record.rarityWeights) as Record<string, number>,
       unlockSchedule: this.record(record.unlockSchedule) as Record<string, string[]>,
       uniquenessRules: this.record(record.uniquenessRules) as unknown as TraitPackPlan["uniquenessRules"],
@@ -798,5 +822,11 @@ export class GeneratorService {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 72);
+  }
+
+  private roleValues(pack: TraitPackPlan, role: keyof TraitPackPlan["categoryRoles"]) {
+    const categoryId = pack.categoryRoles?.[role];
+    const values = categoryId ? pack.categories[categoryId] ?? [] : [];
+    return values.length ? values : ["None"];
   }
 }

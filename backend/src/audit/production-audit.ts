@@ -111,11 +111,97 @@ function styleFixture(): GeneratedStyleProfile {
     raidTheme: "Audit raid",
     lore: "Audit holders verify every launch claim.",
     roleNames: ["Verifier", "Custodian"],
-    brandDna: {} as GeneratedStyleProfile["brandDna"],
-    visualFingerprint: {},
+    brandDna: {
+      tokenSymbol: "$AUDIT",
+      tokenName: "Audit",
+      mintAddress: "audit",
+      logoPalette: ["#6fe7ff", "#5967ff", "#06111a"],
+      logoDerivedColors: ["#6fe7ff", "#5967ff", "#06111a"],
+      colorSystem: { primaryColors: ["#6fe7ff"], secondaryColors: ["#5967ff"], accentColors: ["#f4f7fb"], neutralSupportColors: ["#06111a"], glowLightColors: ["#6fe7ff"], backgroundColors: ["#06111a"], forbiddenColorCombinations: [] },
+      mascotArchetype: "audit",
+      memeLanguage: ["verify"],
+      lore: "Audit holders verify every launch claim.",
+      visualWorld: "Audit chain citadel",
+      shapeLanguage: "geometric",
+      compositionRules: ["metadata must match rendered traits"],
+      traitNamingRules: ["no generic traits"],
+      typographyDirection: "terminal",
+      raidLanguage: ["audit raid"],
+      roleLanguage: ["Verifier"],
+      legendaryDirection: "Audit verifier ascendant full scene",
+      mascotSilhouette: "audit verifier silhouette",
+      backgroundWorld: "Audit chain citadel",
+      baseArchetypes: ["Audit verifier base"],
+      baseSilhouettes: [{ name: "Audit Verifier", bodyShape: "geometric body", poseLanguage: "inspection stance", proportions: "balanced", cameraFraming: "poster crop", rarityUpgradePath: "audit ladder" }],
+      moodCulture: [{ name: "Audit Locked-In", expression: "focused", eyeLanguage: "scanner eyes", mouthLanguage: "flat line", stance: "inspection stance", gesture: "checklist hold", auraBehavior: "verification pulse", animationState: "audit-idle" }],
+      animationReadiness: {
+        blinkLayers: ["audit blink"],
+        mouthLayers: ["audit mouth"],
+        eyeVariants: ["scanner eyes"],
+        auraLoops: ["verification pulse"],
+        fxLoops: ["audit pulse"],
+        emotionalTransitions: ["audit-idle -> audit-idle"],
+        idleStates: ["audit-idle"],
+        reactionStates: { mint: "audit mint", redeem: "audit redeem", stake: "audit stake", unstake: "audit unstake", receiveNft: "audit receive", levelUp: "audit level", raidSuccess: "audit raid", rewards: "audit rewards" }
+      },
+      productionAssetPolicy: {
+        launchClassification: "CONCEPT_PREVIEW",
+        commonToRareSource: "approved_layer_pack_required",
+        epicLegendaryMythicSource: "curated_composition_required",
+        aiFinalImageAllowed: false,
+        artistReviewRequiredFor: ["Epic", "Legendary", "Mythic"],
+        productionReadyRequires: ["approved layer pack"]
+      },
+      traitTaxonomy: [],
+      rarityVisualRules: {
+        Common: { minTraits: 2, maxTraits: 4, pose: "base pose", background: "simple", aura: "none", frame: "none", composition: "simple" },
+        Epic: { minTraits: 7, maxTraits: 9, pose: "premium action pose", background: "premium", aura: "strong", frame: "special", composition: "premium" },
+        Legendary: { minTraits: 9, maxTraits: 11, pose: "unique cinematic pose", background: "unique", aura: "signature", frame: "special", composition: "unique" },
+        Mythic: { minTraits: 10, maxTraits: 12, pose: "near 1/1 curated pose", background: "one-off", aura: "signature", frame: "mythic", composition: "near 1/1" }
+      },
+      forbiddenSimilarities: [],
+      sourceMetadataSummary: {}
+    },
+    visualFingerprint: { archetype: "audit", poseLanguage: ["inspection stance"] },
     assetPackId: "audit",
     artSource: "CURATED_PACK",
-    tenKReadiness: { possibleUniqueCombinations: "10000", expectedDuplicateRisk: "LOW", weakestTraitCategory: "none", overusedBaseVariantRisk: false, rarityDistributionValid: true, silhouetteDominanceRisk: false, shallowCategories: [], pass: true }
+    tenKReadiness: { possibleUniqueCombinations: "10000", expectedDuplicateRisk: "LOW", weakestTraitCategory: "none", overusedBaseVariantRisk: false, rarityDistributionValid: true, silhouetteDominanceRisk: false, shallowCategories: [], pass: true },
+    creativeUniverse: {
+      archetype: "audit",
+      inferredCommunityLanguage: ["verify"],
+      artStyle: "premium cyber cartoon",
+      artStyleReason: "audit fixture",
+      taxonomy: [],
+      baseSilhouettes: [{ name: "Audit Verifier", bodyShape: "geometric body", poseLanguage: "inspection stance", proportions: "balanced", cameraFraming: "poster crop", rarityUpgradePath: "audit ladder" }],
+      moodCulture: [{ name: "Audit Locked-In", expression: "focused", eyeLanguage: "scanner eyes", mouthLanguage: "flat line", stance: "inspection stance", gesture: "checklist hold", auraBehavior: "verification pulse", animationState: "audit-idle" }],
+      animationReadiness: {
+        blinkLayers: ["audit blink"],
+        mouthLayers: ["audit mouth"],
+        eyeVariants: ["scanner eyes"],
+        auraLoops: ["verification pulse"],
+        fxLoops: ["audit pulse"],
+        emotionalTransitions: ["audit-idle -> audit-idle"],
+        idleStates: ["audit-idle"],
+        reactionStates: { mint: "audit mint", redeem: "audit redeem", stake: "audit stake", unstake: "audit unstake", receiveNft: "audit receive", levelUp: "audit level", raidSuccess: "audit raid", rewards: "audit rewards" }
+      },
+      productionAssetPolicy: {
+        launchClassification: "CONCEPT_PREVIEW",
+        commonToRareSource: "approved_layer_pack_required",
+        epicLegendaryMythicSource: "curated_composition_required",
+        aiFinalImageAllowed: false,
+        artistReviewRequiredFor: ["Epic", "Legendary", "Mythic"],
+        productionReadyRequires: ["approved layer pack"]
+      },
+      antiGenericRules: []
+    },
+    productionAssetPolicy: {
+      launchClassification: "CONCEPT_PREVIEW",
+      commonToRareSource: "approved_layer_pack_required",
+      epicLegendaryMythicSource: "curated_composition_required",
+      aiFinalImageAllowed: false,
+      artistReviewRequiredFor: ["Epic", "Legendary", "Mythic"],
+      productionReadyRequires: ["approved layer pack"]
+    }
   };
 }
 
@@ -136,6 +222,34 @@ function packFixture(): TraitPackPlan {
       borderFrame: values("Frame", 18),
       legendaryOverlay: values("Legendary Scene", 12),
       animationOverlay: values("Reveal", 10)
+    },
+    categoryRoles: {
+      base: "baseCharacter",
+      background: "backgrounds",
+      head: "headgear",
+      eyes: "eyes",
+      mouth: "mouthExpression",
+      body: "outfitBody",
+      prop: "accessories",
+      neck: "neckChestAccessory",
+      aura: "auraEffect",
+      frame: "borderFrame",
+      legendary: "legendaryOverlay",
+      animation: "animationOverlay"
+    },
+    categoryLabels: {
+      baseCharacter: "Audit Bodies",
+      backgrounds: "Audit Worlds",
+      headgear: "Audit Head Marks",
+      eyes: "Audit Eye States",
+      mouthExpression: "Audit Mouth States",
+      outfitBody: "Audit Fits",
+      accessories: "Audit Objects",
+      neckChestAccessory: "Audit Badges",
+      auraEffect: "Audit Pulses",
+      borderFrame: "Audit Borders",
+      legendaryOverlay: "Audit Scenes",
+      animationOverlay: "Audit Loops"
     },
     rarityWeights: { Common: 5500, Uncommon: 2500, Rare: 1200, Epic: 600, Legendary: 150, Mythic: 50 },
     unlockSchedule: {},

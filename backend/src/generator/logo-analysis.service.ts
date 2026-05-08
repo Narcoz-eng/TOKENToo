@@ -59,6 +59,8 @@ export class LogoAnalysisService {
     const preference = input.hints?.mascotPreference?.trim().toLowerCase();
     if (preference) return preference;
     const source = words.join(" ");
+    if (/vapor|vaporwave|surreal|liminal|synth|mall|pool|vhs/.test(source)) return "abstract mascot";
+    if (/cute|baby|toy|toast|sticker|soft|candy|breakfast/.test(source)) return "cute mascot";
     if (/frog|toad|pepe|bog|swamp/.test(source)) return "frog";
     if (/dog|doge|shib|inu|kennel|bark/.test(source)) return source.includes("shib") ? "samurai dog" : "dog";
     if (/cat|kitty|meow|claw/.test(source)) return "cat";
