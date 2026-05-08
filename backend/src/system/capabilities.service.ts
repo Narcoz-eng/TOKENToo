@@ -5,6 +5,7 @@ import { isDatabaseSetupError } from "../db/database-errors";
 import { loadedLocalEnvFiles } from "../env/load-local-env";
 import { startupState } from "../env/startup-state";
 import { getLastHeliusErrorCode, heliusDiagnostics, heliusGetAssetBody, normalizeHeliusConfig, setLastHeliusErrorCode } from "../token-scanner/helius-config";
+import { databaseUrlDiagnostics } from "../db/database-url";
 
 export type SystemCapabilities = {
   databaseAvailable: boolean;
@@ -131,6 +132,7 @@ export class CapabilitiesService {
   async diagnostics() {
     const heliusConfig = normalizeHeliusConfig();
     const heliusReachable = await this.heliusReachable(heliusConfig);
+    const database = databaseUrlDiagnostics();
     const status = await this.status();
     const ready = await this.ready();
     return {
@@ -150,6 +152,10 @@ export class CapabilitiesService {
           SOLANA_RPC_URL: this.sanitizedRpcUrl()
         }
       },
+      database: {
+        ...database,
+        databaseConnectionStatus: status.capabilities.databaseAvailable ? "connected" : database.databaseConnectionStatus === "unchecked" ? "unreachable" : database.databaseConnectionStatus
+      },
       helius: heliusDiagnostics(heliusConfig, heliusReachable),
       capabilities: status.capabilities,
       warnings: status.warnings
@@ -157,6 +163,8 @@ export class CapabilitiesService {
   }
 
   private async databaseAvailable() {
+    const diagnostics = databaseUrlDiagnostics();
+    if (diagnostics.databaseConnectionStatus === "password-missing-or-malformed" || diagnostics.databaseConnectionStatus === "invalid-url") return false;
     try {
       await Promise.race([
         this.prisma.$queryRaw`SELECT 1`,

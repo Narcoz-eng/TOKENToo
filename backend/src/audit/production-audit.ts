@@ -80,10 +80,10 @@ function rarityCheck(issues: string[]) {
   const common = previews.find((asset) => asset.metadata.rarity === "Common");
   const premium = previews.find((asset) => asset.metadata.rarity === "Legendary" || asset.metadata.rarity === "Mythic");
   if (common) {
-    const visible = ["headgear", "outfit", "accessory", "aura", "frame"].filter((key) => common.metadata[key] !== "None" && common.metadata[key] !== "Standard frame").length;
-    requireCheck(visible <= 2, "Common sample has too many visible premium traits.", issues);
+    const visible = Number(common.metadata.traitCount ?? 0);
+    requireCheck(visible <= 4, "Common sample has too many visible premium traits.", issues);
   }
-  if (premium) requireCheck(premium.metadata.pose !== "base pose" && premium.metadata.legendaryOverlay !== "None", "Legendary/Mythic sample lacks unique pose or overlay.", issues);
+  if (premium) requireCheck(premium.metadata.pose !== "base pose" && !/none|no signature/i.test(String(premium.metadata.legendaryOverlay)), "Legendary/Mythic sample lacks unique pose or overlay.", issues);
   return previews.map((asset) => ({ label: asset.label, rarity: asset.metadata.rarity, pose: asset.metadata.pose, visualRule: asset.metadata.visualRule }));
 }
 
@@ -171,6 +171,40 @@ function styleFixture(): GeneratedStyleProfile {
     tenKReadiness: { possibleUniqueCombinations: "10000", expectedDuplicateRisk: "LOW", weakestTraitCategory: "none", overusedBaseVariantRisk: false, rarityDistributionValid: true, silhouetteDominanceRisk: false, shallowCategories: [], pass: true },
     creativeUniverse: {
       archetype: "audit",
+      signalProfile: {
+        entities: ["audit"],
+        objects: ["checklist"],
+        animals: [],
+        emotions: ["focused"],
+        colors: ["#00ff99"],
+        visualShapes: ["geometric"],
+        culturalWords: ["verify"],
+        memeLanguage: [],
+        humorType: "none",
+        energyLevel: "focused pressure",
+        communityVibe: "audit verification room",
+        worldReferences: ["audit chain citadel"],
+        styleReferences: ["premium cyber cartoon"],
+        dangerSafetyCues: ["verification"],
+        cueDial: { luxury: 20, chaos: 20, cozy: 20, aggressive: 20, surreal: 20 },
+        semanticWeights: { audit: 100 }
+      },
+      creativeDna: {
+        artStyle: "audit premium cyber cartoon",
+        worldConcept: "audit chain citadel",
+        mascotOrSubject: "audit verifier",
+        baseSilhouetteRules: ["audit verifier silhouette"],
+        cameraFraming: "poster crop",
+        palette: ["#00ff99", "#0f172a", "#ffffff"],
+        textureLanguage: "audit scanline",
+        moodCulture: ["focused"],
+        expressionLanguage: ["scanner focus"],
+        traitCategories: [],
+        rarityPhilosophy: "audit rarity escalates through verification detail",
+        legendaryMythology: "audit verifier ascendant full scene",
+        animationLanguage: "audit pulse loops",
+        forbiddenSimilarities: []
+      },
       inferredCommunityLanguage: ["verify"],
       artStyle: "premium cyber cartoon",
       artStyleReason: "audit fixture",

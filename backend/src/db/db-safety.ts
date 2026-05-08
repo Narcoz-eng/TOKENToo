@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus } from "@nestjs/common";
 import { databaseSetupMessage, isDatabaseSetupError } from "./database-errors";
+import { databaseUrlDiagnostics } from "./database-url";
 import type { PrismaService } from "./prisma.service";
 
 export type ApiErrorCode = "DB_UNAVAILABLE" | "PROVIDER_NOT_CONFIGURED" | "MISSING_ENV" | "VALIDATION_ERROR" | "WALLET_REQUIRED" | "REQUEST_FAILED";
@@ -33,6 +34,15 @@ export function publicEndpointFallback<T>(data: T, warnings: string[] = []) {
 }
 
 export async function requireDbForWrite(prisma: PrismaService) {
+  const diagnostics = databaseUrlDiagnostics();
+  if (diagnostics.databaseConnectionStatus === "password-missing-or-malformed" || diagnostics.databaseConnectionStatus === "invalid-url") {
+    throw new HttpException({
+      ok: false,
+      code: "DB_UNAVAILABLE",
+      message: databaseSetupMessage(),
+      action: "Fix DATABASE_URL/DIRECT_URL credentials before retrying this write."
+    }, HttpStatus.UNPROCESSABLE_ENTITY);
+  }
   try {
     await prisma.$queryRaw`SELECT 1`;
   } catch (error) {

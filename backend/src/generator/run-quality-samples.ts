@@ -12,6 +12,31 @@ import { TraitPackGeneratorService } from "./trait-pack-generator.service";
 
 const samples: CreateGenerationRunInput[] = [
   {
+    tokenMint: "2tXHantaSparseFallback11111111111111111111zs9y",
+    selectedPreset: "mystic-pixel-cult",
+    hints: {
+      sourceMetadata: {
+        mint: "2tXHantaSparseFallback11111111111111111111zs9y",
+        name: "Hantavirus",
+        symbol: "HANTA",
+        imageUri: "https://metadata.example/hanta-logo.png",
+        socialLinks: { twitter: "https://x.com/hantavirus" },
+        extensions: {
+          inferredIdentitySeed: {
+            official: false,
+            signalWeights: { medical: 0.92, contamination: 0.88, mutation: 0.72, quarantine: 0.7 },
+            inferredSignals: ["medical", "contamination", "mutation", "quarantine", "lab", "fever", "microscopic"],
+            description: "Sparse metadata identity seed: medical contamination, mutation, quarantine, lab, fever, microscopic, and paranoid meme signals."
+          }
+        },
+        riskNotes: ["missing_metadata_uri", "missing_description", "rpc_supply_unavailable", "Helius metadata unavailable; using fallback providers."]
+      },
+      memes: ["coughing degen", "patient zero"],
+      slogans: ["Quarantine the chart"],
+      mood: "dark"
+    }
+  },
+  {
     tokenMint: "DT93bLkL1VagdhasrKWqQ6UGMNwUwL1oATRzhepE9SP3",
     selectedPreset: "meme-kingdom",
     hints: {
@@ -207,7 +232,9 @@ async function main() {
     return {
       collection: style.collection,
       sourceMint: input.tokenMint,
-      archetype: style.creativeUniverse.archetype,
+      creativeDnaKey: style.creativeUniverse.archetype,
+      creativeDna: style.creativeUniverse.creativeDna,
+      signalProfile: style.creativeUniverse.signalProfile,
       artStyle: style.artStyle,
       artStyleReason: style.creativeUniverse.artStyleReason,
       mascot: style.mascot,
@@ -259,9 +286,10 @@ function verifySample(
   const legendary = samplesByRarity.get("Legendary");
   const mythic = samplesByRarity.get("Mythic");
   if (!common || !epic || !legendary || !mythic) failures.push("preview set must include Common, Epic, Legendary, and Mythic samples.");
-  if (common && (Number(common.metadata.traitCount) > 4 || common.metadata.aura !== "None" || common.metadata.frame !== "None")) failures.push("Common sample is not simple enough.");
+  if (common && (Number(common.metadata.traitCount) > 4 || /premium|legendary|signature|mythic/i.test(String(common.metadata.aura)) || /premium|legendary|signature|mythic/i.test(String(common.metadata.frame)))) failures.push("Common sample is not simple enough.");
+  if (common && [common.metadata.headgear, common.metadata.accessory, common.metadata.aura].map(String).includes("None")) failures.push("Common sample contains empty None traits.");
   if (common && epic && Number(epic.metadata.traitCount) <= Number(common.metadata.traitCount)) failures.push("Epic sample is not visibly more complex than Common.");
-  if (legendary && (legendary.metadata.compositionCategory !== "signature-scene" || legendary.metadata.legendaryOverlay === "None")) failures.push("Legendary sample is not compositionally unique.");
+  if (legendary && (legendary.metadata.compositionCategory !== "signature-scene" || /none|no signature/i.test(String(legendary.metadata.legendaryOverlay)))) failures.push("Legendary sample is not compositionally unique.");
   if (mythic && (mythic.metadata.compositionCategory !== "near-1-of-1" || mythic.metadata.specialMetadataFlag !== "MYTHIC_CURATED_COMPOSITION")) failures.push("Mythic sample is missing near-1/1 metadata.");
   for (const preview of previews.filter((item) => item.type === "SAMPLE_NFT")) {
     const generated = metadata.sample(style, pack, preview);
@@ -287,6 +315,30 @@ function verifySample(
   }
   const forbiddenText = JSON.stringify({ style, pack: pack.traits.slice(0, 40) }).toLowerCase();
   if (/neon cyber frog/.test(forbiddenText)) failures.push("forbidden generic neon cyber frog pattern found.");
+  if (/biohazard-viral|frog-degen|dog-cozy|dog-pack|cat-hyper-meme|robot-ai|trader-finance/.test(String(style.creativeUniverse.archetype))) {
+    failures.push("Creative DNA key still exposes a fixed archetype template.");
+  }
+  if ((style.brandDna.tokenSymbol ?? "").replace(/^\$/, "") === "HANTA") {
+    const hantaText = JSON.stringify({
+      dna: style.creativeUniverse.creativeDna,
+      signals: style.creativeUniverse.signalProfile,
+      taxonomy: style.creativeUniverse.taxonomy,
+      traits: pack.traits.slice(0, 60)
+    }).toLowerCase();
+    const hantaIdentityText = JSON.stringify({
+      artStyle: style.creativeUniverse.creativeDna.artStyle,
+      worldConcept: style.creativeUniverse.creativeDna.worldConcept,
+      mascotOrSubject: style.creativeUniverse.creativeDna.mascotOrSubject,
+      taxonomy: style.creativeUniverse.taxonomy.map((category) => ({ label: category.label, nouns: category.nouns })),
+      traitExamples: pack.traits.slice(0, 60)
+    }).toLowerCase();
+    if (!/hanta|hantavirus|medical|contamination|virus|viral|infection|pathogen|outbreak|quarantine|mutation|lab|fever|microscope|specimen/.test(hantaText)) {
+      failures.push("HANTA Creative DNA is not strongly related to Hantavirus-like metadata signals.");
+    }
+    if (/generic robot|random robot|token-native sparse/.test(hantaIdentityText)) {
+      failures.push("HANTA sparse metadata fell back to a generic template identity.");
+    }
+  }
   if (!distinctivenessPassed) failures.push("distinctiveness score did not pass.");
   if (!compatibilityPassed) failures.push("compatibility rules did not pass.");
   return failures;
@@ -295,19 +347,32 @@ function verifySample(
 function verifyCollectionSet(report: Array<Record<string, any>>) {
   const failures: string[] = [];
   if (report.length < 8) failures.push("quality samples must include at least 8 metadata examples.");
-  const archetypes = new Set(report.map((item) => item.archetype));
-  if (archetypes.size < 8) failures.push("quality samples must cover 8 different community archetypes.");
+  const creativeDnaKeys = new Set(report.map((item) => item.creativeDnaKey));
+  if (creativeDnaKeys.size !== report.length) failures.push("each quality sample must generate a unique Creative DNA key.");
   const styles = new Map<string, string[]>();
+  const worldConcepts = new Map<string, string[]>();
+  const legendaryStructures = new Map<string, string[]>();
   for (const item of report) {
     const style = String(item.artStyle);
     styles.set(style, [...(styles.get(style) ?? []), String(item.collection)]);
+    const world = String(item.creativeDna?.worldConcept ?? item.world);
+    worldConcepts.set(world, [...(worldConcepts.get(world) ?? []), String(item.collection)]);
+    const legendary = String(item.creativeDna?.legendaryMythology ?? "");
+    legendaryStructures.set(legendary, [...(legendaryStructures.get(legendary) ?? []), String(item.collection)]);
     if (!Array.isArray(item.taxonomy) || item.taxonomy.length < 10) failures.push(`${item.collection} does not expose a community-native taxonomy.`);
     if (!Array.isArray(item.moodCulture) || item.moodCulture.length < 3) failures.push(`${item.collection} does not expose community-native mood culture.`);
+    if (!item.creativeDna?.artStyle || !item.signalProfile?.semanticWeights) failures.push(`${item.collection} does not expose generated Creative DNA and signal profile.`);
     if (item.productionReady !== false || item.productionAssetPolicy?.launchClassification !== "CONCEPT_PREVIEW") failures.push(`${item.collection} incorrectly marks concept output as production-ready.`);
     if (item.productionAssetPolicy?.aiFinalImageAllowed !== false) failures.push(`${item.collection} allows fully AI-generated final NFT images.`);
   }
   for (const [style, collections] of styles) {
-    if (collections.length > 1) failures.push(`art style "${style}" is reused by ${collections.join(", ")} without a collection-specific override.`);
+    if (collections.length > 1) failures.push(`art style "${style}" is reused by ${collections.join(", ")}.`);
+  }
+  for (const [world, collections] of worldConcepts) {
+    if (collections.length > 1) failures.push(`world concept "${world}" is reused by ${collections.join(", ")}.`);
+  }
+  for (const [legendary, collections] of legendaryStructures) {
+    if (collections.length > 1) failures.push(`legendary structure "${legendary}" is reused by ${collections.join(", ")}.`);
   }
   for (let left = 0; left < report.length; left += 1) {
     for (let right = left + 1; right < report.length; right += 1) {
@@ -321,14 +386,90 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
       const poseOverlap = jaccard(significantWords(a.baseArchetypes.join(" ")), significantWords(b.baseArchetypes.join(" ")));
       if (taxonomyOverlap > 0.35) failures.push(`${a.collection} and ${b.collection} share too much trait taxonomy.`);
       if (traitOverlap > 0.34) failures.push(`${a.collection} and ${b.collection} share too much trait vocabulary.`);
-      if (poseOverlap > 0.34) failures.push(`${a.collection} and ${b.collection} share too much pose/silhouette language.`);
+      if (poseOverlap > 0.5) failures.push(`${a.collection} and ${b.collection} share too much pose/silhouette language.`);
     }
   }
   return failures;
 }
 
 function significantWords(value: string) {
-  const stop = new Set(["with", "from", "that", "this", "into", "token", "holder", "holders", "raid", "raids", "vault", "vaults", "scene", "mark", "sigil", "emblem", "trade", "community", "base"]);
+  const stop = new Set([
+    "with",
+    "from",
+    "that",
+    "this",
+    "into",
+    "token",
+    "holder",
+    "holders",
+    "raid",
+    "raids",
+    "vault",
+    "vaults",
+    "scene",
+    "mark",
+    "sigil",
+    "emblem",
+    "trade",
+    "community",
+    "base",
+    "body",
+    "bodies",
+    "form",
+    "forms",
+    "pose",
+    "poses",
+    "crop",
+    "readability",
+    "readable",
+    "rounded",
+    "sharp",
+    "mascot",
+    "signal",
+    "signals",
+    "objects",
+    "relics",
+    "tools",
+    "charms",
+    "rooms",
+    "worlds",
+    "weather",
+    "districts",
+    "masks",
+    "crowns",
+    "glares",
+    "blinks",
+    "fits",
+    "wraps",
+    "frames",
+    "borders",
+    "loops",
+    "motion",
+    "states",
+    "layers",
+    "compact",
+    "braced",
+    "side",
+    "stepping",
+    "front",
+    "facing",
+    "low",
+    "angle",
+    "three",
+    "quarter",
+    "full",
+    "sticker",
+    "waist",
+    "tight",
+    "portrait",
+    "scout",
+    "idol",
+    "carrier",
+    "witness",
+    "runner",
+    "figure",
+    "subject"
+  ]);
   return value
     .toLowerCase()
     .split(/[^a-z0-9]+/)

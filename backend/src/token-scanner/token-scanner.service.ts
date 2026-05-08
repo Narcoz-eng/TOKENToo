@@ -57,7 +57,7 @@ type OffchainMetadata = {
 type RpcMint = { decimals?: number; supply?: string; warning?: string };
 
 type FallbackMetadata = {
-  provider: "dexscreener" | "jupiter";
+  provider: "dexscreener" | "dexscreener-profile" | "dexscreener-search" | "jupiter" | "solana-token-metadata";
   name?: string;
   symbol?: string;
   description?: string;
@@ -68,6 +68,7 @@ type FallbackMetadata = {
   liquidityUsd?: number;
   marketCapUsd?: number;
   volume24hUsd?: number;
+  metadataUri?: string;
   warning?: string;
 };
 
@@ -91,9 +92,20 @@ export class TokenScannerService {
     const { asset, warning: heliusWarning } = await this.fetchHeliusAssetWithFallback(mintAddress, heliusConfig);
     const offchain = asset?.content?.json_uri ? await this.fetchOffchainJson(asset.content.json_uri) : { data: null, warning: asset ? "Helius did not return a metadata URI." : "Helius metadata unavailable; using fallback providers." };
     let resolved = this.resolveMetadata(mintAddress, asset, offchain.data, rpcMint);
-    const needsFallbackIdentity = !resolved.name || !resolved.symbol || !resolved.imageUri || !Object.keys(resolved.socialLinks ?? {}).length;
-    const [dexScreener, jupiter] = needsFallbackIdentity ? await Promise.all([this.fetchDexScreenerMetadata(mintAddress), this.fetchJupiterMetadata(mintAddress)]) : [null, null];
-    resolved = this.resolveMetadata(mintAddress, asset, offchain.data, rpcMint, dexScreener, jupiter);
+    const needsFallbackIdentity = !resolved.name || !resolved.symbol || !resolved.imageUri || !resolved.description || !Object.keys(resolved.socialLinks ?? {}).length;
+    const [dexScreener, dexProfile, dexSearch, jupiter, solanaMetadata] = needsFallbackIdentity
+      ? await Promise.all([
+        this.fetchDexScreenerMetadata(mintAddress),
+        this.fetchDexScreenerProfile(mintAddress),
+        this.fetchDexScreenerSearch(mintAddress),
+        this.fetchJupiterMetadata(mintAddress),
+        this.fetchSolanaTokenMetadata(mintAddress)
+      ])
+      : [null, null, null, null, null];
+    const discoveredUri = this.firstString(solanaMetadata?.metadataUri, dexProfile?.metadataUri, dexSearch?.metadataUri);
+    const discoveredOffchain = !offchain.data && discoveredUri ? await this.fetchOffchainJson(discoveredUri) : { data: null as OffchainMetadata | null, warning: undefined };
+    resolved = this.resolveMetadata(mintAddress, asset, offchain.data ?? discoveredOffchain.data, rpcMint, dexScreener, dexProfile, dexSearch, jupiter, solanaMetadata);
+    resolved = this.withInferredIdentitySeed(resolved);
 
     if (!resolved.name || !resolved.symbol) {
       setLastHeliusErrorCode("TOKEN_METADATA_INCOMPLETE");
@@ -107,12 +119,14 @@ export class TokenScannerService {
           imageUri: resolved.imageUri ?? null,
           heliusWarning,
           dexScreenerWarning: dexScreener?.warning,
+          dexProfileWarning: dexProfile?.warning,
+          dexSearchWarning: dexSearch?.warning,
           jupiterWarning: jupiter?.warning
         }
       });
     }
 
-    const riskNotes = this.riskNotes(resolved, offchain.warning, heliusWarning, dexScreener?.warning, jupiter?.warning);
+    const riskNotes = this.riskNotes(resolved, offchain.warning, discoveredOffchain.warning, heliusWarning, dexScreener?.warning, dexProfile?.warning, dexSearch?.warning, jupiter?.warning, solanaMetadata?.warning);
     const scan: TokenScan = {
       mint: mintAddress,
       symbol: resolved.symbol,
@@ -139,7 +153,7 @@ export class TokenScannerService {
       reasons: riskNotes
     };
 
-    scan.persistenceWarning = await this.persist(scan, asset, offchain.data, { dexScreener, jupiter });
+    scan.persistenceWarning = await this.persist(scan, asset, offchain.data ?? discoveredOffchain.data, { dexScreener, dexProfile, dexSearch, jupiter, solanaMetadata });
     return scan;
   }
 
@@ -171,7 +185,7 @@ export class TokenScannerService {
           throw retryError;
         }
         setLastHeliusErrorCode(retryCode);
-        return { asset: null, warning: `${retryCode}: ${this.exceptionMessage(retryError)}` };
+        return { asset: null, warning: this.sanitizedProviderFailure("Helius", retryCode, retryError) };
       }
     }
   }
@@ -296,11 +310,78 @@ export class TokenScannerService {
     }
   }
 
+  private async fetchDexScreenerProfile(mint: string): Promise<FallbackMetadata | null> {
+    try {
+      const response = await fetch("https://api.dexscreener.com/token-profiles/latest/v1");
+      if (!response.ok) return { provider: "dexscreener-profile", warning: `DexScreener profiles returned ${response.status}.` };
+      const profiles = (await response.json()) as Array<{
+        chainId?: string;
+        tokenAddress?: string;
+        url?: string;
+        description?: string;
+        icon?: string;
+        header?: string;
+        links?: Array<{ type?: string; label?: string; url?: string }>;
+      }>;
+      const profile = profiles.find((item) => item.chainId === "solana" && item.tokenAddress === mint);
+      if (!profile) return { provider: "dexscreener-profile", warning: "DexScreener profile list did not include this mint." };
+      const links = Object.fromEntries((profile.links ?? []).flatMap((link) => link.url ? [[(link.type ?? link.label ?? "website").toLowerCase(), link.url] as const] : []));
+      return {
+        provider: "dexscreener-profile",
+        description: profile.description,
+        imageUri: profile.icon ?? profile.header,
+        externalUrl: profile.url,
+        socialLinks: links,
+        extensions: { dexScreenerProfileUrl: profile.url, dexScreenerProfileDescription: profile.description }
+      };
+    } catch (error) {
+      return { provider: "dexscreener-profile", warning: error instanceof Error ? `DexScreener profile metadata failed: ${error.message}` : "DexScreener profile metadata failed." };
+    }
+  }
+
+  private async fetchDexScreenerSearch(mint: string): Promise<FallbackMetadata | null> {
+    try {
+      const response = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(mint)}`);
+      if (!response.ok) return { provider: "dexscreener-search", warning: `DexScreener search returned ${response.status}.` };
+      const payload = (await response.json()) as {
+        pairs?: Array<{
+          chainId?: string;
+          baseToken?: { name?: string; symbol?: string; address?: string };
+          url?: string;
+          info?: { imageUrl?: string; websites?: Array<{ label?: string; url?: string }>; socials?: Array<{ type?: string; url?: string }> };
+        }>;
+      };
+      const pair = payload.pairs?.find((entry) => entry.chainId === "solana" && entry.baseToken?.address === mint) ?? payload.pairs?.find((entry) => entry.chainId === "solana");
+      if (!pair) return { provider: "dexscreener-search", warning: "DexScreener search did not return this Solana mint." };
+      const socials = Object.fromEntries([
+        ...(pair.info?.websites ?? []).flatMap((site) => site.url ? [[site.label?.toLowerCase() || "website", site.url] as const] : []),
+        ...(pair.info?.socials ?? []).flatMap((social) => social.url ? [[social.type?.toLowerCase() || "social", social.url] as const] : [])
+      ]);
+      return {
+        provider: "dexscreener-search",
+        name: pair.baseToken?.name,
+        symbol: this.stripNullSymbol(pair.baseToken?.symbol),
+        imageUri: pair.info?.imageUrl,
+        externalUrl: pair.url,
+        socialLinks: socials,
+        extensions: { dexScreenerSearchPairUrl: pair.url }
+      };
+    } catch (error) {
+      return { provider: "dexscreener-search", warning: error instanceof Error ? `DexScreener search failed: ${error.message}` : "DexScreener search failed." };
+    }
+  }
+
   private async fetchJupiterMetadata(mint: string): Promise<FallbackMetadata | null> {
     try {
       const response = await fetch(`https://tokens.jup.ag/token/${mint}`);
-      if (!response.ok) return { provider: "jupiter", warning: `Jupiter token metadata returned ${response.status}.` };
-      const token = (await response.json()) as { name?: string; symbol?: string; logoURI?: string; extensions?: Record<string, unknown> };
+      let token = response.ok ? (await response.json()) as { name?: string; symbol?: string; logoURI?: string; extensions?: Record<string, unknown> } : null;
+      if (!token) {
+        const listResponse = await fetch("https://tokens.jup.ag/tokens?tags=verified");
+        if (!listResponse.ok) return { provider: "jupiter", warning: `Jupiter token metadata returned ${response.status}; token list returned ${listResponse.status}.` };
+        const list = (await listResponse.json()) as Array<{ address?: string; name?: string; symbol?: string; logoURI?: string; extensions?: Record<string, unknown> }>;
+        token = list.find((item) => item.address === mint) ?? null;
+      }
+      if (!token) return { provider: "jupiter", warning: "Jupiter token list did not include this mint." };
       return {
         provider: "jupiter",
         name: token.name,
@@ -314,32 +395,56 @@ export class TokenScannerService {
     }
   }
 
-  private resolveMetadata(mint: string, asset: HeliusAsset | null, offchain: OffchainMetadata | null, rpcMint: RpcMint, dexScreener?: FallbackMetadata | null, jupiter?: FallbackMetadata | null) {
+  private async fetchSolanaTokenMetadata(mint: string): Promise<FallbackMetadata | null> {
+    try {
+      const info = await new Connection(this.rpcUrl(), "confirmed").getParsedAccountInfo(new PublicKey(mint), "confirmed");
+      const parsed = this.record(this.record(info.value?.data).parsed);
+      const data = this.record(this.record(parsed.info).extensions);
+      const metadataUri = this.firstString(data.metadataUri, data.uri);
+      return {
+        provider: "solana-token-metadata",
+        name: this.firstString(data.name),
+        symbol: this.stripNullSymbol(this.firstString(data.symbol)),
+        description: this.firstString(data.description),
+        imageUri: this.firstString(data.image, data.logoUri),
+        externalUrl: this.firstString(data.externalUrl, data.website),
+        metadataUri,
+        socialLinks: this.socialLinks(data),
+        extensions: Object.keys(data).length ? data : undefined,
+        warning: Object.keys(data).length ? undefined : "Solana parsed mint did not expose token metadata extensions."
+      };
+    } catch (error) {
+      return { provider: "solana-token-metadata", warning: error instanceof Error ? `Solana token metadata failed: ${error.message}` : "Solana token metadata failed." };
+    }
+  }
+
+  private resolveMetadata(mint: string, asset: HeliusAsset | null, offchain: OffchainMetadata | null, rpcMint: RpcMint, ...fallbackSources: Array<FallbackMetadata | null | undefined>) {
     const content = asset?.content;
     const heliusMetadata = content?.metadata ?? {};
-    const imageUri = this.firstString(offchain?.image, content?.links?.image, heliusMetadata.image, content?.files?.find((file) => file.uri)?.uri, dexScreener?.imageUri, jupiter?.imageUri);
-    const externalUrl = this.firstString(offchain?.external_url, content?.links?.external_url, heliusMetadata.external_url, dexScreener?.externalUrl, jupiter?.externalUrl);
+    const imageUri = this.firstString(offchain?.image, content?.links?.image, heliusMetadata.image, content?.files?.find((file) => file.uri)?.uri, ...fallbackSources.map((source) => source?.imageUri));
+    const externalUrl = this.firstString(offchain?.external_url, content?.links?.external_url, heliusMetadata.external_url, ...fallbackSources.map((source) => source?.externalUrl));
     const extensions = this.record(offchain?.extensions ?? heliusMetadata.properties ?? {});
-    const socialLinks = { ...this.socialLinks(extensions), ...(jupiter?.socialLinks ?? {}), ...(dexScreener?.socialLinks ?? {}) };
+    const socialLinks = Object.assign({}, this.socialLinks(extensions), ...fallbackSources.map((source) => source?.socialLinks ?? {}));
+    const fallbackExtensions = Object.assign({}, ...fallbackSources.map((source) => source?.extensions ?? {}));
+    const marketSource = fallbackSources.find((source) => source?.liquidityUsd || source?.marketCapUsd || source?.volume24hUsd);
     return {
       mint,
-      name: this.firstString(offchain?.name, heliusMetadata.name, dexScreener?.name, jupiter?.name),
-      symbol: this.stripNullSymbol(this.firstString(offchain?.symbol, heliusMetadata.symbol, dexScreener?.symbol, jupiter?.symbol)),
-      description: this.firstString(offchain?.description, heliusMetadata.description, dexScreener?.description, jupiter?.description),
-      metadataUri: content?.json_uri,
+      name: this.firstString(offchain?.name, heliusMetadata.name, ...fallbackSources.map((source) => source?.name)),
+      symbol: this.stripNullSymbol(this.firstString(offchain?.symbol, heliusMetadata.symbol, ...fallbackSources.map((source) => source?.symbol))),
+      description: this.firstString(offchain?.description, heliusMetadata.description, ...fallbackSources.map((source) => source?.description)),
+      metadataUri: this.firstString(content?.json_uri, ...fallbackSources.map((source) => source?.metadataUri)),
       imageUri,
       externalUrl,
       decimals: rpcMint.decimals ?? asset?.token_info?.decimals ?? 0,
       supply: rpcMint.supply ?? (asset?.token_info?.supply === undefined ? undefined : String(asset.token_info.supply)),
       socialLinks,
-      liquidityUsd: dexScreener?.liquidityUsd,
-      marketCapUsd: dexScreener?.marketCapUsd,
-      volume24hUsd: dexScreener?.volume24hUsd,
+      liquidityUsd: marketSource?.liquidityUsd,
+      marketCapUsd: marketSource?.marketCapUsd,
+      volume24hUsd: marketSource?.volume24hUsd,
       extensions: {
         ...extensions,
-        ...(jupiter?.extensions ?? {}),
-        ...(dexScreener?.extensions ?? {}),
-        metadataFallbackProviders: [dexScreener?.provider, jupiter?.provider].filter(Boolean),
+        ...fallbackExtensions,
+        metadataFallbackProviders: fallbackSources.map((source) => source?.provider).filter(Boolean),
         heliusTokenProgram: asset?.token_info?.token_program,
         rpcWarning: rpcMint.warning,
         royalty: asset?.royalty,
@@ -349,7 +454,52 @@ export class TokenScannerService {
     };
   }
 
-  private async persist(scan: TokenScan, asset: HeliusAsset | null, offchain: OffchainMetadata | null, fallback: { dexScreener: FallbackMetadata | null; jupiter: FallbackMetadata | null }) {
+  private withInferredIdentitySeed<T extends { name?: string; symbol?: string; description?: string; extensions?: Record<string, unknown>; socialLinks?: Record<string, string>; imageUri?: string; metadataUri?: string; supply?: string }>(resolved: T): T {
+    if (resolved.description) return resolved;
+    const seed = this.identitySeed(resolved);
+    return {
+      ...resolved,
+      description: seed.description,
+      extensions: {
+        ...(resolved.extensions ?? {}),
+        inferredIdentitySeed: seed,
+        inferredIdentitySeedSource: "token name, symbol, logo URI, socials, and fallback market/profile metadata; not official token metadata"
+      }
+    };
+  }
+
+  private identitySeed(input: { name?: string; symbol?: string; imageUri?: string; socialLinks?: Record<string, string> }) {
+    const text = `${input.name ?? ""} ${input.symbol ?? ""} ${input.imageUri ?? ""} ${Object.keys(input.socialLinks ?? {}).join(" ")}`.toLowerCase();
+    if (/hanta|hantavirus|virus|viral|biohazard|infection|infect|pathogen|lab|quarantine|mutation|toxic/.test(text)) {
+      return {
+        signalWeights: {
+          medical: 0.92,
+          contamination: 0.88,
+          mutation: 0.72,
+          quarantine: 0.7,
+          memeParanoia: 0.64
+        },
+        inferredSignals: ["medical", "contamination", "mutation", "quarantine", "lab", "fever", "meme paranoia"],
+        confidence: "medium",
+        official: false,
+        description: `${input.name ?? input.symbol ?? "This token"} has sparse official metadata. Internal identity seed inferred from name, symbol, logo URI, socials, and fallback market/profile text: medical contamination, mutation, quarantine, lab, fever, microscopic, and paranoid meme signals.`
+      };
+    }
+    return {
+      signalWeights: {
+        tokenNameMorphology: 0.55,
+        symbolShape: 0.48,
+        logoUriLanguage: input.imageUri ? 0.42 : 0,
+        socialPresence: Object.keys(input.socialLinks ?? {}).length ? 0.38 : 0
+      },
+      inferredSignals: ["token name morphology", "symbol", "logo URI language", "social context"],
+      confidence: "low",
+      official: false,
+      description: `${input.name ?? input.symbol ?? "This token"} has sparse official metadata. Internal identity seed inferred from token name morphology, symbol, image/logo URI, social context, and fallback market/profile text; not official token metadata.`
+    };
+  }
+
+  private async persist(scan: TokenScan, asset: HeliusAsset | null, offchain: OffchainMetadata | null, fallback: Record<string, FallbackMetadata | null>) {
     try {
       const token = await this.prisma.token.upsert({
         where: { mint: scan.mint },
@@ -401,7 +551,8 @@ export class TokenScannerService {
       });
       return undefined;
     } catch (error) {
-      if (isDatabaseSetupError(error) || error instanceof Error) return `Token metadata resolved but could not be persisted: ${error instanceof Error ? error.message : "database unavailable"}`;
+      if (isDatabaseSetupError(error)) return "Token metadata resolved but could not be persisted: DATABASE_URL password missing or malformed.";
+      if (error instanceof Error) return `Token metadata resolved but could not be persisted: ${this.sanitizeErrorMessage(error.message)}`;
       return "Token metadata resolved but could not be persisted.";
     }
   }
@@ -476,6 +627,15 @@ export class TokenScannerService {
     const message = typeof response === "object" && response && "message" in response ? response.message : undefined;
     if (typeof message === "string") return message;
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private sanitizedProviderFailure(provider: string, code: HeliusErrorCode, error: unknown) {
+    return `${provider} ${code}: ${this.sanitizeErrorMessage(this.exceptionMessage(error))}`;
+  }
+
+  private sanitizeErrorMessage(message: string) {
+    if (/SASL: SCRAM-SERVER-FIRST-MESSAGE|client password must be a string/i.test(message)) return "DATABASE_URL password missing or malformed.";
+    return message.replace(/api-key=[^&\s]+/gi, "api-key=...").replace(/password=[^&\s]+/gi, "password=...").slice(0, 240);
   }
 
   private json(value: unknown): Prisma.InputJsonValue {

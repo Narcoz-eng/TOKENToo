@@ -41,24 +41,33 @@ export class ArtPreviewGeneratorService {
     const frameCategory = this.categoryFor(pack, "frame");
     const legendaryCategory = this.categoryFor(pack, "legendary");
     const animationCategory = this.categoryFor(pack, "animation");
-    const headgear = intensity >= 3 ? pick(headCategory.values, seed + 2) : "None";
-    const eyePool = headgear !== "None" && /Mask|Helm|Kabuto|Hood|Shell/i.test(headgear) ? eyesCategory.values.filter((eye) => !/Visor|Scanner|Screen/i.test(eye)) : eyesCategory.values;
+    const mood = this.moodFor(style, rarity, seed);
+    const headgear = intensity >= 3 ? pick(headCategory.values, seed + 2) : `${this.identityPrefix(style)} simple head mark`;
+    const eyePool = /Mask|Helm|Kabuto|Hood|Shell|Shield/i.test(headgear) ? eyesCategory.values.filter((eye) => !/Visor|Scanner|Screen/i.test(eye)) : eyesCategory.values;
+    const restrainedAura = `${this.identityPrefix(style)} restrained FX`;
+    const cleanFrame = `${this.identityPrefix(style)} clean edge`;
     const traits = {
-      base: pick(baseCategory.values, seed),
+      base: intensity >= 5 ? pick(baseCategory.values.slice(18), seed) : intensity >= 4 ? pick(baseCategory.values.slice(8, 24), seed) : pick(baseCategory.values.slice(0, 10), seed),
       background: intensity >= 4 ? pick(backgroundCategory.values.slice(20), seed + 1) : intensity >= 3 ? pick(backgroundCategory.values.slice(8, 34), seed + 1) : pick(backgroundCategory.values.slice(0, 12), seed + 1),
       headgear,
       eyes: intensity >= 1 ? pick(eyePool.length ? eyePool : eyesCategory.values, seed + 3) : "Base eyes",
-      mouthExpression: intensity >= 2 ? pick(mouthCategory.values, seed + 10) : "Base expression",
-      outfit: intensity >= 3 ? pick(bodyCategory.values, seed + 4) : "Base pose",
-      accessory: intensity >= 2 ? pick(propCategory.values, seed + 5) : "None",
-      neckChestAccessory: intensity >= 4 ? pick(neckCategory.values, seed + 6) : "None",
-      aura: intensity >= 4 ? pick(auraCategory.values, seed + 6) : "None",
-      frame: intensity >= 5 ? pick(frameCategory.values, seed + 7) : intensity >= 2 ? "Standard frame" : "None",
-      legendaryOverlay: intensity >= 5 ? pick(legendaryCategory.values, seed + 9) : "None",
-      animationOverlay: intensity >= 5 ? pick(animationCategory.values, seed + 8) : "Static Still",
+      mouthExpression: intensity >= 2 ? pick(mouthCategory.values, seed + 10) : mood.mouthLanguage,
+      outfit: intensity >= 3 ? pick(bodyCategory.values, seed + 4) : `${this.identityPrefix(style)} base outfit`,
+      accessory: pick(propCategory.values, seed + 5),
+      neckChestAccessory: intensity >= 4 ? pick(neckCategory.values, seed + 6) : `${this.identityPrefix(style)} small badge`,
+      aura: intensity >= 4 ? pick(auraCategory.values, seed + 6) : restrainedAura,
+      frame: intensity >= 5 ? pick(frameCategory.values, seed + 7) : intensity >= 2 ? pick(frameCategory.values.slice(0, 4), seed + 7) : cleanFrame,
+      legendaryOverlay: intensity >= 5 ? pick(legendaryCategory.values, seed + 9) : `${this.identityPrefix(style)} no signature scene`,
+      animationOverlay: intensity >= 5 ? pick(animationCategory.values, seed + 8) : `${this.identityPrefix(style)} idle still`,
       pose: rule.pose,
       scene: intensity >= 5 ? style.legendaryTheme : rule.background,
       visualRule: rule.composition,
+      mood: mood.name,
+      expression: mood.expression,
+      eyeLanguage: mood.eyeLanguage,
+      mouthLanguage: mood.mouthLanguage,
+      stance: mood.stance,
+      gesture: mood.gesture,
       rarity,
       compositionCategory,
       specialMetadataFlag: rarity === "Mythic" ? "MYTHIC_CURATED_COMPOSITION" : rarity === "Legendary" ? "LEGENDARY_SIGNATURE_SCENE" : "NONE",
@@ -131,7 +140,7 @@ export class ArtPreviewGeneratorService {
       width: 900,
       height: 1100,
       title: String(traits.base ?? style.collection),
-      subtitle: `${String(traits.pose ?? "base pose")} / ${String(traits.visualRule ?? "simple")}`,
+      subtitle: `${String(traits.mood ?? traits.pose ?? "base pose")} / ${String(traits.visualRule ?? "simple")}`,
       seed,
       mode: "nft",
       fx,
@@ -158,7 +167,7 @@ export class ArtPreviewGeneratorService {
     const cx = options.mode === "banner" ? Math.round(w * 0.68) : Math.round(w * 0.5);
     const cy = options.mode === "banner" ? Math.round(h * 0.55) : Math.round(h * 0.48);
     const scale = options.mode === "banner" ? 0.82 : options.mode === "nft" ? 1.05 : 1;
-    const mascot = this.mascotShape(style.mascot, cx, cy, scale, primary, secondary, ink, options.seed);
+    const mascot = this.mascotShape(style.mascot, cx, cy, scale, primary, secondary, ink, options.seed, options.traits);
     const landmarks = this.landmarks(style, w, h, options.seed);
     const texture = this.texture(w, h, options.seed);
     const rarity = String(options.traits?.rarity ?? "");
@@ -187,20 +196,32 @@ export class ArtPreviewGeneratorService {
   ${showLandmarks ? landmarks : ""}
   <g opacity="${rarity === "Common" ? "0.18" : "0.55"}">${texture}</g>
   <circle cx="${cx}" cy="${cy}" r="${Math.round(250 * scale)}" fill="${primary}" opacity="${0.11 + glow * 0.12}" filter="url(#premiumGlow)"/>
-  ${this.mascotShape(style.mascot, cx, cy, mascotScale, primary, secondary, ink, options.seed)}
+  ${this.mascotShape(style.mascot, cx, cy, mascotScale, primary, secondary, ink, options.seed, options.traits)}
   ${sceneBadge}
   <rect x="18" y="18" width="${w - 36}" height="${h - 36}" rx="${rarity === "Common" ? 12 : 34}" fill="none" stroke="url(#frame)" stroke-width="${frameWidth}" opacity="${rarity === "Common" ? "0.34" : "0.78"}"/>
   <g font-family="Inter, Arial, sans-serif">
     <text x="${titleX}" y="${titleY}" fill="#fff" font-size="${options.mode === "banner" ? 58 : 38}" font-weight="900">${this.escape(options.title).slice(0, 42)}</text>
     <text x="${titleX}" y="${titleY + 42}" fill="${primary}" font-size="${options.mode === "banner" ? 26 : 22}" font-weight="800">${this.escape(options.subtitle).slice(0, 58)}</text>
-    ${options.traits ? `<text x="${titleX}" y="${titleY + 78}" fill="#d8dee9" font-size="18">${this.escape(String(options.traits.rarity))} / ${this.escape(String(options.traits.accessory)).slice(0, 28)}</text>` : ""}
+    ${options.traits ? `<text x="${titleX}" y="${titleY + 78}" fill="#d8dee9" font-size="18">${this.escape(String(options.traits.rarity))} / ${this.escape(String(options.traits.mood)).slice(0, 28)}</text><text x="${titleX}" y="${titleY + 108}" fill="#d8dee9" font-size="16">${this.escape(String(options.traits.accessory)).slice(0, 34)}</text>` : ""}
   </g>
 </svg>`;
   }
 
-  private mascotShape(mascot: string, cx: number, cy: number, scale: number, primary: string, secondary: string, ink: string, seed: number) {
+  private mascotShape(mascot: string, cx: number, cy: number, scale: number, primary: string, secondary: string, ink: string, seed: number, traits?: Record<string, unknown>) {
     const s = (value: number) => Math.round(value * scale);
     const lean = (seed % 31) - 15;
+    const rarity = String(traits?.rarity ?? "");
+    const eyeShift = rarity === "Legendary" ? s(18) : rarity === "Mythic" ? -s(20) : 0;
+    if (/infected|lab|virus|biohazard|pathogen/.test(mascot)) {
+      return `<g transform="rotate(${lean / 4} ${cx} ${cy})" filter="url(#premiumGlow)">
+        <path d="M${cx - s(160)} ${cy - s(230)} Q${cx - s(250)} ${cy - s(80)} ${cx - s(178)} ${cy + s(100)} Q${cx - s(92)} ${cy + s(280)} ${cx + s(42)} ${cy + s(224)} Q${cx + s(225)} ${cy + s(150)} ${cx + s(172)} ${cy - s(82)} Q${cx + s(126)} ${cy - s(275)} ${cx - s(160)} ${cy - s(230)}Z" fill="${primary}" stroke="${secondary}" stroke-width="${s(11)}"/>
+        <path d="M${cx - s(95)} ${cy - s(175)} l${s(48)} -${s(76)} l${s(64)} ${s(70)} l${s(72)} -${s(88)} l${s(38)} ${s(114)}" fill="none" stroke="#f2d34f" stroke-width="${s(9)}" stroke-linecap="round" opacity="0.9"/>
+        <circle cx="${cx - s(72) + eyeShift}" cy="${cy - s(45)}" r="${s(44)}" fill="#d8fff0" stroke="${ink}" stroke-width="${s(9)}"/><circle cx="${cx + s(70) - eyeShift}" cy="${cy - s(35)}" r="${s(32)}" fill="#d8fff0" stroke="${ink}" stroke-width="${s(8)}"/>
+        <circle cx="${cx - s(72) + eyeShift}" cy="${cy - s(45)}" r="${s(17)}" fill="${ink}"/><circle cx="${cx + s(70) - eyeShift}" cy="${cy - s(35)}" r="${s(13)}" fill="${ink}"/>
+        <path d="M${cx - s(84)} ${cy + s(92)} Q${cx - s(4)} ${cy + s(142)} ${cx + s(94)} ${cy + s(74)}" stroke="${ink}" stroke-width="${s(13)}" fill="none" stroke-linecap="round"/>
+        <path d="M${cx + s(170)} ${cy - s(210)} l${s(36)} ${s(64)} l-${s(72)} 0z M${cx - s(230)} ${cy + s(150)} l${s(38)} ${s(66)} l-${s(78)} -${s(4)}z" fill="#f2d34f" opacity="0.86"/>
+      </g>`;
+    }
     if (/cat/.test(mascot)) {
       return `<g transform="translate(${lean} 0)" filter="url(#premiumGlow)">
         <path d="M${cx - s(185)} ${cy - s(130)} L${cx - s(105)} ${cy - s(270)} L${cx - s(42)} ${cy - s(145)} Q${cx} ${cy - s(178)} ${cx + s(42)} ${cy - s(145)} L${cx + s(110)} ${cy - s(270)} L${cx + s(185)} ${cy - s(130)} Q${cx + s(230)} ${cy + s(28)} ${cx + s(130)} ${cy + s(184)} Q${cx} ${cy + s(260)} ${cx - s(130)} ${cy + s(184)} Q${cx - s(230)} ${cy + s(28)} ${cx - s(185)} ${cy - s(130)}Z" fill="${ink}" stroke="${secondary}" stroke-width="${s(9)}"/>
@@ -294,10 +315,12 @@ export class ArtPreviewGeneratorService {
 
   private renderedTraitKeys(traits: Record<string, unknown>) {
     const visibleKeys = ["base", "background", "eyes", "mouthExpression", "headgear", "outfit", "accessory", "neckChestAccessory", "aura", "frame", "legendaryOverlay"];
+    const rarity = String(traits.rarity ?? "");
+    const caps: Record<string, number> = { Common: 4, Uncommon: 5, Rare: 7, Epic: 9, Legendary: 11, Mythic: 12 };
     return visibleKeys.filter((key) => {
       const value = String(traits[key] ?? "");
-      return value && value !== "None" && value !== "Base pose" && value !== "Base expression" && value !== "Static Still" && value !== "Standard frame";
-    });
+      return value && !/None|Base pose|Base expression|Static Still|Standard frame|simple head mark|restrained FX|clean edge|no signature scene|idle still|base outfit|small badge/i.test(value);
+    }).slice(0, caps[rarity] ?? 12);
   }
 
   private renderedTraits(traits: Record<string, unknown>, pack: TraitPackPlan) {
@@ -326,7 +349,7 @@ export class ArtPreviewGeneratorService {
           value
         };
       })
-      .filter((trait) => typeof trait.value === "string" && trait.value !== "None" && trait.value !== "Base pose" && trait.value !== "Base expression" && trait.value !== "Static Still" && trait.value !== "Standard frame");
+      .filter((trait) => typeof trait.value === "string" && !/None|Base pose|Base expression|Static Still|Standard frame/i.test(trait.value));
   }
 
   private categoryFor(pack: TraitPackPlan, role: TraitCategoryRole) {
@@ -342,5 +365,24 @@ export class ArtPreviewGeneratorService {
 
   private escape(value: string) {
     return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char] ?? char);
+  }
+
+  private moodFor(style: GeneratedStyleProfile, rarity: string, seed: number) {
+    const moods = style.creativeUniverse?.moodCulture ?? [];
+    const index = rarity === "Mythic" ? moods.length - 1 : rarity === "Legendary" ? Math.max(0, moods.length - 2) : seed % Math.max(1, moods.length);
+    return moods[Math.max(0, index)] ?? {
+      name: `${this.identityPrefix(style)} focused`,
+      expression: "focused",
+      eyeLanguage: "community eyes",
+      mouthLanguage: "community expression",
+      stance: "readable stance",
+      gesture: "identity prop hold",
+      auraBehavior: "low FX",
+      animationState: "idle"
+    };
+  }
+
+  private identityPrefix(style: GeneratedStyleProfile) {
+    return String(style.brandDna?.tokenName ?? style.collection).split(/\s+/).filter(Boolean).slice(0, 2).join(" ") || "Token";
   }
 }

@@ -7,6 +7,8 @@ import type {
   CommunityContextOutput,
   CommunityCreativeUniverse,
   CreateGenerationRunInput,
+  CreativeDNA,
+  CreativeSignalProfile,
   GeneratedStyleProfile,
   LogoAnalysisOutput,
   MoodExpressionPlan,
@@ -17,6 +19,19 @@ import type {
 } from "./generator.types";
 import { pick, seedFrom, titleCase, unique } from "./generator.util";
 import { RarityEngineService } from "./rarity-engine.service";
+
+type SemanticHint = {
+  key: string;
+  pattern: RegExp;
+  objects: string[];
+  worlds: string[];
+  textures: string[];
+  styles: string[];
+  expressions: string[];
+  silhouettes: string[];
+  roleWords?: Partial<Record<TraitCategoryRole, string[]>>;
+  danger?: string[];
+};
 
 @Injectable()
 export class StyleProfileGeneratorService {
@@ -29,14 +44,15 @@ export class StyleProfileGeneratorService {
     const tokenName = input.tokenName ?? source?.name ?? "Token";
     const tokenSymbol = input.tokenSymbol ?? source?.symbol ?? "$TOKEN";
     const sourceWords = unique([...context.extractedVocabulary, ...this.sourceWords(input), ...analysis.visualKeywords]).filter((word) => !this.genericWord(word));
-    const motif = titleCase(pick(sourceWords.length ? sourceWords : context.extractedVocabulary, seed));
-    const world = input.hints?.themePreference?.trim() || this.visualWorld(sourceWords, preset.backgroundWorlds, seed + 2);
-    const universe = this.creativeUniverse(input, analysis, context, sourceWords, motif, world, seed, preset);
-    const assetPack = selectAssetPack(analysis.mascot, [...sourceWords, ...context.traitSeeds, world]);
-    const silhouette = this.silhouette(analysis, sourceWords, seed);
-    const mascot = `${analysis.mascot} ${silhouette}`;
-    const theme = `${motif} ${pick(["vault circle", "holder house", "raid club", "signal crew", "meme order", "liquidity guild"], seed + 6)}`;
-    const roleNames = unique([...context.roleNames, ...this.roleLanguage(motif, analysis.mascot, sourceWords, seed)]).slice(0, 10);
+    const motif = this.primaryMotif(tokenName, tokenSymbol, sourceWords, context.extractedVocabulary, seed);
+    const seedWorld = input.hints?.themePreference?.trim() || this.visualWorld(sourceWords, preset.backgroundWorlds, seed + 2);
+    const universe = this.creativeUniverse(input, analysis, context, sourceWords, motif, seedWorld, seed, preset);
+    const world = universe.creativeDna.worldConcept;
+    const assetPack = selectAssetPack(analysis.mascot, [...sourceWords, ...context.traitSeeds, world, ...universe.signalProfile.objects]);
+    const silhouette = universe.creativeDna.baseSilhouetteRules[0] ?? this.silhouette(analysis, sourceWords, seed);
+    const mascot = universe.creativeDna.mascotOrSubject;
+    const theme = `${motif} ${pick(["holder house", "signal crew", "meme order", "liquidity guild", "origin circle", "raid studio"], seed + 6)}`;
+    const roleNames = unique([...context.roleNames, ...this.roleLanguage(motif, mascot, sourceWords, seed)]).slice(0, 10);
     const cultureNouns = universe.taxonomy.flatMap((category) => category.nouns);
     const traitLanguage = unique([
       ...this.communityTraitLanguage(tokenName, sourceWords, analysis, seed, cultureNouns),
@@ -47,7 +63,7 @@ export class StyleProfileGeneratorService {
 
     const lore = this.lore(input, analysis, context, theme, world);
     const tenKReadiness = this.tenKReadiness(input, analysis);
-    const colorSystem = this.collectionColorSystem(analysis.palette, input.hints?.colorPreference);
+    const colorSystem = this.collectionColorSystem(universe.creativeDna.palette, input.hints?.colorPreference);
     const rarityVisualRules = this.rarityVisualRules(motif, world, silhouette);
     const baseArchetypes = universe.baseSilhouettes.map((item) => `${item.name}: ${item.bodyShape}, ${item.poseLanguage}, ${item.cameraFraming}`);
     const brandDna = {
@@ -57,21 +73,21 @@ export class StyleProfileGeneratorService {
       logoPalette: analysis.palette,
       logoDerivedColors: analysis.palette,
       colorSystem,
-      mascotArchetype: analysis.mascot,
-      memeLanguage: unique([...context.memes, ...context.phrases, ...context.slogans, ...sourceWords]).slice(0, 24),
+      mascotArchetype: mascot,
+      memeLanguage: unique([...context.memes, ...context.phrases, ...context.slogans, ...sourceWords, ...universe.signalProfile.memeLanguage]).slice(0, 24),
       lore,
       visualWorld: world,
       shapeLanguage: analysis.shapeLanguage,
       compositionRules: assetPack.compositionRules,
       traitNamingRules: [
-        "Use token/community language in every visible trait.",
-        "Avoid plain color/object labels.",
+        "Use generated Creative DNA language in every visible trait.",
+        "Avoid fixed archetype labels and plain color/object names.",
         "Rarity must be readable from silhouette, glow, or composition."
       ],
       typographyDirection: assetPack.typographyDirection,
       raidLanguage: context.raidNames,
       roleLanguage: roleNames,
-      legendaryDirection: this.legendaryDirection(motif, analysis.mascot, world, preset.legendaryDirection),
+      legendaryDirection: universe.creativeDna.legendaryMythology,
       mascotSilhouette: silhouette,
       backgroundWorld: world,
       baseArchetypes,
@@ -83,11 +99,11 @@ export class StyleProfileGeneratorService {
       rarityVisualRules,
       forbiddenSimilarities: [
         ...assetPack.forbiddenCombinations.map((item) => `${item.trait}: ${item.incompatibleWith.join(", ")}`),
-        "No generic neon cyber mascot identity without token-specific vocabulary.",
-        "No platform Phew lime/cyan/gold palette as the collection identity.",
-        "No legendary recolors; legendary/mythic must change pose, scene, frame, and FX.",
+        ...universe.creativeDna.forbiddenSimilarities,
         ...universe.antiGenericRules
       ],
+      creativeDna: universe.creativeDna,
+      signalProfile: universe.signalProfile,
       sourceMetadataSummary: {
         source: "helius_scan_primary",
         logoUri: input.logoUri ?? source?.imageUri ?? source?.logoUri,
@@ -113,7 +129,7 @@ export class StyleProfileGeneratorService {
       theme,
       mascot,
       artStyle: universe.artStyle,
-      colors: analysis.palette,
+      colors: universe.creativeDna.palette,
       backgroundWorld: world,
       traitLanguage,
       rarityStructure: this.rarity.weights(),
@@ -125,7 +141,9 @@ export class StyleProfileGeneratorService {
       brandDna,
       visualFingerprint: {
         archetype: universe.archetype,
-        mascotArchetype: analysis.mascot,
+        creativeDna: universe.creativeDna,
+        signalWeights: universe.signalProfile.semanticWeights,
+        mascotArchetype: mascot,
         silhouetteFamily: silhouette,
         palette: colorSystem,
         backgroundWorld: world,
@@ -192,31 +210,36 @@ export class StyleProfileGeneratorService {
   private sourceWords(input: CreateGenerationRunInput) {
     const source = input.hints?.sourceMetadata;
     const links = source?.socialLinks ? Object.keys(source.socialLinks) : [];
+    const extensionText = Object.entries(source?.extensions ?? {}).flatMap(([key, value]) => [key, ...String(JSON.stringify(value)).split(/\W+/)]);
     return unique([
       ...(source?.name ? source.name.split(/\W+/) : []),
       ...(source?.symbol ? [source.symbol.replace(/^\$/, "")] : []),
       ...(source?.description ? source.description.split(/\W+/) : []),
+      ...(input.description ? input.description.split(/\W+/) : []),
       ...links,
-      ...Object.keys(source?.extensions ?? {})
-    ].map((word) => word.toLowerCase()).filter((word) => word.length > 2)).slice(0, 28);
+      ...extensionText,
+      ...(source?.riskNotes ?? []).flatMap((note) => note.split(/\W+/))
+    ].map((word) => word.toLowerCase()).filter((word) => word.length > 2)).slice(0, 60);
   }
 
   private visualWorld(words: string[], fallbackWorlds: string[], seed: number) {
-    const source = words.join(" ");
-    if (/vapor|vaporwave|surreal|liminal|mall|vhs|pool/.test(source)) return "liminal vaporwave arcade";
-    if (/skull|bone|reaper|crypt|shadow|cursed|dark/.test(source)) return "black moon crypt market";
-    if (/dog|doge|shib|inu|bone|pack/.test(source)) return "moonlit kennel dojo district";
-    if (/cat|kitty|meow|claw|nft/.test(source)) return "night market alley network";
-    if (/degen|pump|casino|moon|chart|liquidity/.test(source)) return "chart-lit degen bazaar";
-    if (/(^|\s)(ai|bot)(\s|$)|robot|agent|neural|compute/.test(source)) return "autonomous machine server temple";
-    if (/pepe|frog|swamp|bog|pond/.test(source)) return "memetic swamp trading floor";
-    if (/cute|toy|toast|sticker|soft|candy/.test(source)) return "sunny sticker toy room";
-    return pick(fallbackWorlds, seed);
+    const hints = this.topHints(this.semanticWeights(words.join(" "))).flatMap((hint) => hint.worlds);
+    const anchor = titleCase(pick(words.length ? words : ["origin"], seed + 3));
+    const selected = hints.length ? pick(hints, seed + 5) : pick(fallbackWorlds, seed);
+    const frame = pick(["district", "room", "map", "altar", "market", "theater", "habitat", "archive"], seed + 9);
+    return `${anchor} ${selected} ${frame}`.toLowerCase();
+  }
+
+  private primaryMotif(tokenName: string, tokenSymbol: string, sourceWords: string[], contextWords: string[], seed: number) {
+    const identityWords = unique([...tokenName.split(/\W+/), tokenSymbol.replace(/^\$/, ""), ...sourceWords].map((word) => word.toLowerCase()).filter((word) => word.length > 2 && !this.genericWord(word)));
+    const named = identityWords.find((word) => tokenName.toLowerCase().includes(word) || tokenSymbol.toLowerCase().includes(word));
+    if (named) return titleCase(named);
+    return titleCase(pick(sourceWords.length ? sourceWords : contextWords.length ? contextWords : ["origin"], seed));
   }
 
   private silhouette(analysis: LogoAnalysisOutput, words: string[], seed: number) {
-    const source = words.join(" ");
-    const modifier = /shib|samurai|dojo/.test(source) ? "kabuto side-profile" : /(^|\s)(ai|bot)(\s|$)|robot/.test(source) ? "modular visor chassis" : /cat/.test(source) ? "arched alley-stalker" : /frog|pepe/.test(source) ? "wide-eyed squat meme idol" : pick(["crest-backed", "asymmetric relic-bearer", "banner-shouldered", "mask-forward"], seed);
+    const hints = this.topHints(this.semanticWeights(words.join(" ")));
+    const modifier = pick(unique([...hints.flatMap((hint) => hint.silhouettes), "crest-backed signal bearer", "asymmetric relic carrier", "banner-shouldered community figure", "mask-forward mascot subject"]), seed);
     return `${analysis.shapeLanguage} ${modifier}`;
   }
 
@@ -232,24 +255,8 @@ export class StyleProfileGeneratorService {
 
   private communityTraitLanguage(tokenName: string, words: string[], analysis: LogoAnalysisOutput, seed: number, cultureNouns: string[] = []) {
     const motifs = unique([...words, ...tokenName.split(/\W+/), ...analysis.visualKeywords]).filter((word) => word.length > 2 && !this.genericWord(word));
-    const nouns = cultureNouns.length
-      ? unique(cultureNouns).slice(0, 28)
-      : ["emblem", "chant", "sigil", "trade mark", "holder badge", "raid prop", "scene key", "origin mark", "meme relic", "liquidity tag"];
+    const nouns = cultureNouns.length ? unique(cultureNouns).slice(0, 28) : ["emblem", "chant", "sigil", "holder badge", "raid prop", "scene key", "origin mark", "meme relic", "liquidity tag"];
     return Array.from({ length: 18 }, (_, index) => `${titleCase(pick(motifs.length ? motifs : [analysis.mascot], seed + index * 7))} ${pick(nouns, seed + index * 11)}`);
-  }
-
-  private legendaryDirection(motif: string, mascot: string, world: string, fallback: string) {
-    return `${fallback}; ${motif} ${titleCase(mascot)} takes over ${world} with unique scene layout, signature frame, strong FX, and custom silhouette`;
-  }
-
-  private baseArchetypes(mascot: string, motif: string, silhouette: string, seed: number) {
-    return [
-      `${motif} base holder, ${silhouette}, front readable pose`,
-      `${titleCase(mascot)} scout, lighter silhouette, one prop slot`,
-      `${motif} raid lead, broader shoulders, gesture pose`,
-      `${titleCase(mascot)} myth form, reserved for legendary/mythic composition`,
-      `${motif} liquidity guard, badge-forward silhouette`
-    ].map((value, index) => `${value} #${index + 1 + (seed % 3)}`);
   }
 
   private creativeUniverse(
@@ -262,286 +269,482 @@ export class StyleProfileGeneratorService {
     seed: number,
     preset: { artStyle: string; animationDirection: string }
   ): CommunityCreativeUniverse {
-    const text = unique([...words, ...context.extractedVocabulary, analysis.mascot, input.hints?.mood ?? ""]).join(" ").toLowerCase();
-    const archetype = this.communityArchetype(text, analysis.mascot);
-    const art = this.artDirection(archetype, text, motif, preset.artStyle, seed);
-    const taxonomy = this.taxonomy(archetype, motif, words, seed);
-    const moodCulture = this.moodCulture(archetype, motif, seed);
-    const baseSilhouettes = this.baseSilhouettes(archetype, motif, analysis.shapeLanguage, world, seed);
-    const animationReadiness = this.animationReadiness(archetype, motif, moodCulture, preset.animationDirection);
+    const signalProfile = this.extractSignals(input, analysis, context, words, seed);
+    const creativeDna = this.generateCreativeDna(input, analysis, signalProfile, motif, world, seed, preset);
+    const taxonomy = this.dynamicTaxonomy(creativeDna, signalProfile, motif, seed);
+    const moodCulture = this.dynamicMoodCulture(creativeDna, signalProfile, motif, seed);
+    const baseSilhouettes = this.dynamicBaseSilhouettes(creativeDna, signalProfile, analysis.shapeLanguage, seed);
+    const animationReadiness = this.dynamicAnimationReadiness(creativeDna, signalProfile, moodCulture, preset.animationDirection, seed);
+    const archetype = this.dynamicIdentityKey(motif, signalProfile, seed);
     const productionAssetPolicy = this.productionAssetPolicy();
     return {
       archetype,
-      inferredCommunityLanguage: unique([...context.memes, ...context.slogans, ...context.phrases, ...words]).slice(0, 28),
-      artStyle: art.style,
-      artStyleReason: art.reason,
+      signalProfile,
+      creativeDna,
+      inferredCommunityLanguage: unique([...context.memes, ...context.slogans, ...context.phrases, ...words, ...signalProfile.culturalWords]).slice(0, 32),
+      artStyle: creativeDna.artStyle,
+      artStyleReason: `${creativeDna.artStyle} was generated from weighted metadata, logo, social, mood, and fallback-market signals: ${this.topWeightKeys(signalProfile.semanticWeights).join(", ")}.`,
       taxonomy,
       baseSilhouettes,
       moodCulture,
       animationReadiness,
       productionAssetPolicy,
       antiGenericRules: [
-        `Do not reuse ${archetype} categories outside communities with matching token metadata.`,
-        "Do not approve collection taxonomy if more than half the trait categories are shared with another collection.",
-        "Do not repeat crown, armor, aura, or frame concepts unless the community metadata explicitly supports them.",
+        "Do not select final collection worlds from fixed animal, robot, trader, or virus templates.",
+        "Do not approve collection taxonomy if another collection has the same role-label structure.",
+        "Do not repeat art style, base pose logic, mood vocabulary, or legendary structure without new source signals.",
         "Do not ship common/uncommon/rare NFTs from generic AI image output; use approved layer packs.",
         "Do not mark production-ready without curated or handmade layers and permanent final storage."
       ]
     };
   }
 
-  private communityArchetype(text: string, mascot: string) {
-    if (/vapor|vaporwave|surreal|dream|synth|mall|liminal|gradient|vhs|pool/.test(text) || /abstract/.test(mascot)) return "abstract-vaporwave";
-    if (/frog|pepe|toad|bog|swamp|ribbit|pond/.test(text) || /frog/.test(mascot)) return "frog-degen";
-    if (/skull|bone|reaper|necromancer|crypt|shadow|cursed|dark/.test(text) || /skull/.test(mascot)) return "dark-fantasy-skull";
-    if (/dog|doge|shib|inu|kennel|bark|bone|cozy|blanket|lofi/.test(text) || /dog|samurai/.test(mascot)) return /cozy|blanket|lofi|soft/.test(text) ? "dog-cozy" : "dog-pack";
-    if (/cat|kitty|meow|claw|nine.?life|streamer|arcade/.test(text) || /cat/.test(mascot)) return "cat-hyper-meme";
-    if (/(^|\s)(ai|bot)(\s|$)|robot|agent|neural|compute|machine|model|swarm/.test(text) || /robot/.test(mascot)) return "robot-ai";
-    if (/trader|terminal|chart|candle|liquidation|perp|finance|yield|market|index/.test(text)) return "trader-finance";
-    if (/cute|baby|toy|nursery|cartoon|kids|soft|candy|toast|sticker|breakfast/.test(text) || /cute/.test(mascot)) return "cute-cartoon";
-    return "token-native";
-  }
-
-  private artDirection(archetype: string, text: string, motif: string, fallback: string, seed: number) {
-    const choices: Record<string, string[]> = {
-      "frog-degen": ["pixel art swamp prophecy", "hand-drawn meme poster art", "retro game bog cult"],
-      "dog-cozy": ["children's cartoon cozy streetwear", "clay rendered toy kennel club", "soft cartoon sticker pack"],
-      "dog-pack": ["streetwear mascot cartoon", "comic dog raid crew", "low-poly moon pack"],
-      "cat-hyper-meme": ["hand-drawn hyper meme arcade", "anime streamer-room chaos", "comic night-market cat"],
-      "robot-ai": ["glitch/cyber machine poster", "low-poly autonomous robot", "trading-terminal AI interface"],
-      "trader-finance": ["trading-terminal aesthetic", "comic finance stress poster", "arcade liquidation screen"],
-      "dark-fantasy-skull": ["dark fantasy cursed collectible", "horror cute skull storybook", "painterly raid crypt"],
-      "cute-cartoon": ["children's cartoon collectible", "clay/rendered toy mascot", "soft poster art"],
-      "abstract-vaporwave": ["surreal vaporwave poster art", "abstract retro game dream", "glitch/cyber vaporwave"],
-      "token-native": [fallback, "luxury collectible poster art", "community mascot cartoon"]
+  private extractSignals(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput, context: CommunityContextOutput, words: string[], seed: number): CreativeSignalProfile {
+    const sourceText = this.sourceText(input, context, analysis, words);
+    const weights = this.semanticWeights(sourceText);
+    const hints = this.topHints(weights);
+    const significant = this.significantWords(sourceText);
+    const cue = (pattern: RegExp) => pattern.test(sourceText) ? 90 : hints.some((hint) => pattern.test(hint.key)) ? 64 : 24;
+    const styleRefs = unique([...hints.flatMap((hint) => hint.styles), analysis.style, input.selectedPreset ?? ""]).filter(Boolean);
+    const worldRefs = unique([...hints.flatMap((hint) => hint.worlds), ...context.backgroundNames, input.hints?.themePreference ?? ""]).filter(Boolean);
+    const objects = unique([...hints.flatMap((hint) => hint.objects), ...context.traitSeeds, ...significant.slice(0, 8)]).slice(0, 36);
+    const animals = significant.filter((word) => /frog|toad|dog|doge|shib|inu|cat|kitty|meow|skull|alien|hanta|mouse|bear|bull|ape/.test(word)).slice(0, 8);
+    const emotions = unique([
+      input.hints?.mood ?? "",
+      ...hints.flatMap((hint) => hint.expressions),
+      ...significant.filter((word) => /panic|cozy|rage|happy|sad|fear|sleep|stress|chaos|luxury|dream|toxic|cute|dark|safe|danger/.test(word))
+    ].filter(Boolean)).slice(0, 16);
+    return {
+      entities: unique([input.tokenName ?? "", input.tokenSymbol ?? "", input.hints?.sourceMetadata?.name ?? "", ...significant.slice(0, 12)].filter(Boolean)).slice(0, 18),
+      objects,
+      animals,
+      emotions,
+      colors: unique([...analysis.palette, ...significant.filter((word) => /green|red|blue|gold|black|white|pink|purple|orange|silver|chrome|toxic|neon/.test(word))]).slice(0, 12),
+      visualShapes: unique([...analysis.shapeLanguage.split(/\s+/), ...hints.flatMap((hint) => hint.silhouettes).flatMap((item) => item.split(/\s+/))]).filter((word) => word.length > 3).slice(0, 18),
+      culturalWords: unique([...context.extractedVocabulary, ...significant, ...Object.keys(input.hints?.sourceMetadata?.socialLinks ?? {})]).slice(0, 32),
+      memeLanguage: unique([...context.memes, ...context.phrases, ...context.slogans]).slice(0, 24),
+      humorType: this.humorType(sourceText, weights, seed),
+      energyLevel: this.energyLevel(sourceText, weights),
+      communityVibe: this.communityVibe(sourceText, weights, seed),
+      worldReferences: worldRefs.slice(0, 18),
+      styleReferences: styleRefs.slice(0, 14),
+      dangerSafetyCues: unique([...hints.flatMap((hint) => hint.danger ?? []), ...significant.filter((word) => /safe|danger|toxic|hazard|risk|quarantine|dark|shadow|protect|guard|rage/.test(word))]).slice(0, 18),
+      cueDial: {
+        luxury: cue(/luxury|gold|vip|premium|diamond|velvet/),
+        chaos: cue(/chaos|degen|wild|glitch|mutation|outbreak|casino/),
+        cozy: cue(/cozy|soft|blanket|lofi|nap|cute|toy|sleep/),
+        aggressive: cue(/aggressive|war|fang|blade|raid|rage|skull|danger/),
+        surreal: cue(/surreal|dream|vapor|liminal|abstract|microscope|mutation/)
+      },
+      semanticWeights: weights
     };
-    const style = pick(choices[archetype] ?? choices["token-native"], seed + 17);
-    const reason = `${style} was selected because ${motif} metadata language maps to ${archetype} community signals instead of a platform-wide preset.`;
-    return { style, reason };
   }
 
-  private taxonomy(archetype: string, motif: string, words: string[], seed: number): TraitCategoryPlan[] {
-    const keyword = titleCase(pick(words.length ? words : [motif], seed + 19));
-    const build = (role: TraitCategoryRole, label: string, targetCount: number, nouns: string[], description: string, forbiddenConcepts: string[] = []) => ({
-      id: this.categoryId(label),
-      label,
-      role,
-      description,
-      targetCount,
-      nouns,
-      forbiddenConcepts
-    });
-    const sets: Record<string, TraitCategoryPlan[]> = {
-      "frog-degen": [
-        build("base", `${motif} Bog Bodies`, 42, ["Squat Idol", "Pond Prophet", "Liquidity Toad", "Mud Oracle", "Ribbit Raider"], "Wide squat frog silhouettes with meme-eye readability."),
-        build("background", `${keyword} Swamp Weather`, 60, ["Mire Dawn", "Pond Candle", "Bog Floor", "Chart Rain", "Lily Ruin"], "Swamp scenes shaped by degen chart language."),
-        build("head", "Swamp Crowns", 34, ["Reed Crown", "Mold Tiara", "Lilypad Cap", "Bog Circlet"], "Frog-specific status marks.", ["generic crown"]),
-        build("eyes", "Prophecy Eyes", 36, ["Rugged Pupil", "Candle Stare", "Ribbit Blink", "Moon Bog Gaze"], "Eye language from prophecy and chart anxiety."),
-        build("mouth", "Ribbit Reactions", 30, ["Croak Smirk", "Bogged Grin", "Pond Gasp", "Degen Tongue"], "Community-specific meme reactions."),
-        build("body", "Mire Wraps", 44, ["Algae Hoodie", "Mud Poncho", "Chart Vest", "Wader Cloak"], "Body layers that feel swamp-made."),
-        build("prop", "Bog Relics", 70, ["Prophecy Scroll", "Toxic Lily", "Liquidity Jar", "Mosquito Banner", "Chart Reed"], "Held and foreground culture objects."),
-        build("neck", "Pond Tokens", 24, ["Slug Chain", "Lily Medallion", "Croak Beads"], "Small badges for mid-rarity detail."),
-        build("aura", "Toxic Mist Events", 24, ["Mire Fumes", "Ribbit Echo", "Bog Halo", "Chart Spores"], "Rare+ atmosphere without becoming a global aura category."),
-        build("frame", "Pond Treaty Borders", 12, ["Reed Border", "Mud Stamp", "Lily Seal"], "Only premium rarity composition devices."),
-        build("legendary", "Bog Prophecies", 10, ["Final Croak", "Pond King Collapse", "Ribbit Eclipse"], "Legendary scene rules, never recolors."),
-        build("animation", "Croak Loops", 10, ["Blink Ripple", "Tongue Pop", "Mist Breath"], "Future animation layer names.")
-      ],
-      "dog-cozy": [
-        build("base", `${motif} Cozy Pups`, 42, ["Blanket Pup", "Sofa Sprinter", "Pillow Guard", "Moon Napper"], "Rounded dog bodies and soft poses."),
-        build("background", "Cozy Kennel Corners", 60, ["Lofi Rug", "Treat Shelf", "Rain Window", "Moon Couch"], "Warm home-world backdrops."),
-        build("head", "Nap Hats", 32, ["Beanie Fold", "Sleep Cap", "Ear Muff", "Snack Crown"], "Soft head items, no heavy armor.", ["armor", "battle crown"]),
-        build("eyes", "Puppy Mood Eyes", 36, ["Sleepy Spark", "Treat Focus", "Fake Brave", "Blanket Blink"], "Cozy canine expression language."),
-        build("mouth", "Snack Reactions", 30, ["Biscuit Smile", "Tiny Bark", "Awkward Pant", "Cozy Yawn"], "Mouth states that match cozy culture."),
-        build("body", "Street Blankets", 44, ["Oversized Hoodie", "Patch Jacket", "Fleece Wrap", "Raincoat"], "Streetwear plus comfort."),
-        build("prop", "Pack Comforts", 70, ["Tennis Ball", "Treat Bag", "Tea Cup", "Bone Banner"], "Props from dog community rituals."),
-        build("neck", "Collar Lore", 24, ["Name Tag", "Soft Collar", "Pack Charm"], "Readable neck accessory system."),
-        build("aura", "Warm Room Glow", 24, ["Lamp Glow", "Nap Steam", "Treat Sparkles"], "FX as cozy room atmosphere."),
-        build("frame", "Sticker Edges", 12, ["Scrapbook Trim", "Sofa Stitch", "Blanket Border"], "Premium frame equivalents."),
-        build("legendary", "Cozy Pack Scenes", 10, ["Moon Couch Commander", "Final Treat Raid", "Blanket Throne"], "Unique warm dog scenes."),
-        build("animation", "Tail Loops", 10, ["Tail Wag", "Ear Twitch", "Sleep Blink"], "Animation-ready dog layer names.")
-      ],
-      "dog-pack": [
-        build("base", `${motif} Pack Bodies`, 42, ["Street Pup", "Bone Marshal", "Moon Runner", "Banner Biter"], "Energetic dog poses and readable pack silhouettes."),
-        build("background", "Moon Kennel Blocks", 60, ["Alley Kennel", "Pack Roof", "Bone Court", "Moon Lot"], "Street-pack locations."),
-        build("head", "Pack Hats", 34, ["Snapback", "Rally Cap", "Bone Beanie", "Moon Hood"], "Streetwear head layers, not royal crowns.", ["generic crown"]),
-        build("eyes", "Pack Glares", 36, ["Treat Lock", "Chaos Side Eye", "Moon Squint", "Raid Focus"], "Canine eye culture."),
-        build("mouth", "Bark States", 30, ["Victory Bark", "Smug Pant", "Bone Grin", "Chaos Tongue"], "Dog-specific reactions."),
-        build("body", "Kennel Fits", 44, ["Varsity Jacket", "Rally Vest", "Track Hoodie", "Moon Jersey"], "Streetwear body system."),
-        build("prop", "Pack Props", 70, ["Tennis Ball", "Bone Banner", "Leash Mic", "Snack Bag"], "Dog culture objects."),
-        build("neck", "Collar Signals", 24, ["Alpha Tag", "Raid Collar", "Moon Chain"], "Neck status tokens."),
-        build("aura", "Pack Noise", 24, ["Bark Lines", "Dust Kick", "Moon Spark"], "Movement and noise FX."),
-        build("frame", "Sticker Frames", 12, ["Paw Tape", "Kennel Stamp", "Rally Border"], "Premium composition trim."),
-        build("legendary", "Pack Takeovers", 10, ["Moon Yard Captain", "Bone Banner Riot", "Kennel Boss Shot"], "Unique pack scenes."),
-        build("animation", "Pack Loops", 10, ["Tail Wag", "Paw Tap", "Bark Pop"], "Animation-ready dog layer names.")
-      ],
-      "cat-hyper-meme": [
-        build("base", `${motif} Cat Bodies`, 42, ["Keyboard Goblin", "Arcade Cat", "Stream Chair Cat", "Alley Sprinter"], "Flexible cat proportions and chaotic sitting/leaning poses."),
-        build("background", "Streamer Rooms", 60, ["RGB Desk", "Arcade Cabinet", "Milk Bar", "Claw Alley"], "Rooms and alleys that match hyper meme cat culture."),
-        build("head", "Ear Interrupts", 30, ["Headset", "Tiny Crown JPEG", "Beanie Ears", "Clip Bow"], "Head items that work around cat ears."),
-        build("eyes", "Combo Eyes", 38, ["Lag Blink", "Arcade Stare", "Claw Combo", "Dead Chat"], "Cat eye states from streaming and arcade language."),
-        build("mouth", "Meow Reactions", 34, ["Keyboard Scream", "Milk Smirk", "Tiny Hiss", "Combo O"], "Mouth states as meme reactions."),
-        build("body", "Streamer Fits", 44, ["Oversized Tee", "Arcade Hoodie", "Mod Jacket", "Milk Bar Apron"], "Cat streamer/streetwear outfits."),
-        build("prop", "Claw Objects", 70, ["Mouse Cursor", "Energy Drink", "Arcade Token", "Claw Mark", "Chat Banner"], "Cat props from digital chaos."),
-        build("neck", "Charm Collars", 24, ["Bell Chain", "Mod Badge", "Combo Charm"], "Neck accessories."),
-        build("aura", "Chat FX", 24, ["Emote Storm", "Lag Static", "Combo Burst"], "FX as chat and arcade movement."),
-        build("frame", "Screen Borders", 12, ["CRT Edge", "Stream Overlay", "Cabinet Trim"], "Premium UI-like framing."),
-        build("legendary", "Nine-Life Moments", 10, ["Final Combo", "Dead Chat Revival", "Arcade Boss Cat"], "Unique cat scenes."),
-        build("animation", "Meow Loops", 10, ["Tail Flick", "Blink Lag", "Mouth Meow"], "Animation layers.")
-      ],
-      "robot-ai": [
-        build("base", `${motif} Chassis`, 42, ["Node Runner", "Inference Unit", "Patch Bot", "Server Idol"], "Robot bodies with chassis variance."),
-        build("background", "Compute Rooms", 60, ["Server Shrine", "Inference Rack", "Node Hangar", "Terminal Chapel"], "AI infrastructure worlds."),
-        build("head", "Processor Shells", 32, ["Heatsink Crown", "Cracked Shell", "Antenna Fin", "Patch Hood"], "Hardware identity, no fantasy helmets.", ["helm", "armor"]),
-        build("eyes", "Screen States", 38, ["Loading Eyes", "Kernel Panic", "Blue Screen Blink", "Prompt Cursor"], "Robotic eye/screen language."),
-        build("mouth", "Speaker Outputs", 28, ["Flatline Speaker", "Syntax Smile", "Error Chirp", "Null Mouth"], "Robot mouth/audio output layers."),
-        build("body", "Firmware Plates", 48, ["Patch Plate", "Debug Harness", "Cable Vest", "Model Jacket"], "Body layers as hardware/firmware."),
-        build("prop", "Compute Relics", 70, ["Prompt Card", "GPU Shard", "Patch Cable", "Node Key", "Broken Dataset"], "AI community props."),
-        build("neck", "Port Badges", 24, ["USB Charm", "Node Tag", "Model License"], "Small hardware identifiers."),
-        build("aura", "Signal Corruption", 26, ["Packet Loss", "Circuit Halo", "Terminal Glow", "Firmware Leak"], "Rare+ machine FX."),
-        build("frame", "HUD Containers", 12, ["Terminal Window", "Debug Frame", "Model Card"], "Interface framing."),
-        build("legendary", "Autonomous Incidents", 10, ["Model Awakening", "Server Temple Breach", "Recursive Commander"], "Unique AI scenes."),
-        build("animation", "Firmware Loops", 10, ["Cursor Blink", "Fan Spin", "Screen Tear"], "Animation layer names.")
-      ],
-      "trader-finance": [
-        build("base", `${motif} Trader Avatars`, 42, ["Desk Sleeper", "Leverage Addict", "Floor Captain", "Liquidation Monk"], "Human/mascot trader poses at terminals."),
-        build("background", "Market Screens", 60, ["Red Candle Wall", "Perp Desk", "Liquidation Alley", "Coffee Terminal"], "Terminal and finance environments."),
-        build("head", "Desk Wear", 30, ["Headset", "Cap Tilt", "Stress Band", "Floor Visor"], "Trader head layers, no crowns unless metadata says so.", ["crown", "armor"]),
-        build("eyes", "Chart Eyes", 38, ["Green Candle Pupils", "Red Wick Panic", "Locked-In Stare", "Margin Blink"], "Finance eye language."),
-        build("mouth", "Pnl Faces", 32, ["Fake Happy", "Liquidation Gasp", "Smug Fill", "Dead Inside Line"], "Mouth expressions from PnL culture."),
-        build("body", "Desk Fits", 44, ["Wrinkled Hoodie", "Broker Vest", "Coffee-Stained Tee", "Terminal Jacket"], "Body layers for trader culture."),
-        build("prop", "Desk Objects", 70, ["Coffee Cup", "Margin Call Phone", "Chart Tablet", "Stress Ball", "Liquidation Notice"], "Trader props."),
-        build("neck", "Pnl Badges", 24, ["Exchange Lanyard", "Whale Tag", "Risk Badge"], "Finance identifiers."),
-        build("aura", "Market Volatility", 26, ["Candle Smoke", "Funding Glow", "Liquidation Sparks", "Orderbook Rain"], "FX as market state."),
-        build("frame", "Terminal Panels", 12, ["Orderbook Frame", "Pnl Border", "Exchange Window"], "UI panel framing."),
-        build("legendary", "Market Events", 10, ["God Candle Witness", "Margin Call Saint", "Black Swan Desk"], "Unique finance scenes."),
-        build("animation", "Terminal Loops", 10, ["Ticker Scroll", "Candle Blink", "Pnl Flash"], "Animation layers.")
-      ],
-      "dark-fantasy-skull": [
-        build("base", `${motif} Skull Forms`, 42, ["Crypt Warden", "Ash Prophet", "Bone Baron", "Cursed Child"], "Skull silhouettes with distinct posture."),
-        build("background", "Cursed Locations", 60, ["Crypt Gate", "Ash Chapel", "Black Moon", "Bone Market"], "Dark fantasy worlds."),
-        build("head", "Bone Signs", 32, ["Cracked Horns", "Candle Melt", "Ash Hood", "Grave Ribbon"], "Skull head marks, not generic helmets.", ["armor", "generic crown"]),
-        build("eyes", "Haunted Sockets", 36, ["Empty Glow", "Cursed Wink", "Moon Socket", "Dead Rich Stare"], "Skull eye language."),
-        build("mouth", "Bone Reactions", 30, ["Cursed Grin", "Silent Jaw", "Tiny Scream", "Gold Tooth Curse"], "Mouth/jaw states."),
-        build("body", "Crypt Drapes", 44, ["Ash Cloak", "Ritual Bib", "Candle Robe", "Bone Harness"], "Body silhouette layers."),
-        build("prop", "Cursed Relics", 70, ["Black Candle", "Grave Receipt", "Bone Coin", "Raid Tombstone"], "Dark culture props."),
-        build("neck", "Omen Charms", 24, ["Coffin Tag", "Skull Beads", "Ash Signet"], "Small marks."),
-        build("aura", "Curses", 26, ["Ash Drift", "Moon Curse", "Soul Leak", "Candle Smoke"], "Atmospheric FX."),
-        build("frame", "Crypt Edges", 12, ["Tomb Border", "Wax Seal", "Bone Trim"], "Premium frames."),
-        build("legendary", "Cursed Scenes", 10, ["Black Moon Coronation", "Crypt Raid Saint", "Final Ash Smile"], "Unique scenes."),
-        build("animation", "Haunt Loops", 10, ["Jaw Click", "Eye Flame", "Ash Drift"], "Animation layers.")
-      ],
-      "cute-cartoon": [
-        build("base", `${motif} Toy Bodies`, 42, ["Tiny Mascot", "Sticker Friend", "Plush Walker", "Bubble Hero"], "Soft toy-like proportions."),
-        build("background", "Play Worlds", 60, ["Sticker Desk", "Candy Room", "Toy Shelf", "Sunny Park"], "Cute environments."),
-        build("head", "Tiny Toppers", 30, ["Bow Puff", "Party Cap", "Cloud Clip", "Sticker Hat"], "Soft head items."),
-        build("eyes", "Sparkle Eyes", 36, ["Blink Shine", "Curious Dot", "Happy Arc", "Sleepy Star"], "Simple readable eyes."),
-        build("mouth", "Tiny Faces", 30, ["Small Smile", "Oops O", "Snack Chew", "Proud Puff"], "Children's cartoon mouth states."),
-        build("body", "Soft Outfits", 44, ["Raincoat", "Jumper", "Capelet", "Pajama Suit"], "Cute body layers."),
-        build("prop", "Pocket Toys", 70, ["Sticker Wand", "Juice Box", "Tiny Flag", "Cloud Plush"], "Cute props."),
-        build("neck", "Friend Charms", 24, ["Name Bead", "Star Collar", "Ribbon Tag"], "Small identifiers."),
-        build("aura", "Happy Effects", 24, ["Bubble Pop", "Sun Spark", "Sticker Burst"], "Rare+ cute FX."),
-        build("frame", "Sticker Cuts", 12, ["Die Cut Edge", "Notebook Border", "Candy Trim"], "Premium sticker framing."),
-        build("legendary", "Storybook Moments", 10, ["Parade Hero", "Toy Shelf Champion", "Candy Room Wish"], "Unique cute scenes."),
-        build("animation", "Toy Loops", 10, ["Blink Shine", "Bounce Idle", "Sticker Pop"], "Animation layers.")
-      ],
-      "abstract-vaporwave": [
-        build("base", `${motif} Dream Forms`, 42, ["Chrome Silhouette", "Mall Phantom", "Liquid Idol", "Grid Dancer"], "Abstract character silhouettes."),
-        build("background", "Vapor Rooms", 60, ["Mall Atrium", "Sunset Grid", "Pool Tile", "Liminal Arcade"], "Surreal vaporwave worlds."),
-        build("head", "Signal Masks", 30, ["Chrome Mask", "Mall Visor", "Sunset Cap", "Dream Lens"], "Abstract head components."),
-        build("eyes", "Dream Optics", 36, ["VHS Blink", "Grid Stare", "Mall Glare", "Soft Glitch"], "Surreal eye language."),
-        build("mouth", "Signal Mouths", 28, ["VHS Smile", "Static O", "Dream Mute", "Chrome Smirk"], "Abstract mouth states."),
-        build("body", "Vapor Fits", 44, ["Windbreaker", "Chrome Drape", "Grid Jacket", "Pool Robe"], "Retro-future body layers."),
-        build("prop", "Liminal Objects", 70, ["Cassette", "Palm Token", "Arcade Receipt", "Broken Statue"], "Vaporwave props."),
-        build("neck", "Mall Badges", 24, ["Arcade Lanyard", "Palm Charm", "VHS Tag"], "Small identifiers."),
-        build("aura", "VHS Weather", 26, ["Scanline Rain", "Sunset Bloom", "Grid Echo", "Tape Warp"], "Rare+ vapor FX."),
-        build("frame", "VHS Mattes", 12, ["Tape Border", "Grid Panel", "Mall Kiosk"], "Premium framing."),
-        build("legendary", "Liminal Scenes", 10, ["Empty Mall Ascension", "Sunset Grid Idol", "Pool Tile Oracle"], "Unique scenes."),
-        build("animation", "Tape Loops", 10, ["Tracking Roll", "Grid Pulse", "Palm Sway"], "Animation layers.")
+  private generateCreativeDna(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput, signals: CreativeSignalProfile, motif: string, seedWorld: string, seed: number, preset: { artStyle: string; animationDirection: string }): CreativeDNA {
+    const hints = this.topHints(signals.semanticWeights);
+    const primary = hints[0];
+    const secondary = hints[1] ?? primary;
+    const texture = pick(unique([...hints.flatMap((hint) => hint.textures), "inked grain", "cut-paper shadows", "sticker gloss", "screenprint noise"]), seed + 23);
+    const styleBase = pick(unique([...hints.flatMap((hint) => hint.styles), preset.artStyle, "cinematic collectible poster", "community mascot cartoon"]), seed + 29);
+    const worldCore = pick(unique([...signals.worldReferences, ...hints.flatMap((hint) => hint.worlds), seedWorld]), seed + 31);
+    const worldConcept = `${motif} ${worldCore} ${pick(["micro-world", "signal district", "holder habitat", "myth room", "ritual market", "dream map"], seed + 37)}`.toLowerCase();
+    const subjectWord = pick(unique([...signals.entities, analysis.mascot, motif]).filter(Boolean), seed + 41);
+    const mascotOrSubject = `${motif} ${pick([...primary.silhouettes, ...secondary.silhouettes, analysis.mascot], seed + 43)} ${titleCase(subjectWord)}`.toLowerCase();
+    const baseSilhouetteRules = unique([
+      `${analysis.shapeLanguage} ${pick(primary.silhouettes, seed + 47)}`,
+      `${pick(secondary.silhouettes, seed + 53)} with ${pick(signals.objects.length ? signals.objects : [motif], seed + 59)} readability`,
+      `${pick(["front-readable", "three-quarter", "low-angle", "sticker-flat", "poster-cropped"], seed + 61)} pose family with rarity-specific silhouette changes`
+    ]);
+    const moodCulture = unique([...signals.emotions, ...hints.flatMap((hint) => hint.expressions)]).slice(0, 8);
+    const expressionLanguage = unique([
+      `${motif} ${pick(moodCulture.length ? moodCulture : ["focus"], seed + 67)}`,
+      `${pick(signals.humorType.split(/\s+/), seed + 71)} reaction`,
+      `${pick(signals.dangerSafetyCues.length ? signals.dangerSafetyCues : ["signal"], seed + 73)} expression`
+    ]).map(titleCase);
+    const traitCategories = this.roleOrder().map((role, index) => this.dynamicCategoryLabel(role, motif, signals, seed + index * 17));
+    return {
+      artStyle: `${motif} ${styleBase} with ${texture}`.toLowerCase(),
+      worldConcept,
+      mascotOrSubject,
+      baseSilhouetteRules,
+      cameraFraming: pick(["tight collectible bust", "three-quarter poster crop", "full-body sticker crop", "low-angle myth portrait", "orthographic trait-readable card"], seed + 79),
+      palette: this.paletteFromSignals(analysis.palette, signals, seed),
+      textureLanguage: texture,
+      moodCulture,
+      expressionLanguage,
+      traitCategories,
+      rarityPhilosophy: `${motif} rarity escalates through silhouette, scene density, signal-specific objects, and myth composition rather than recolors.`,
+      legendaryMythology: `${motif} ${pick(signals.worldReferences.length ? signals.worldReferences : [worldConcept], seed + 83)} becomes a one-off myth where ${pick(signals.objects.length ? signals.objects : [motif], seed + 89)} changes the pose, frame, FX, and background logic.`,
+      animationLanguage: `${motif} ${pick([...hints.flatMap((hint) => hint.expressions), preset.animationDirection], seed + 97)} loops with ${texture} motion.`,
+      forbiddenSimilarities: [
+        "No fixed frog, dog, cat, robot, trader, or virus template selection.",
+        "No generic vault/crown/robot fallback when metadata is sparse.",
+        "No repeated world concept, art style, base pose ladder, mood vocabulary, or legendary scene structure.",
+        `Do not reuse the ${motif} Creative DNA for unrelated communities.`
       ]
     };
-    return sets[archetype] ?? [
-      build("base", `${motif} Community Bodies`, 42, ["Founder", "Raider", "Scout", "Myth"], "Token-native silhouettes."),
-      build("background", `${motif} Worlds`, 60, ["Gate", "Room", "District", "Signal"], "Token-native locations."),
-      build("head", `${motif} Head Marks`, 30, ["Cap", "Badge", "Mask"], "Community head marks."),
-      build("eyes", `${motif} Eye States`, 36, ["Focus", "Blink", "Glare"], "Community eye language."),
-      build("mouth", `${motif} Reactions`, 28, ["Smile", "Gasp", "Smirk"], "Community expressions."),
-      build("body", `${motif} Fits`, 44, ["Jacket", "Cloak", "Vest"], "Body layers."),
-      build("prop", `${motif} Objects`, 70, ["Badge", "Banner", "Token"], "Community props."),
-      build("neck", `${motif} Charms`, 24, ["Tag", "Charm"], "Small identifiers."),
-      build("aura", `${motif} Events`, 24, ["Glow", "Spark"], "FX events."),
-      build("frame", `${motif} Borders`, 12, ["Border", "Seal"], "Premium frames."),
-      build("legendary", `${motif} Scenes`, 10, ["Ascension", "Takeover"], "Unique scenes."),
-      build("animation", `${motif} Loops`, 10, ["Blink", "Pulse"], "Animation layers.")
-    ];
   }
 
-  private baseSilhouettes(archetype: string, motif: string, shapeLanguage: string, world: string, seed: number): BaseSilhouettePlan[] {
-    const variants: Record<string, Array<[string, string, string, string, string]>> = {
-      "frog-degen": [["Squat Prophet", "wide squat body, oversized eyes", "low crouch with scroll grip", "short legs, big head, wet feet", "low 3/4 portrait"], ["Bog Whale", "round heavy body", "leaning on lily platform", "wide torso, tiny crown space", "centered collectible bust"], ["Pond Runner", "spring-loaded thin limbs", "mid-hop silhouette", "long toes, compact torso", "dynamic side angle"]],
-      "dog-cozy": [["Blanket Pup", "soft round puppy body", "curled seated pose", "large head, blanket mass", "warm close portrait"], ["Sofa Guard", "compact dog body", "front paws on cushion", "short legs, tall ears", "eye-level cozy crop"], ["Treat Sprinter", "small fast body", "side run with snack", "long tail arc", "sticker-like full body"]],
-      "dog-pack": [["Street Pup", "athletic mascot body", "one paw forward rally stance", "big ears, visible jacket", "waist-up street crop"], ["Bone Marshal", "stocky dog body", "banner shoulder pose", "broad chest, short legs", "low heroic angle"], ["Moon Runner", "lean running dog", "side sprint", "long tail, lifted paw", "full-body action frame"]],
-      "cat-hyper-meme": [["Keyboard Cat", "compact seated body", "hunched at desk", "long tail, sharp ears", "desk-level crop"], ["Arcade Scratcher", "springy cat body", "claws up combo pose", "long arms, bent knees", "cabinet side crop"], ["Stream Gremlin", "tiny body in huge chair", "lean into camera", "giant eyes, thin limbs", "webcam portrait"]],
-      "robot-ai": [["Inference Unit", "boxy modular chassis", "front terminal stance", "rectangular torso, screen face", "orthographic poster crop"], ["Patch Bot", "asymmetric repair body", "cable-drag lean", "thin limbs, big backpack", "3/4 technical crop"], ["Server Idol", "tall monolith body", "floating node pose", "long neck, halo ports", "low vertical framing"]],
-      "trader-finance": [["Desk Sleeper", "slumped trader body", "one hand on keyboard", "rounded shoulders, tired head", "terminal desk crop"], ["Liquidation Monk", "thin upright figure", "hands folded under charts", "long robe, screen eyes", "centered portrait"], ["Floor Captain", "broad stance body", "phone-and-coffee gesture", "wide shoulders, headset silhouette", "news-poster crop"]],
-      "dark-fantasy-skull": [["Crypt Warden", "tall skull body", "candle-forward pose", "long cloak, narrow head", "low crypt angle"], ["Bone Baron", "round skull noble", "seated relic pose", "large skull, small rib body", "painterly bust"], ["Cursed Child", "small skull body", "tilted head stare", "tiny torso, giant sockets", "storybook close crop"]],
-      "cute-cartoon": [["Tiny Mascot", "plush rounded body", "front wave", "large head, bean limbs", "sticker portrait"], ["Bubble Hero", "soft inflated body", "floating hop", "round arms, tiny feet", "full-body toy crop"], ["Sticker Friend", "flat die-cut body", "side tilt", "simple proportions", "close sticker frame"]],
-      "abstract-vaporwave": [["Mall Phantom", "elongated chrome body", "still mannequin pose", "long limbs, small face", "wide poster crop"], ["Grid Dancer", "angular dream body", "contrapposto grid pose", "geometric torso, floating hands", "low surreal frame"], ["Liquid Idol", "melting silhouette", "slow lean", "fluid proportions", "centered album-cover crop"]]
-    };
-    return (variants[archetype] ?? variants["cute-cartoon"]).map(([name, bodyShape, poseLanguage, proportions, cameraFraming], index) => ({
-      name: `${motif} ${name} ${1 + ((seed + index) % 3)}`,
-      bodyShape: `${shapeLanguage}; ${bodyShape}`,
-      poseLanguage,
-      proportions,
-      cameraFraming,
-      rarityUpgradePath: index === 0 ? `Common-Uncommon base in ${world}` : index === 1 ? "Rare-Epic stronger silhouette and prop readability" : "Legendary-Mythic unique pose or scene anchor"
-    }));
+  private dynamicTaxonomy(dna: CreativeDNA, signals: CreativeSignalProfile, motif: string, seed: number): TraitCategoryPlan[] {
+    return this.roleOrder().map((role, index) => {
+      const label = dna.traitCategories[index] ?? this.dynamicCategoryLabel(role, motif, signals, seed + index * 17);
+      const nouns = this.nounsForRole(role, motif, signals, seed + index * 101);
+      return {
+        id: this.categoryId(label),
+        label,
+        role,
+        description: `${label} generated from Creative DNA signals: ${this.topWeightKeys(signals.semanticWeights).join(", ")}.`,
+        targetCount: this.targetCount(role),
+        nouns,
+        forbiddenConcepts: this.forbiddenForSignals(signals)
+      };
+    });
   }
 
-  private moodCulture(archetype: string, motif: string, seed: number): MoodExpressionPlan[] {
-    const banks: Record<string, Array<[string, string, string, string, string, string, string, string]>> = {
-      "frog-degen": [["Bogged But Certain", "fake confidence", "wide wet prophecy eyes", "crooked ribbit smirk", "low squat", "scroll pinch", "slow toxic mist", "bogged-idle"], ["Pond Enlightened", "blank enlightened stare", "tiny moon pupils", "closed croak line", "still crouch", "raised lily", "halo ripple", "prophecy-blink"], ["Rug Pull Survivor", "exhausted panic", "one eye twitch", "tongue half-out", "collapsed squat", "empty bag grip", "mist hiccup", "survivor-breath"]],
-      "dog-cozy": [["Treat Locked", "hopeful focus", "round snack pupils", "tiny pant smile", "front-paw lean", "ball hold", "warm lamp glow", "tail-wag-idle"], ["Nap Commander", "sleepy authority", "half-lid eyes", "small yawn", "blanket sit", "paw salute", "steam curl", "sleep-blink"], ["Fake Brave Pup", "nervous happy", "big uncertain eyes", "awkward grin", "small chest puff", "collar tug", "soft sparkle", "brave-shiver"]],
-      "dog-pack": [["Pack Locked", "overconfident", "moon squint", "tooth grin", "forward lean", "paw point", "dust kick", "tail-snap"], ["Bone Chaos", "manic joy", "spiral treat eyes", "tongue-out bark", "running stance", "banner bite", "bark lines", "bark-pop"], ["Moon Alpha", "smug command", "side-eye glare", "closed confident mouth", "wide stance", "leash mic point", "moon spark", "leader-idle"]],
-      "cat-hyper-meme": [["Dead Chat", "blank panic", "tiny screen pupils", "flat mouth", "chair slump", "cursor hover", "lag static", "lag-blink"], ["Combo Demon", "manic focus", "arcade star eyes", "keyboard scream", "claws up", "combo swipe", "emote storm", "combo-loop"], ["Milk Smug", "smug comfort", "half-lid eyes", "milk mustache smile", "side curl", "cup raise", "soft chat sparkle", "tail-flick"]],
-      "robot-ai": [["Kernel Panic Calm", "calm failure", "error-code eyes", "flat speaker line", "rigid stance", "debug cable grip", "packet loss", "screen-tear"], ["Recursive Giga Brain", "overclocked", "nested cursor eyes", "syntax grin", "floating posture", "node fan gesture", "circuit halo", "cursor-blink"], ["Patch Notes Sad", "tired machine", "low battery eyes", "tiny waveform mouth", "slumped chassis", "wrench hold", "fan sputter", "low-power-idle"]],
-      "trader-finance": [["Locked-In Candle", "focused stress", "chart pupils", "jaw clenched", "desk lean", "coffee death grip", "ticker rain", "ticker-scroll"], ["Sad Millionaire", "wealthy despair", "red wick eyes", "thin fake smile", "chair collapse", "phone ignored", "funding glow", "pnl-flash"], ["Liquidation Saint", "zen after loss", "blank margin eyes", "small exhale", "hands folded", "notice held", "candle smoke", "slow-breath"]],
-      "dark-fantasy-skull": [["Cursed Smirk", "evil cute", "one candle socket", "jaw grin", "cloak lean", "black candle lift", "ash drift", "jaw-click"], ["Dead Rich", "sad aristocrat", "gold socket shine", "toothless frown", "seated slouch", "coin pinch", "moon curse", "socket-flicker"], ["Crypt Zen", "serene doom", "empty calm sockets", "closed jaw", "ritual stillness", "bead count", "soul leak", "ash-idle"]],
-      "cute-cartoon": [["Tiny Brave", "small heroic", "sparkle dot eyes", "proud puff mouth", "front wave", "sticker wand", "bubble pop", "bounce-idle"], ["Oops Friend", "gentle surprise", "round o eyes", "small o mouth", "tilted stance", "juice box squeeze", "sun spark", "oops-blink"], ["Sleepy Star", "sleepy happy", "star half-lids", "soft smile", "pajama sway", "cloud hold", "dream bubble", "sleep-loop"]],
-      "abstract-vaporwave": [["Mall Empty", "calm uncanny", "VHS washed eyes", "muted smile", "mannequin stillness", "cassette hold", "scanline rain", "tracking-roll"], ["Sunset Oracle", "enlightened surreal", "grid pupils", "chrome smirk", "floating lean", "palm gesture", "sunset bloom", "grid-pulse"], ["Tape Warp", "paranoid dream", "glitch eyes", "static mouth", "broken dance", "receipt clutch", "tape warp", "soft-glitch"]]
-    };
-    return (banks[archetype] ?? banks["cute-cartoon"]).map((item, index) => ({
-      name: `${motif} ${item[0]} ${index + 1 + (seed % 2)}`,
-      expression: item[1],
-      eyeLanguage: item[2],
-      mouthLanguage: item[3],
-      stance: item[4],
-      gesture: item[5],
-      auraBehavior: item[6],
-      animationState: item[7]
-    }));
+  private dynamicBaseSilhouettes(dna: CreativeDNA, signals: CreativeSignalProfile, shapeLanguage: string, seed: number): BaseSilhouettePlan[] {
+    const objects = signals.objects.length ? signals.objects : ["signal", "relic", "badge"];
+    return Array.from({ length: 3 }, (_, index) => {
+      const rule = dna.baseSilhouetteRules[index % dna.baseSilhouetteRules.length] ?? shapeLanguage;
+      return {
+        name: `${titleCase(pick(signals.entities.length ? signals.entities : ["Origin"], seed + index * 11))} ${pick(["Carrier", "Witness", "Scout", "Idol", "Runner"], seed + index * 13)}`,
+        bodyShape: `${shapeLanguage}; ${rule}`,
+        poseLanguage: `${pick(["crouched", "floating", "leaning", "front-facing", "side-stepping", "braced"], seed + index * 17)} ${pick(objects, seed + index * 19)} pose`,
+        proportions: `${pick(["oversized head", "compact torso", "long gesture limbs", "wide readable shoulders", "asymmetric profile"], seed + index * 23)} with ${pick(signals.visualShapes.length ? signals.visualShapes : ["clear"], seed + index * 29)} shape cues`,
+        cameraFraming: index === 2 ? dna.cameraFraming : pick(["tight portrait crop", "waist-up trait crop", "full-body sticker crop", dna.cameraFraming], seed + index * 31),
+        rarityUpgradePath: index === 0 ? "Common-Uncommon base read" : index === 1 ? "Rare-Epic stronger object and expression read" : "Legendary-Mythic unique pose, scene, frame, and FX"
+      };
+    });
   }
 
-  private animationReadiness(archetype: string, motif: string, moods: MoodExpressionPlan[], fallback: string): AnimationReadinessPlan {
+  private dynamicMoodCulture(dna: CreativeDNA, signals: CreativeSignalProfile, motif: string, seed: number): MoodExpressionPlan[] {
+    const moods = unique([...dna.moodCulture, ...signals.emotions, signals.energyLevel, signals.communityVibe]).filter(Boolean);
+    const objects = signals.objects.length ? signals.objects : ["signal", "badge", "relic"];
+    return Array.from({ length: Math.max(3, Math.min(4, moods.length || 3)) }, (_, index) => {
+      const mood = pick(moods.length ? moods : ["focused signal"], seed + index * 13);
+      const object = pick(objects, seed + index * 17);
+      return {
+        name: `${motif} ${titleCase(mood)} ${index + 1}`,
+        expression: `${mood} ${signals.humorType}`,
+        eyeLanguage: `${titleCase(pick(signals.visualShapes.length ? signals.visualShapes : ["signal"], seed + index * 19))} ${pick(["stare", "blink", "glare", "squint", "wide-eye"], seed + index * 23)}`,
+        mouthLanguage: `${titleCase(pick(dna.expressionLanguage.length ? dna.expressionLanguage : [mood], seed + index * 29))} mouth`,
+        stance: `${pick(["braced", "tilted", "cornered", "floating", "locked-in", "soft"], seed + index * 31)} ${object} stance`,
+        gesture: `${object} ${pick(["grip", "point", "lift", "shield", "clutch", "offer"], seed + index * 37)}`,
+        auraBehavior: `${pick(signals.dangerSafetyCues.length ? signals.dangerSafetyCues : signals.worldReferences.length ? signals.worldReferences : ["signal"], seed + index * 41)} ${pick(["pulse", "drift", "flash", "spark", "haze"], seed + index * 43)}`,
+        animationState: this.categoryId(`${motif}-${mood}-${index}`)
+      };
+    });
+  }
+
+  private dynamicAnimationReadiness(dna: CreativeDNA, signals: CreativeSignalProfile, moods: MoodExpressionPlan[], fallback: string, seed: number): AnimationReadinessPlan {
     const moodStates = moods.map((mood) => mood.animationState);
+    const identity = pick(signals.entities.length ? signals.entities : ["creative dna"], seed + 7);
     return {
       blinkLayers: moods.map((mood) => `${mood.name} blink layer`),
       mouthLayers: moods.map((mood) => `${mood.name} mouth layer`),
       eyeVariants: moods.map((mood) => mood.eyeLanguage),
       auraLoops: moods.map((mood) => mood.auraBehavior),
-      fxLoops: [`${motif} idle FX`, `${motif} rarity FX`, fallback],
+      fxLoops: [`${identity} idle FX`, `${dna.textureLanguage} rarity FX`, fallback],
       emotionalTransitions: moodStates.map((state, index) => `${state} -> ${moodStates[(index + 1) % moodStates.length]}`),
       idleStates: moodStates,
       reactionStates: {
-        mint: `${archetype} mint reveal with ${motif} identity snap`,
-        redeem: `${archetype} redeem relief expression`,
-        stake: `${archetype} lock-in stance`,
-        unstake: `${archetype} release blink`,
-        receiveNft: `${archetype} receive flex pose`,
-        levelUp: `${archetype} upgraded aura loop`,
-        raidSuccess: `${archetype} raid victory reaction`,
-        rewards: `${archetype} reward burst expression`
+        mint: `${identity} Creative DNA reveal`,
+        redeem: `${identity} relief expression`,
+        stake: `${identity} lock-in stance`,
+        unstake: `${identity} release blink`,
+        receiveNft: `${identity} receive flex pose`,
+        levelUp: `${identity} upgraded aura loop`,
+        raidSuccess: `${identity} raid victory reaction`,
+        rewards: `${identity} reward burst expression`
       }
     };
+  }
+
+  private semanticHints(): SemanticHint[] {
+    return [
+      {
+        key: "medical-contamination",
+        pattern: /hanta|hantavirus|virus|viral|biohazard|infection|infected|pathogen|outbreak|quarantine|mutation|patient|fever|plague|microbe|microscope|specimen|containment|toxic|lab/,
+        objects: ["Quarantine Patient", "Lab Relic", "Petri Dish", "Warning Syringe", "Specimen Tag", "Mutation Sample", "Biohazard Badge"],
+        worlds: ["quarantine ward", "microscope slide city", "containment hallway", "fever map", "sealed lab bench"],
+        textures: ["sickly scanlines", "toxic droplet grain", "rubber glove gloss", "clinical warning tape"],
+        styles: ["contaminated medical meme poster", "microscopic horror cartoon", "specimen-card collectible"],
+        expressions: ["fever lucid", "infected amused", "containment panic", "mutation rage"],
+        silhouettes: ["asymmetric infected lab specimen", "sealed patient mascot", "spore-edged carrier"],
+        roleWords: {
+          base: ["Infection Stages", "Mutation Carriers", "Patient Forms"],
+          background: ["Quarantine Scenes", "Microscope Zones", "Containment Rooms"],
+          prop: ["Lab Relics", "Outbreak Objects", "Specimen Tools"],
+          aura: ["Viral Load FX", "Fever Weather", "Toxic Drift"],
+          legendary: ["Outbreak Myths", "Patient Zero Incidents"]
+        },
+        danger: ["biohazard", "quarantine", "contamination", "fever", "mutation"]
+      },
+      {
+        key: "amphibian-meme",
+        pattern: /frog|toad|pepe|bog|swamp|ribbit|pond|mire|lily/,
+        objects: ["Lily Token", "Bog Relic", "Mire Scroll", "Pond Candle", "Ribbit Banner"],
+        worlds: ["mire trading floor", "pond shrine", "lily ruin", "mud oracle room"],
+        textures: ["wet ink", "muddy halftone", "algae sticker edge"],
+        styles: ["hand-drawn swamp meme poster", "pond-prophecy cartoon"],
+        expressions: ["bogged confidence", "pond enlightenment", "rug pull survivor"],
+        silhouettes: ["wide-eyed squat idol", "spring-loaded pond body"],
+        roleWords: { base: ["Bog Bodies", "Pond Forms"], background: ["Swamp Weather"], prop: ["Bog Relics"] }
+      },
+      {
+        key: "canine-pack",
+        pattern: /dog|doge|shib|inu|kennel|bark|bone|pack|paws|blanket|lofi/,
+        objects: ["Treat Bag", "Pack Charm", "Tennis Ball", "Moon Collar", "Blanket Badge"],
+        worlds: ["kennel block", "lofi couch room", "moon yard", "snack corner"],
+        textures: ["soft fur grain", "streetwear patchwork", "warm lamp glow"],
+        styles: ["streetwear mascot cartoon", "cozy sticker collectible"],
+        expressions: ["treat locked", "fake brave", "nap commander"],
+        silhouettes: ["rounded pack mascot", "compact blanket guard"],
+        roleWords: { base: ["Pack Forms", "Comfort Poses"], background: ["Kennel Corners"], prop: ["Pack Comforts"] }
+      },
+      {
+        key: "feline-chaos",
+        pattern: /cat|kitty|meow|claw|nine.?life|milk|alley|stream|arcade/,
+        objects: ["Mouse Cursor", "Claw Mark", "Milk Cup", "Arcade Token", "Chat Banner"],
+        worlds: ["stream desk", "night alley", "arcade cabinet", "milk bar"],
+        textures: ["chat-static grain", "claw-scratch ink", "screen glow"],
+        styles: ["hyper meme arcade poster", "night-market comic collectible"],
+        expressions: ["dead chat", "combo panic", "milk smug"],
+        silhouettes: ["arched alley-stalker", "keyboard-chaos sitter"],
+        roleWords: { base: ["Nine-Life Bodies", "Stream Poses"], background: ["Chat Rooms"], prop: ["Claw Objects"] }
+      },
+      {
+        key: "machine-intelligence",
+        pattern: /(^|\s)(ai|bot)(\s|$)|robot|agent|neural|compute|machine|model|swarm|reactor|node|terminal/,
+        objects: ["Prompt Card", "GPU Shard", "Node Key", "Patch Cable", "Terminal Cursor"],
+        worlds: ["server shrine", "reactor node room", "terminal chapel", "inference rack"],
+        textures: ["glitch metal", "debug scanline", "circuit dust"],
+        styles: ["autonomous machine poster", "terminal-interface collectible"],
+        expressions: ["kernel calm", "recursive focus", "patch note tired"],
+        silhouettes: ["modular visor chassis", "boxy signal unit"],
+        roleWords: { base: ["Signal Chassis", "Node Bodies"], background: ["Compute Rooms"], prop: ["Compute Relics"] }
+      },
+      {
+        key: "market-stress",
+        pattern: /trader|terminal|chart|candle|liquidation|perp|finance|yield|market|index|pnl|margin|liquidity|pump|degen/,
+        objects: ["Margin Phone", "Chart Tablet", "Coffee Cup", "Liquidation Notice", "Orderbook Panel"],
+        worlds: ["red candle wall", "perp desk", "orderbook alley", "liquidity pit"],
+        textures: ["ticker rain", "terminal glow", "receipt paper grain"],
+        styles: ["comic finance stress poster", "trading-terminal collectible"],
+        expressions: ["locked-in candle", "liquidation gasp", "wealthy despair"],
+        silhouettes: ["desk-leaning stress avatar", "orderbook-lit trader form"],
+        roleWords: { base: ["Market Scars", "Desk Avatars"], background: ["Terminal Reflections"], aura: ["Liquidation Auras"], legendary: ["Market Events"] }
+      },
+      {
+        key: "dream-surreal",
+        pattern: /dream|vapor|vaporwave|surreal|liminal|mall|vhs|pool|cloud|sleep|candy|abstract/,
+        objects: ["VHS Receipt", "Cloud Accessory", "Candy Mutation", "Palm Token", "Dream Lens"],
+        worlds: ["empty mall", "pool tile dream", "sunset grid", "cloud arcade"],
+        textures: ["VHS bloom", "soft cloud grain", "liquid chrome"],
+        styles: ["surreal vapor poster", "dream-layer cartoon"],
+        expressions: ["mall empty", "sleepy signal", "tape-warp calm"],
+        silhouettes: ["melting dream silhouette", "floating cloud body"],
+        roleWords: { base: ["Dream Layers", "Sleepy Poses"], background: ["Cloud Rooms"], prop: ["Candy Mutations"], legendary: ["Liminal Myths"] }
+      },
+      {
+        key: "dark-ritual",
+        pattern: /skull|bone|reaper|crypt|shadow|cursed|dark|ash|moon|ritual|ledger/,
+        objects: ["Bone Receipt", "Black Candle", "Ash Ledger", "Omen Charm", "Crypt Coin"],
+        worlds: ["black moon crypt", "ash chapel", "bone market", "cursed ledger room"],
+        textures: ["ash drift", "candle soot", "moonlit ink"],
+        styles: ["dark fantasy storybook poster", "cursed collectible painting"],
+        expressions: ["cursed smirk", "dead rich", "crypt calm"],
+        silhouettes: ["hollow-eyed omen figure", "candle-forward relic bearer"],
+        roleWords: { base: ["Omen Forms", "Crypt Bodies"], background: ["Cursed Locations"], prop: ["Cursed Relics"] },
+        danger: ["curse", "shadow", "black moon", "debt"]
+      },
+      {
+        key: "soft-play",
+        pattern: /cute|baby|toy|toast|sticker|soft|candy|breakfast|tiny|friend|juice/,
+        objects: ["Juice Box", "Sticker Wand", "Cloud Plush", "Toast Charm", "Pocket Flag"],
+        worlds: ["sunny toy shelf", "breakfast room", "sticker desk", "pillow stage"],
+        textures: ["soft sticker gloss", "plush grain", "breakfast cereal color"],
+        styles: ["soft toy poster", "children's cartoon collectible"],
+        expressions: ["tiny brave", "oops friend", "sleepy star"],
+        silhouettes: ["plush rounded mascot", "tiny sticker body"],
+        roleWords: { base: ["Toy Bodies", "Dreamy Poses"], background: ["Play Worlds"], prop: ["Pocket Toys"] }
+      }
+    ];
+  }
+
+  private sourceText(input: CreateGenerationRunInput, context: CommunityContextOutput, analysis: LogoAnalysisOutput, words: string[]) {
+    const source = input.hints?.sourceMetadata;
+    return [
+      input.tokenName,
+      input.tokenSymbol,
+      input.description,
+      input.logoUri,
+      source?.name,
+      source?.symbol,
+      source?.description,
+      source?.metadataUri,
+      source?.imageUri,
+      source?.externalUrl,
+      JSON.stringify(source?.socialLinks ?? {}),
+      JSON.stringify(source?.extensions ?? {}),
+      source?.riskNotes?.join(" "),
+      input.hints?.memes?.join(" "),
+      input.hints?.slogans?.join(" "),
+      input.hints?.phrases?.join(" "),
+      input.hints?.lore,
+      input.hints?.mascotPreference,
+      input.hints?.themePreference,
+      input.hints?.colorPreference,
+      input.hints?.mood,
+      context.extractedVocabulary.join(" "),
+      analysis.visualKeywords.join(" "),
+      analysis.mascot,
+      analysis.shapeLanguage,
+      words.join(" ")
+    ].filter(Boolean).join(" ").toLowerCase();
+  }
+
+  private semanticWeights(text: string) {
+    const weights = Object.fromEntries(this.semanticHints().map((hint) => [hint.key, hint.pattern.test(text) ? 72 : 0]));
+    for (const word of this.significantWords(text)) {
+      for (const hint of this.semanticHints()) {
+        if (hint.objects.concat(hint.worlds, hint.textures, hint.styles, hint.expressions, hint.silhouettes).join(" ").toLowerCase().includes(word)) {
+          weights[hint.key] = (weights[hint.key] ?? 0) + 6;
+        }
+      }
+    }
+    return Object.fromEntries(Object.entries(weights).map(([key, value]) => [key, Math.min(100, value)]));
+  }
+
+  private topHints(weights: Record<string, number>) {
+    const hints = this.semanticHints();
+    return Object.entries(weights)
+      .sort((a, b) => b[1] - a[1])
+      .filter(([, value]) => value > 0)
+      .map(([key]) => hints.find((hint) => hint.key === key))
+      .filter((hint): hint is SemanticHint => Boolean(hint))
+      .concat(hints)
+      .filter((hint, index, list) => list.findIndex((item) => item.key === hint.key) === index)
+      .slice(0, 3);
+  }
+
+  private topWeightKeys(weights: Record<string, number>) {
+    return Object.entries(weights).sort((a, b) => b[1] - a[1]).filter(([, value]) => value > 0).slice(0, 4).map(([key]) => key);
+  }
+
+  private dynamicIdentityKey(motif: string, signals: CreativeSignalProfile, seed: number) {
+    const key = pick(this.topWeightKeys(signals.semanticWeights).length ? this.topWeightKeys(signals.semanticWeights) : signals.culturalWords.length ? signals.culturalWords : ["token-native"], seed + 5);
+    return `creative-dna-${this.categoryId(`${motif}-${key}-${signals.energyLevel}`)}`;
+  }
+
+  private dynamicCategoryLabel(role: TraitCategoryRole, motif: string, signals: CreativeSignalProfile, seed: number) {
+    const hint = pick(this.topHints(signals.semanticWeights), seed + 3);
+    const roleWords = hint.roleWords?.[role] ?? [];
+    if (roleWords.length) return `${motif} ${pick(roleWords, seed + 7)}`;
+    const suffixes: Record<TraitCategoryRole, string[]> = {
+      base: ["Bodies", "Forms", "Vessels", "Avatars"],
+      background: ["Worlds", "Rooms", "Weather", "Districts"],
+      head: ["Head Marks", "Crowns", "Masks", "Signals"],
+      eyes: ["Eye States", "Optics", "Glares", "Blinks"],
+      mouth: ["Reactions", "Mouth States", "Chants", "Expressions"],
+      body: ["Fits", "Wraps", "Uniforms", "Shells"],
+      prop: ["Objects", "Relics", "Tools", "Charms"],
+      neck: ["Badges", "Tags", "Neck Signals", "Small Relics"],
+      aura: ["Auras", "Weather", "FX Loads", "Signal Events"],
+      frame: ["Frames", "Borders", "UI Edges", "Seals"],
+      legendary: ["Myths", "Incidents", "One-Off Scenes", "Takeovers"],
+      animation: ["Loops", "Motion States", "Idle Signals", "Reaction Layers"]
+    };
+    const anchor = titleCase(pick(unique([motif, ...signals.objects, ...signals.culturalWords]).filter(Boolean), seed + 11));
+    return `${anchor} ${pick(suffixes[role], seed + 13)}`;
+  }
+
+  private nounsForRole(role: TraitCategoryRole, motif: string, signals: CreativeSignalProfile, seed: number) {
+    const hints = this.topHints(signals.semanticWeights);
+    const objects = unique([...hints.flatMap((hint) => hint.objects), ...signals.objects, motif]).filter(Boolean);
+    const worlds = unique([...hints.flatMap((hint) => hint.worlds), ...signals.worldReferences, motif]).filter(Boolean);
+    const expressions = unique([...hints.flatMap((hint) => hint.expressions), ...signals.emotions, motif]).filter(Boolean);
+    const base = role === "background" ? worlds : role === "eyes" || role === "mouth" ? expressions : role === "aura" ? unique([...signals.dangerSafetyCues, ...worlds, ...expressions]) : role === "legendary" ? unique([...worlds, ...objects]) : objects;
+    const fallback = {
+      base: ["Origin Body", "Signal Form", "Holder Vessel"],
+      background: ["Origin Room", "Signal District", "Myth Map"],
+      head: ["Signal Mark", "Origin Mask", "Trait Crown"],
+      eyes: ["Focus Blink", "Signal Stare", "Wide Glare"],
+      mouth: ["Holder Smile", "Signal Gasp", "Meme Chant"],
+      body: ["Origin Jacket", "Signal Wrap", "Holder Fit"],
+      prop: ["Origin Relic", "Signal Tool", "Meme Object"],
+      neck: ["Origin Tag", "Signal Charm", "Holder Badge"],
+      aura: ["Signal Pulse", "Origin Drift", "Rarity Spark"],
+      frame: ["Origin Border", "Signal Edge", "Myth Seal"],
+      legendary: ["Origin Myth", "Signal Takeover", "One-Off Scene"],
+      animation: ["Blink Loop", "Signal Pulse", "Reaction Pop"]
+    }[role];
+    return Array.from({ length: Math.min(8, Math.max(4, base.length)) }, (_, index) => titleCase(pick(base.length ? base : fallback, seed + index * 17)));
+  }
+
+  private forbiddenForSignals(signals: CreativeSignalProfile) {
+    const specific = this.topWeightKeys(signals.semanticWeights);
+    return [
+      "generic crown",
+      "plain aura",
+      "template mascot",
+      "random robot fallback",
+      ...specific.length ? [`unrelated ${specific[0]} copy`] : []
+    ];
+  }
+
+  private targetCount(role: TraitCategoryRole) {
+    const counts: Record<TraitCategoryRole, number> = {
+      base: 42,
+      background: 60,
+      head: 34,
+      eyes: 38,
+      mouth: 34,
+      body: 48,
+      prop: 70,
+      neck: 24,
+      aura: 28,
+      frame: 14,
+      legendary: 10,
+      animation: 10
+    };
+    return counts[role];
+  }
+
+  private roleOrder(): TraitCategoryRole[] {
+    return ["base", "background", "head", "eyes", "mouth", "body", "prop", "neck", "aura", "frame", "legendary", "animation"];
+  }
+
+  private paletteFromSignals(palette: string[], signals: CreativeSignalProfile, seed: number) {
+    const accentByCue = signals.cueDial.luxury > 65 ? "#d8b65a" : signals.cueDial.cozy > 65 ? "#f6b7a8" : signals.cueDial.surreal > 65 ? "#8d7cff" : signals.cueDial.aggressive > 65 ? "#ff365e" : "#45e0a8";
+    return unique([...palette, accentByCue, pick(["#101018", "#031017", "#16120f", "#06131f"], seed + 3)]).slice(0, 5);
+  }
+
+  private humorType(text: string, weights: Record<string, number>, seed: number) {
+    if (/dead chat|rug|liquidation|panic|coughing|patient zero/.test(text)) return "deadpan stress humor";
+    if (/cute|tiny|toast|sleep|cozy|oops/.test(text)) return "soft absurd humor";
+    if ((weights["market-stress"] ?? 0) > 50) return "finance panic humor";
+    if ((weights["medical-contamination"] ?? 0) > 50) return "outbreak paranoia humor";
+    return pick(["ironic meme humor", "ritual in-joke humor", "surreal community humor"], seed + 5);
+  }
+
+  private energyLevel(text: string, weights: Record<string, number>) {
+    if (/rage|war|pump|chaos|outbreak|breakout|combo/.test(text)) return "high volatility";
+    if (/cozy|sleep|lofi|soft|calm/.test(text)) return "low warm";
+    if ((weights["market-stress"] ?? 0) > 50 || (weights["machine-intelligence"] ?? 0) > 50) return "focused pressure";
+    return "medium ritual";
+  }
+
+  private communityVibe(text: string, weights: Record<string, number>, seed: number) {
+    if ((weights["medical-contamination"] ?? 0) > 50) return "paranoid outbreak crew";
+    if ((weights["dream-surreal"] ?? 0) > 50) return "liminal dream circle";
+    if ((weights["market-stress"] ?? 0) > 50) return "terminal stress desk";
+    if (/cozy|soft|friend|blanket/.test(text)) return "cozy holder room";
+    return pick(["raiding signal club", "meme ritual guild", "origin myth circle"], seed + 11);
+  }
+
+  private significantWords(value: string) {
+    const stop = new Set(["with", "from", "that", "this", "into", "token", "coin", "official", "website", "twitter", "discord", "telegram", "https", "metadata", "example", "image", "symbol", "name", "for", "and", "the", "com", "json", "png", "false", "true", "description", "identity", "seed", "inferredidentityseed", "signalweights", "inferredsignals"]);
+    return unique(value.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2 && !stop.has(word))).slice(0, 80);
   }
 
   private productionAssetPolicy(): ProductionAssetPolicy {
@@ -562,11 +765,7 @@ export class StyleProfileGeneratorService {
   }
 
   private categoryId(label: string) {
-    return label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_|_$/g, "")
-      .slice(0, 48);
+    return label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 48);
   }
 
   private rarityVisualRules(motif: string, world: string, silhouette: string): Record<string, RarityComplexityRule> {
@@ -581,7 +780,7 @@ export class StyleProfileGeneratorService {
   }
 
   private genericWord(word: string) {
-    return /^(token|coin|crypto|vault|nft|the|and|for|with|official|website|twitter|telegram|discord)$/i.test(word);
+    return /^(token|coin|crypto|vault|nft|the|and|for|with|official|website|twitter|telegram|discord|metadata|image|description)$/i.test(word);
   }
 
   private genericTrait(value: string) {

@@ -1,5 +1,6 @@
 import { recordStartupValidation, type StartupCheck } from "./startup-state";
 import { normalizeHeliusConfig } from "../token-scanner/helius-config";
+import { databaseUrlDiagnostics } from "../db/database-url";
 
 export function validateStartupEnvironment() {
   const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development";
@@ -9,8 +10,15 @@ export function validateStartupEnvironment() {
   process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-1";
   process.env.ENABLE_AI_IMAGE_GENERATION ??= "false";
   const helius = normalizeHeliusConfig();
+  const database = databaseUrlDiagnostics();
   for (const warning of helius.warnings) {
     issues.push({ code: "HELIUS_CONFIG_WARNING", severity: "warning", message: warning });
+  }
+  if (database.databaseConnectionStatus === "password-missing-or-malformed") {
+    issues.push({ code: "DATABASE_URL_PASSWORD_INVALID", severity: "warning", message: "DATABASE_URL password missing or malformed." });
+  }
+  if (database.databaseConnectionStatus === "invalid-url") {
+    issues.push({ code: "DATABASE_URL_INVALID", severity: "warning", message: database.message ?? "DATABASE_URL is not a valid PostgreSQL connection URL." });
   }
   if (process.env.PROGRAM_ID === placeholderProgramId) {
     issues.push({ code: "PLACEHOLDER_PROGRAM_ID", severity: "fatal", message: "PROGRAM_ID cannot be the system-program placeholder." });

@@ -164,8 +164,46 @@ export type ProductionAssetPolicy = {
   productionReadyRequires: string[];
 };
 
+export type CreativeSignalProfile = {
+  entities: string[];
+  objects: string[];
+  animals: string[];
+  emotions: string[];
+  colors: string[];
+  visualShapes: string[];
+  culturalWords: string[];
+  memeLanguage: string[];
+  humorType: string;
+  energyLevel: string;
+  communityVibe: string;
+  worldReferences: string[];
+  styleReferences: string[];
+  dangerSafetyCues: string[];
+  cueDial: Record<"luxury" | "chaos" | "cozy" | "aggressive" | "surreal", number>;
+  semanticWeights: Record<string, number>;
+};
+
+export type CreativeDNA = {
+  artStyle: string;
+  worldConcept: string;
+  mascotOrSubject: string;
+  baseSilhouetteRules: string[];
+  cameraFraming: string;
+  palette: string[];
+  textureLanguage: string;
+  moodCulture: string[];
+  expressionLanguage: string[];
+  traitCategories: string[];
+  rarityPhilosophy: string;
+  legendaryMythology: string;
+  animationLanguage: string;
+  forbiddenSimilarities: string[];
+};
+
 export type CommunityCreativeUniverse = {
   archetype: string;
+  signalProfile: CreativeSignalProfile;
+  creativeDna: CreativeDNA;
   inferredCommunityLanguage: string[];
   artStyle: string;
   artStyleReason: string;

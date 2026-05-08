@@ -1,3 +1,5 @@
+import { databaseUrlDiagnostics } from "./database-url";
+
 export function isDatabaseSetupError(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const record = error as Record<string, unknown>;
@@ -13,6 +15,8 @@ export function isDatabaseSetupError(error: unknown) {
     name.includes("PrismaClientInitializationError") ||
     name.includes("DriverAdapterError") ||
     message.includes("ECIRCUITBREAKER") ||
+    message.includes("SASL: SCRAM-SERVER-FIRST-MESSAGE") ||
+    message.includes("client password must be a string") ||
     message.includes("too many authentication failures") ||
     message.includes("Authentication failed against the database server") ||
     message.includes("Can't reach database server") ||
@@ -22,5 +26,8 @@ export function isDatabaseSetupError(error: unknown) {
 }
 
 export function databaseSetupMessage() {
+  const diagnostics = databaseUrlDiagnostics();
+  if (diagnostics.databaseConnectionStatus === "password-missing-or-malformed") return "DATABASE_URL password missing or malformed.";
+  if (diagnostics.databaseConnectionStatus === "invalid-url") return "DATABASE_URL is not a valid PostgreSQL connection URL.";
   return "Database setup required. Check DATABASE_URL and run migrations before using this endpoint.";
 }

@@ -29,9 +29,15 @@ export class QualityValidatorService {
     if (this.hasForbiddenGenericIdentity(style, pack)) issues.push("Collection repeats a forbidden generic AI prompt pattern.");
     if (this.hasGenericMoodCulture(style)) issues.push("Mood culture uses generic global emotions instead of community-native states.");
     if (this.hasGenericTaxonomy(style)) issues.push("Trait taxonomy still reads like a shared headgear/eyes/armor/aura/frame engine.");
+    if (!style.creativeUniverse?.creativeDna || !style.creativeUniverse?.signalProfile) issues.push("Generated Creative DNA and signal profile are required.");
+    if (this.usesFixedArchetypeTemplate(style)) issues.push("Generator still exposes a fixed archetype template instead of dynamic Creative DNA.");
     if (!style.productionAssetPolicy || style.productionAssetPolicy.launchClassification !== "CONCEPT_PREVIEW") issues.push("Production asset policy must distinguish concept previews from final approved assets.");
     if (style.productionAssetPolicy?.aiFinalImageAllowed !== false) issues.push("Production policy must not allow fully AI-generated final NFT images.");
     if (this.poseReuse(previews) > 0.55) issues.push("Too many sample NFTs reuse the same pose; rarity ladder needs visible composition changes.");
+    if (this.sameBaseAcrossRarities(previews)) issues.push("All rarity previews share the same base/face language.");
+    if (this.commonUncommonEmpty(previews)) issues.push("Common/uncommon previews must use real visible traits, not empty None placeholders.");
+    if (!this.tokenIdentityPresent(style, pack)) issues.push("Token identity is not present in trait names.");
+    if (this.sparseMetadataGenericFallback(style, pack)) issues.push("Sparse metadata fell back to generic robot/crown/vault traits.");
     issues.push(...this.rarityVisualIssues(previews));
     issues.push(...this.traitCollisionIssues(previews));
 
@@ -132,13 +138,13 @@ export class QualityValidatorService {
       const rule = preview.metadata.complexityRule as { minTraits?: number; maxTraits?: number } | undefined;
       if (rule?.minTraits && visibleTraitCount < rule.minTraits) issues.push(`${preview.label} has ${visibleTraitCount} visible traits but ${rarity} requires at least ${rule.minTraits}.`);
       if (rule?.maxTraits && visibleTraitCount > rule.maxTraits) issues.push(`${preview.label} has ${visibleTraitCount} visible traits but ${rarity} allows at most ${rule.maxTraits}.`);
-      if (rarity === "Common" && (preview.metadata.aura !== "None" || preview.metadata.frame !== "None" || /premium|legendary|unique/i.test(String(preview.metadata.scene)))) {
+      if (rarity === "Common" && (/premium|legendary|unique|signature|mythic/i.test(String(preview.metadata.aura)) || /premium|legendary|unique|signature|mythic/i.test(String(preview.metadata.frame)) || /premium|legendary|unique/i.test(String(preview.metadata.scene)))) {
         issues.push(`${preview.label} is Common but includes premium aura/frame/scene language.`);
       }
-      if (rarity === "Epic" && (preview.metadata.aura === "None" || /simple/i.test(String(preview.metadata.scene)))) {
+      if (rarity === "Epic" && (/none|restrained/i.test(String(preview.metadata.aura)) || /simple/i.test(String(preview.metadata.scene)))) {
         issues.push(`${preview.label} is Epic but lacks aura or a premium background.`);
       }
-      if ((rarity === "Legendary" || rarity === "Mythic") && (preview.metadata.pose === "base pose" || preview.metadata.legendaryOverlay === "None")) {
+      if ((rarity === "Legendary" || rarity === "Mythic") && (preview.metadata.pose === "base pose" || /none|no signature/i.test(String(preview.metadata.legendaryOverlay)))) {
         issues.push(`${preview.label} is ${rarity} but lacks a unique pose/scene/overlay.`);
       }
       if ((rarity === "Legendary" || rarity === "Mythic") && this.legendaryLooksLikeRecolor(preview.metadata)) {
@@ -154,9 +160,9 @@ export class QualityValidatorService {
   private traitCollisionIssues(previews: PreviewAssetPlan[]) {
     const issues: string[] = [];
     for (const preview of previews.filter((item) => item.type === "SAMPLE_NFT")) {
-      const hasFullHead = preview.metadata.headgear !== "None" && /Mask|Helm|Kabuto|Hood/i.test(String(preview.metadata.headgear));
+      const hasFullHead = !/none/i.test(String(preview.metadata.headgear)) && /Mask|Helm|Kabuto|Hood/i.test(String(preview.metadata.headgear));
       const hasVisor = /Visor|Scanner/i.test(String(preview.metadata.eyes));
-      const hasHeavyAura = preview.metadata.aura !== "None" && /Mist|Glow|Flame|Pulse|Static/i.test(String(preview.metadata.aura));
+      const hasHeavyAura = !/none|restrained/i.test(String(preview.metadata.aura)) && /Mist|Glow|Flame|Pulse|Static/i.test(String(preview.metadata.aura));
       const hasBusyBackground = /Mist|Glow|Flame|Pulse|Static/i.test(String(preview.metadata.background));
       if (hasFullHead && hasVisor) issues.push(`${preview.label} stacks full headgear with visor/eye hardware.`);
       if (hasHeavyAura && hasBusyBackground && String(preview.metadata.rarity) !== "Mythic") issues.push(`${preview.label} risks unreadable aura/background collision.`);
@@ -187,6 +193,38 @@ export class QualityValidatorService {
     return /neon cyber frog/.test(text) || /gold .*(common|base).*legendary/.test(text) || /random unrelated/.test(text) || /generic ai nft|prompt generated|same base/i.test(text);
   }
 
+  private sameBaseAcrossRarities(previews: PreviewAssetPlan[]) {
+    const samples = previews.filter((item) => item.type === "SAMPLE_NFT");
+    const bases = new Set(samples.map((preview) => String(preview.metadata.base ?? "")));
+    const moods = new Set(samples.map((preview) => String(preview.metadata.mood ?? "")));
+    return samples.length >= 4 && (bases.size <= 1 || moods.size <= 1);
+  }
+
+  private commonUncommonEmpty(previews: PreviewAssetPlan[]) {
+    return previews.filter((item) => item.type === "SAMPLE_NFT" && /Common|Uncommon/.test(String(item.metadata.rarity))).some((preview) => {
+      const values = [preview.metadata.headgear, preview.metadata.accessory, preview.metadata.aura].map(String);
+      return values.some((value) => value === "None") || Number(preview.metadata.traitCount ?? 0) < 3;
+    });
+  }
+
+  private tokenIdentityPresent(style: GeneratedStyleProfile, pack: TraitPackPlan) {
+    const tokens = [style.brandDna.tokenName, style.brandDna.tokenSymbol, ...style.brandDna.memeLanguage]
+      .flatMap((value) => String(value).toLowerCase().replace(/^\$/, "").split(/[^a-z0-9]+/))
+      .filter((word) => word.length > 3 && !/token|coin|official|website|twitter|discord|telegram/.test(word));
+    if (!tokens.length) return true;
+    const text = [...style.traitLanguage, ...pack.traits.slice(0, 80).map((trait) => trait.name), style.backgroundWorld, style.artStyle].join(" ").toLowerCase();
+    return tokens.some((token) => text.includes(token));
+  }
+
+  private sparseMetadataGenericFallback(style: GeneratedStyleProfile, pack: TraitPackPlan) {
+    const source = style.brandDna.sourceMetadataSummary ?? {};
+    const sparse = !source.description || !source.metadataUri;
+    if (!sparse) return false;
+    const text = [style.mascot, style.artStyle, style.backgroundWorld, ...style.traitLanguage, ...pack.traits.slice(0, 40).map((trait) => trait.name)].join(" ").toLowerCase();
+    const hasSpecificSparseIdentity = /hanta|virus|viral|biohazard|infection|infected|pathogen|outbreak|quarantine|mutation|toxic|lab|fever|microscope/.test(text);
+    return /generic|robot|crown|vault/.test(text) && !hasSpecificSparseIdentity;
+  }
+
   private poseReuse(previews: PreviewAssetPlan[]) {
     const poses = previews.filter((item) => item.type === "SAMPLE_NFT").map((preview) => String(preview.metadata.pose ?? ""));
     const counts = new Map<string, number>();
@@ -208,11 +246,17 @@ export class QualityValidatorService {
     return genericHits >= 3;
   }
 
+  private usesFixedArchetypeTemplate(style: GeneratedStyleProfile) {
+    const key = String(style.creativeUniverse?.archetype ?? "");
+    const dna = JSON.stringify(style.creativeUniverse?.creativeDna ?? {}).toLowerCase();
+    return /^(biohazard-viral|frog-degen|dog-cozy|dog-pack|cat-hyper-meme|robot-ai|trader-finance)$/.test(key) || /selected because .* maps to .* archetype/.test(dna);
+  }
+
   private legendaryLooksLikeRecolor(metadata: Record<string, unknown>) {
     const scene = String(metadata.scene ?? "");
     const pose = String(metadata.pose ?? "");
     const overlay = String(metadata.legendaryOverlay ?? "");
-    return /recolor|palette|colorway/i.test(`${scene} ${pose} ${overlay}`) || pose === "base pose" || overlay === "None";
+    return /recolor|palette|colorway/i.test(`${scene} ${pose} ${overlay}`) || pose === "base pose" || /none|no signature/i.test(overlay);
   }
 
   private roleValues(pack: TraitPackPlan, role: TraitCategoryRole) {

@@ -51,16 +51,19 @@ export class CommunityContextService {
 
   private fallbackWords(analysis: LogoAnalysisOutput) {
     const mascot = analysis.mascot.toLowerCase();
+    if (/infected|lab|virus|biohazard|pathogen/.test(mascot)) return ["viral", "biohazard", "outbreak", "quarantine", "mutation", "lab", "fever", "microscope"];
     if (/frog|swamp/.test(mascot)) return ["swamp", "bog", "lily", "mire", "ritual", "toxic"];
     if (/dog|samurai/.test(mascot)) return ["kennel", "moon", "crown", "bark", "marshal", "kingdom"];
     if (/cat/.test(mascot)) return ["neon", "alley", "static", "claw", "syndicate", "hacker"];
     if (/robot/.test(mascot)) return ["reactor", "mech", "warband", "signal", "factory", "core"];
     if (/alien/.test(mascot)) return ["nebula", "casino", "jackpot", "orbit", "plasma", "vault"];
-    return ["vault", "raid", "crown", "sigil", "guild", "legend"];
+    return unique([...analysis.visualKeywords, mascot, "origin", "signal", "holder", "myth"])
+      .flatMap((word) => word.split(/\W+/))
+      .filter((word) => word.length > 2)
+      .slice(0, 8);
   }
 
   private namedSet(words: string[], seed: number, nouns: string[]) {
     return nouns.map((noun, index) => `${titleCase(pick(words, seed + index * 3))} ${noun}`);
   }
 }
-

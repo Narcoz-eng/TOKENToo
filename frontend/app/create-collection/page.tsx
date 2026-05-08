@@ -663,7 +663,15 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
         image: asset.uri,
         rarity: metadata.rarity ?? "Rare",
         role: roles[index] ?? "Raider",
-        traits: [metadata.headgear, metadata.aura, metadata.accessory].filter(Boolean)
+        traits: [
+          metadata.mood ? `Mood: ${metadata.mood}` : null,
+          metadata.expression ? `Expression: ${metadata.expression}` : null,
+          metadata.base ? `Base: ${metadata.base}` : null,
+          metadata.background ? `Background: ${metadata.background}` : null,
+          metadata.headgear,
+          metadata.aura,
+          metadata.accessory
+        ].filter((value) => typeof value === "string" && value.trim() && value !== "None").map(String).slice(0, 7)
       };
     })),
     quality: {
@@ -716,7 +724,15 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
       image: sample.uri,
       rarity: String(sample.metadata.rarity ?? "Rare"),
       role: roles[index] ?? "Founder",
-      traits: [sample.metadata.headgear, sample.metadata.aura, sample.metadata.accessory].filter(Boolean).map(String)
+      traits: [
+        sample.metadata.mood ? `Mood: ${sample.metadata.mood}` : null,
+        sample.metadata.expression ? `Expression: ${sample.metadata.expression}` : null,
+        sample.metadata.base ? `Base: ${sample.metadata.base}` : null,
+        sample.metadata.background ? `Background: ${sample.metadata.background}` : null,
+        sample.metadata.headgear,
+        sample.metadata.aura,
+        sample.metadata.accessory
+      ].filter((value) => typeof value === "string" && value.trim() && value !== "None").map(String).slice(0, 7)
     }))),
     quality: {
       previewQualityScore: data.quality.previewQualityScore,

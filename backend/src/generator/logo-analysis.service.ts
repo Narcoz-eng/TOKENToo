@@ -14,6 +14,8 @@ const fallbackPalettes = [
   ["#a8ff3e", "#00e5ff", "#101018"]
 ];
 
+const viralPattern = /hanta|hantavirus|virus|viral|biohazard|infection|infected|pathogen|outbreak|quarantine|mutation|mutant|patient zero|fever|plague|microbe|microscopic|specimen|containment/;
+
 @Injectable()
 export class LogoAnalysisService {
   analyze(input: CreateGenerationRunInput): LogoAnalysisOutput {
@@ -59,6 +61,7 @@ export class LogoAnalysisService {
     const preference = input.hints?.mascotPreference?.trim().toLowerCase();
     if (preference) return preference;
     const source = words.join(" ");
+    if (viralPattern.test(source)) return "infected lab mascot";
     if (/vapor|vaporwave|surreal|liminal|synth|mall|pool|vhs/.test(source)) return "abstract mascot";
     if (/cute|baby|toy|toast|sticker|soft|candy|breakfast/.test(source)) return "cute mascot";
     if (/frog|toad|pepe|bog|swamp/.test(source)) return "frog";
@@ -69,7 +72,8 @@ export class LogoAnalysisService {
     if (/degen|pump|casino|jackpot|candle|liquidity|chart/.test(source)) return "alien";
     if (/coin|gold|cash|bank|vault/.test(source)) return "coin mascot";
     if (/wizard|mage|spell|magic/.test(source)) return "wizard";
-    return pick(["frog", "dog", "cat", "alien", "robot", "wizard", "skull", "coin mascot"], seed);
+    const subject = pick(words.filter((word) => !/token|coin|official|metadata|image|website|twitter|discord|telegram/.test(word)).length ? words : ["origin", "signal", "holder"], seed);
+    return `${subject} token-native subject`;
   }
 
   private palette(input: CreateGenerationRunInput, seed: number) {
@@ -79,6 +83,7 @@ export class LogoAnalysisService {
       return [matches[0], matches[1] ?? "#7a35ff", matches[2] ?? "#090916"];
     }
     const source = `${input.tokenName ?? ""} ${input.tokenSymbol ?? ""} ${input.description ?? ""} ${JSON.stringify(input.hints?.sourceMetadata ?? {})}`.toLowerCase();
+    if (viralPattern.test(source)) return ["#7cff38", "#3dd6ff", "#f2d34f", "#101018"];
     if (/pepe|frog|swamp|bog|ribbit|pond/.test(source)) return ["#2bd66f", "#6b3f20", "#071509"];
     if (/dog|doge|shib|inu|kennel|bark|bone/.test(source)) return ["#f3a43b", "#6d3a12", "#110b06"];
     if (/cat|kitty|meow|claw|alley/.test(source)) return ["#ff5fc8", "#2ac7d8", "#111019"];
@@ -89,6 +94,7 @@ export class LogoAnalysisService {
 
   private shapeLanguage(words: string[], fallback: string, seed: number) {
     const source = words.join(" ");
+    if (viralPattern.test(source)) return "organic microscopic hazard";
     if (/blade|samurai|war|fang|skull|aggressive/.test(source)) return "sharp armored";
     if (/robot|mech|coin|machine/.test(source)) return "geometric mechanical";
     if (/cyber|glitch|neon|hacker/.test(source)) return "sharp glitch";
@@ -98,6 +104,7 @@ export class LogoAnalysisService {
 
   private mood(words: string[], fallback: string, seed: number) {
     const source = words.join(" ");
+    if (viralPattern.test(source)) return "toxic";
     if (/luxury|vip|gold|premium|crown/.test(source)) return "premium";
     if (/dark|shadow|skull|dead/.test(source)) return "mysterious";
     if (/chaos|degen|wild|bonk/.test(source)) return "chaotic";
@@ -117,6 +124,7 @@ export class LogoAnalysisService {
   }
 
   private presetFromMascot(mascot: string) {
+    if (/infected|lab|virus|biohazard/.test(mascot)) return "dark-fantasy-raiders";
     if (/cat/.test(mascot)) return "cyber-alley-syndicate";
     if (/dog|coin/.test(mascot)) return "meme-kingdom";
     if (/samurai/.test(mascot)) return "neon-samurai";

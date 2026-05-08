@@ -4,18 +4,18 @@ TOKENToo generation is CA-first. The creator only needs to enter the Solana mint
 
 ## Identity Model
 
-Each generated collection stores Brand DNA:
+Each generated collection stores Brand DNA and generated Creative DNA:
 
 - token source summary and override flags
 - logo-derived palette and collection color system
-- mascot archetype and silhouette family
-- visual world and background language
+- extracted signal profile: entities, objects, animals, emotions, colors, visual shapes, meme language, cultural words, cue weights, and world/style references
+- generated art style, world concept, mascot or subject, camera framing, palette, texture language, and base silhouette rules
 - role language and trait vocabulary
-- base archetypes for the collection
-- legendary direction and forbidden similarities
+- dynamic trait taxonomy and mood culture for the collection
+- rarity philosophy, legendary mythology, animation language, and forbidden similarities
 - visual fingerprint for distinctiveness scoring
 
-The generator avoids platform palette reuse and generic prompt patterns. Social links can influence community context, but raw URLs must not become visible trait names.
+The generator avoids platform palette reuse, generic prompt patterns, and fixed archetype templates. Social links can influence community context, but raw URLs must not become visible trait names.
 
 ## Rarity Rules
 
@@ -41,6 +41,9 @@ The validator rejects:
 - trait collisions such as full headgear plus visor hardware
 - platform palette reuse as collection identity
 - generic patterns such as "neon cyber frog"
+- fixed archetype template keys instead of generated Creative DNA
+- missing Creative DNA or missing signal profile
+- sparse metadata falling back to generic robot/crown/vault traits
 - collections whose visual fingerprint is too close to previous generated collections
 
 ## Production Readiness

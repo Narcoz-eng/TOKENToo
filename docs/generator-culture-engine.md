@@ -14,24 +14,23 @@ The backend normalizes token metadata into a creative source packet:
 
 The generator must never fall back to a mock community identity when metadata exists. Missing metadata can produce a draft, but not a production-ready launch.
 
-## Art Style Selection
+## Creative DNA
 
-Art style is collection-specific. The engine infers a community archetype such as frog/degen, dog/cozy, cat/hyper meme, robot/AI, trader/finance, dark fantasy/skull, cute/cartoon, or abstract/vaporwave, then chooses an art direction that fits that archetype.
+Art style is collection-specific. The engine extracts open-ended signals from metadata, logo analysis, creator hints, socials, and fallback market/profile text, then generates Creative DNA. Animal, medical, market, machine, cozy, luxury, aggressive, chaotic, and surreal words are low-level semantic weights only; they are not final templates.
 
-Valid directions include pixel art, cartoon, anime, comic, clay/rendered toy, low-poly, streetwear mascot, dark fantasy, arcade, glitch/cyber, hand-drawn meme, surreal, luxury collectible, poster art, retro game, children’s cartoon, horror cute, vaporwave, and trading-terminal aesthetic.
+Creative DNA includes art style, world concept, mascot or subject, base silhouette rules, camera framing, palette, texture language, mood culture, expression language, trait category labels, rarity philosophy, legendary mythology, animation language, and forbidden similarities.
 
-The selected style is stored with a reason so reviewers can tell why the token community received that direction.
+The generated style is stored with a reason so reviewers can tell which metadata and signal weights produced that direction.
 
 ## Community Trait Taxonomy
 
-Collections do not share one global taxonomy. The engine still uses semantic roles internally so rendering can find a base, background, head, eye, mouth, body, prop, FX, frame, legendary, and animation layer. The user-facing taxonomy is community-native.
+Collections do not share one global taxonomy. The engine still uses semantic roles internally so rendering can find a base, background, head, eye, mouth, body, prop, FX, frame, legendary, and animation layer. The user-facing taxonomy is community-native and generated per collection.
 
 Examples:
 
-- frog/degen: bog bodies, swamp weather, prophecy eyes, ribbit reactions, bog relics
-- dog/cozy: cozy pups, kennel corners, nap hats, snack reactions, pack comforts
-- robot/AI: chassis, compute rooms, processor shells, screen states, firmware plates
-- trader/finance: market screens, chart eyes, PnL faces, desk objects, market volatility
+- a medical/contamination token might generate Infection Stages, Quarantine Scenes, Lab Relics, and Fever Moods
+- a dream/cute token might generate Dream Layers, Candy Mutations, Sleepy Poses, and Cloud Accessories
+- a market-stress token might generate Market Scars, Terminal Reflections, Stress Expressions, and Liquidation Auras
 
 The quality gate fails if taxonomy labels collapse back into generic headgear/eyes/armor/aura/frame vocabulary.
 
@@ -47,7 +46,7 @@ Each collection receives named mood states with:
 - aura behavior
 - animation state
 
-These are not global emotion names. A trader collection can have `Locked-In Candle`; a robot collection can have `Kernel Panic Calm`; a frog collection can have `Bogged But Certain`. Future animation systems can consume these states directly.
+These are not global emotion names. They are generated from the same Creative DNA and signal profile as the taxonomy. Future animation systems can consume these states directly.
 
 ## Rarity Complexity Rules
 
@@ -67,8 +66,12 @@ Legendary and mythic outputs must not be recolors. They need new composition lan
 Generation must fail or block approval when:
 
 - two collections share too many trait names
-- two collections share the same art style without a strong archetype reason
+- two collections share the same trait taxonomy structure
+- two collections share the same world concept
+- the same art style repeats too often
 - pose or silhouette language repeats too much
+- mood vocabulary repeats too much
+- legendary structure repeats too much
 - crown/armor/aura/frame concepts repeat without metadata support
 - emotions are generic global labels
 - legendary traits are recolors
@@ -76,7 +79,7 @@ Generation must fail or block approval when:
 - metadata attributes do not match rendered traits
 - the collection reads as generic AI NFT art
 
-The quality sample gate now exercises eight distinct metadata examples to prove the engine produces different creative universes.
+The quality sample gate exercises multiple metadata examples and verifies that each one produces unique Creative DNA. HANTA-style sparse metadata is expected to produce DNA strongly related to Hantavirus-like signals, not a hardcoded biohazard template.
 
 ## Animation Readiness
 

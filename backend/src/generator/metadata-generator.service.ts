@@ -14,6 +14,8 @@ export class MetadataGeneratorService {
       { trait_type: "Lock Duration", value: "90 Days" },
       { trait_type: "Redeemable", value: "Yes" },
       { trait_type: "Role", value: pick(style.roleNames, seed + 1) },
+      { trait_type: "Mood", value: this.trait(visual.mood, "Community mood") },
+      { trait_type: "Expression", value: this.trait(visual.expression, "Community expression") },
       { trait_type: "Background", value: this.trait(visual.background, this.pickRole(pack, "background", seed + 2)) },
       { trait_type: "Base Character", value: this.trait(visual.base, this.pickRole(pack, "base", seed + 3)) },
       { trait_type: "Headgear", value: this.trait(visual.headgear, this.pickRole(pack, "head", seed + 4)) },
