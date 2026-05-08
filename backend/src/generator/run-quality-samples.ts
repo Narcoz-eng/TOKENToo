@@ -251,7 +251,13 @@ async function main() {
         rarity: item.metadata.rarity,
         traitCount: item.metadata.traitCount,
         compositionCategory: item.metadata.compositionCategory,
-        renderedTraitKeys: item.metadata.renderedTraitKeys
+        renderedTraitKeys: item.metadata.renderedTraitKeys,
+        renderingEngine: item.metadata.renderingEngine,
+        cameraVariant: item.metadata.cameraVariant,
+        faceVariant: item.metadata.faceVariant,
+        silhouetteVariant: item.metadata.silhouetteVariant,
+        eventFrame: item.metadata.eventFrame,
+        renderFingerprint: item.metadata.renderFingerprint
       })),
       qualityTier: quality.tier,
       conceptIssues: quality.issues.filter((issue) => !/production|fallback/i.test(issue)),
@@ -292,6 +298,17 @@ function verifySample(
   if (common && epic && Number(epic.metadata.traitCount) <= Number(common.metadata.traitCount)) failures.push("Epic sample is not visibly more complex than Common.");
   if (legendary && (legendary.metadata.compositionCategory !== "signature-scene" || /none|no signature/i.test(String(legendary.metadata.legendaryOverlay)))) failures.push("Legendary sample is not compositionally unique.");
   if (mythic && (mythic.metadata.compositionCategory !== "near-1-of-1" || mythic.metadata.specialMetadataFlag !== "MYTHIC_CURATED_COMPOSITION")) failures.push("Mythic sample is missing near-1/1 metadata.");
+  const sampleNfts = previews.filter((item) => item.type === "SAMPLE_NFT");
+  const faceVariants = new Set(sampleNfts.map((item) => String(item.metadata.faceVariant ?? "")));
+  const cameraVariants = new Set(sampleNfts.map((item) => String(item.metadata.cameraVariant ?? "")));
+  const silhouetteVariants = new Set(sampleNfts.map((item) => String(item.metadata.silhouetteVariant ?? "")));
+  const renderFingerprints = new Set(sampleNfts.map((item) => String(item.metadata.renderFingerprint ?? "")));
+  if (faceVariants.size < 5) failures.push("Rarity ladder does not vary face rendering enough.");
+  if (cameraVariants.size < 5) failures.push("Rarity ladder does not vary camera/framing enough.");
+  if (silhouetteVariants.size < 5) failures.push("Rarity ladder does not vary silhouette enough.");
+  if (renderFingerprints.size < 5) failures.push("Rarity ladder does not expose unique render fingerprints.");
+  if (legendary && !/event|incident|takeover|scene|legendary|wide|camera/i.test(String(legendary.metadata.eventFrame) + String(legendary.metadata.cameraVariant))) failures.push("Legendary sample is not a scene-level event.");
+  if (mythic && !/mythic|takeover|one-off|world|near/i.test(String(mythic.metadata.eventFrame) + String(mythic.metadata.cameraVariant) + String(mythic.metadata.silhouetteVariant))) failures.push("Mythic sample is not a near-1/1 world-level event.");
   for (const preview of previews.filter((item) => item.type === "SAMPLE_NFT")) {
     const generated = metadata.sample(style, pack, preview);
     const attributes = Object.fromEntries(generated.attributes.map((attribute) => [attribute.trait_type, String(attribute.value)]));
@@ -355,6 +372,7 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
   const legendaryStructures = new Map<string, string[]>();
   const visualSignatures = new Map<string, string[]>();
   const rendererFamilies = new Set<string>();
+  const renderingEngines = new Set<string>();
   for (const item of report) {
     const style = String(item.artStyle);
     styles.set(style, [...(styles.get(style) ?? []), String(item.collection)]);
@@ -364,12 +382,16 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
     legendaryStructures.set(legendary, [...(legendaryStructures.get(legendary) ?? []), String(item.collection)]);
     const visual = item.visualSystem ?? item.creativeDna?.visualSystem;
     if (visual?.rendererFamily) rendererFamilies.add(String(visual.rendererFamily));
+    if (visual?.renderingEngine) renderingEngines.add(String(visual.renderingEngine));
     const signature = [
       visual?.rendererFamily,
+      visual?.renderingEngine,
       visual?.bodySystem,
       visual?.eyeSystem,
       visual?.mouthSystem,
+      visual?.faceGrammar,
       visual?.compositionStyle,
+      visual?.cameraSystem,
       visual?.lightingModel,
       visual?.cardStructure
     ].map(String).join("|");
@@ -377,11 +399,12 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
     if (!Array.isArray(item.taxonomy) || item.taxonomy.length < 10) failures.push(`${item.collection} does not expose a community-native taxonomy.`);
     if (!Array.isArray(item.moodCulture) || item.moodCulture.length < 3) failures.push(`${item.collection} does not expose community-native mood culture.`);
     if (!item.creativeDna?.artStyle || !item.signalProfile?.semanticWeights) failures.push(`${item.collection} does not expose generated Creative DNA and signal profile.`);
-    if (!visual?.bodySystem || !visual?.eyeSystem || !visual?.mouthSystem || !visual?.compositionStyle || !visual?.lightingModel || !visual?.rarityProgression) failures.push(`${item.collection} does not expose a complete visual system.`);
+    if (!visual?.renderingEngine || !visual?.bodySystem || !visual?.eyeSystem || !visual?.mouthSystem || !visual?.faceGrammar || !visual?.compositionStyle || !visual?.cameraSystem || !visual?.lightingModel || !visual?.rarityProgression || !visual?.rarityFrames?.Mythic) failures.push(`${item.collection} does not expose a complete visual system.`);
     if (item.productionReady !== false || item.productionAssetPolicy?.launchClassification !== "CONCEPT_PREVIEW") failures.push(`${item.collection} incorrectly marks concept output as production-ready.`);
     if (item.productionAssetPolicy?.aiFinalImageAllowed !== false) failures.push(`${item.collection} allows fully AI-generated final NFT images.`);
   }
   if (rendererFamilies.size < 5) failures.push("quality samples must exercise at least five renderer families.");
+  if (renderingEngines.size < 5) failures.push("quality samples must exercise at least five rendering engines.");
   for (const [style, collections] of styles) {
     if (collections.length > 1) failures.push(`art style "${style}" is reused by ${collections.join(", ")}.`);
   }

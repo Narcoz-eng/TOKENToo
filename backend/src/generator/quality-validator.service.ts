@@ -37,6 +37,8 @@ export class QualityValidatorService {
     if (this.poseReuse(previews) > 0.55) issues.push("Too many sample NFTs reuse the same pose; rarity ladder needs visible composition changes.");
     if (this.sameBaseAcrossRarities(previews)) issues.push("All rarity previews share the same base/face language.");
     if (this.sameVisualCompositionAcrossRarities(previews)) issues.push("Rarity previews reuse the same visual composition system without visible progression.");
+    if (this.sameFaceOrCameraAcrossRarities(previews)) issues.push("Rarity previews reuse the same face, camera, or silhouette rendering variants.");
+    if (this.legendaryNotSceneLevel(previews)) issues.push("Legendary/mythic previews are not scene-level visual events.");
     if (this.commonUncommonEmpty(previews)) issues.push("Common/uncommon previews must use real visible traits, not empty None placeholders.");
     if (!this.tokenIdentityPresent(style, pack)) issues.push("Token identity is not present in trait names.");
     if (this.sparseMetadataGenericFallback(style, pack)) issues.push("Sparse metadata fell back to generic robot/crown/vault traits.");
@@ -253,27 +255,64 @@ export class QualityValidatorService {
     if (!visual) return true;
     return [
       visual.rendererFamily,
+      visual.renderingEngine,
       visual.bodySystem,
       visual.headShape,
       visual.eyeSystem,
       visual.mouthSystem,
       visual.compositionStyle,
       visual.cameraFraming,
+      visual.cameraSystem,
       visual.lightingModel,
       visual.environmentSystem,
+      visual.anatomyModel,
+      visual.faceGrammar,
+      visual.sceneGrammar,
       visual.emotionalRendering,
       visual.rarityProgression,
       visual.legendaryPhilosophy,
       visual.cardStructure
-    ].some((value) => !String(value ?? "").trim());
+    ].some((value) => !String(value ?? "").trim()) || !visual.rarityFrames || ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"].some((rarity) => {
+      const frame = visual.rarityFrames[rarity as keyof typeof visual.rarityFrames];
+      return !frame || [frame.composition, frame.camera, frame.subjectTreatment, frame.faceTreatment, frame.bodyLanguage, frame.environment, frame.lighting, frame.event, frame.silhouetteMutation, frame.animationCue].some((value) => !String(value ?? "").trim());
+    });
   }
 
   private sameVisualCompositionAcrossRarities(previews: PreviewAssetPlan[]) {
     const samples = previews.filter((item) => item.type === "SAMPLE_NFT");
     const poses = new Set(samples.map((preview) => String(preview.metadata.pose ?? "")));
     const scenes = new Set(samples.map((preview) => String(preview.metadata.scene ?? "")));
-    const rendered = new Set(samples.map((preview) => `${preview.metadata.rendererFamily}:${preview.metadata.compositionCategory}:${preview.metadata.lightingModel}`));
-    return samples.length >= 4 && (poses.size < 4 || scenes.size < 4 || rendered.size < 3);
+    const rendered = new Set(samples.map((preview) => String(preview.metadata.renderFingerprint ?? `${preview.metadata.renderingEngine}:${preview.metadata.cameraVariant}:${preview.metadata.compositionCategory}`)));
+    return samples.length >= 4 && (poses.size < 4 || scenes.size < 4 || rendered.size < Math.min(samples.length, 5));
+  }
+
+  private sameFaceOrCameraAcrossRarities(previews: PreviewAssetPlan[]) {
+    const samples = previews.filter((item) => item.type === "SAMPLE_NFT");
+    if (samples.length < 4) return true;
+    const faces = new Set(samples.map((preview) => String(preview.metadata.faceVariant ?? "")));
+    const eyes = new Set(samples.map((preview) => String(preview.metadata.eyeVariant ?? "")));
+    const mouths = new Set(samples.map((preview) => String(preview.metadata.mouthVariant ?? "")));
+    const cameras = new Set(samples.map((preview) => String(preview.metadata.cameraVariant ?? "")));
+    const silhouettes = new Set(samples.map((preview) => String(preview.metadata.silhouetteVariant ?? "")));
+    return faces.size < 5 || eyes.size < 4 || mouths.size < 4 || cameras.size < 5 || silhouettes.size < 5;
+  }
+
+  private legendaryNotSceneLevel(previews: PreviewAssetPlan[]) {
+    const samples = previews.filter((item) => item.type === "SAMPLE_NFT");
+    const commonFingerprint = String(samples.find((preview) => preview.metadata.rarity === "Common")?.metadata.renderFingerprint ?? "");
+    const legendary = samples.filter((preview) => preview.metadata.rarity === "Legendary" || preview.metadata.rarity === "Mythic");
+    if (legendary.length < 2) return true;
+    return legendary.some((preview) => {
+      const text = [
+        preview.metadata.eventFrame,
+        preview.metadata.cameraVariant,
+        preview.metadata.silhouetteVariant,
+        preview.metadata.environmentVariant,
+        preview.metadata.visualRule,
+        preview.metadata.renderFingerprint
+      ].join(" ");
+      return !/event|incident|takeover|mythic|legendary|scene|world|one-off|breach|overload|splash|boss|wide|camera/i.test(text) || String(preview.metadata.renderFingerprint ?? "") === commonFingerprint;
+    });
   }
 
   private usesFixedArchetypeTemplate(style: GeneratedStyleProfile) {

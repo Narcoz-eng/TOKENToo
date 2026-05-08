@@ -10,7 +10,7 @@ Each generated collection stores Brand DNA and generated Creative DNA:
 - logo-derived palette and collection color system
 - extracted signal profile: entities, objects, animals, emotions, colors, visual shapes, meme language, cultural words, cue weights, and world/style references
 - generated art style, world concept, mascot or subject, camera framing, palette, texture language, and base silhouette rules
-- generated visual design system: body system, head shape, eye system, mouth system, proportions, rendering family, composition style, lighting model, environment system, emotional rendering, rarity progression, legendary philosophy, and card structure
+- generated visual design system: body system, head shape, eye system, mouth system, proportions, rendering engine, anatomy model, face grammar, camera system, scene grammar, composition style, lighting model, environment system, emotional rendering, rarity progression, legendary philosophy, card structure, and per-rarity visual frames
 - role language and trait vocabulary
 - dynamic trait taxonomy and mood culture for the collection
 - rarity philosophy, legendary mythology, animation language, and forbidden similarities
@@ -20,7 +20,7 @@ The generator avoids platform palette reuse, generic prompt patterns, fixed arch
 
 ## Rarity Rules
 
-Preview generation produces one concept NFT per rarity tier so the ladder can be audited.
+Preview generation produces one concept NFT per rarity tier so the ladder can be audited. Rarities are visual frames, not just trait-count buckets. Each frame must carry distinct camera, face, silhouette, body-language, environment, lighting, and story-event choices.
 
 - Common: low-density read in the collection's own renderer, 2-4 visible traits, no premium event treatment.
 - Uncommon: visible expression, posture, camera, prop, or environment variation.
@@ -29,7 +29,7 @@ Preview generation produces one concept NFT per rarity tier so the ladder can be
 - Legendary: 9-11 visible traits, unique scene or event frame, visible new camera/anatomy/face/environment, never just a recolor.
 - Mythic: 10-12 visible traits, near 1/1 emotional snapshot, unique silhouette/scene, and `MYTHIC_CURATED_COMPOSITION` metadata.
 
-Rendered preview metadata records `renderedTraitKeys`, `traitCount`, `compositionCategory`, and `specialMetadataFlag`. Metadata attributes must match those rendered traits exactly.
+Rendered preview metadata records `renderedTraitKeys`, `traitCount`, `compositionCategory`, `renderingEngine`, `cameraVariant`, `faceVariant`, `silhouetteVariant`, `eventFrame`, `renderFingerprint`, and `specialMetadataFlag`. Metadata attributes must match those rendered traits exactly.
 
 ## Quality Gates
 
@@ -47,7 +47,15 @@ The validator rejects:
 - sparse metadata falling back to generic robot/crown/vault traits
 - collections whose visual fingerprint is too close to previous generated collections
 - missing visual design system fields
+- missing rendering engine, anatomy model, face grammar, camera system, scene grammar, or rarity frames
 - rarity previews that reuse the same face, silhouette, framing, composition, lighting, or card structure without visible progression
+- preview ladders with fewer than five distinct face variants, camera variants, silhouette variants, or render fingerprints
+- legendary samples without scene-level event frames
+- mythic samples without near-1/1 world-level event frames
+
+## Rendering Diversity
+
+The quality sample suite must prove the generator can produce different visual systems from different metadata. A passing sample set should include multiple rendering engines such as pixel/top-down, cinematic/anime portrait, clay/toy, comic panel, horror, terminal/brutalist, poster, arcade, low-poly, surreal, sticker, cozy cartoon, and painterly systems. The test expectation is not that HANTA equals a biohazard template; it is that HANTA-like metadata produces unique Creative DNA strongly related to medical contamination signals without becoming a generic shared mascot system.
 
 ## Production Readiness
 

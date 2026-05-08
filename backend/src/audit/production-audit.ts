@@ -199,19 +199,32 @@ function styleFixture(): GeneratedStyleProfile {
         textureLanguage: "audit scanline",
         visualSystem: {
           rendererFamily: "terminal-brutalist",
+          renderingEngine: "terminal-engine",
           bodySystem: "audit checklist body blocks",
           headShape: "rectangular verifier monitor",
           eyeSystem: "scanner slits",
           mouthSystem: "flat status line",
           proportionSystem: "compact inspector",
+          anatomyModel: "screen-and-checklist inspector body",
+          faceGrammar: "scanner eyes, status-line mouth, and cursor blinks",
           compositionStyle: "terminal verification layout",
           cameraFraming: "poster crop",
+          cameraSystem: "screen-capture crops and audit panel wides",
           lightingModel: "flat terminal glow",
           environmentSystem: "audit panels",
+          sceneGrammar: "audit panels escalate into verification event screens",
           emotionalRendering: "focused posture and scanner eyes",
           rarityProgression: "more verification panels and checklist density",
           legendaryPhilosophy: "full audit event screen",
-          cardStructure: "rectangular terminal card"
+          cardStructure: "rectangular terminal card",
+          rarityFrames: {
+            Common: { rarity: "Common", composition: "terminal-engine: base audit read", camera: "audit panel", subjectTreatment: "small monitor", faceTreatment: "scanner blink", bodyLanguage: "still verifier", environment: "quiet audit panels", lighting: "flat terminal glow", event: "audit starts", silhouetteMutation: "base monitor", animationCue: "cursor blink" },
+            Uncommon: { rarity: "Uncommon", composition: "terminal-engine: tilted audit read", camera: "tilted panel", subjectTreatment: "monitor with checklist", faceTreatment: "side scanner", bodyLanguage: "leaning verifier", environment: "first warning row", lighting: "green terminal pulse", event: "checklist enters", silhouetteMutation: "checklist prop", animationCue: "cursor blink plus row flash" },
+            Rare: { rarity: "Rare", composition: "terminal-engine: deeper panel read", camera: "foreground panels", subjectTreatment: "screen stack", faceTreatment: "asymmetric scanner", bodyLanguage: "focused inspector", environment: "richer audit panels", lighting: "stronger terminal contrast", event: "audit pressure", silhouetteMutation: "screen stack", animationCue: "scanner sweep" },
+            Epic: { rarity: "Epic", composition: "terminal-engine: action audit screen", camera: "diagonal panel zoom", subjectTreatment: "premium monitor stack", faceTreatment: "high-emotion error face", bodyLanguage: "alert verifier", environment: "complex audit console", lighting: "event terminal glow", event: "audit threshold", silhouetteMutation: "major screen outline", animationCue: "error loop" },
+            Legendary: { rarity: "Legendary", composition: "terminal-engine: full audit event", camera: "event wide", subjectTreatment: "new audit silhouette", faceTreatment: "signature scanner reaction", bodyLanguage: "event verifier", environment: "legendary audit room", lighting: "signature terminal event", event: "full audit event", silhouetteMutation: "legendary monitor silhouette", animationCue: "event pulse" },
+            Mythic: { rarity: "Mythic", composition: "terminal-engine: mythic audit takeover", camera: "one-off audit camera", subjectTreatment: "transformed audit system", faceTreatment: "mythic scanner face", bodyLanguage: "world-owning verifier", environment: "mythic audit room", lighting: "mythic terminal light", event: "audit takeover", silhouetteMutation: "near-one-of-one monitor", animationCue: "multi-state audit loop" }
+          }
         },
         moodCulture: ["focused"],
         expressionLanguage: ["scanner focus"],

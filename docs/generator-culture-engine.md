@@ -20,7 +20,25 @@ Art style is collection-specific. The engine extracts open-ended signals from me
 
 Creative DNA includes art style, world concept, mascot or subject, base silhouette rules, camera framing, palette, texture language, mood culture, expression language, trait category labels, rarity philosophy, legendary mythology, animation language, forbidden similarities, and a generated visual design system.
 
-The visual design system is the art bible for the collection. It must specify body system, head shape, eye system, mouth system, proportions, renderer family, composition style, camera framing, lighting model, environment system, emotional rendering, rarity progression, legendary philosophy, and card structure. These fields are generated from signals. They are not selected from static brand cards such as Mystic Pixel Cult, Meme Kingdom, Neon Samurai, robot, frog, cat, trader, or virus templates.
+The visual design system is the art bible for the collection. It must specify body system, head shape, eye system, mouth system, proportions, rendering engine, composition style, camera framing, lighting model, environment system, emotional rendering, rarity progression, legendary philosophy, and card structure. These fields are generated from signals. They are not selected from static brand cards such as Mystic Pixel Cult, Meme Kingdom, Neon Samurai, robot, frog, cat, trader, or virus templates.
+
+## Rendering System Pipeline
+
+Generation now flows through a visual pipeline:
+
+1. Creative DNA
+2. Rendering system
+3. Composition rules
+4. Silhouette rules
+5. Emotional language
+6. Trait taxonomy
+7. Rarity storytelling
+8. Animation language
+9. Final collection world
+
+Rendering engines are not cosmetic labels. They change anatomy, face construction, camera logic, environments, and event framing. Supported directions include pixel/top-down, cinematic portrait, anime portrait, clay/toy render, comic panel, grotesque horror, cozy cartoon, surreal collage, retro arcade, low-poly, sticker-pack, propaganda-poster, terminal/brutalist, and painterly portrait. The engine is generated from signal weights and morphology, not chosen from a one-to-one archetype map.
+
+Every collection receives rarity frames for common, uncommon, rare, epic, legendary, and mythic. A rarity frame defines the expected composition, camera variant, subject treatment, face treatment, body language, environment, lighting, event, silhouette mutation, and animation cue. Preview rendering must consume those frames directly so rarities do not become the same centered mascot with renamed traits.
 
 The generated style is stored with a reason so reviewers can tell which metadata and signal weights produced that direction.
 
@@ -61,7 +79,7 @@ Rarity rules are consistent, but visual execution is collection-specific.
 - Legendary: unique pose or scene, special composition, unique emotional state, special background
 - Mythic: near 1/1 curated identity snapshot with explicit `MYTHIC_CURATED_COMPOSITION`
 
-Legendary and mythic outputs must not be recolors or the same character with extra labels. They need scene, event, camera, anatomy, face, lighting, environment, or emotional-story changes that read as cinematic moments.
+Legendary and mythic outputs must not be recolors or the same character with extra labels. They need scene, event, camera, anatomy, face, lighting, environment, or emotional-story changes that read as cinematic moments: outbreak scenes, terminal overloads, throne rooms, collapsing chart rooms, late-night degen caves, glitch hallucinations, rainy alleys, dream sequences, battle frames, propaganda posters, arcade action frames, or equivalent collection-native moments.
 
 ## Anti-Generic Validation
 
@@ -73,9 +91,12 @@ Generation must fail or block approval when:
 - two collections share the same visual design system structure
 - the same art style repeats too often
 - the same body, head, eye, mouth, composition, lighting, or card structure repeats too often
+- the same rendering engine, face grammar, camera system, or rarity-frame structure repeats too often
 - pose or silhouette language repeats too much
 - mood vocabulary repeats too much
 - legendary structure repeats too much
+- legendary or mythic samples are not scene-level events
+- moods exist only as metadata and do not alter eyes, posture, lighting, framing, or body language
 - crown/armor/aura/frame concepts repeat without metadata support
 - emotions are generic global labels
 - legendary traits are recolors

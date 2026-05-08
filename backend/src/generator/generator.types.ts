@@ -187,21 +187,69 @@ export type CreativeDNA = {
   forbiddenSimilarities: string[];
 };
 
+export type RenderingEngineName =
+  | "portrait-engine"
+  | "sticker-engine"
+  | "pixel-engine"
+  | "cinematic-engine"
+  | "comic-panel-engine"
+  | "clay-render-engine"
+  | "poster-engine"
+  | "arcade-engine"
+  | "surreal-engine"
+  | "terminal-engine"
+  | "horror-engine"
+  | "low-poly-engine";
+
+export type VisualRarityFrame = {
+  rarity: "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Mythic";
+  composition: string;
+  camera: string;
+  subjectTreatment: string;
+  faceTreatment: string;
+  bodyLanguage: string;
+  environment: string;
+  lighting: string;
+  event: string;
+  silhouetteMutation: string;
+  animationCue: string;
+};
+
 export type VisualDesignSystem = {
-  rendererFamily: "pixel-topdown" | "anime-portrait" | "clay-toy" | "biohazard-horror" | "terminal-brutalist" | "surreal-collage";
+  rendererFamily:
+    | "pixel-topdown"
+    | "anime-portrait"
+    | "clay-toy"
+    | "biohazard-horror"
+    | "terminal-brutalist"
+    | "surreal-collage"
+    | "sticker-pack"
+    | "comic-panel"
+    | "cinematic-scene"
+    | "propaganda-poster"
+    | "retro-arcade"
+    | "low-poly"
+    | "painterly-portrait"
+    | "children-cartoon";
+  renderingEngine: RenderingEngineName;
   bodySystem: string;
   headShape: string;
   eyeSystem: string;
   mouthSystem: string;
   proportionSystem: string;
+  anatomyModel: string;
+  faceGrammar: string;
   compositionStyle: string;
   cameraFraming: string;
+  cameraSystem: string;
   lightingModel: string;
   environmentSystem: string;
+  sceneGrammar: string;
   emotionalRendering: string;
   rarityProgression: string;
   legendaryPhilosophy: string;
   cardStructure: string;
+  rarityFrames: Record<"Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Mythic", VisualRarityFrame>;
 };
 
 export type CommunityCreativeUniverse = {

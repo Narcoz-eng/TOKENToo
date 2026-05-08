@@ -14,7 +14,8 @@ import type {
   RarityComplexityRule,
   TraitCategoryPlan,
   TraitCategoryRole,
-  VisualDesignSystem
+  VisualDesignSystem,
+  VisualRarityFrame
 } from "./generator.types";
 import { pick, seedFrom, titleCase, unique } from "./generator.util";
 import { RarityEngineService } from "./rarity-engine.service";
@@ -152,10 +153,15 @@ export class StyleProfileGeneratorService {
         traitTaxonomy: universe.taxonomy.map((category) => `${category.role}:${category.label}`),
         artStyle: universe.artStyle,
         rendererFamily: universe.creativeDna.visualSystem.rendererFamily,
+        renderingEngine: universe.creativeDna.visualSystem.renderingEngine,
         bodySystem: universe.creativeDna.visualSystem.bodySystem,
+        anatomyModel: universe.creativeDna.visualSystem.anatomyModel,
         eyeSystem: universe.creativeDna.visualSystem.eyeSystem,
+        faceGrammar: universe.creativeDna.visualSystem.faceGrammar,
         compositionStyle: universe.creativeDna.visualSystem.compositionStyle,
+        cameraSystem: universe.creativeDna.visualSystem.cameraSystem,
         lightingModel: universe.creativeDna.visualSystem.lightingModel,
+        rarityFrames: universe.creativeDna.visualSystem.rarityFrames,
         poseLanguage: universe.baseSilhouettes.map((base) => base.poseLanguage),
         moodCulture: universe.moodCulture.map((mood) => mood.name),
         compositionType: compositionRules,
@@ -218,9 +224,12 @@ export class StyleProfileGeneratorService {
       visual.compositionStyle,
       visual.cameraFraming,
       visual.bodySystem,
+      visual.anatomyModel,
       visual.eyeSystem,
       visual.mouthSystem,
+      visual.faceGrammar,
       visual.environmentSystem,
+      visual.sceneGrammar,
       visual.rarityProgression,
       visual.legendaryPhilosophy,
       "Mood must alter visible face, posture, framing, or lighting rather than metadata text only.",
@@ -235,7 +244,15 @@ export class StyleProfileGeneratorService {
       "clay-toy": "soft toy packaging labels with small handmade captions",
       "biohazard-horror": "specimen-file labeling, warning tape, surveillance timestamps",
       "terminal-brutalist": "monospace terminal UI, receipt rows, command-line captions",
-      "surreal-collage": "cut-paper captions, album-cover labels, displaced text fragments"
+      "surreal-collage": "cut-paper captions, album-cover labels, displaced text fragments",
+      "sticker-pack": "die-cut sticker labels, small punchline captions, pack-sheet numbering",
+      "comic-panel": "bold comic sound effects, panel captions, speech-bubble fragments",
+      "cinematic-scene": "film-title lower thirds, location stamps, cinematic credits",
+      "propaganda-poster": "large poster headline blocks, stamp marks, campaign slogans",
+      "retro-arcade": "score HUD, stage labels, combo text, cartridge-era pixels",
+      "low-poly": "minimal technical labels, viewport coordinates, low-poly asset tags",
+      "painterly-portrait": "gallery plaque captions, brush-signature marks, emotional title cards",
+      "children-cartoon": "bouncy title stickers, toy-box captions, mischief labels"
     };
     return directions[visual.rendererFamily];
   }
@@ -436,124 +453,407 @@ export class StyleProfileGeneratorService {
     const family = this.rendererFamily(signals, seed);
     const object = pick(signals.objects.length ? signals.objects : [motif], seed + 11);
     const world = pick(signals.worldReferences.length ? signals.worldReferences : ["origin room"], seed + 13);
-    const systems: Record<VisualDesignSystem["rendererFamily"], VisualDesignSystem> = {
+    const systems: Record<VisualDesignSystem["rendererFamily"], Omit<VisualDesignSystem, "rendererFamily" | "rarityFrames">> = {
       "pixel-topdown": {
-        rendererFamily: "pixel-topdown",
+        renderingEngine: "pixel-engine",
         bodySystem: `${motif} tiny tile sprites with square-foot walk cycles`,
         headShape: "block head or tiny icon head, never circular portrait",
         eyeSystem: "two-to-four pixel eyes, blink frames, panic dots, sideways glances",
         mouthSystem: "single-pixel grimace, open shout tile, or missing-mouth deadpan",
         proportionSystem: "tiny bodies, oversized object readability, top-down limbs",
+        anatomyModel: "8-bit walk-cycle body with independent head tile, hand tile, and prop tile",
+        faceGrammar: "pixel eyes and mouth are separate swap frames, not one shared face",
         compositionStyle: "top-down arcade map with diagonal chaos lanes",
         cameraFraming: "orthographic top-down board view",
+        cameraSystem: "locked orthographic camera with rarity-specific zoom, pan, and crowd density",
         lightingModel: "flat arcade color ramps with blinking hazard tiles",
         environmentSystem: `${world} as playable tile map with obstacles and moving clutter`,
+        sceneGrammar: "environment is a game board; legendary and mythic are frozen gameplay incidents",
         emotionalRendering: "emotion shown by sprite lean, shake frames, eye pixels, and collision posture",
         rarityProgression: "map complexity, sprite mutation, obstacle density, and event tiles",
         legendaryPhilosophy: "a full playable incident map frozen at the decisive frame",
         cardStructure: "edge-to-edge pixel map, no centered portrait frame"
       },
       "anime-portrait": {
-        rendererFamily: "anime-portrait",
+        renderingEngine: "portrait-engine",
         bodySystem: `${motif} shoulder-up character acting with hair/cloth silhouette breaks`,
         headShape: "angular portrait head with jawline, cheek planes, and non-circular crop",
         eyeSystem: "large cinematic eyes with highlights, tears, glare cuts, and blink layers",
         mouthSystem: "asymmetric lips, clenched teeth, whisper mouth, or trembling expression",
         proportionSystem: "portrait proportions, visible shoulders, dramatic neck and hand gesture",
+        anatomyModel: "anime portrait anatomy with hair masses, neck tension, hand acting, and shoulder silhouette",
+        faceGrammar: "eyes, brow, mouth, and hand tension all change per rarity and mood",
         compositionStyle: "cinematic portrait with off-center gaze and foreground object",
         cameraFraming: "shoulder-up emotional close-up",
+        cameraSystem: "push-in portrait camera, alternating over-shoulder, profile, and wide reaction shots",
         lightingModel: "dramatic key light, rim shadow, and mood-specific color temperature",
         environmentSystem: `${world} as blurred emotional set dressing behind the face`,
+        sceneGrammar: "portrait becomes a film reaction shot; legendary/mythic are story beats, not trait piles",
         emotionalRendering: "emotion shown through eye shape, brow tilt, mouth asymmetry, hand tension, and lighting",
         rarityProgression: "acting intensity, lighting contrast, hand/prop staging, and background story",
         legendaryPhilosophy: "a cinematic reaction shot at the exact community myth moment",
         cardStructure: "poster frame with asymmetrical title space, no rarity badge plate"
       },
       "clay-toy": {
-        rendererFamily: "clay-toy",
+        renderingEngine: "clay-render-engine",
         bodySystem: `${motif} handmade toy bodies with squash, fingerprints, and poseable limbs`,
         headShape: "soft sculpted head, bean or plush form, not a perfect circle",
         eyeSystem: "inset bead eyes, sleepy lids, lopsided buttons, blink dents",
         mouthSystem: "pressed clay smile, tiny worried notch, or raised smug bead",
         proportionSystem: "short rounded limbs, tactile chunky silhouette, toy shelf scale",
+        anatomyModel: "stop-motion toy armature with squashed torso, bead eyes, and bendable limbs",
+        faceGrammar: "face is sculpted clay dents and beads that visibly shift with mood",
         compositionStyle: "small diorama scene with props at table height",
         cameraFraming: "low macro toy photography",
+        cameraSystem: "macro tabletop camera with shallow depth and set-piece cuts",
         lightingModel: "softbox shadows, ambient bounce, cozy practical lights",
         environmentSystem: `${world} as tactile miniature set with handmade props`,
+        sceneGrammar: "rarity adds handmade set depth; legendary/mythic become one-off dioramas",
         emotionalRendering: "emotion shown by slumped clay posture, bead-eye angle, head tilt, and tiny hands",
         rarityProgression: "materials, set depth, sculpt complexity, and prop storytelling",
         legendaryPhilosophy: "a handmade diorama event with one-off sculpt and set",
         cardStructure: "photographic diorama crop, no graphic card border"
       },
       "biohazard-horror": {
-        rendererFamily: "biohazard-horror",
+        renderingEngine: "horror-engine",
         bodySystem: `${motif} mutated anatomy with infection growths and uneven limb mass`,
         headShape: "asymmetric specimen skull, swollen jaw, cracked mask, or parasite crown",
         eyeSystem: "mismatched pupils, fever glare, one sealed eye, microscope stare",
         mouthSystem: "crooked infected grin, cough gape, split-mouth snarl, or surgical seam",
         proportionSystem: "unbalanced torso, one oversized limb, visible growth stages",
+        anatomyModel: "body evolves through infection stages with asymmetrical mass and unstable joints",
+        faceGrammar: "face mutates per rarity: sealed eye, mismatched pupil, split mouth, fever glare",
         compositionStyle: "containment incident scene with unstable subject placement",
         cameraFraming: "surveillance close-up or low horror specimen crop",
+        cameraSystem: "security-camera cuts, specimen close-ups, low-angle breach frames",
         lightingModel: "sick fluorescent horror, warning red, and contaminated green-blue spill",
         environmentSystem: `${world} as lab accident space with stains, tape, glass, and warning UI`,
+        sceneGrammar: "rarity is containment failure; legendary/mythic are breach events",
         emotionalRendering: "emotion shown by asymmetric face, infected posture, tremor lines, and paranoid eye direction",
         rarityProgression: "infection stage, anatomy distortion, containment failure, and lab incident severity",
         legendaryPhilosophy: "a containment breach event where the subject changes form and scene logic",
         cardStructure: "specimen file or surveillance capture, no centered mascot card"
       },
       "terminal-brutalist": {
-        rendererFamily: "terminal-brutalist",
+        renderingEngine: "terminal-engine",
         bodySystem: `${motif} reduced avatar made of terminal panels, desk posture, and dead UI blocks`,
         headShape: "rectangle screen, receipt strip, or cropped human silhouette",
         eyeSystem: "flat exhausted eye bars, cursor pupils, red wick stare, or empty sockets",
         mouthSystem: "one-line deadpan, error glyph, clenched dash, or no-mouth silence",
         proportionSystem: "minimal body, hunched shoulders, big desk/screen dominance",
+        anatomyModel: "avatar is built from screens, receipts, cursor blocks, and desk posture",
+        faceGrammar: "face is UI state: cursor pupils, flat bars, error glyph mouth, no-mouth silence",
         compositionStyle: "brutalist terminal layout with charts and negative space",
         cameraFraming: "wide terminal screen or desk-cam crop",
+        cameraSystem: "screen-capture camera with panel crops, desk cams, and wide command-room views",
         lightingModel: "low-color monitor glow with harsh flat shadows",
         environmentSystem: `${world} as screen stack, orderbook, receipt, or command-line room`,
+        sceneGrammar: "rarity increases information pressure; legendary/mythic are system failure screens",
         emotionalRendering: "emotion shown by posture collapse, screen glare, cursor eyes, and chart pressure",
         rarityProgression: "layout density, screen count, market scars, and emotional collapse",
         legendaryPhilosophy: "a market/system event screen captured at the irreversible moment",
         cardStructure: "brutalist UI panel, no glow aura or collectible badge"
       },
       "surreal-collage": {
-        rendererFamily: "surreal-collage",
+        renderingEngine: "surreal-engine",
         bodySystem: `${motif} collage body with cutout layers, warped objects, and scale contradictions`,
         headShape: "mask, window, object-head, or melting silhouette",
         eyeSystem: "floating eyes, sticker pupils, VHS offsets, or hidden face fragments",
         mouthSystem: "cut-paper mouth, silent void, smile sticker, or displaced caption",
         proportionSystem: "dream scale shifts, elongated limbs, object-body hybrids",
+        anatomyModel: "body is assembled from cutouts, object-heads, floating layers, and impossible scale",
+        faceGrammar: "face fragments drift independently: eyes, captions, void mouths, sticker smiles",
         compositionStyle: "asymmetric collage scene with impossible perspective",
         cameraFraming: "album-cover surreal crop",
+        cameraSystem: "album-cover crop with forced perspective shifts and object-scale jumps",
         lightingModel: "flat collage shadows, VHS bloom, or impossible sunset wash",
         environmentSystem: `${world} as layered dream set with props floating across depth planes`,
+        sceneGrammar: "rarity increases dream logic; legendary/mythic swap subject and world roles",
         emotionalRendering: "emotion shown by object placement, scale, off-axis eyes, and unsettling negative space",
         rarityProgression: "layer count, impossible perspective, object transformation, and dream logic",
         legendaryPhilosophy: "a mythic dream tableau where the world and subject swap roles",
         cardStructure: "edge-to-edge collage canvas, no standard NFT card frame"
+      },
+      "sticker-pack": {
+        renderingEngine: "sticker-engine",
+        bodySystem: `${motif} die-cut sticker mascots with bendy limbs and punchline props`,
+        headShape: "sticker head silhouette changes between blob, object, badge, and mascot icon",
+        eyeSystem: "dot eyes, X-eyes, side glances, sticker eyelids, and meme tears",
+        mouthSystem: "sticker grin, open yell, deadpan dash, sticker bite, or misplaced caption mouth",
+        proportionSystem: "chunky sticker proportions with thick outline and exaggerated prop scale",
+        anatomyModel: "flat sticker layers with detachable face decals, limbs, and object props",
+        faceGrammar: "facial stickers swap positions and shapes per mood, including off-center misprints",
+        compositionStyle: "sticker-sheet cluster with uneven cut lines and negative-space jokes",
+        cameraFraming: "flat product scan or sticker-pack sheet view",
+        cameraSystem: "flat lay camera with sheet crops, singles, and clustered pack spreads",
+        lightingModel: "flat sticker gloss with paper shadows and small specular hits",
+        environmentSystem: `${world} as a sticker sheet, phone case, laptop lid, or meme pack`,
+        sceneGrammar: "rarity adds sticker count, misprint drama, and sheet storytelling",
+        emotionalRendering: "emotion shown by sticker decal placement, body bend, misprint asymmetry, and caption-mouths",
+        rarityProgression: "outline thickness, sticker count, prop jokes, pack layout, and misprint rarity",
+        legendaryPhilosophy: "a one-off sticker sheet takeover where the pack tells a whole incident",
+        cardStructure: "die-cut sheet layout, no portrait card"
+      },
+      "comic-panel": {
+        renderingEngine: "comic-panel-engine",
+        bodySystem: `${motif} comic actors with inked action poses and panel-breaking limbs`,
+        headShape: "inked head shapes shift between profile, three-quarter, screaming, and shadowed mask",
+        eyeSystem: "ink slits, shocked circles, speed-line glare, narrowed panels, and asymmetrical brows",
+        mouthSystem: "speech-shout mouth, clenched teeth, gutter silence, caption mouth, or crooked grin",
+        proportionSystem: "comic anatomy with elastic limbs, foreshortened hands, and panel-breaking silhouettes",
+        anatomyModel: "inked comic anatomy with foreground hands, motion smears, and panel cuts",
+        faceGrammar: "face is drawn through brow shape, panel angle, mouth bubble, and ink shadow",
+        compositionStyle: "comic page panels with gutters, action diagonals, and sound-effect staging",
+        cameraFraming: "panel crop, action close-up, or splash-page wide shot",
+        cameraSystem: "panel-to-panel camera grammar with close-up, reaction, and splash page variants",
+        lightingModel: "bold ink shadow, halftone light, and spot-color impact",
+        environmentSystem: `${world} as panel backgrounds, speed lines, and action gutters`,
+        sceneGrammar: "rarity escalates from single panel to splash-page event",
+        emotionalRendering: "emotion shown by panel angle, ink shadow, mouth bubble, motion smear, and body impact",
+        rarityProgression: "panel count, ink impact, motion, sound effects, and splash-page stakes",
+        legendaryPhilosophy: "a splash-page event where the collection myth breaks the panel grid",
+        cardStructure: "comic page crop, no standard badge frame"
+      },
+      "cinematic-scene": {
+        renderingEngine: "cinematic-engine",
+        bodySystem: `${motif} scene actors staged in environments with foreground/background depth`,
+        headShape: "silhouette-first head reads through rim light, profile, helmet, or shadow cut",
+        eyeSystem: "small cinematic eye glints, hard stares, reflected lights, or shadow-hidden eyes",
+        mouthSystem: "subtle acting mouth, breath cloud, shout silhouette, or no-dialogue tension",
+        proportionSystem: "full-scene human/creature proportions with foreground props and depth layers",
+        anatomyModel: "film still anatomy with blocking, foreground props, and environmental scale",
+        faceGrammar: "emotion is carried by camera, light, posture, and tiny facial acting",
+        compositionStyle: "cinematic wide frame with foreground obstruction and environmental storytelling",
+        cameraFraming: "wide film still, low angle, over-shoulder, or extreme close-up",
+        cameraSystem: "shot-list camera grammar: establishing, medium, close-up, low angle, event wide",
+        lightingModel: "cinematic key light, motivated practicals, atmospheric haze, and rim light",
+        environmentSystem: `${world} as a film set with depth, weather, props, and blocked action`,
+        sceneGrammar: "rarity is a shot progression; legendary/mythic are decisive film frames",
+        emotionalRendering: "emotion shown by blocking, light direction, distance, posture, and atmosphere",
+        rarityProgression: "camera distance, set scale, event stakes, atmospheric depth, and actor blocking",
+        legendaryPhilosophy: "a cinematic event frame where the world is actively changing",
+        cardStructure: "film still frame with location/scene marks, no collectible badge"
+      },
+      "propaganda-poster": {
+        renderingEngine: "poster-engine",
+        bodySystem: `${motif} emblematic poster figures with hard silhouette and symbolic props`,
+        headShape: "iconic poster head, mask, statue profile, or emblem face",
+        eyeSystem: "minimal poster eyes, cutout shadows, slogan gaze, or blank propaganda stare",
+        mouthSystem: "slogan mouth, stern line, open chant, or sealed emblem",
+        proportionSystem: "monumental poster proportions, graphic hands, and simplified anatomy",
+        anatomyModel: "flat poster anatomy with hard shadows, symbol props, and monument scale",
+        faceGrammar: "expression is poster rhetoric: gaze angle, slogan mouth, and graphic shadow",
+        compositionStyle: "propaganda poster with diagonal hierarchy, symbol blocks, and oversized type",
+        cameraFraming: "heroic low poster angle or flat campaign print",
+        cameraSystem: "poster camera with monument scale, diagonal hierarchy, and type-as-composition",
+        lightingModel: "hard graphic shadows, limited spot palette, screenprint grain",
+        environmentSystem: `${world} as campaign symbols, banners, print texture, and crowd silhouettes`,
+        sceneGrammar: "rarity adds public ritual, crowd scale, and symbolic takeover",
+        emotionalRendering: "emotion shown by slogan pressure, body monumentality, shadow shape, and crowd scale",
+        rarityProgression: "poster hierarchy, symbol density, crowd scale, print layers, and campaign stakes",
+        legendaryPhilosophy: "a mythic campaign poster announcing a one-time community event",
+        cardStructure: "full poster print, not a portrait card"
+      },
+      "retro-arcade": {
+        renderingEngine: "arcade-engine",
+        bodySystem: `${motif} arcade fighters and playable icons with stage-specific action frames`,
+        headShape: "sprite head, boss icon, helmet tile, or tiny expression icon",
+        eyeSystem: "arcade glints, hurt-frame eyes, victory eyes, boss eyes, and blink sprites",
+        mouthSystem: "hurt-frame mouth, victory grin, shout sprite, or silent idle",
+        proportionSystem: "sprite proportions with readable limbs, impact frames, and power-up props",
+        anatomyModel: "arcade sprite anatomy with idle, hurt, attack, victory, and boss frames",
+        faceGrammar: "face changes are animation frames, not static portrait features",
+        compositionStyle: "arcade action frame with HUD, stage hazards, and combo lanes",
+        cameraFraming: "side-scroller, top-down arena, or boss-stage framing",
+        cameraSystem: "game camera with side-scroll, arena, boss zoom, and HUD crop variants",
+        lightingModel: "limited arcade palette, flashing hit lights, scanline glow",
+        environmentSystem: `${world} as playable stage with HUD, hazards, and power-ups`,
+        sceneGrammar: "rarity escalates from idle sprite to boss-stage event",
+        emotionalRendering: "emotion shown by animation frame, squash, hit flash, and HUD state",
+        rarityProgression: "stage hazards, sprite frames, combo events, boss states, and HUD chaos",
+        legendaryPhilosophy: "a boss-stage event frozen during the community's final input",
+        cardStructure: "arcade screen capture with HUD, no collectible card border"
+      },
+      "low-poly": {
+        renderingEngine: "low-poly-engine",
+        bodySystem: `${motif} faceted low-poly figures with silhouette-first geometry`,
+        headShape: "faceted helmet, object head, angular mask, or prism skull",
+        eyeSystem: "small emissive triangles, visor slits, gem eyes, or blank polygons",
+        mouthSystem: "polygon notch, broken seam, low-poly grin, or silent faceted face",
+        proportionSystem: "low-poly proportions with big silhouette planes and readable joints",
+        anatomyModel: "geometry-first anatomy with large planes, joints, and low-poly object props",
+        faceGrammar: "face is defined by polygon cuts, emissive triangles, and edge highlights",
+        compositionStyle: "isometric low-poly scene with geometric props and camera depth",
+        cameraFraming: "isometric game asset view or low-poly cinematic angle",
+        cameraSystem: "isometric and low-angle camera variants with geometry scale shifts",
+        lightingModel: "flat-shaded facets, sharp rim edges, and gradient skybox light",
+        environmentSystem: `${world} as faceted terrain, object clusters, and polygon ruins`,
+        sceneGrammar: "rarity adds terrain complexity, geometry mutations, and scene scale",
+        emotionalRendering: "emotion shown by polygon tilt, visor angle, posture, and faceted light",
+        rarityProgression: "geometry complexity, environment scale, edge glow, and object transformation",
+        legendaryPhilosophy: "a low-poly world event where the scene geometry reconfigures around the subject",
+        cardStructure: "isometric viewport, no centered portrait card"
+      },
+      "painterly-portrait": {
+        renderingEngine: "portrait-engine",
+        bodySystem: `${motif} painterly busts with brushy silhouette breaks and visible gesture`,
+        headShape: "painted head, mask, profile, or dissolved edge silhouette",
+        eyeSystem: "brush-stroke eyes, wet highlights, half-lids, and abstract glances",
+        mouthSystem: "painted smirk, smeared shout, closed line, or dissolved mouth",
+        proportionSystem: "painterly portrait proportions with expressive shoulders and hand marks",
+        anatomyModel: "painted bust anatomy with visible brush direction and gesture marks",
+        faceGrammar: "emotion is brushwork: eye smear, mouth edge, cheek plane, and head tilt",
+        compositionStyle: "painterly portrait with uneven crop, atmospheric background, and brush drama",
+        cameraFraming: "painted bust crop or emotional close-up",
+        cameraSystem: "portrait camera with crop shifts, profile turns, and brush-field depth",
+        lightingModel: "painterly chiaroscuro, color fields, and brush-textured rim light",
+        environmentSystem: `${world} as painted atmosphere, symbolic props, and texture fields`,
+        sceneGrammar: "rarity escalates from study to finished emotional painting",
+        emotionalRendering: "emotion shown by brush direction, eye smears, mouth edge, posture, and color temperature",
+        rarityProgression: "brush density, crop drama, symbolic props, atmosphere, and emotional finish",
+        legendaryPhilosophy: "a one-off painted emotional snapshot where the myth is captured as a portrait",
+        cardStructure: "gallery painting crop, no badge plate"
+      },
+      "children-cartoon": {
+        renderingEngine: "sticker-engine",
+        bodySystem: `${motif} chaotic cartoon bodies with squash, noodle limbs, and toy-like props`,
+        headShape: "rubber-hose head, object head, silly mask, or soft blob silhouette",
+        eyeSystem: "button dots, spiral eyes, star eyes, sleepy arcs, and panic ovals",
+        mouthSystem: "big open laugh, tiny oops mouth, wobble smile, or sticker bite",
+        proportionSystem: "big head, rubber limbs, squash body, and prop-first readability",
+        anatomyModel: "children-cartoon squash anatomy with noodle arms and overacting props",
+        faceGrammar: "face is highly animated: star eyes, panic ovals, wobble smiles, and bite frames",
+        compositionStyle: "toy-box cartoon chaos with bouncing props and playful depth",
+        cameraFraming: "storybook close-up, toy-box wide, or bouncing sticker crop",
+        cameraSystem: "playroom camera with wide chaos, close reaction, and toy-box stage variants",
+        lightingModel: "bright cartoon flats, soft shadows, playful color pops",
+        environmentSystem: `${world} as a toy-box/playroom stage with jumping props`,
+        sceneGrammar: "rarity adds more mischief, props, and storybook chaos",
+        emotionalRendering: "emotion shown by squashed posture, star eyes, mouth scale, prop motion, and goofy framing",
+        rarityProgression: "prop chaos, squash intensity, toy-box depth, and storybook event scale",
+        legendaryPhilosophy: "a full playroom incident where every prop joins the joke",
+        cardStructure: "storybook/toy-box frame, no generic NFT card"
       }
     };
     const system = systems[family];
+    const bodySystem = `${system.bodySystem}; dominant signal ${topKey || "token-native"}; anchor object ${object}`;
+    const legendaryPhilosophy = `${system.legendaryPhilosophy}; built around ${object}`;
     return {
       ...system,
-      bodySystem: `${system.bodySystem}; dominant signal ${topKey || "token-native"}; anchor object ${object}`,
+      rendererFamily: family,
+      bodySystem,
       environmentSystem: system.environmentSystem,
-      legendaryPhilosophy: `${system.legendaryPhilosophy}; built around ${object}`
+      legendaryPhilosophy,
+      rarityFrames: this.rarityFrames(family, system.renderingEngine, motif, object, world, system, seed)
     };
+  }
+
+  private rarityFrames(
+    family: VisualDesignSystem["rendererFamily"],
+    engine: VisualDesignSystem["renderingEngine"],
+    motif: string,
+    object: string,
+    world: string,
+    system: Omit<VisualDesignSystem, "rendererFamily" | "rarityFrames">,
+    seed: number
+  ): VisualDesignSystem["rarityFrames"] {
+    const eventWords = ["first signal", "pressure spike", "identity rupture", "world event", "myth frame", "one-off takeover"];
+    const entries: VisualRarityFrame[] = [
+      {
+        rarity: "Common",
+        composition: `entry read in ${system.compositionStyle}`,
+        camera: `identity camera: ${system.cameraSystem}`,
+        subjectTreatment: `base ${system.anatomyModel}`,
+        faceTreatment: `neutral ${system.faceGrammar}`,
+        bodyLanguage: `low-intensity ${system.emotionalRendering}`,
+        environment: `quiet ${system.environmentSystem}`,
+        lighting: `baseline ${system.lightingModel}`,
+        event: `${motif} ${pick(eventWords, seed + 1)}`,
+        silhouetteMutation: `clean ${family} silhouette`,
+        animationCue: "idle blink or breathing loop"
+      },
+      {
+        rarity: "Uncommon",
+        composition: `off-axis variant of ${system.compositionStyle}`,
+        camera: `tilted camera variation in ${system.cameraSystem}`,
+        subjectTreatment: `small prop/body shift around ${object}`,
+        faceTreatment: `blink/asymmetry pass using ${system.faceGrammar}`,
+        bodyLanguage: `noticeable lean or stance change`,
+        environment: `first active layer inside ${world}`,
+        lighting: `small mood shift in ${system.lightingModel}`,
+        event: `${object} enters frame`,
+        silhouetteMutation: `one visible appendage or prop breaks the base outline`,
+        animationCue: "blink plus prop wobble"
+      },
+      {
+        rarity: "Rare",
+        composition: `deeper scene variant with foreground/background separation`,
+        camera: `rarer crop from ${system.cameraSystem}`,
+        subjectTreatment: `stronger anatomy read: ${system.anatomyModel}`,
+        faceTreatment: `asymmetric eyes and mouth state from ${system.faceGrammar}`,
+        bodyLanguage: `emotion-driven posture, not neutral standing`,
+        environment: `richer ${system.environmentSystem}`,
+        lighting: `stronger contrast in ${system.lightingModel}`,
+        event: `${motif} pressure beat with ${object}`,
+        silhouetteMutation: `secondary shape changes the outline`,
+        animationCue: "expression loop plus aura/lighting pulse"
+      },
+      {
+        rarity: "Epic",
+        composition: `action composition with diagonal movement and staging`,
+        camera: `dramatic crop/zoom from ${system.cameraSystem}`,
+        subjectTreatment: `premium body and prop transformation around ${object}`,
+        faceTreatment: `high-emotion expression from ${system.faceGrammar}`,
+        bodyLanguage: `active gesture, impact, collapse, or performance pose`,
+        environment: `complex ${system.environmentSystem}`,
+        lighting: `event lighting through ${system.lightingModel}`,
+        event: `${motif} event threshold`,
+        silhouetteMutation: `major outline shift with visible rarity read`,
+        animationCue: "idle cycle changes into action loop"
+      },
+      {
+        rarity: "Legendary",
+        composition: `scene-level legendary frame: ${system.legendaryPhilosophy}`,
+        camera: `new camera language from ${system.cameraSystem}`,
+        subjectTreatment: `new silhouette and anatomy state, not upgraded base`,
+        faceTreatment: `unique emotional snapshot using ${system.faceGrammar}`,
+        bodyLanguage: `story pose tied to the event`,
+        environment: `legendary ${world} event environment`,
+        lighting: `signature lighting event in ${system.lightingModel}`,
+        event: `${motif} ${object} incident`,
+        silhouetteMutation: `legendary silhouette is separately readable`,
+        animationCue: "reaction frame, event loop, and lighting pulse"
+      },
+      {
+        rarity: "Mythic",
+        composition: `near-1/1 mythic world takeover using ${system.sceneGrammar}`,
+        camera: `one-off camera impossible for lower tiers`,
+        subjectTreatment: `mythic transformed subject with scene-owned anatomy`,
+        faceTreatment: `one-off face grammar: transformed eyes, mouth, and emotional lighting`,
+        bodyLanguage: `full narrative body language with environment interaction`,
+        environment: `mythic ${system.environmentSystem} changed by ${object}`,
+        lighting: `mythic lighting rule, not just stronger glow`,
+        event: `${motif} ${object} mythic takeover`,
+        silhouetteMutation: `near-1/1 silhouette and scale change`,
+        animationCue: "multi-state loop with blink, expression, event, and camera motion"
+      }
+    ];
+    return Object.fromEntries(entries.map((entry) => [entry.rarity, { ...entry, composition: `${engine}: ${entry.composition}` }])) as VisualDesignSystem["rarityFrames"];
   }
 
   private rendererFamily(signals: CreativeSignalProfile, seed: number): VisualDesignSystem["rendererFamily"] {
     const weights = signals.semanticWeights;
-    if ((weights["medical-contamination"] ?? 0) >= 70) return "biohazard-horror";
-    if ((weights["market-stress"] ?? 0) >= 82 && (weights["dream-surreal"] ?? 0) < 90) return "terminal-brutalist";
-    if ((weights["machine-intelligence"] ?? 0) >= 72) return "terminal-brutalist";
-    if ((weights["canine-pack"] ?? 0) >= 70 && signals.animals.some((animal) => /dog|doge|shib|inu/.test(animal))) return "anime-portrait";
-    if ((weights["soft-play"] ?? 0) >= 70 || signals.cueDial.cozy >= 70) return "clay-toy";
-    if ((weights["dream-surreal"] ?? 0) >= 78) return "surreal-collage";
-    if ((weights["feline-chaos"] ?? 0) >= 72 || (weights["amphibian-meme"] ?? 0) >= 72 || signals.cueDial.chaos >= 80) return "pixel-topdown";
-    if (signals.cueDial.aggressive >= 70 || signals.cueDial.luxury >= 70) return "anime-portrait";
-    return pick(["pixel-topdown", "anime-portrait", "clay-toy", "terminal-brutalist", "surreal-collage"], seed + 17) as VisualDesignSystem["rendererFamily"];
+    if ((weights["medical-contamination"] ?? 0) >= 70) return pick(["biohazard-horror", "cinematic-scene", "comic-panel"], seed + 3) as VisualDesignSystem["rendererFamily"];
+    if ((weights["market-stress"] ?? 0) >= 82 && (weights["dream-surreal"] ?? 0) < 90) return pick(["terminal-brutalist", "cinematic-scene", "propaganda-poster"], seed + 5) as VisualDesignSystem["rendererFamily"];
+    if ((weights["machine-intelligence"] ?? 0) >= 72) return pick(["terminal-brutalist", "low-poly", "comic-panel"], seed + 7) as VisualDesignSystem["rendererFamily"];
+    if ((weights["canine-pack"] ?? 0) >= 70 && signals.animals.some((animal) => /dog|doge|shib|inu/.test(animal))) return pick(["anime-portrait", "sticker-pack", "painterly-portrait"], seed + 9) as VisualDesignSystem["rendererFamily"];
+    if ((weights["soft-play"] ?? 0) >= 70 || signals.cueDial.cozy >= 70) return pick(["clay-toy", "children-cartoon", "sticker-pack"], seed + 11) as VisualDesignSystem["rendererFamily"];
+    if ((weights["dream-surreal"] ?? 0) >= 78) return pick(["surreal-collage", "painterly-portrait", "low-poly"], seed + 13) as VisualDesignSystem["rendererFamily"];
+    if ((weights["feline-chaos"] ?? 0) >= 72) return pick(["comic-panel", "retro-arcade", "sticker-pack"], seed + 15) as VisualDesignSystem["rendererFamily"];
+    if ((weights["amphibian-meme"] ?? 0) >= 72 || signals.cueDial.chaos >= 80) return pick(["retro-arcade", "pixel-topdown", "comic-panel"], seed + 17) as VisualDesignSystem["rendererFamily"];
+    if (signals.cueDial.aggressive >= 70) return pick(["cinematic-scene", "comic-panel", "anime-portrait"], seed + 19) as VisualDesignSystem["rendererFamily"];
+    if (signals.cueDial.luxury >= 70) return pick(["painterly-portrait", "propaganda-poster", "cinematic-scene"], seed + 21) as VisualDesignSystem["rendererFamily"];
+    return pick(["pixel-topdown", "anime-portrait", "clay-toy", "terminal-brutalist", "surreal-collage", "sticker-pack", "comic-panel", "cinematic-scene", "retro-arcade", "low-poly"], seed + 17) as VisualDesignSystem["rendererFamily"];
   }
 
   private dynamicTaxonomy(dna: CreativeDNA, signals: CreativeSignalProfile, motif: string, seed: number): TraitCategoryPlan[] {
@@ -576,37 +876,67 @@ export class StyleProfileGeneratorService {
     const objects = signals.objects.length ? signals.objects : ["signal", "relic", "badge"];
     const visual = dna.visualSystem;
     const family = visual.rendererFamily;
-    const poseVerbs: Record<VisualDesignSystem["rendererFamily"], string[]> = {
+    const fallbackPoseVerbs = ["off-axis acting", "prop-driven leaning", "environment-reacting", "camera-aware turning", "scene-breaking"];
+    const poseVerbs: Partial<Record<VisualDesignSystem["rendererFamily"], string[]>> = {
       "pixel-topdown": ["tile-dashing", "corner-camping", "item-carrying", "hazard-dodging", "crowd-bumping"],
       "anime-portrait": ["over-shoulder glaring", "hand-clenched reacting", "tearline holding", "jaw-tight turning", "foreground-reaching"],
       "clay-toy": ["slumped tabletop", "tiny-hand waving", "head-tilted wobbling", "squash-foot planted", "prop-hugging"],
       "biohazard-horror": ["tremor-crouched", "limb-dragging", "glass-pressed", "warning-lit recoiling", "growth-burst twisting"],
       "terminal-brutalist": ["desk-collapsing", "screen-hunched", "cursor-staring", "receipt-folded", "chart-lit frozen"],
-      "surreal-collage": ["scale-slipping", "object-swapping", "cutout-drifting", "mask-displaced", "perspective-falling"]
+      "surreal-collage": ["scale-slipping", "object-swapping", "cutout-drifting", "mask-displaced", "perspective-falling"],
+      "sticker-pack": ["die-cut bending", "misprint leaning", "prop-hugging", "sheet-peeling", "caption-biting"],
+      "comic-panel": ["panel-breaking", "speed-line lunging", "speech-bubble shouting", "gutter-hiding", "impact-falling"],
+      "cinematic-scene": ["over-shoulder blocking", "low-angle bracing", "foreground-reaching", "wide-shot isolated", "event-lit turning"],
+      "propaganda-poster": ["monument-standing", "banner-pointing", "crowd-facing", "slogan-chanting", "symbol-hoisting"],
+      "retro-arcade": ["attack-frame lunging", "hurt-frame blinking", "boss-stage posing", "combo-dashing", "victory-hopping"],
+      "low-poly": ["faceted leaning", "isometric stepping", "edge-lit bracing", "prism-turning", "geometry-shifting"],
+      "painterly-portrait": ["brush-tilted", "profile-turning", "hand-to-face acting", "shadow-sinking", "rim-lit looking"],
+      "children-cartoon": ["squash-bouncing", "noodle-arm waving", "toy-box tumbling", "star-eye wobbling", "prop-chasing"]
     };
-    const frames: Record<VisualDesignSystem["rendererFamily"], string[]> = {
+    const fallbackFrames = ["off-axis scene crop", "wide environment frame", visual.cameraFraming];
+    const frames: Partial<Record<VisualDesignSystem["rendererFamily"], string[]>> = {
       "pixel-topdown": ["orthographic tile viewport", "mini-map crowd read", visual.cameraFraming],
       "anime-portrait": ["off-center shoulder portrait", "foreground hand crop", visual.cameraFraming],
       "clay-toy": ["macro tabletop crop", "toy shelf diorama crop", visual.cameraFraming],
       "biohazard-horror": ["surveillance specimen crop", "low containment angle", visual.cameraFraming],
       "terminal-brutalist": ["desk-cam layout", "wide terminal viewport", visual.cameraFraming],
-      "surreal-collage": ["album-cover crop", "layered paper stage", visual.cameraFraming]
+      "surreal-collage": ["album-cover crop", "layered paper stage", visual.cameraFraming],
+      "sticker-pack": ["sticker sheet flat lay", "die-cut single crop", visual.cameraFraming],
+      "comic-panel": ["panel close-up", "splash-page wide", visual.cameraFraming],
+      "cinematic-scene": ["establishing wide", "low-angle film still", visual.cameraFraming],
+      "propaganda-poster": ["heroic poster angle", "flat campaign print", visual.cameraFraming],
+      "retro-arcade": ["side-scroll stage", "boss-stage viewport", visual.cameraFraming],
+      "low-poly": ["isometric viewport", "low-poly low angle", visual.cameraFraming],
+      "painterly-portrait": ["gallery portrait crop", "profile brush crop", visual.cameraFraming],
+      "children-cartoon": ["toy-box wide", "storybook close-up", visual.cameraFraming]
     };
-    const roles: Record<VisualDesignSystem["rendererFamily"], string[]> = {
+    const fallbackRoles = ["Actor", "Subject", "Event", "Variant"];
+    const roles: Partial<Record<VisualDesignSystem["rendererFamily"], string[]>> = {
       "pixel-topdown": ["Sprite", "NPC", "Map Event", "Pickup"],
       "anime-portrait": ["Lead", "Witness", "Rival", "Closeup"],
       "clay-toy": ["Figurine", "Shelf Friend", "Miniature", "Plush"],
       "biohazard-horror": ["Specimen", "Patient", "Carrier", "Incident"],
       "terminal-brutalist": ["Operator", "Screen", "Desk Ghost", "Terminal"],
-      "surreal-collage": ["Cutout", "Mask", "Dream Body", "Fragment"]
+      "surreal-collage": ["Cutout", "Mask", "Dream Body", "Fragment"],
+      "sticker-pack": ["Sticker", "Peel", "Decal", "Misprint"],
+      "comic-panel": ["Panel Lead", "Splash Figure", "Gutter Witness", "Action Beat"],
+      "cinematic-scene": ["Actor", "Frame", "Witness", "Set Piece"],
+      "propaganda-poster": ["Icon", "Banner", "Chant", "Campaign Figure"],
+      "retro-arcade": ["Fighter", "Boss", "Pickup", "Stage Event"],
+      "low-poly": ["Mesh", "Prism", "Isometric Figure", "Geometry Event"],
+      "painterly-portrait": ["Sitter", "Study", "Profile", "Brush Figure"],
+      "children-cartoon": ["Toy", "Mischief", "Sidekick", "Storybook Figure"]
     };
+    const roleSet = roles[family] ?? fallbackRoles;
+    const poseSet = poseVerbs[family] ?? fallbackPoseVerbs;
+    const frameSet = frames[family] ?? fallbackFrames;
     return Array.from({ length: 3 }, (_, index) => {
       return {
-        name: `${titleCase(pick(signals.entities.length ? signals.entities : ["Origin"], seed + index * 11))} ${pick(roles[family], seed + index * 13)}`,
+        name: `${titleCase(pick(signals.entities.length ? signals.entities : ["Origin"], seed + index * 11))} ${pick(roleSet, seed + index * 13)}`,
         bodyShape: `${family}; ${visual.bodySystem}; ${visual.headShape}; ${pick(signals.visualShapes.length ? signals.visualShapes : [shapeLanguage], seed + index * 7)}`,
-        poseLanguage: `${pick(poseVerbs[family], seed + index * 17)} with ${pick(objects, seed + index * 19)}; ${visual.emotionalRendering}`,
+        poseLanguage: `${pick(poseSet, seed + index * 17)} with ${pick(objects, seed + index * 19)}; ${visual.emotionalRendering}`,
         proportions: `${visual.proportionSystem}; ${pick(signals.visualShapes.length ? signals.visualShapes : ["clear"], seed + index * 29)} shape cues`,
-        cameraFraming: index === 2 ? visual.cameraFraming : pick(frames[family], seed + index * 31),
+        cameraFraming: index === 2 ? visual.cameraFraming : pick(frameSet, seed + index * 31),
         rarityUpgradePath: index === 0 ? "Common-Uncommon base read" : index === 1 ? "Rare-Epic stronger object and expression read" : "Legendary-Mythic unique pose, scene, frame, and FX"
       };
     });
