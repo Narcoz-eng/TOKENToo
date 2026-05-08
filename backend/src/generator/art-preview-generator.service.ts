@@ -24,18 +24,23 @@ export class ArtPreviewGeneratorService {
   }
 
   private sample(style: GeneratedStyleProfile, pack: TraitPackPlan, seed: number, index: number): PreviewAssetPlan {
-    const rarity = pick(["Common", "Rare", "Epic", "Legendary", "Mythic"], seed + index);
+    const rarity = pick(["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"], seed + index);
+    const intensity = this.rarityIntensity(rarity);
     const traits = {
       base: pick(pack.categories.baseCharacter, seed),
       background: pick(pack.categories.backgrounds, seed + 1),
-      headgear: pick(pack.categories.headgear, seed + 2),
-      eyes: pick(pack.categories.eyes, seed + 3),
-      outfit: pick(pack.categories.outfitBody, seed + 4),
-      accessory: pick(pack.categories.accessories, seed + 5),
-      neckChestAccessory: pick(pack.categories.neckChestAccessory ?? ["Vault Sigil"], seed + 6),
-      aura: pick(pack.categories.auraEffect, seed + 6),
-      frame: pick(pack.categories.borderFrame, seed + 7),
-      animationOverlay: pick(pack.categories.animationOverlay ?? ["Static Still"], seed + 8),
+      headgear: intensity >= 2 ? pick(pack.categories.headgear, seed + 2) : "None",
+      eyes: intensity >= 1 ? pick(pack.categories.eyes, seed + 3) : "Base eyes",
+      outfit: intensity >= 2 ? pick(pack.categories.outfitBody, seed + 4) : "Base pose",
+      accessory: intensity >= 3 ? pick(pack.categories.accessories, seed + 5) : "None",
+      neckChestAccessory: intensity >= 3 ? pick(pack.categories.neckChestAccessory ?? ["Vault Sigil"], seed + 6) : "None",
+      aura: intensity >= 4 ? pick(pack.categories.auraEffect, seed + 6) : "None",
+      frame: intensity >= 5 ? pick(pack.categories.borderFrame, seed + 7) : "Standard frame",
+      legendaryOverlay: intensity >= 5 ? pick(pack.categories.legendaryOverlay, seed + 9) : "None",
+      animationOverlay: intensity >= 5 ? pick(pack.categories.animationOverlay ?? ["Static Still"], seed + 8) : "Static Still",
+      pose: intensity >= 5 ? "unique cinematic pose" : intensity >= 4 ? "premium action pose" : "base pose",
+      scene: intensity >= 5 ? style.legendaryTheme : intensity >= 4 ? "premium background scene" : "simple background",
+      visualRule: this.rarityVisualRule(rarity),
       rarity
     };
 
@@ -76,7 +81,7 @@ export class ArtPreviewGeneratorService {
       width: 900,
       height: 1100,
       title: traits.base,
-      subtitle: `${traits.headgear} / ${traits.aura}`,
+      subtitle: `${traits.pose} / ${traits.visualRule}`,
       seed,
       mode: "nft",
       fx,
@@ -197,6 +202,24 @@ export class ArtPreviewGeneratorService {
 
   private svgUri(svg: string) {
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }
+
+  private rarityIntensity(rarity: string) {
+    if (rarity === "Mythic") return 6;
+    if (rarity === "Legendary") return 5;
+    if (rarity === "Epic") return 4;
+    if (rarity === "Rare") return 3;
+    if (rarity === "Uncommon") return 2;
+    return 1;
+  }
+
+  private rarityVisualRule(rarity: string) {
+    if (rarity === "Mythic") return "near 1/1 curated scene";
+    if (rarity === "Legendary") return "unique pose scene frame and FX";
+    if (rarity === "Epic") return "aura outfit premium background";
+    if (rarity === "Rare") return "strong accessory expression background";
+    if (rarity === "Uncommon") return "one modest accessory variation";
+    return "simple background base pose minimal traits";
   }
 
   private escape(value: string) {

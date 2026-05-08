@@ -10,9 +10,10 @@ const feeBps = {
 };
 
 const split = [
-  { destination: "raidRewards" as const, bps: 3500 },
-  { destination: "buybackBacking" as const, bps: 3500 },
-  { destination: "protocolTreasury" as const, bps: 1500 },
+  { destination: "raidRewards" as const, bps: 3000 },
+  { destination: "buybackBacking" as const, bps: 3000 },
+  { destination: "liquidityReserve" as const, bps: 1500 },
+  { destination: "protocolTreasury" as const, bps: 1000 },
   { destination: "creatorCommunity" as const, bps: 1000 },
   { destination: "safetyReserve" as const, bps: 500 }
 ];
@@ -42,4 +43,3 @@ export class FeeEngineService {
     return Math.round(value * 1_000_000_000) / 1_000_000_000;
   }
 }
-

@@ -109,6 +109,7 @@ export function FounderStatusPanel({ status }: { status?: { mode?: string; capab
       </div>
       <div className="flex flex-wrap gap-2">
         <CapabilityBadge label="OpenAI Images" enabled={capabilities.openaiImagesAvailable} />
+        <CapabilityBadge label="Helius" enabled={capabilities.heliusAvailable ?? capabilities.heliusReachable ?? capabilities.heliusConfigured} />
         <CapabilityBadge label="Pinata" enabled={capabilities.pinataAvailable} />
         <CapabilityBadge label="Solana" enabled={capabilities.solanaAvailable} />
         <CapabilityBadge label="Program ID" enabled={capabilities.devnetProgramConfigured} />

@@ -51,10 +51,11 @@ export class AssetProductionLayerService {
         ...pack.categories.borderFrame
       ], "Premium trait layers must be handmade, curated, or generated from the approved art direction."),
       legendaryAssets: this.layerSet(legendaryProvider, [...pack.categories.legendaryOverlay, ...(pack.categories.animationOverlay ?? [])], "Legendary and mythic traits require visibly premium composition and optional animation."),
+      royaltyPolicy: this.royaltyPolicy(),
       readinessReport,
       warnings: productionReady
-        ? []
-        : ["Production mint art is not enabled. Current asset output uses the deterministic SVG fallback and must not be used for public launch."]
+        ? [this.royaltyPolicy().note]
+        : ["Production mint art is not enabled. Current asset output uses the deterministic SVG fallback and must not be used for public launch.", this.royaltyPolicy().note]
     };
   }
 
@@ -82,7 +83,8 @@ export class AssetProductionLayerService {
         phew: {
           metadataSchemaVersion: "phew-v1",
           nftStandard: "Metaplex Core",
-          assetProductionReady: this.manifest(input.style, input.pack, input.qualityTier).productionReady
+          assetProductionReady: this.manifest(input.style, input.pack, input.qualityTier).productionReady,
+          royaltyPolicy: this.royaltyPolicy()
         }
       },
       attributes: [
@@ -120,5 +122,25 @@ export class AssetProductionLayerService {
   private provider(value?: string): ProducedLayerSet["provider"] {
     if (value === "ai" || value === "curated" || value === "handmade") return value;
     return "mock";
+  }
+
+  private royaltyPolicy() {
+    const standard = (process.env.METAPLEX_NFT_STANDARD ?? "METAPLEX_CORE").toUpperCase();
+    return {
+      defaultCreatorRoyaltyBps: 500,
+      enforceableOnSelectedStandard: false,
+      selectedStandardSupportsConfiguredRoyalties: false,
+      distribution: {
+        platformTreasuryBps: 1000,
+        communityTreasuryBps: 3000,
+        liquidityReserveBps: 1500,
+        raidRewardsPoolBps: 3000,
+        creatorBps: 1500
+      },
+      note:
+        standard === "METAPLEX_CORE"
+          ? "Current Metaplex Core adapter creates assets without a royalty plugin; marketplace royalty enforcement is not claimed."
+          : "Token Metadata/pNFT royalty path is not implemented in this build; royalty claims are blocked."
+    };
   }
 }

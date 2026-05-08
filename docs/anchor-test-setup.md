@@ -55,4 +55,4 @@ anchor test --skip-local-validator
 - PDA vault balance increases on deposit
 - PDA vault balance decreases on redeem
 
-`programs/vaultx/tests/vaultx.ts` now contains executable coverage for these cases, but the tests have not passed in this environment because Rust/Cargo is not installed and the program id remains a placeholder. Do not call Anchor launch-ready until `anchor test` passes locally and in CI with a real program id.
+`programs/vaultx/tests/vaultx.ts` now contains executable coverage for these cases, but the tests have not passed in this environment because Rust/Cargo was not verified here. Do not call Anchor launch-ready until `anchor test` passes locally and in CI against the configured devnet/localnet program id.

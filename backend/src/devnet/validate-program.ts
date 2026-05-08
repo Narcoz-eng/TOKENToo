@@ -1,22 +1,26 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { loadLocalEnv } from "../env/load-local-env";
 
 const PLACEHOLDER_PROGRAM_ID = "11111111111111111111111111111111";
 
 async function main() {
+  loadLocalEnv();
   const programId = process.env.PROGRAM_ID;
   const rpcUrl = process.env.SOLANA_RPC_URL ?? process.env.ANCHOR_PROVIDER_URL ?? "https://api.devnet.solana.com";
   const anchorToml = readFileSync(resolve(process.cwd(), "../Anchor.toml"), "utf8");
   const libRs = readFileSync(resolve(process.cwd(), "../programs/vaultx/src/lib.rs"), "utf8");
   const anchorId = anchorToml.match(/vaultx\s*=\s*"([^"]+)"/)?.[1] ?? null;
   const declareId = libRs.match(/declare_id!\("([^"]+)"\)/)?.[1] ?? null;
+  const publicProgramId = process.env.NEXT_PUBLIC_PROGRAM_ID;
   const issues: string[] = [];
 
   if (!programId) issues.push("PROGRAM_ID is missing.");
   if (programId === PLACEHOLDER_PROGRAM_ID) issues.push("PROGRAM_ID is still the system-program placeholder.");
   if (programId && anchorId !== programId) issues.push(`Anchor.toml id ${anchorId ?? "<missing>"} does not match PROGRAM_ID.`);
   if (programId && declareId !== programId) issues.push(`declare_id! ${declareId ?? "<missing>"} does not match PROGRAM_ID.`);
+  if (programId && publicProgramId && publicProgramId !== programId) issues.push(`NEXT_PUBLIC_PROGRAM_ID ${publicProgramId} does not match PROGRAM_ID.`);
 
   let deployed = false;
   let executable = false;
@@ -37,6 +41,7 @@ async function main() {
         status: issues.length ? "FAILED" : "READY",
         rpcUrl,
         PROGRAM_ID: programId ?? null,
+        NEXT_PUBLIC_PROGRAM_ID: publicProgramId ?? null,
         anchorTomlProgramId: anchorId,
         declareId,
         deployed,

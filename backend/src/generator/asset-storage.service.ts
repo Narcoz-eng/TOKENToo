@@ -37,16 +37,16 @@ export class AssetStorageService {
 
   async storeFinalNftAsset(path: string, dataUri: string) {
     const provider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
+    this.assertPermanentStorage(provider);
     if (provider === "supabase") return this.storePreviewAsset(`final/${path}`, dataUri);
-    if (provider === "mock") return dataUri;
     if (provider === "pinata") return this.pinataFile(path, dataUri);
-    throw new Error(`${provider} final NFT asset storage is not configured. Add an AssetStorageAdapter before production minting.`);
+    throw new Error(`${provider} final NFT asset storage is not implemented. Configure pinata or add a permanent storage adapter for ${provider}.`);
   }
 
   async storeFinalNftMetadata(path: string, metadata: Record<string, unknown>) {
     const provider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
+    this.assertPermanentStorage(provider);
     const json = JSON.stringify(metadata);
-    if (provider === "mock") return `data:application/json;utf8,${encodeURIComponent(json)}`;
     if (provider === "pinata") return this.pinataJson(path, metadata);
     if (provider === "supabase") {
       const supabaseUrl = process.env.SUPABASE_URL;
@@ -72,7 +72,7 @@ export class AssetStorageService {
       return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
     }
 
-    throw new Error(`${provider} final NFT metadata storage is not configured. Add an AssetStorageAdapter before production minting.`);
+    throw new Error(`${provider} final NFT metadata storage is not implemented. Configure pinata or add a permanent storage adapter for ${provider}.`);
   }
 
   private async pinataFile(path: string, dataUri: string) {
@@ -120,5 +120,18 @@ export class AssetStorageService {
     const base64Match = /^data:([^;,]+);base64,(.*)$/s.exec(dataUri);
     if (base64Match) return { mimeType: base64Match[1], bytes: Buffer.from(base64Match[2], "base64") };
     return undefined;
+  }
+
+  private assertPermanentStorage(provider: string) {
+    if (provider === "mock") {
+      throw new Error("FINAL_ASSET_STORAGE_PROVIDER=mock is preview-only. Configure permanent storage before launch.");
+    }
+    if (provider === "pinata" && !process.env.PINATA_JWT) throw new Error("PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata.");
+    if ((provider === "arweave" || provider === "irys") && !(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY)) {
+      throw new Error(`${provider} final storage requires IRYS_PRIVATE_KEY or ARWEAVE_KEY and a storage adapter.`);
+    }
+    if (provider === "supabase" && !(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+      throw new Error("Supabase final storage requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+    }
   }
 }

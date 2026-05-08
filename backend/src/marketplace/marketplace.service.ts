@@ -90,6 +90,12 @@ export class MarketplaceEngineService {
       mint: vault.collection.token.mint,
       symbol: vault.collection.token.symbol,
       name: vault.collection.token.name,
+      decimals: vault.collection.token.decimals,
+      metadataUri: vault.collection.token.metadataUri ?? undefined,
+      imageUri: vault.collection.token.imageUri ?? undefined,
+      provider: "helius",
+      indexed: true,
+      riskNotes: ["market_data_loaded_from_persisted_token_record"],
       ageHours: vault.collection.token.ageHours,
       liquidityUsd: Number(vault.collection.token.liquidityUsd),
       marketCapUsd: Number(vault.collection.token.marketCapUsd),
@@ -97,7 +103,7 @@ export class MarketplaceEngineService {
       volume24hUsd: Number(vault.collection.token.volume24hUsd),
       riskScore: vault.collection.token.riskScore,
       activeVolume: Number(vault.collection.token.volume24hUsd) > 0,
-      reasons: []
+      reasons: ["market_data_loaded_from_persisted_token_record"]
     };
     const quote = this.instantSellQuote(scan, input.backingValueSol, vault.collection.emergencyFlag);
     if (!quote.enabled) throw new BadRequestException(quote.reason ?? "Instant sell is disabled for this collection");

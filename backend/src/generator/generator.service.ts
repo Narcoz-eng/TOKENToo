@@ -283,6 +283,7 @@ export class GeneratorService {
       throw new BadRequestException("Approved run no longer satisfies launch quality gates.");
     }
     if (profile.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Collection launch requires curated, handmade, or AI-assisted production assets.");
+    this.assertLaunchProviders(this.styleFromRecord(profile), this.packFromRecord(profile.traitPack), report.tier);
 
     const slug = this.slug(input.slug ?? profile.collection);
     return this.prisma.$transaction(async (tx) => {
@@ -665,6 +666,17 @@ export class GeneratorService {
       compatibilityValidated: true,
       blockers
     };
+  }
+
+  private assertLaunchProviders(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: "BASIC" | "PREMIUM" | "LEGENDARY_READY") {
+    const manifest = this.assetProduction.manifest(style, pack, qualityTier);
+    const issues = manifest.readinessReport.reasonIfNo ? [manifest.readinessReport.reasonIfNo] : [];
+    const storageProvider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
+    if (!manifest.productionReady) issues.push("Real asset provider is missing. Configure DESIGN_MODEL_PROVIDER, LAYER_PACK_PROVIDER, and LEGENDARY_ASSET_PROVIDER as ai, curated, or handmade.");
+    if (storageProvider === "mock") issues.push("Permanent storage is missing. Set FINAL_ASSET_STORAGE_PROVIDER to pinata, arweave, irys, or a supported permanent adapter.");
+    if (storageProvider === "pinata" && !process.env.PINATA_JWT) issues.push("PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata.");
+    if ((storageProvider === "arweave" || storageProvider === "irys") && !(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY)) issues.push(`${storageProvider} requires IRYS_PRIVATE_KEY or ARWEAVE_KEY.`);
+    if (issues.length) throw new BadRequestException(`Collection launch blocked: ${[...new Set(issues)].join(" ")}`);
   }
 
   private inputFromRun(run: any): CreateGenerationRunInput {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, Crown, Gem, Layers3, Loader2, LockKeyhole, Palette, RadioTower, RefreshCcw, ShieldCheck, Sparkles, Swords, Upload, Wand2, Zap } from "lucide-react";
+import { Check, ChevronDown, Loader2, LockKeyhole, Palette, RadioTower, RefreshCcw, Search, ShieldCheck, Sparkles, Swords, Upload, Wand2, Zap } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { CollectionPreview } from "@/components/CollectionPreview";
 import { SetupWarning } from "@/components/ApiState";
@@ -119,6 +119,24 @@ type PreviewOnlyResponse = {
   warnings: string[];
 };
 
+type TokenScan = {
+  mint: string;
+  name: string;
+  symbol: string;
+  description?: string;
+  metadataUri?: string;
+  imageUri?: string;
+  logoUri?: string;
+  externalUrl?: string;
+  decimals: number;
+  supply?: string;
+  socialLinks?: Record<string, string>;
+  extensions?: Record<string, unknown>;
+  riskNotes: string[];
+  riskScore: number;
+  persistenceWarning?: string;
+};
+
 const steps = ["Basics", "Brand Kit", "Vault Collection", "Review", "Launch"];
 const rarityRows = [
   ["Common", "Core vault frame", "62%"],
@@ -137,6 +155,7 @@ export default function CreateCollectionPage() {
   const [tokenMint, setTokenMint] = useState("");
   const [logoUri, setLogoUri] = useState("");
   const [description, setDescription] = useState("");
+  const [scan, setScan] = useState<TokenScan | null>(null);
   const [memes, setMemes] = useState("");
   const [phrases, setPhrases] = useState("");
   const [mascotPreference, setMascotPreference] = useState("");
@@ -154,8 +173,12 @@ export default function CreateCollectionPage() {
   const latestQuality = latestProfile?.qualityReports[0];
   const latestDistinctiveness = latestProfile?.distinctivenessReports[0];
   const canApprove = Boolean(run && approvalConfirmed && latestQuality?.passed && latestQuality.tier !== "BASIC" && latestDistinctiveness?.passed && capabilityState.data?.capabilities?.databaseAvailable);
-  const studioPreview = preview ?? fallbackPreview(tokenName, tokenSymbol, description, presetName);
-  const activeStep = launchResult ? 4 : run?.status === "APPROVED" ? 3 : preview ? 2 : tokenName || tokenSymbol || description ? 1 : 0;
+  const effectiveTokenName = tokenName.trim() || scan?.name || "";
+  const effectiveTokenSymbol = tokenSymbol.trim() || scan?.symbol || "";
+  const effectiveDescription = description.trim() || scan?.description || (effectiveTokenName ? `${effectiveTokenName} holder community built from verified Solana token metadata.` : "");
+  const effectiveLogoUri = logoUri.trim() || scan?.imageUri || scan?.logoUri || "";
+  const studioPreview = preview ?? fallbackPreview(effectiveTokenName, effectiveTokenSymbol, effectiveDescription, presetName);
+  const activeStep = launchResult ? 4 : run?.status === "APPROVED" ? 3 : preview ? 2 : scan ? 1 : 0;
 
   useEffect(() => {
     apiFetch<Preset[]>("/generator/presets")
@@ -171,11 +194,11 @@ export default function CreateCollectionPage() {
       const data = await walletAuth.authFetch<GeneratorRun>("/generator/runs", {
         method: "POST",
         body: JSON.stringify({
-          tokenName,
-          tokenSymbol,
+          tokenName: effectiveTokenName,
+          tokenSymbol: effectiveTokenSymbol,
           tokenMint,
-          logoUri,
-          description,
+          logoUri: effectiveLogoUri,
+          description: effectiveDescription,
           selectedPreset,
           hints: {
             memes: splitList(memes),
@@ -187,6 +210,16 @@ export default function CreateCollectionPage() {
         })
       });
       setRun(data);
+    });
+  }
+
+  async function scanToken() {
+    await action(async () => {
+      const mint = tokenMint.trim();
+      const data = await apiFetch<TokenScan>(`/tokens/${encodeURIComponent(mint)}/scan`);
+      setScan(data);
+      setRun(null);
+      setPreviewOnly(null);
     });
   }
 
@@ -249,11 +282,11 @@ export default function CreateCollectionPage() {
 
   function previewPayload() {
     return {
-      tokenName,
-      tokenSymbol,
+      tokenName: effectiveTokenName,
+      tokenSymbol: effectiveTokenSymbol,
       tokenMint,
-      logoUri,
-      description,
+      logoUri: effectiveLogoUri,
+      description: effectiveDescription,
       selectedPreset,
       hints: {
         memes: splitList(memes),
@@ -297,14 +330,27 @@ export default function CreateCollectionPage() {
           <aside className="space-y-5">
             <SectionCard title="Launch Brief" className="p-5">
               <div className="space-y-4">
-                <Field label="Community name" value={tokenName} onChange={setTokenName} placeholder="Example: Neon Vault Syndicate" />
-                <Field label="Token symbol" value={tokenSymbol} onChange={setTokenSymbol} placeholder="PHEW" />
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-300">Faction story</span>
-                  <textarea className="phew-input mt-2 min-h-28 w-full resize-none rounded-md px-4 py-3 text-sm" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What should this faction feel like to collectors?" />
-                </label>
+                <Field label="Token CA / mint address" value={tokenMint} onChange={(value) => { setTokenMint(value); setScan(null); }} placeholder="Solana token mint address" />
+                <button type="button" onClick={scanToken} disabled={loading || tokenMint.trim().length < 32} className="phew-button phew-button-primary inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
+                  {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />} Scan Token
+                </button>
+                {scan ? <ResolvedTokenCard scan={scan} /> : null}
               </div>
             </SectionCard>
+
+            {scan ? (
+              <SectionCard title="Optional Overrides" className="p-5">
+                <div className="space-y-4">
+                  <Field label="Community name override" value={tokenName} onChange={setTokenName} placeholder={scan.name} />
+                  <Field label="Token symbol override" value={tokenSymbol} onChange={setTokenSymbol} placeholder={scan.symbol} />
+                  <label className="block">
+                    <span className="text-sm font-semibold text-slate-300">Description override</span>
+                    <textarea className="phew-input mt-2 min-h-28 w-full resize-none rounded-md px-4 py-3 text-sm" value={description} onChange={(event) => setDescription(event.target.value)} placeholder={scan.description || "Optional collection tone override"} />
+                  </label>
+                  <Field label="Logo URL override" value={logoUri} onChange={setLogoUri} icon={Upload} placeholder={scan.imageUri || "Optional"} />
+                </div>
+              </SectionCard>
+            ) : null}
 
             <SectionCard title="Brand Kit" className="p-5">
               <div className="grid gap-3">
@@ -344,8 +390,6 @@ export default function CreateCollectionPage() {
               </button>
               {advancedOpen ? (
                 <div className="mt-4 space-y-3 rounded-md border border-vault-line bg-black/25 p-4">
-                  <Field label="SPL token mint" value={tokenMint} onChange={setTokenMint} placeholder="Optional until production launch" />
-                  <Field label="Existing logo URL" value={logoUri} onChange={setLogoUri} icon={Upload} placeholder="Optional" />
                   <Field label="Community phrases" value={phrases} onChange={setPhrases} placeholder="Comma separated" />
                   <Field label="Faction archetype" value={mascotPreference} onChange={setMascotPreference} placeholder="Vault knights, cyber reapers, etc." />
                   <Field label="Mood" value={mood} onChange={setMood} placeholder="Dark, elite, high-energy" />
@@ -355,10 +399,10 @@ export default function CreateCollectionPage() {
             </SectionCard>
 
             <div className="grid gap-3">
-              <button type="button" onClick={generatePreview} disabled={loading} className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
+              <button type="button" onClick={generatePreview} disabled={loading || !scan} className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
                 {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate Preview
               </button>
-              <button type="button" onClick={createRun} disabled={loading || !walletAuth.connected || !capabilityState.data?.capabilities?.databaseAvailable} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-45">
+              <button type="button" onClick={createRun} disabled={loading || !scan || !walletAuth.connected || !capabilityState.data?.capabilities?.databaseAvailable} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-45">
                 <ShieldCheck className="size-4" /> Save Launch Draft
               </button>
             </div>
@@ -481,6 +525,44 @@ function LaunchStat({ label, value }: { label: string; value: string }) {
 
 function ProductNotice({ tone, message }: { tone: "red" | "gold"; message: string }) {
   return <div className={cn("rounded-md border p-4 text-sm", tone === "red" ? "border-vault-red/40 bg-vault-red/10 text-vault-red" : "border-vault-gold/40 bg-vault-gold/10 text-vault-gold")}>{message}</div>;
+}
+
+function ResolvedTokenCard({ scan }: { scan: TokenScan }) {
+  return (
+    <div className="rounded-md border border-vault-green/35 bg-vault-green/8 p-4">
+      <div className="flex gap-3">
+        <img src={safeImage(scan.imageUri || scan.logoUri, brandAssets.factionMark)} alt="" className="size-16 rounded-md border border-white/10 object-cover" />
+        <div className="min-w-0">
+          <p className="truncate text-lg font-black text-white">{scan.name}</p>
+          <p className="mt-1 text-sm font-bold text-vault-green">{scan.symbol}</p>
+          <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-300">{scan.description || "No token description returned by metadata provider."}</p>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-2 text-xs text-slate-300">
+        <TokenFact label="Mint" value={short(scan.mint)} />
+        <TokenFact label="Metadata URI" value={scan.metadataUri || "Missing"} />
+        <TokenFact label="Decimals" value={String(scan.decimals)} />
+        <TokenFact label="Supply" value={scan.supply || "Unavailable"} />
+      </div>
+      {scan.riskNotes.length ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {scan.riskNotes.slice(0, 5).map((note) => (
+            <span key={note} className="rounded-md border border-vault-gold/25 bg-vault-gold/8 px-2 py-1 text-[11px] font-bold text-vault-gold">{note}</span>
+          ))}
+        </div>
+      ) : null}
+      {scan.persistenceWarning ? <p className="mt-3 text-xs text-vault-gold">{scan.persistenceWarning}</p> : null}
+    </div>
+  );
+}
+
+function TokenFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-2">
+      <span className="text-slate-500">{label}</span>
+      <span className="truncate font-semibold">{value}</span>
+    </div>
+  );
 }
 
 function fallbackPreview(tokenName: string, tokenSymbol: string, description: string, preset: string): CollectionGeneratorPreview {
@@ -676,6 +758,10 @@ function splitList(value: string) {
 
 function selectedPresetName(presets: Preset[], id: string) {
   return presets.find((preset) => preset.id === id)?.name ?? id;
+}
+
+function short(value: string) {
+  return value.length > 12 ? `${value.slice(0, 4)}...${value.slice(-4)}` : value;
 }
 
 function asArray(value: unknown) {

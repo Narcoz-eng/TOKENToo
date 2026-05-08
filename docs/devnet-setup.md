@@ -98,7 +98,8 @@ declare_id!("<PROGRAM_ID>");
 Set:
 
 ```env
-PROGRAM_ID=<PROGRAM_ID>
+PROGRAM_ID=8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6
+NEXT_PUBLIC_PROGRAM_ID=8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6
 ANCHOR_PROVIDER_URL=https://api.devnet.solana.com
 SOLANA_RPC_URL=https://api.devnet.solana.com
 SOLANA_TRANSACTION_PROVIDER=devnet
@@ -146,6 +147,8 @@ PINATA_JWT=<pinata jwt>
 
 Supabase Storage is preview-only. Final NFT image and metadata must use immutable storage.
 
+Current build supports Pinata final uploads. Arweave/Irys env is recognized as a production requirement but needs an adapter before launch can pass.
+
 ## 8. Create Core Collection Asset
 
 Flow:
@@ -171,12 +174,14 @@ ENABLE_MOCK_MINT=false
 ENABLE_PRODUCTION_MINT=false
 SOLANA_TRANSACTION_PROVIDER=devnet
 SOLANA_RPC_URL=https://api.devnet.solana.com
-PROGRAM_ID=
+PROGRAM_ID=8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6
+NEXT_PUBLIC_PROGRAM_ID=8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6
 ANCHOR_PROVIDER_URL=https://api.devnet.solana.com
 ANCHOR_WALLET=./devnet-deploy.json
 METAPLEX_NFT_STANDARD=METAPLEX_CORE
 FINAL_ASSET_STORAGE_PROVIDER=pinata
 PINATA_JWT=
+HELIUS_API_KEY=
 DEVNET_TEST_TOKEN_MINT=
 DEVNET_TEST_WALLET_PUBLIC_KEY=
 DEVNET_TEST_COLLECTION_ASSET=

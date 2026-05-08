@@ -20,7 +20,22 @@ export type AssetProductionManifest = {
   premiumTraits: ProducedLayerSet;
   legendaryAssets: ProducedLayerSet;
   warnings: string[];
+  royaltyPolicy: RoyaltyPolicy;
   readinessReport: AssetProviderReadinessReport;
+};
+
+export type RoyaltyPolicy = {
+  defaultCreatorRoyaltyBps: number;
+  enforceableOnSelectedStandard: boolean;
+  selectedStandardSupportsConfiguredRoyalties: boolean;
+  distribution: {
+    platformTreasuryBps: number;
+    communityTreasuryBps: number;
+    liquidityReserveBps: number;
+    raidRewardsPoolBps: number;
+    creatorBps: number;
+  };
+  note: string;
 };
 
 export type AssetProviderReadinessReport = {

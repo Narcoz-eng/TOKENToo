@@ -15,6 +15,7 @@
     "db:generate": "npm --workspace backend run db:generate",
     "db:migrate:deploy": "npm --workspace backend run db:migrate:deploy",
     "db:verify:generator": "npm --workspace backend run db:verify:generator",
+    "audit:production": "npm --workspace backend run audit:production",
     "db:push": "npm --workspace backend run db:push",
     "assets": "powershell -ExecutionPolicy Bypass -File scripts/generate-assets.ps1"
   },

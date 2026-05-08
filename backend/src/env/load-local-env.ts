@@ -15,6 +15,10 @@ export function loadLocalEnv() {
   }
 }
 
+export function loadedLocalEnvFiles() {
+  return [...loadedFiles];
+}
+
 function envFileCandidates() {
   const cwd = process.cwd();
   return [

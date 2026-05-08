@@ -339,6 +339,9 @@ export class ProductDataService {
     const permanentStorage = finalStorageProvider === "pinata" ? Boolean(process.env.PINATA_JWT) : finalStorageProvider === "supabase" ? Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) : false;
     return {
       databaseAvailable,
+      heliusConfigured: Boolean(process.env.HELIUS_API_KEY),
+      heliusReachable: Boolean(process.env.HELIUS_API_KEY),
+      heliusAvailable: Boolean(process.env.HELIUS_API_KEY),
       openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
       pinataAvailable: Boolean(process.env.PINATA_JWT),
       solanaAvailable: Boolean(process.env.SOLANA_RPC_URL || process.env.ANCHOR_PROVIDER_URL || process.env.PROGRAM_ID),

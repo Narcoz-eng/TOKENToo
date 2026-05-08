@@ -23,6 +23,7 @@ export class QualityValidatorService {
     if (!style.tenKReadiness?.pass) issues.push("10k collection readiness validation failed.");
     if (style.artSource === "PROCEDURAL_FALLBACK") issues.push("Procedural SVG fallback art cannot be approved for production launch.");
     if (this.hasGenericTraitNames(style, pack)) issues.push("Trait names are too generic for premium collection identity.");
+    issues.push(...this.rarityVisualIssues(previews));
 
     const tierScore = average([previewQualityScore, uniquenessScore, colorHarmonyScore, rarityDistributionScore, duplicateRiskScore, compatibilityScore, distinctiveness.score]);
     const tier = tierScore >= 92 && distinctiveness.score >= 86 ? "LEGENDARY_READY" : tierScore >= 80 && previewQualityScore >= 78 ? "PREMIUM" : "BASIC";
@@ -111,5 +112,19 @@ export class QualityValidatorService {
     const names = [...style.traitLanguage, ...pack.traits.slice(0, 80).map((trait) => trait.name)];
     const generic = /^(green|red|blue|yellow|purple|black|white)\s+(hat|background|aura|eyes|shirt|crown)$|^(hat|background|aura|eyes|shirt|crown)$/i;
     return names.some((name) => generic.test(name.trim()));
+  }
+
+  private rarityVisualIssues(previews: PreviewAssetPlan[]) {
+    const issues: string[] = [];
+    for (const preview of previews.filter((item) => item.type === "SAMPLE_NFT")) {
+      const rarity = String(preview.metadata.rarity ?? "");
+      const values = ["headgear", "outfit", "accessory", "neckChestAccessory", "aura", "frame", "legendaryOverlay"].map((key) => preview.metadata[key]);
+      const visibleTraitCount = values.filter((value) => typeof value === "string" && value !== "None" && value !== "Standard frame" && value !== "Base pose").length;
+      if (rarity === "Common" && visibleTraitCount > 2) issues.push(`${preview.label} is Common but has too many premium visible traits.`);
+      if ((rarity === "Legendary" || rarity === "Mythic") && (preview.metadata.pose === "base pose" || preview.metadata.legendaryOverlay === "None")) {
+        issues.push(`${preview.label} is ${rarity} but lacks a unique pose/scene/overlay.`);
+      }
+    }
+    return issues;
   }
 }

@@ -194,6 +194,9 @@ pub mod vaultx {
     }
 
     pub fn stake_vault_nft(ctx: Context<StakeVaultNft>, duration: i64) -> Result<()> {
+        return err!(VaultXError::StakingCustodyNotImplemented);
+        #[allow(unreachable_code)]
+        {
         require!(duration >= 0, VaultXError::InvalidLockDuration);
         require!(ctx.accounts.collection_profile.status == CollectionStatus::Active, VaultXError::CollectionPaused);
         require_keys_eq!(ctx.accounts.vault_position.nft_mint, ctx.accounts.nft_mint.key(), VaultXError::InvalidNft);
@@ -214,8 +217,6 @@ pub mod vaultx {
         staking.active = true;
         staking.bump = ctx.bumps.staking_position;
 
-        // TODO: Validate holder owns the Vault NFT and freeze/escrow if staking design requires it.
-
         emit!(VaultStaked {
             collection: staking.collection,
             owner: staking.owner,
@@ -223,6 +224,7 @@ pub mod vaultx {
             duration,
         });
         Ok(())
+        }
     }
 
     pub fn unstake_vault_nft(ctx: Context<UnstakeVaultNft>) -> Result<()> {
@@ -272,9 +274,12 @@ pub mod vaultx {
     }
 
     pub fn claim_rewards(ctx: Context<ClaimRewards>) -> Result<()> {
+        return err!(VaultXError::RewardsTransferNotImplemented);
+        #[allow(unreachable_code)]
+        {
         require!(ctx.accounts.staking_position.active, VaultXError::StakeInactive);
-        // TODO: Calculate claimable staking and raid rewards, then CPI transfer from fee vault.
         Ok(())
+        }
     }
 
     pub fn pause_collection(ctx: Context<CollectionAdmin>) -> Result<()> {
@@ -705,4 +710,8 @@ pub enum VaultXError {
     StringTooLong,
     #[msg("Invalid treasury")]
     InvalidTreasury,
+    #[msg("Staking is blocked until NFT ownership escrow/freeze verification is implemented")]
+    StakingCustodyNotImplemented,
+    #[msg("Reward claims are blocked until fee-vault transfer accounting is implemented")]
+    RewardsTransferNotImplemented,
 }

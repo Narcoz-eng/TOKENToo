@@ -104,18 +104,17 @@ See `docs/anchor-gap-report.md`.
 
 Key blockers:
 
-- `declare_id!` and `Anchor.toml` still use the placeholder program id.
+- `declare_id!`, `Anchor.toml`, and env are aligned to devnet program `8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6`.
 - SPL token custody transfer is implemented in `deposit_and_mint_vault_nft`.
 - SPL custody release is implemented in `redeem_vault_nft`.
 - Metaplex Core burn/invalidation is implemented in the backend-built redeem transaction, not inside Anchor.
 - Anchor does not parse/verify Metaplex Core ownership or collection on-chain.
-- Anchor tests now contain executable custody/redeem coverage, but have not passed locally because Cargo is missing and the program id is still placeholder.
+- Anchor tests now contain executable custody/redeem coverage, but have not passed locally because the Rust/Anchor toolchain was not verified here.
 - Pause and emergency controls need complete program tests.
 
 ## Public Launch Blockers
 
-- Replace the placeholder Anchor program id with a deployed devnet program id.
-- Full Anchor test implementation/execution and deployed devnet program validation.
+- Full Anchor test implementation/execution in CI.
 - Full devnet E2E execution with funded wallet, SPL token mint, confirmed Core collection asset, Pinata JWT, and deployed program.
 - Backend collection asset transaction confirmation flow.
 - Production-quality asset provider for mascots, backgrounds, trait packs, and legendary/animated assets.

@@ -2,6 +2,19 @@ export type TokenScan = {
   mint: string;
   symbol: string;
   name: string;
+  description?: string;
+  metadataUri?: string;
+  imageUri?: string;
+  logoUri?: string;
+  externalUrl?: string;
+  decimals: number;
+  supply?: string;
+  socialLinks?: Record<string, string>;
+  extensions?: Record<string, unknown>;
+  provider: "helius";
+  indexed: boolean;
+  riskNotes: string[];
+  persistenceWarning?: string;
   ageHours: number;
   liquidityUsd: number;
   marketCapUsd: number;
@@ -89,7 +102,7 @@ export type FeeQuote = {
   totalFeeSol: number;
   blendedFeeBps: number;
   allocations: Array<{
-    destination: "raidRewards" | "buybackBacking" | "protocolTreasury" | "creatorCommunity" | "safetyReserve";
+    destination: "raidRewards" | "buybackBacking" | "protocolTreasury" | "creatorCommunity" | "safetyReserve" | "liquidityReserve";
     bps: number;
     sol: number;
   }>;

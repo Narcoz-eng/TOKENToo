@@ -9,4 +9,9 @@ export class SystemController {
   status() {
     return this.capabilities.status();
   }
+
+  @Get("diagnostics")
+  diagnostics() {
+    return this.capabilities.diagnostics();
+  }
 }

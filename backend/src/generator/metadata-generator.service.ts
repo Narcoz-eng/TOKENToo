@@ -6,20 +6,23 @@ import { pick, seedFrom } from "./generator.util";
 export class MetadataGeneratorService {
   sample(style: GeneratedStyleProfile, pack: TraitPackPlan, preview?: PreviewAssetPlan) {
     const seed = seedFrom(`${style.collection}:metadata:${preview?.label ?? "sample"}`);
+    const visual = preview?.metadata ?? {};
     const attributes = [
       { trait_type: "Underlying Token", value: style.collection.replace(" Vaults", "") },
       { trait_type: "Locked Amount", value: "50,000" },
       { trait_type: "Lock Duration", value: "90 Days" },
       { trait_type: "Redeemable", value: "Yes" },
       { trait_type: "Role", value: pick(style.roleNames, seed + 1) },
-      { trait_type: "Background", value: pick(pack.categories.backgrounds, seed + 2) },
-      { trait_type: "Base Character", value: pick(pack.categories.baseCharacter, seed + 3) },
-      { trait_type: "Headgear", value: pick(pack.categories.headgear, seed + 4) },
-      { trait_type: "Eyes", value: pick(pack.categories.eyes, seed + 5) },
-      { trait_type: "Outfit", value: pick(pack.categories.outfitBody, seed + 6) },
-      { trait_type: "Aura", value: pick(pack.categories.auraEffect, seed + 7) },
-      { trait_type: "Accessory", value: pick(pack.categories.accessories, seed + 8) },
-      { trait_type: "Rarity", value: pick(["Rare", "Epic", "Legendary"], seed + 9) }
+      { trait_type: "Background", value: this.trait(visual.background, pick(pack.categories.backgrounds, seed + 2)) },
+      { trait_type: "Base Character", value: this.trait(visual.base, pick(pack.categories.baseCharacter, seed + 3)) },
+      { trait_type: "Headgear", value: this.trait(visual.headgear, pick(pack.categories.headgear, seed + 4)) },
+      { trait_type: "Eyes", value: this.trait(visual.eyes, pick(pack.categories.eyes, seed + 5)) },
+      { trait_type: "Outfit", value: this.trait(visual.outfit, pick(pack.categories.outfitBody, seed + 6)) },
+      { trait_type: "Aura", value: this.trait(visual.aura, pick(pack.categories.auraEffect, seed + 7)) },
+      { trait_type: "Accessory", value: this.trait(visual.accessory, pick(pack.categories.accessories, seed + 8)) },
+      { trait_type: "Frame/Border", value: this.trait(visual.frame, "Standard frame") },
+      { trait_type: "Pose", value: this.trait(visual.pose, "base pose") },
+      { trait_type: "Rarity", value: this.trait(visual.rarity, pick(["Rare", "Epic", "Legendary"], seed + 9)) }
     ];
 
     return {
@@ -29,5 +32,9 @@ export class MetadataGeneratorService {
       image: preview?.uri ?? "ipfs://phew/preview.png",
       attributes
     };
+  }
+
+  private trait(value: unknown, fallback: string) {
+    return typeof value === "string" && value.trim() ? value : fallback;
   }
 }
