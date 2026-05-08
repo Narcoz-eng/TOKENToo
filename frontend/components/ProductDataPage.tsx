@@ -68,7 +68,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   const [sort, setSort] = useState("level");
   const blockedByWallet = Boolean(walletRequired && !wallet.connected);
   const walletPath = wallet.address ? `${endpoint}${endpoint.includes("?") ? "&" : "?"}wallet=${encodeURIComponent(wallet.address)}` : endpoint;
-  const state = useApiResource<ProductData | VaultCollection[] | VaultNft[] | RaidRoom[]>(walletPath);
+  const state = useApiResource<ProductData | VaultCollection[] | VaultNft[] | RaidRoom[]>(walletPath, { enabled: !blockedByWallet });
   const capabilityState = useApiResource<{ mode: string; capabilities: Record<string, boolean>; warnings: string[] }>("/system/capabilities");
   const data = normalizeProductData(endpoint, state.data);
   const warnings = apiWarnings(state.data);

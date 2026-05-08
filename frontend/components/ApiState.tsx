@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, RefreshCcw, Wallet, XCircle } from "lucide
 import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
 import { brandAssets } from "@/lib/brand-assets";
+import { ApiError, isDevMode } from "@/lib/api";
 
 export function LoadingState() {
   return (
@@ -22,15 +23,25 @@ export function LoadingState() {
   );
 }
 
-export function ErrorState({ error, retry }: { error: string; retry?: () => void }) {
+export function ErrorState({ error, retry }: { error: string | ApiError; retry?: () => void }) {
+  const apiError = error instanceof ApiError ? error : null;
+  const message = apiError?.message ?? sanitizeErrorText(String(error || "The request failed."));
+  const title = titleForError(apiError);
   return (
     <SectionCard>
       <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-5">
         <div className="flex items-start gap-3">
           <AlertTriangle className="size-5 text-vault-red" />
           <div className="min-w-0 flex-1">
-            <p className="font-bold text-vault-red">Data is temporarily unavailable</p>
-            <p className="mt-2 break-words text-sm text-slate-300">{error}</p>
+            <p className="font-bold text-vault-red">{title}</p>
+            <p className="mt-2 break-words text-sm text-slate-300">{message}</p>
+            {apiError?.requestId ? <p className="mt-2 text-xs text-slate-500">Request ID: {apiError.requestId}</p> : null}
+            {apiError && isDevMode() ? (
+              <details className="mt-3 rounded-md border border-vault-line bg-black/25 p-3 text-xs text-slate-300">
+                <summary className="cursor-pointer font-bold text-slate-200">Developer diagnostics</summary>
+                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(apiError.diagnostics, null, 2)}</pre>
+              </details>
+            ) : null}
           </div>
         </div>
         {retry ? (
@@ -41,6 +52,25 @@ export function ErrorState({ error, retry }: { error: string; retry?: () => void
       </div>
     </SectionCard>
   );
+}
+
+function titleForError(error: ApiError | null) {
+  if (!error) return "Data is temporarily unavailable";
+  if (error.kind === "network") return "Backend is unreachable";
+  if (error.kind === "timeout") return "Request timed out";
+  if (error.kind === "html_response") return "API returned an invalid response";
+  if (error.kind === "invalid_json") return "API response could not be parsed";
+  if (error.kind === "auth") return "Authentication required";
+  if (error.kind === "capability_disabled") return "Capability is not configured";
+  return "Data is temporarily unavailable";
+}
+
+function sanitizeErrorText(value: string) {
+  const trimmed = value.trim();
+  if (/^\s*<!doctype html/i.test(trimmed) || /^\s*<html/i.test(trimmed) || /<body[\s>]/i.test(trimmed)) {
+    return "The backend returned an HTML error page instead of API data.";
+  }
+  return trimmed.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").slice(0, 500) || "The request failed.";
 }
 
 export function EmptyState({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {

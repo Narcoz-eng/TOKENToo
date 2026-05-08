@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Transaction } from "@solana/web3.js";
 import bs58 from "bs58";
-import { API_BASE_URL, safeErrorMessage } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 export function useWalletAuth() {
   const wallet = useWallet();
@@ -54,9 +54,7 @@ export function useWalletAuth() {
       const headers = new Headers(init.headers);
       headers.set("authorization", `Bearer ${accessToken}`);
       if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
-      const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
-      if (!response.ok) throw new Error(await safeErrorMessage(response));
-      return response.json() as Promise<T>;
+      return apiFetch<T>(path, { ...init, headers });
     },
     [login, token]
   );
@@ -75,11 +73,9 @@ export function useWalletAuth() {
 }
 
 async function postJson<T>(path: string, body: unknown) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  return apiFetch<T>(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(await safeErrorMessage(response));
-  return response.json() as Promise<T>;
 }

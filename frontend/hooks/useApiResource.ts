@@ -1,35 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE_URL, safeErrorMessage } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 export type ApiResourceState<T> = {
   data: T | null;
   loading: boolean;
-  error: string | null;
+  error: ApiError | null;
   reload: () => void;
 };
 
-export function useApiResource<T>(path: string): ApiResourceState<T> {
+export function useApiResource<T>(path: string, options: { enabled?: boolean } = {}): ApiResourceState<T> {
   const [version, setVersion] = useState(0);
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
   useEffect(() => {
+    if (options.enabled === false) {
+      setLoading(false);
+      setError(null);
+      setData(null);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`${API_BASE_URL}${path}`, { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(await safeErrorMessage(response));
-        return response.json() as Promise<T>;
-      })
+    apiFetch<T>(path, { cache: "no-store" })
       .then((next) => {
         if (!cancelled) setData(next);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Data request failed");
+        if (!cancelled) setError(err instanceof ApiError ? err : new ApiError({ kind: "network", message: err instanceof Error ? err.message : "Data request failed", diagnostics: { requestId: "unknown", url: path } }));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -37,7 +39,7 @@ export function useApiResource<T>(path: string): ApiResourceState<T> {
     return () => {
       cancelled = true;
     };
-  }, [path, version]);
+  }, [path, version, options.enabled]);
 
   return { data, loading, error, reload: () => setVersion((value) => value + 1) };
 }
