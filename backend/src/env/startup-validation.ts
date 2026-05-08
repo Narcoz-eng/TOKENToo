@@ -1,4 +1,5 @@
 import { recordStartupValidation, type StartupCheck } from "./startup-state";
+import { normalizeHeliusConfig } from "../token-scanner/helius-config";
 
 export function validateStartupEnvironment() {
   const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development";
@@ -7,6 +8,10 @@ export function validateStartupEnvironment() {
   const issues: StartupCheck[] = [];
   process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-1";
   process.env.ENABLE_AI_IMAGE_GENERATION ??= "false";
+  const helius = normalizeHeliusConfig();
+  for (const warning of helius.warnings) {
+    issues.push({ code: "HELIUS_CONFIG_WARNING", severity: "warning", message: warning });
+  }
   if (process.env.PROGRAM_ID === placeholderProgramId) {
     issues.push({ code: "PLACEHOLDER_PROGRAM_ID", severity: "fatal", message: "PROGRAM_ID cannot be the system-program placeholder." });
   }
@@ -24,7 +29,8 @@ export function validateStartupEnvironment() {
     if ((process.env.ENABLE_MOCK_MINT ?? "false") === "true") issues.push({ code: "MOCK_MINT_ENABLED", severity: "warning", message: "ENABLE_MOCK_MINT should be false in production." });
     if ((process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "mock") issues.push({ code: "MOCK_SOLANA_PROVIDER", severity: "warning", message: "SOLANA_TRANSACTION_PROVIDER=mock disables production transactions." });
     if ((process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") === "mock") issues.push({ code: "MOCK_FINAL_STORAGE", severity: "warning", message: "FINAL_ASSET_STORAGE_PROVIDER=mock blocks public production launch." });
-    if (!process.env.HELIUS_API_KEY) issues.push({ code: "HELIUS_MISSING", severity: "warning", message: "HELIUS_API_KEY is required for CA-first token scanning." });
+    if (!helius.heliusApiKey) issues.push({ code: "HELIUS_MISSING", severity: "warning", message: "A Helius api-key is required for CA-first token scanning. Set HELIUS_API_KEY key-only, HELIUS_RPC_URL, or a Helius SOLANA_RPC_URL." });
+    if (helius.errorCode) issues.push({ code: helius.errorCode, severity: "warning", message: helius.errorMessage ?? "Helius configuration is invalid." });
     if (!process.env.PROGRAM_ID) issues.push({ code: "PROGRAM_ID_MISSING", severity: "warning", message: "PROGRAM_ID is required for devnet/mainnet actions." });
     if ((process.env.DESIGN_MODEL_PROVIDER ?? "mock") === "mock") issues.push({ code: "DESIGN_PROVIDER_MOCK", severity: "warning", message: "DESIGN_MODEL_PROVIDER=mock blocks production art launch." });
     if ((process.env.LAYER_PACK_PROVIDER ?? "mock") === "mock") issues.push({ code: "LAYER_PROVIDER_MOCK", severity: "warning", message: "LAYER_PACK_PROVIDER=mock blocks production art launch." });

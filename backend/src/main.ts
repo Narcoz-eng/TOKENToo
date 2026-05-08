@@ -7,6 +7,7 @@ import { loadLocalEnv } from "./env/load-local-env";
 import { validateStartupEnvironment } from "./env/startup-validation";
 import { loadedLocalEnvFiles } from "./env/load-local-env";
 import { recordStartupComplete, recordStartupFailure, recordStartupListening, recordStartupModules, startupState } from "./env/startup-state";
+import { normalizeHeliusConfig } from "./token-scanner/helius-config";
 
 async function bootstrap() {
   try {
@@ -46,13 +47,17 @@ void bootstrap();
 
 function logBoot(port: number) {
   const rpcUrl = sanitizeUrl(process.env.SOLANA_RPC_URL ?? process.env.ANCHOR_PROVIDER_URL ?? process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.devnet.solana.com");
-  const heliusConfigured = Boolean(process.env.HELIUS_API_KEY);
+  const helius = normalizeHeliusConfig();
+  const heliusConfigured = Boolean(helius.heliusApiKey);
   console.info("[startup] backend boot", {
     url: `http://localhost:${port}`,
     environment: process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
     loadedEnvFiles: loadedLocalEnvFiles(),
     rpcUrl,
     heliusConfigured,
+    heliusKeySource: helius.heliusKeySource,
+    heliusRpcUrlHost: helius.heliusRpcUrlHost,
+    heliusNetwork: helius.network,
     dbConfigured: Boolean(process.env.DATABASE_URL),
     programId: process.env.PROGRAM_ID ?? null,
     cluster: process.env.NEXT_PUBLIC_SOLANA_NETWORK ?? process.env.SOLANA_CLUSTER ?? "devnet",

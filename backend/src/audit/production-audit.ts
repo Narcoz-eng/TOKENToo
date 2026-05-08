@@ -7,6 +7,7 @@ import { TokenScannerService } from "../token-scanner/token-scanner.service";
 import { ArtPreviewGeneratorService } from "../generator/art-preview-generator.service";
 import { MetadataGeneratorService } from "../generator/metadata-generator.service";
 import type { GeneratedStyleProfile, TraitPackPlan } from "../generator/generator.types";
+import { normalizeHeliusConfig } from "../token-scanner/helius-config";
 
 const EXPECTED_DEVNET_PROGRAM_ID = "8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6";
 const PLACEHOLDER_PROGRAM_ID = "11111111111111111111111111111111";
@@ -18,8 +19,9 @@ async function main() {
   const root = resolve(__dirname, "../../..");
 
   const scannerSource = readFileSync(resolve(root, "backend/src/token-scanner/token-scanner.service.ts"), "utf8");
+  const heliusConfigSource = readFileSync(resolve(root, "backend/src/token-scanner/helius-config.ts"), "utf8");
   requireCheck(!scannerSource.includes("Frog Vault Token") && !scannerSource.includes("$FROG"), "Token scanner still contains mock Frog data.", issues);
-  requireCheck(scannerSource.includes("getAsset") && scannerSource.includes("HELIUS_API_KEY"), "Token scanner does not use Helius getAsset.", issues);
+  requireCheck(scannerSource.includes("normalizeHeliusConfig") && heliusConfigSource.includes("getAsset") && heliusConfigSource.includes("showFungible"), "Token scanner does not use normalized Helius getAsset.", issues);
 
   const createPage = readFileSync(resolve(root, "frontend/app/create-collection/page.tsx"), "utf8");
   requireCheck(createPage.includes("Token CA / mint address") && createPage.includes("/tokens/") && createPage.includes("Optional Overrides"), "Create Collection is not CA-first.", issues);
@@ -39,7 +41,8 @@ async function main() {
   };
 
   const testMint = process.env.TEST_TOKEN_MINT;
-  if (process.env.HELIUS_API_KEY && testMint) {
+  const helius = normalizeHeliusConfig();
+  if (helius.heliusApiKey && testMint) {
     const scan = await new TokenScannerService(prisma).scanToken(testMint);
     requireCheck(Boolean(scan.name && scan.symbol && scan.provider === "helius"), "Helius scan did not resolve token identity.", issues);
     checks.heliusScan = { mint: scan.mint, name: scan.name, symbol: scan.symbol, metadataUri: scan.metadataUri, imageUri: scan.imageUri };

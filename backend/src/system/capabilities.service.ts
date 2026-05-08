@@ -4,6 +4,7 @@ import { PrismaService } from "../db/prisma.service";
 import { isDatabaseSetupError } from "../db/database-errors";
 import { loadedLocalEnvFiles } from "../env/load-local-env";
 import { startupState } from "../env/startup-state";
+import { getLastHeliusErrorCode, heliusDiagnostics, heliusGetAssetBody, normalizeHeliusConfig, setLastHeliusErrorCode } from "../token-scanner/helius-config";
 
 export type SystemCapabilities = {
   databaseAvailable: boolean;
@@ -46,12 +47,13 @@ export class CapabilitiesService {
   }
 
   async ready() {
+    const heliusConfig = normalizeHeliusConfig();
     const [databaseAvailable, heliusReachable, programAccount] = await Promise.all([
       this.databaseAvailable(),
-      this.heliusReachable(),
+      this.heliusReachable(heliusConfig),
       this.programAccountStatus()
     ]);
-    const heliusConfigured = Boolean(process.env.HELIUS_API_KEY);
+    const heliusConfigured = Boolean(heliusConfig.heliusApiKey);
     const boot = startupState();
     const checks = {
       bootComplete: boot.ready,
@@ -89,12 +91,13 @@ export class CapabilitiesService {
   }
 
   async status() {
+    const heliusConfig = normalizeHeliusConfig();
     const [databaseAvailable, heliusReachable, programAccount] = await Promise.all([
       this.databaseAvailable(),
-      this.heliusReachable(),
+      this.heliusReachable(heliusConfig),
       this.programAccountStatus()
     ]);
-    const heliusConfigured = Boolean(process.env.HELIUS_API_KEY);
+    const heliusConfigured = Boolean(heliusConfig.heliusApiKey);
     const capabilities: SystemCapabilities = {
       databaseAvailable,
       heliusConfigured,
@@ -126,6 +129,8 @@ export class CapabilitiesService {
   }
 
   async diagnostics() {
+    const heliusConfig = normalizeHeliusConfig();
+    const heliusReachable = await this.heliusReachable(heliusConfig);
     const status = await this.status();
     const ready = await this.ready();
     return {
@@ -145,6 +150,7 @@ export class CapabilitiesService {
           SOLANA_RPC_URL: this.sanitizedRpcUrl()
         }
       },
+      helius: heliusDiagnostics(heliusConfig, heliusReachable),
       capabilities: status.capabilities,
       warnings: status.warnings
     };
@@ -184,23 +190,41 @@ export class CapabilitiesService {
     return heliusAvailable && this.productionStorageAvailable() && this.solanaAvailable() && this.devnetProgramConfigured() && programExecutable;
   }
 
-  private async heliusReachable() {
-    const apiKey = process.env.HELIUS_API_KEY;
-    if (!apiKey) return false;
+  private async heliusReachable(config = normalizeHeliusConfig()) {
+    if (!config.heliusApiKey || !config.heliusRpcUrl || config.errorCode) {
+      setLastHeliusErrorCode(config.errorCode);
+      return false;
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2500);
     try {
-      const response = await fetch(this.heliusRpcUrl(apiKey), {
+      const response = await fetch(config.heliusRpcUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: "phew-health", method: "getHealth" }),
+        body: JSON.stringify(heliusGetAssetBody("11111111111111111111111111111111")),
         signal: controller.signal
       });
-      if (response.status === 429) return false;
-      if (!response.ok) return false;
+      if (response.status === 401 || response.status === 403) {
+        setLastHeliusErrorCode("HELIUS_AUTH_FAILED");
+        return false;
+      }
+      if (response.status === 429) {
+        setLastHeliusErrorCode("HELIUS_RATE_LIMITED");
+        return false;
+      }
+      if (!response.ok) {
+        setLastHeliusErrorCode("HELIUS_ERROR");
+        return false;
+      }
       const payload = (await response.json()) as { result?: string; error?: unknown };
-      return !payload.error && payload.result === "ok";
+      if (payload.error) {
+        setLastHeliusErrorCode("TOKEN_NOT_INDEXED");
+        return true;
+      }
+      setLastHeliusErrorCode(undefined);
+      return true;
     } catch {
+      setLastHeliusErrorCode("HELIUS_UNREACHABLE");
       return false;
     } finally {
       clearTimeout(timeout);
@@ -218,10 +242,6 @@ export class CapabilitiesService {
     } catch {
       return { exists: false, executable: false };
     }
-  }
-
-  private heliusRpcUrl(apiKey: string) {
-    return `https://${this.cluster() === "mainnet-beta" ? "mainnet" : "devnet"}.helius-rpc.com/?api-key=${encodeURIComponent(apiKey)}`;
   }
 
   private cluster() {
@@ -249,6 +269,7 @@ export class CapabilitiesService {
   private diagnosticEnvKeys() {
     return [
       "HELIUS_API_KEY",
+      "HELIUS_RPC_URL",
       "SOLANA_RPC_URL",
       "ANCHOR_PROVIDER_URL",
       "PROGRAM_ID",
@@ -268,7 +289,7 @@ export class CapabilitiesService {
     const warnings: string[] = [];
     if (!capabilities.databaseAvailable) warnings.push("Database is unavailable; public reads use empty states and writes are blocked.");
     if (!capabilities.heliusConfigured) warnings.push("HELIUS_API_KEY is missing; CA-first token scanning is blocked.");
-    if (capabilities.heliusConfigured && !capabilities.heliusReachable) warnings.push("HELIUS_API_KEY is set but Helius is unreachable or unhealthy.");
+    if (capabilities.heliusConfigured && !capabilities.heliusReachable) warnings.push(`Helius is configured but unreachable or unhealthy${getLastHeliusErrorCode() ? ` (${getLastHeliusErrorCode()})` : ""}.`);
     if (capabilities.aiGenerationEnabled && !capabilities.openaiImagesAvailable) warnings.push("AI image generation is enabled but OPENAI_API_KEY is not configured.");
     if (!capabilities.pinataAvailable) warnings.push("Pinata is not configured; final immutable asset uploads are blocked.");
     if (!capabilities.walletConfigured) warnings.push("Founder wallet is not configured; wallet-required actions need a connected wallet.");

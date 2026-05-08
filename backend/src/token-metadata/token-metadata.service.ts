@@ -3,6 +3,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { requireDbForWrite } from "../db/db-safety";
 import { PrismaService } from "../db/prisma.service";
 import { AssetStorageService } from "../generator/asset-storage.service";
+import { normalizeHeliusConfig, setLastHeliusErrorCode } from "../token-scanner/helius-config";
 
 export type TokenMetadataInput = {
   mint: string;
@@ -83,23 +84,39 @@ export class TokenMetadataService {
 
   async fetchTokenMetadata(mint: string) {
     this.assertMint(mint);
-    const heliusKey = process.env.HELIUS_API_KEY;
-    if (!heliusKey) {
+    const helius = normalizeHeliusConfig();
+    if (!helius.heliusApiKey || helius.errorCode) {
+      setLastHeliusErrorCode(helius.errorCode ?? "HELIUS_CONFIG_INVALID");
       return {
         ok: true,
         mint,
         metadata: null,
         indexed: false,
-        warning: "HELIUS_API_KEY is not configured; token metadata indexing status is unavailable."
+        code: helius.errorCode ?? "HELIUS_CONFIG_INVALID",
+        warning: helius.errorMessage ?? "Helius API key is not configured; token metadata indexing status is unavailable."
       };
     }
-    const response = await fetch(`https://api.helius.xyz/v0/token-metadata?api-key=${heliusKey}`, {
+    const legacyUrl = new URL("https://api.helius.xyz/v0/token-metadata");
+    legacyUrl.searchParams.set("api-key", helius.heliusApiKey);
+    const response = await fetch(legacyUrl.toString(), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ mintAccounts: [mint], includeOffChain: true, disableCache: false })
     });
-    if (!response.ok) throw new ServiceUnavailableException(`Helius metadata lookup failed with status ${response.status}.`);
+    if (response.status === 401 || response.status === 403) {
+      setLastHeliusErrorCode("HELIUS_AUTH_FAILED");
+      throw new ServiceUnavailableException({ code: "HELIUS_AUTH_FAILED", message: "Helius rejected the configured API key." });
+    }
+    if (response.status === 429) {
+      setLastHeliusErrorCode("HELIUS_RATE_LIMITED");
+      throw new ServiceUnavailableException({ code: "HELIUS_RATE_LIMITED", message: "Helius rate limit reached. Retry after the provider window resets." });
+    }
+    if (!response.ok) {
+      setLastHeliusErrorCode("HELIUS_ERROR");
+      throw new ServiceUnavailableException({ code: "HELIUS_ERROR", message: `Helius metadata lookup failed with status ${response.status}.` });
+    }
     const data = await response.json();
+    setLastHeliusErrorCode(undefined);
     return { ok: true, mint, metadata: data, indexed: true };
   }
 
@@ -119,7 +136,7 @@ export class TokenMetadataService {
     return {
       ok: true,
       tokenMetadataAvailable: Boolean(process.env.PROGRAM_ID && (process.env.PINATA_JWT || process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY)),
-      heliusAvailable: Boolean(process.env.HELIUS_API_KEY),
+      heliusAvailable: Boolean(normalizeHeliusConfig().heliusApiKey),
       storageAvailable: Boolean(process.env.PINATA_JWT),
       onChainWriteAdapter: false,
       warning: "Metadata upload/status hooks are present. On-chain token metadata write adapter is a setup blocker, not a fake success."

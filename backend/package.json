@@ -11,6 +11,7 @@
     "db:seed": "tsx src/db/seed-devnet.ts",
     "db:verify:generator": "tsx src/generator/verify-generator-tables.ts",
     "generator:quality-samples": "tsx src/generator/run-quality-samples.ts",
+    "test:helius-config": "tsx src/token-scanner/helius-config.test.ts",
     "audit:production": "tsx src/audit/production-audit.ts",
     "scan:helius": "tsx src/audit/production-audit.ts",
     "devnet:setup": "tsx src/devnet/devnet-setup.ts",
