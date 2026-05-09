@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { loadLocalEnv } from "../env/load-local-env";
-import { runtimeDatabaseUrl } from "./database-url";
+import { runtimeDatabasePoolConfig } from "./database-url";
 
 const DEVNET = {
   programId: "8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6",
@@ -13,8 +13,7 @@ const DEVNET = {
 
 async function main() {
   loadLocalEnv();
-  const connectionString = runtimeDatabaseUrl();
-  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  const prisma = new PrismaClient({ adapter: new PrismaPg(runtimeDatabasePoolConfig()) });
 
   const programId = process.env.PROGRAM_ID || DEVNET.programId;
   const founderWallet = process.env.DEVNET_TEST_WALLET_PUBLIC_KEY || DEVNET.founderWallet;

@@ -3,18 +3,23 @@ const SUPPORTED_SSL_MODES = new Set(["disable", "allow", "prefer", "require", "v
 
 export function runtimeDatabaseUrl(env: NodeJS.ProcessEnv = process.env) {
   const candidates = databaseCandidates(env);
-  return firstValidDatabaseUrl(candidates, env)?.value ?? firstPresentDatabaseUrl(candidates, env)?.value ?? LOCAL_DATABASE_FALLBACK;
+  const selected = firstValidDatabaseUrl(candidates, env) ?? firstPresentDatabaseUrl(candidates, env);
+  return selected?.value ? normalizeDatabaseUrlOrRaw(selected.value, env) : LOCAL_DATABASE_FALLBACK;
 }
 
 export function runtimeDatabasePoolConfig(env: NodeJS.ProcessEnv = process.env) {
   return databasePoolConfig(runtimeDatabaseUrl(env), env);
 }
 
+export function migrationDatabasePoolConfig(env: NodeJS.ProcessEnv = process.env) {
+  return databasePoolConfig(migrationDatabaseUrl(env), env);
+}
+
 export function databasePoolConfig(connectionString: string, env: NodeJS.ProcessEnv = process.env) {
   const url = normalizeDatabaseUrl(connectionString, env);
   const parsed = new URL(url);
   const sslMode = effectiveSslMode(parsed, env);
-  const ssl = sslConfig(sslMode, env);
+  const ssl = sslConfig(sslMode, parsed, env);
   return {
     connectionString: url,
     ...(ssl === undefined ? {} : { ssl }),
@@ -29,7 +34,7 @@ export function normalizeDatabaseUrl(value: string, env: NodeJS.ProcessEnv = pro
   const url = new URL(value);
   const sslMode = effectiveSslMode(url, env);
   if (sslMode && !url.searchParams.has("sslmode")) url.searchParams.set("sslmode", sslMode);
-  if (sslMode === "require" && wantsLibpqNoVerify(env) && !url.searchParams.has("uselibpqcompat")) {
+  if (sslMode === "require" && !url.searchParams.has("uselibpqcompat") && !url.searchParams.has("sslrootcert") && (wantsLibpqNoVerify(env) || isLibpqRequireHost(url))) {
     url.searchParams.set("uselibpqcompat", "true");
   }
   return url.toString();
@@ -38,7 +43,8 @@ export function normalizeDatabaseUrl(value: string, env: NodeJS.ProcessEnv = pro
 export function migrationDatabaseUrl(env: NodeJS.ProcessEnv = process.env) {
   const direct = directCandidates(env);
   const database = databaseCandidates(env);
-  return firstValidDatabaseUrl(direct, env)?.value ?? firstValidDatabaseUrl(database, env)?.value ?? firstPresentDatabaseUrl(direct, env)?.value ?? firstPresentDatabaseUrl(database, env)?.value ?? LOCAL_DATABASE_FALLBACK;
+  const selected = firstValidDatabaseUrl(direct, env) ?? firstValidDatabaseUrl(database, env) ?? firstPresentDatabaseUrl(direct, env) ?? firstPresentDatabaseUrl(database, env);
+  return selected?.value ? normalizeDatabaseUrlOrRaw(selected.value, env) : LOCAL_DATABASE_FALLBACK;
 }
 
 export type DatabaseUrlStatus = "valid" | "missing" | "password-missing-or-malformed" | "invalid-url";
@@ -52,7 +58,9 @@ export type DatabaseUrlDiagnostics = {
   databaseUrlSource?: string;
   directUrlSource?: string;
   databaseSslMode?: string;
-  databaseSslVerification?: "disabled" | "system-ca" | "ca-file" | "no-verify";
+  directSslMode?: string;
+  directSslVerification?: "disabled" | "system-ca" | "ca-file" | "require-no-ca" | "no-verify";
+  databaseSslVerification?: "disabled" | "system-ca" | "ca-file" | "require-no-ca" | "no-verify";
   message?: string;
 };
 
@@ -70,6 +78,8 @@ export function databaseUrlDiagnostics(env: NodeJS.ProcessEnv = process.env): Da
     directUrlSource: direct.selected.source,
     databaseSslMode: database.selected.sslMode,
     databaseSslVerification: database.selected.sslVerification,
+    directSslMode: direct.selected.sslMode,
+    directSslVerification: direct.selected.sslVerification,
     message: database.selected.message ?? (direct.selected.status !== "valid" && direct.selected.status !== "missing" ? direct.selected.message : undefined)
   };
 }
@@ -131,14 +141,14 @@ function inspectDatabaseUrl(value: string | undefined, label: string, env: NodeJ
     if (!protocolOk || !url.hostname || !url.username) {
       return { source: label, present: true, passwordPresent: false, status: "invalid-url" as DatabaseUrlStatus, message: `${label} is not a valid PostgreSQL connection URL.` };
     }
+    const sslMode = effectiveSslMode(url, env);
+    if (sslMode && !SUPPORTED_SSL_MODES.has(sslMode)) {
+      return { source: label, present: true, passwordPresent: true, status: "invalid-url" as DatabaseUrlStatus, message: `${label} has unsupported sslmode '${sslMode}'.`, sslMode, sslVerification: sslVerification(sslMode, url, env) };
+    }
     const decodedPassword = decodeURIComponent(url.password);
     const passwordPresent = decodedPassword.length > 0 && !isPlaceholderPassword(decodedPassword);
     if (!passwordPresent) {
-      return { source: label, present: true, passwordPresent: false, status: "password-missing-or-malformed" as DatabaseUrlStatus, message: `${label} password missing or malformed.` };
-    }
-    const sslMode = effectiveSslMode(url, env);
-    if (sslMode && !SUPPORTED_SSL_MODES.has(sslMode)) {
-      return { source: label, present: true, passwordPresent: true, status: "invalid-url" as DatabaseUrlStatus, message: `${label} has unsupported sslmode '${sslMode}'.` };
+      return { source: label, present: true, passwordPresent: false, status: "password-missing-or-malformed" as DatabaseUrlStatus, message: `${label} password missing or malformed.`, sslMode, sslVerification: sslVerification(sslMode, url, env) };
     }
     return {
       source: label,
@@ -169,11 +179,12 @@ function effectiveSslMode(url: URL, env: NodeJS.ProcessEnv) {
   return undefined;
 }
 
-function sslConfig(mode: string | undefined, env: NodeJS.ProcessEnv): false | true | { rejectUnauthorized: false } | undefined {
+function sslConfig(mode: string | undefined, url: URL, env: NodeJS.ProcessEnv): false | true | { rejectUnauthorized: false } | undefined {
   if (!mode) return undefined;
   if (mode === "disable") return false;
   if (mode === "no-verify") return { rejectUnauthorized: false };
   if (mode === "require" && wantsLibpqNoVerify(env)) return { rejectUnauthorized: false };
+  if (mode === "require" && !url.searchParams.has("sslrootcert") && isLibpqRequireHost(url)) return { rejectUnauthorized: false };
   return true;
 }
 
@@ -182,7 +193,21 @@ function sslVerification(mode: string | undefined, url: URL, env: NodeJS.Process
   if (mode === "no-verify") return "no-verify";
   if (mode === "require" && wantsLibpqNoVerify(env)) return "no-verify";
   if (url.searchParams.has("sslrootcert")) return "ca-file";
+  if (mode === "require" && isLibpqRequireHost(url)) return "require-no-ca";
   return "system-ca";
+}
+
+function normalizeDatabaseUrlOrRaw(value: string, env: NodeJS.ProcessEnv) {
+  try {
+    return normalizeDatabaseUrl(value, env);
+  } catch {
+    return value;
+  }
+}
+
+function isLibpqRequireHost(url: URL) {
+  const host = url.hostname.toLowerCase();
+  return host.includes("supabase.") || host.includes("pooler.supabase.com") || host.includes("neon.tech") || host.includes("prisma.io");
 }
 
 function wantsLibpqNoVerify(env: NodeJS.ProcessEnv) {

@@ -42,8 +42,8 @@ Copy `.env.example` to `.env.local`. The backend loader checks root `.env.local`
 Core:
 
 ```env
-DATABASE_URL=
-DIRECT_URL=
+DATABASE_URL= # include sslmode=require for Supabase/Neon
+DIRECT_URL=   # include sslmode=require for Supabase/Neon
 HELIUS_API_KEY=
 SOLANA_RPC_URL=https://api.devnet.solana.com
 ANCHOR_PROVIDER_URL=https://api.devnet.solana.com
@@ -94,7 +94,7 @@ For localnet testing, switch RPC and provider intentionally and do not treat Hel
 - `HELIUS_RATE_LIMITED`: retry later or raise provider limits.
 - `Helius metadata unavailable; using fallback providers`: the scan is partial but useful. The backend will still use Solana RPC supply/decimals, DexScreener profile/search, Jupiter token metadata, and any discovered off-chain URI to build token identity.
 - `TOKEN_METADATA_INCOMPLETE`: the mint resolved but lacks name or symbol metadata.
-- `DATABASE_URL password missing or malformed.`: the database URL is present but the password segment is empty, a placeholder, or not parseable as a string. For Supabase pooler URLs, use the exact database password in `postgresql://user:<password>@host:6543/postgres?...`; do not leave `[YOUR-PASSWORD]`, `undefined`, or an empty password. `/system/diagnostics` reports `databaseUrlPresent`, `databasePasswordPresent`, and `databaseConnectionStatus` without exposing credentials.
+- `DATABASE_URL password missing or malformed.`: the database URL is present but the password segment is empty, a placeholder, or not parseable as a string. For Supabase pooler URLs, use the exact database password in `postgresql://user:<password>@host:6543/postgres?...`; do not leave `[YOUR-PASSWORD]`, `undefined`, or an empty password. Supabase and Neon URLs must include `sslmode=require` on both `DATABASE_URL` and `DIRECT_URL`. `/system/diagnostics` reports `databaseUrlPresent`, `databasePasswordPresent`, `databaseConnectionStatus`, and sanitized TLS mode details without exposing credentials.
 - `DB_UNAVAILABLE`: database writes are disabled until the URL is fixed and migrations are applied. The UI intentionally hides raw Prisma/SASL errors.
 - `PROGRAM_ID is missing or placeholder`: set `PROGRAM_ID` and `NEXT_PUBLIC_PROGRAM_ID` to the deployed program ID.
 - `Program account exists but is not executable`: RPC/cluster does not match the deployed program.

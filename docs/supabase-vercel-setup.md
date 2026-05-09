@@ -40,6 +40,8 @@ DIRECT_URL = POSTGRES_URL_NON_POOLING
 Implementation details:
 - Runtime Prisma uses `DATABASE_URL`, then `POSTGRES_PRISMA_URL`, then `POSTGRES_URL`.
 - Prisma migrations use `DIRECT_URL`, then `POSTGRES_URL_NON_POOLING`, then the runtime URL.
+- Supabase Postgres URLs must include `sslmode=require` on both runtime and direct URLs. Runtime code also appends `sslmode=require` for recognized Supabase/Neon hosts, but explicit env values are preferred so diagnostics and external tools agree.
+- `DATABASE_SSL_NO_VERIFY=true` is only for trusted private self-signed Postgres endpoints. Do not use it for normal Supabase. For custom CA verification, prefer `sslmode=verify-full&sslrootcert=/path/to/ca.crt`.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` is the preferred browser public key name. `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` remains supported as an alias in env templates.
 
 Set these app-specific values in Vercel:
@@ -60,14 +62,16 @@ ASSET_STORAGE_PROVIDER=supabase
 Use this only outside Vercel integration or for local development with manually copied credentials:
 
 ```env
-DATABASE_URL="postgresql://postgres.etmrgphkomagszfezsxf:[YOUR-PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
-DIRECT_URL="postgresql://postgres.etmrgphkomagszfezsxf:[YOUR-PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
+DATABASE_URL="postgresql://postgres.etmrgphkomagszfezsxf:[YOUR-PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require"
+DIRECT_URL="postgresql://postgres.etmrgphkomagszfezsxf:[YOUR-PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
 SUPABASE_URL="https://etmrgphkomagszfezsxf.supabase.co"
 SUPABASE_ANON_KEY="sb_publishable_CBv8Gmyx9g3Lrl9LLk_6vg_G6Qg6KPV"
 NEXT_PUBLIC_SUPABASE_URL="https://etmrgphkomagszfezsxf.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="sb_publishable_CBv8Gmyx9g3Lrl9LLk_6vg_G6Qg6KPV"
 SUPABASE_SERVICE_ROLE_KEY="..."
 ```
+
+If `/system/diagnostics` reports `password-missing-or-malformed`, replace `[YOUR-PASSWORD]` with the actual database password from Supabase Dashboard -> Project Settings -> Database. If it reports TLS verification failure, confirm both URLs include `sslmode=require` and restart the backend so Prisma rebuilds its connection pool.
 
 ## Prisma 7 note
 

@@ -170,7 +170,7 @@ export type CollectionCompetition = {
   endsIn: string;
 };
 
-export type GeneratorQualityTier = "Basic" | "Premium" | "Legendary-ready";
+export type GeneratorQualityTier = "Wireframe concept" | "Basic" | "Premium" | "Legendary-ready";
 
 export type CollectionGeneratorPreview = {
   id: string;
@@ -189,6 +189,7 @@ export type CollectionGeneratorPreview = {
   rarityWeights: Record<string, number>;
   unlocks: Record<string, string[]>;
   assetProvider?: string;
+  previewClassification?: "WIREFRAME_CONCEPT" | "PRODUCTION_ASSET_PREVIEW";
   finalProductionReady?: boolean;
   warnings?: string[];
   avatar: string;

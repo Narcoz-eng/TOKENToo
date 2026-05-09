@@ -73,6 +73,7 @@ type GeneratorRun = {
 type PreviewOnlyResponse = {
   ok: true;
   assetProvider: string;
+  previewClassification?: "WIREFRAME_CONCEPT" | "PRODUCTION_ASSET_PREVIEW";
   finalProductionReady: boolean;
   brandDna: Record<string, unknown>;
   collection: {
@@ -466,7 +467,7 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
             <StatusPill accent="green">{preview.preset || "PHEW Launch Studio"}</StatusPill>
-            <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : "Concept preview"}</StatusPill>
+            <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : previewStatusLabel(preview)}</StatusPill>
             {launchResult ? <StatusPill accent="cyan">Launched</StatusPill> : null}
           </div>
           <h2 className="mt-4 text-4xl font-black leading-tight">{preview.collection}</h2>
@@ -480,7 +481,7 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
           <LaunchStat label="Vault supply" value="10,000" />
           <LaunchStat label="Rarity tiers" value="6" />
-          <LaunchStat label="Readiness" value={preview.finalProductionReady ? "Production" : "Concept"} />
+          <LaunchStat label="Readiness" value={preview.finalProductionReady ? "Production" : "Wireframe"} />
         </div>
       </div>
     </section>
@@ -587,6 +588,7 @@ function fallbackPreview(tokenName: string, tokenSymbol: string, description: st
     rarityWeights: { Common: 6200, Rare: 2400, Epic: 1000, Legendary: 400 },
     unlocks: {},
     assetProvider: "phew-curated-preview",
+    previewClassification: "WIREFRAME_CONCEPT",
     finalProductionReady: false,
     avatar: brandAssets.factionMark,
     banner: brandAssets.launchHero,
@@ -604,7 +606,7 @@ function fallbackPreview(tokenName: string, tokenSymbol: string, description: st
       colorHarmonyScore: 92,
       duplicateRiskScore: 18,
       compatibilityScore: 88,
-      tier: "Premium",
+      tier: "Wireframe concept",
       passed: false
     },
     distinctiveness: {
@@ -652,6 +654,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     rarityWeights: asRecord<number>(profile.traitPack?.rarityWeights ?? profile.rarityStructure),
     unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
     assetProvider: "persisted-generator-run",
+    previewClassification: "WIREFRAME_CONCEPT",
     finalProductionReady: false,
     avatar: safeImage(previews.find((asset) => asset.type === "AVATAR")?.uri, brandAssets.factionMark),
     banner: safeImage(previews.find((asset) => asset.type === "BANNER")?.uri, brandAssets.launchHero),
@@ -680,7 +683,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
       colorHarmonyScore: quality.colorHarmonyScore,
       duplicateRiskScore: quality.duplicateRiskScore,
       compatibilityScore: quality.compatibilityScore,
-      tier: quality.tier === "LEGENDARY_READY" ? "Legendary-ready" : quality.tier === "PREMIUM" ? "Premium" : "Basic",
+      tier: previewTierLabel(quality.tier, false, "persisted-generator-run", "WIREFRAME_CONCEPT"),
       passed: quality.passed
     },
     distinctiveness: {
@@ -714,6 +717,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     rarityWeights: data.rarityTable,
     unlocks: {},
     assetProvider: data.assetProvider,
+    previewClassification: data.previewClassification ?? (data.finalProductionReady ? "PRODUCTION_ASSET_PREVIEW" : "WIREFRAME_CONCEPT"),
     finalProductionReady: data.finalProductionReady,
     warnings: data.warnings,
     avatar: safeImage(data.avatarPreviewSpec?.uri, brandAssets.factionMark),
@@ -740,7 +744,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
       colorHarmonyScore: data.quality.colorHarmonyScore,
       duplicateRiskScore: data.quality.duplicateRiskScore,
       compatibilityScore: data.quality.compatibilityScore,
-      tier: data.quality.tier === "LEGENDARY_READY" ? "Legendary-ready" : data.quality.tier === "PREMIUM" ? "Premium" : "Basic",
+      tier: previewTierLabel(data.quality.tier, data.finalProductionReady, data.assetProvider, data.previewClassification),
       passed: false
     },
     distinctiveness: {
@@ -770,6 +774,16 @@ function safeImage(src: string | undefined | null, fallback: string) {
   const value = src.toLowerCase();
   if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink")) return fallback;
   return src;
+}
+
+function previewStatusLabel(preview: CollectionGeneratorPreview) {
+  if (preview.previewClassification === "WIREFRAME_CONCEPT" || /wireframe|fallback|preview/i.test(preview.assetProvider ?? "")) return "Wireframe concept preview";
+  return "Concept preview";
+}
+
+function previewTierLabel(tier: "BASIC" | "PREMIUM" | "LEGENDARY_READY", finalProductionReady: boolean, assetProvider?: string, previewClassification?: string): CollectionGeneratorPreview["quality"]["tier"] {
+  if (!finalProductionReady && (previewClassification === "WIREFRAME_CONCEPT" || /wireframe|fallback|preview|persisted-generator-run/i.test(assetProvider ?? ""))) return "Wireframe concept";
+  return tier === "LEGENDARY_READY" ? "Legendary-ready" : tier === "PREMIUM" ? "Premium" : "Basic";
 }
 
 function sourceMetadataFromScan(scan: TokenScan) {

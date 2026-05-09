@@ -32,6 +32,6 @@ export function databaseSetupMessage() {
   const diagnostics = databaseUrlDiagnostics();
   if (diagnostics.databaseConnectionStatus === "password-missing-or-malformed") return "DATABASE_URL password missing or malformed.";
   if (diagnostics.databaseConnectionStatus === "invalid-url") return "DATABASE_URL is not a valid PostgreSQL connection URL.";
-  if (diagnostics.databaseSslVerification === "system-ca") return "Database TLS verification failed or database is unreachable. For Supabase/Neon use sslmode=require; for private self-signed Postgres set DATABASE_SSL_NO_VERIFY=true only in trusted environments or configure sslrootcert.";
+  if (diagnostics.databaseSslVerification === "system-ca") return "Database TLS verification failed or database is unreachable. For Supabase/Neon use sslmode=require on DATABASE_URL and DIRECT_URL; for private self-signed Postgres set DATABASE_SSL_NO_VERIFY=true only in trusted environments or configure sslrootcert.";
   return "Database setup required. Check DATABASE_URL and run migrations before using this endpoint.";
 }

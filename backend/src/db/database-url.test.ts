@@ -5,9 +5,12 @@ function run() {
   usesValidVercelFallbackWhenDatabaseUrlIsPlaceholder();
   keepsDatabaseUrlWhenItIsValid();
   reportsPasswordProblemWhenNoValidFallbackExists();
+  reportsSslModeEvenWhenPasswordIsPlaceholder();
   usesDirectUrlFallbacksForMigrations();
   normalizesSupabaseSslRequire();
+  normalizesDirectSupabaseSslRequire();
   supportsNoVerifyForTrustedSelfSignedDatabases();
+  keepsVerifyFullOnSystemCaByDefault();
   console.log("database-url tests passed");
 }
 
@@ -43,6 +46,19 @@ function reportsPasswordProblemWhenNoValidFallbackExists() {
   assert.equal(diagnostics.databasePasswordPresent, false);
 }
 
+function reportsSslModeEvenWhenPasswordIsPlaceholder() {
+  const env = {
+    DATABASE_URL: "postgresql://postgres.project:[YOUR-PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require",
+    DIRECT_URL: "postgresql://postgres.project:[YOUR-PASSWORD]@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
+  } as NodeJS.ProcessEnv;
+  const diagnostics = databaseUrlDiagnostics(env);
+  assert.equal(diagnostics.databaseConnectionStatus, "password-missing-or-malformed");
+  assert.equal(diagnostics.databaseSslMode, "require");
+  assert.equal(diagnostics.directSslMode, "require");
+  assert.equal(diagnostics.databaseSslVerification, "require-no-ca");
+  assert.equal(diagnostics.directSslVerification, "require-no-ca");
+}
+
 function usesDirectUrlFallbacksForMigrations() {
   const env = {
     DATABASE_URL: "postgresql://postgres:primary-pass@primary.example.com:5432/app",
@@ -61,8 +77,22 @@ function normalizesSupabaseSslRequire() {
   const normalized = normalizeDatabaseUrl(databaseUrl, env);
   const diagnostics = databaseUrlDiagnostics(env);
   assert.match(normalized, /sslmode=require/);
+  assert.match(normalized, /uselibpqcompat=true/);
   assert.equal(diagnostics.databaseSslMode, "require");
-  assert.equal(diagnostics.databaseSslVerification, "system-ca");
+  assert.equal(diagnostics.databaseSslVerification, "require-no-ca");
+  const config = databasePoolConfig(databaseUrl, env);
+  assert.equal((config.ssl as { rejectUnauthorized?: boolean }).rejectUnauthorized, false);
+}
+
+function normalizesDirectSupabaseSslRequire() {
+  const env = {
+    DATABASE_URL: "postgresql://postgres.project:primary-pass@aws-0-eu-west-1.pooler.supabase.com:6543/postgres",
+    DIRECT_URL: "postgresql://postgres.project:primary-pass@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
+  } as NodeJS.ProcessEnv;
+  const diagnostics = databaseUrlDiagnostics(env);
+  assert.equal(diagnostics.databaseSslMode, "require");
+  assert.equal(diagnostics.directSslMode, "require");
+  assert.equal(diagnostics.directSslVerification, "require-no-ca");
 }
 
 function supportsNoVerifyForTrustedSelfSignedDatabases() {
@@ -75,6 +105,13 @@ function supportsNoVerifyForTrustedSelfSignedDatabases() {
   assert.equal((config.ssl as { rejectUnauthorized?: boolean }).rejectUnauthorized, false);
   assert.match(config.connectionString, /uselibpqcompat=true/);
   assert.equal(databaseUrlDiagnostics(env).databaseSslVerification, "no-verify");
+}
+
+function keepsVerifyFullOnSystemCaByDefault() {
+  const databaseUrl = "postgresql://postgres:primary-pass@db.example.com:5432/app?sslmode=verify-full";
+  const config = databasePoolConfig(databaseUrl, { DATABASE_URL: databaseUrl } as NodeJS.ProcessEnv);
+  assert.equal(config.ssl, true);
+  assert.equal(databaseUrlDiagnostics({ DATABASE_URL: databaseUrl } as NodeJS.ProcessEnv).databaseSslVerification, "system-ca");
 }
 
 run();

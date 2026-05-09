@@ -22,12 +22,17 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
               <img src={safeImage(preview.avatar, brandAssets.factionMark)} alt={preview.collection} className="aspect-square rounded-lg border border-vault-green/40 object-cover shadow-green" />
               <div className="min-w-0">
                 <div className="flex flex-wrap gap-2">
-                  <StatusPill accent={preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
+                  <StatusPill accent={preview.quality.tier === "Wireframe concept" || preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
                   <StatusPill accent="cyan">{preview.theme}</StatusPill>
-                  <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : "Concept preview"}</StatusPill>
+                  <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : previewStatusLabel(preview)}</StatusPill>
                 </div>
                 <h2 className="mt-4 text-4xl font-black leading-tight lg:text-5xl">{preview.collection}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{preview.lore}</p>
+                {!preview.finalProductionReady ? (
+                  <p className="mt-3 max-w-3xl rounded-md border border-vault-gold/35 bg-vault-gold/10 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
+                    Wireframe concept preview - final collection requires curated or artist-approved asset pack.
+                  </p>
+                ) : null}
                 <div className="mt-5 flex flex-wrap gap-2">
                   {["Overview", "Vault NFTs", "Staking", "Raids", "Traits"].map((tab, index) => (
                     <span key={tab} className={cn("rounded-md border px-3 py-2 text-xs font-bold", index === 0 ? "border-vault-green bg-vault-green/12 text-vault-green" : "border-vault-line bg-black/30 text-slate-400")}>{tab}</span>
@@ -37,7 +42,7 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
               <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
                 <PreviewMetric label="Vault supply" value="10,000" />
                 <PreviewMetric label="Trait layers" value={String(Object.keys(preview.traitCounts).length || 5)} />
-                <PreviewMetric label="Readiness" value={preview.finalProductionReady ? "Production" : "Concept"} />
+                <PreviewMetric label="Readiness" value={preview.finalProductionReady ? "Production" : "Wireframe"} />
               </div>
             </div>
 
@@ -174,6 +179,11 @@ function safeImage(src: string | undefined | null, fallback: string) {
   const value = src.toLowerCase();
   if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink")) return fallback;
   return src;
+}
+
+function previewStatusLabel(preview: CollectionGeneratorPreview) {
+  if (preview.previewClassification === "WIREFRAME_CONCEPT" || /wireframe|fallback|preview/i.test(preview.assetProvider ?? "")) return "Wireframe concept preview";
+  return "Concept preview";
 }
 
 function formatWeight(value: number) {

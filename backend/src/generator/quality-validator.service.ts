@@ -23,7 +23,10 @@ export class QualityValidatorService {
     if (compatibilityScore < 80) issues.push("Compatibility coverage is too thin.");
     if (!style.brandDna) issues.push("Brand DNA is required before approval.");
     if (!style.tenKReadiness?.pass) issues.push("10k collection readiness validation failed.");
-    if (style.artSource === "PROCEDURAL_FALLBACK") issues.push("Procedural SVG fallback art cannot be approved for production launch.");
+    if (style.artSource === "PROCEDURAL_FALLBACK") {
+      issues.push("Wireframe concept preview only; final collection requires curated or artist-approved asset pack.");
+      issues.push("Procedural SVG fallback art cannot be approved for production launch.");
+    }
     if (this.hasGenericTraitNames(style, pack)) issues.push("Trait names are too generic for premium collection identity.");
     if (this.usesPlatformPalette(style)) issues.push("Collection identity reuses the platform palette instead of a token-derived palette.");
     if (this.hasForbiddenGenericIdentity(style, pack)) issues.push("Collection repeats a forbidden generic AI prompt pattern.");
@@ -46,7 +49,8 @@ export class QualityValidatorService {
     issues.push(...this.traitCollisionIssues(previews));
 
     const tierScore = average([previewQualityScore, uniquenessScore, colorHarmonyScore, rarityDistributionScore, duplicateRiskScore, compatibilityScore, distinctiveness.score]);
-    const tier = tierScore >= 92 && distinctiveness.score >= 86 ? "LEGENDARY_READY" : tierScore >= 80 && previewQualityScore >= 78 ? "PREMIUM" : "BASIC";
+    const computedTier = tierScore >= 92 && distinctiveness.score >= 86 ? "LEGENDARY_READY" : tierScore >= 80 && previewQualityScore >= 78 ? "PREMIUM" : "BASIC";
+    const tier = style.artSource === "PROCEDURAL_FALLBACK" ? "BASIC" : computedTier;
 
     return {
       previewQualityScore,

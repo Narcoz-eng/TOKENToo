@@ -86,7 +86,8 @@ export class GeneratorService {
     return {
       ok: true,
       mode: "preview-only",
-      assetProvider: "premium-fallback-preview",
+      assetProvider: "wireframe-concept-preview",
+      previewClassification: "WIREFRAME_CONCEPT",
       finalProductionReady: false,
       brandDna: style.brandDna,
       creativeUniverse: style.creativeUniverse,
@@ -112,7 +113,7 @@ export class GeneratorService {
       animationMetadata: style.creativeUniverse.animationReadiness,
       quality: {
         ...quality,
-        issues: [...quality.issues, "Fallback preview is concept-only and cannot be approved for public production launch."]
+        issues: [...quality.issues, "Wireframe concept preview only; final collection requires curated or artist-approved asset pack."]
       },
       distinctiveness: {
         ...distinctiveness,
@@ -128,7 +129,7 @@ export class GeneratorService {
       },
       warnings: [
         "Preview generated without DB persistence.",
-        "Fallback assets are concept previews; final launch requires curated or handmade production assets and permanent storage.",
+        "Wireframe concept preview only; final launch requires curated or artist-approved production assets and permanent storage.",
         "AI image generation may support concept drafts only and is not a final NFT production dependency."
       ]
     };
