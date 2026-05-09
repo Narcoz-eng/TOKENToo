@@ -1,4 +1,5 @@
 import { BadRequestException, GatewayTimeoutException, Inject, Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
+import { createHash } from "node:crypto";
 import {
   buildOpenAIImageRequest,
   openAIImageConfigFix,
@@ -76,6 +77,14 @@ export class OpenAIImageProvider implements ImageProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Number(process.env.OPENAI_IMAGE_TIMEOUT_MS ?? 120_000));
     try {
+      this.logger.log(
+        JSON.stringify({
+          event: "openai_image_request_started",
+          providerSelected: "openai",
+          request: sanitizedOpenAIImagePayload(request),
+          promptHash: hashForLog(String(request.payload.prompt ?? ""))
+        })
+      );
       const response = await this.imageRequest(request, apiKey, controller.signal);
       if (!response.ok) throw await openAiResponseException(response, request, this.logger);
       const result = (await response.json()) as { data?: Array<{ b64_json?: string; url?: string }> };
@@ -170,7 +179,9 @@ export async function openAiResponseException(response: Response, request: OpenA
       event: "openai_image_request_failed",
       status: response.status,
       request: sanitizedOpenAIImagePayload(request),
-      openaiError
+      promptHash: hashForLog(String(request.payload.prompt ?? "")),
+      openaiError,
+      accountBillingError: /billing|hard limit|quota|credit/i.test(`${openaiError.code ?? ""} ${openaiError.type ?? ""} ${openaiError.message ?? ""}`)
     })
   );
   const reason = openaiError.message || `OpenAI returned HTTP ${response.status}`;
@@ -242,4 +253,8 @@ function sanitizeOpenAiText(value: string) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 1_000);
+}
+
+function hashForLog(value: string) {
+  return createHash("sha256").update(value).digest("hex").slice(0, 16);
 }

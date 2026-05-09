@@ -29,6 +29,8 @@ export function CollectionPreview({
   const tags = identityTags(preview);
   const pitch = culturePitch(preview);
   const generationUnavailable = preview.warnings?.some((warning) => /AI concept generation unavailable/i.test(warning)) ?? false;
+  const planningVisual = /local-placeholder|planning-visual/i.test(preview.assetProvider ?? "") || preview.samples.some((sample) => /local-placeholder/i.test(sample.provider ?? ""));
+  const conceptRequest = preview.conceptRequest;
 
   return (
     <div className="space-y-5">
@@ -54,13 +56,16 @@ export function CollectionPreview({
                   <StatusPill accent="cyan">{cleanDisplayText(preview.theme)}</StatusPill>
                   <StatusPill accent={isProductionStatus(preview.productionAssetStatus) ? "green" : "gold"}>{previewStatusLabel(preview)}</StatusPill>
                   {generationUnavailable ? <StatusPill accent="gold">Generation unavailable</StatusPill> : null}
+                  {planningVisual ? <StatusPill accent="cyan">Planning visual</StatusPill> : null}
                 </div>
                 <h2 className="mt-4 text-4xl font-black leading-tight lg:text-5xl">{preview.collection}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{pitch}</p>
                 {!preview.finalProductionReady ? (
                   <p className="mt-3 max-w-3xl rounded-md border border-vault-gold/35 bg-vault-gold/10 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
                     {generationUnavailable
-                      ? "AI concept generation is unavailable right now. A cinematic planning preview is shown so the collection experience stays reviewable; retry after the OpenAI issue is fixed."
+                      ? exactGenerationReason(preview) ?? "AI concept generation is unavailable right now. A cinematic planning preview is shown so the collection experience stays reviewable; retry after the OpenAI issue is fixed."
+                      : planningVisual
+                      ? "Branded planning visuals are shown instead of paid AI concept art. They keep the collection reviewable and are not mintable NFT art."
                       : preview.productionAssetStatus === "AI_CONCEPT"
                       ? "AI concept preview - creator review only. Final minting requires curated or artist-approved layer packs."
                       : "Professional concept preview required. Generate AI concept imagery before reviewing collection visuals."}
@@ -81,6 +86,8 @@ export function CollectionPreview({
 
             {wireframeOnly ? <ProfessionalPreviewGate preview={preview} onGenerateAiConcept={onGenerateAiConcept} canGenerateAiConcept={canGenerateAiConcept} loading={loading} generationUnavailable={generationUnavailable} /> : null}
 
+            {conceptRequest ? <ConceptRunStatus conceptRequest={conceptRequest} provider={preview.assetProvider} planningVisual={planningVisual} /> : null}
+
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <FeatureTile icon={LockKeyhole} title={wireframeOnly ? "Vault visuals pending" : "Vault NFTs"} body={wireframeOnly ? "Vault NFT visuals pending professional concept or curated layer pack." : "Token-backed identity cards with redeem and marketplace hooks."} />
               <FeatureTile icon={Swords} title="Raid Rooms" body={cleanDisplayText(preview.raidTheme || "Faction raids activate after launch.")} />
@@ -91,8 +98,8 @@ export function CollectionPreview({
       </SectionCard>
 
       {professionalPreview ? (
-        <SectionCard title={aiConcept ? "AI Concept Preview" : "Vault NFT Preview Set"}>
-          {aiConcept ? <p className="mb-4 rounded-md border border-vault-cyan/25 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">AI concept preview - not mintable final art.</p> : null}
+        <SectionCard title={planningVisual ? "Planning Visual Preview" : aiConcept ? "AI Concept Preview" : "Vault NFT Preview Set"}>
+          {aiConcept ? <p className="mb-4 rounded-md border border-vault-cyan/25 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">{planningVisual ? "Planning visual - branded placeholder for review, not generated concept art and not mintable final art." : "AI concept preview - not mintable final art."}</p> : null}
           {visualSamples.length ? (
             <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
               {visualSamples.slice(0, compact ? 3 : 6).map((sample) => (
@@ -151,6 +158,18 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
           <span key={item} className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-slate-200">{item}</span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ConceptRunStatus({ conceptRequest, provider, planningVisual }: { conceptRequest: NonNullable<CollectionGeneratorPreview["conceptRequest"]>; provider?: string; planningVisual: boolean }) {
+  const paid = Boolean(conceptRequest.usesPaidOpenAIImageGeneration);
+  return (
+    <div className="mt-5 grid gap-3 rounded-lg border border-vault-line bg-black/35 p-4 text-xs font-bold text-slate-300 md:grid-cols-4">
+      <p>Provider <span className="mt-1 block text-sm font-black text-white">{providerLabel(provider ?? conceptRequest.provider)}</span></p>
+      <p>Images <span className="mt-1 block text-sm font-black text-white">{conceptRequest.imageCount ?? 0}</span></p>
+      <p>OpenAI spend <span className={cn("mt-1 block text-sm font-black", paid ? "text-vault-gold" : "text-vault-green")}>{paid ? `${conceptRequest.estimatedOpenAIRequestCount ?? 0} request(s)` : "None"}</span></p>
+      <p>Cache <span className={cn("mt-1 block text-sm font-black", conceptRequest.cachedResultAvailable ? "text-vault-green" : "text-vault-gold")}>{conceptRequest.cachedResultAvailable ? "Available" : planningVisual ? "Placeholder active" : "Not available"}</span></p>
     </div>
   );
 }
@@ -316,6 +335,7 @@ function AdvancedBlock({ title, children }: { title: string; children: ReactNode
 
 function PreviewNftCard({ sample }: { sample: CollectionGeneratorPreview["samples"][number] }) {
   const rarityAccent = sample.rarity === "Legendary" || sample.rarity === "Mythic" ? "gold" : sample.rarity === "Epic" ? "cyan" : "green";
+  const planning = /local-placeholder/i.test(sample.provider ?? "");
   return (
     <article className="phew-card-hover overflow-hidden rounded-lg border border-vault-line bg-black/35">
       <div className="relative aspect-[4/5] overflow-hidden">
@@ -324,6 +344,7 @@ function PreviewNftCard({ sample }: { sample: CollectionGeneratorPreview["sample
         <div className="absolute left-3 top-3">
           <StatusPill accent={rarityAccent}>{sample.rarity}</StatusPill>
         </div>
+        {planning ? <div className="absolute right-3 top-3"><StatusPill accent="cyan">Planning visual</StatusPill></div> : null}
         <div className="absolute bottom-3 left-3 right-3">
           <p className="text-sm font-black text-white">{sample.name}</p>
           <p className="mt-1 text-xs font-bold text-vault-green">{sample.role}</p>
@@ -459,6 +480,20 @@ function safeImage(src: string | undefined | null, fallback: string) {
   const value = src.toLowerCase();
   if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink")) return fallback;
   return src;
+}
+
+function exactGenerationReason(preview: CollectionGeneratorPreview) {
+  const warning = preview.warnings?.find((item) => /AI concept generation unavailable/i.test(item));
+  if (!warning) return undefined;
+  return warning.replace(/^AI concept generation unavailable:\s*/i, "OpenAI generation unavailable: ");
+}
+
+function providerLabel(provider?: string) {
+  if (!provider) return "Automatic fallback";
+  if (/openai/i.test(provider)) return "OpenAI concept";
+  if (/cached/i.test(provider)) return "Cached concept";
+  if (/local-placeholder|planning/i.test(provider)) return "Branded planning visual";
+  return cleanDisplayText(provider);
 }
 
 function shortSpec(value: string) {

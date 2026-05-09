@@ -1,18 +1,29 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 
 const bucket = "generator-previews";
 
 @Injectable()
 export class AssetStorageService {
+  private readonly logger = new Logger(AssetStorageService.name);
+
   async storePreviewAsset(path: string, dataUri: string) {
-    if (process.env.ASSET_STORAGE_PROVIDER !== "supabase") return dataUri;
+    if (process.env.ASSET_STORAGE_PROVIDER !== "supabase") {
+      this.logStorage("inline", path, dataUri, "asset-storage-provider-not-supabase");
+      return dataUri;
+    }
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceRoleKey) return dataUri;
+    if (!supabaseUrl || !serviceRoleKey) {
+      this.logStorage("inline", path, dataUri, "supabase-preview-storage-missing-credentials");
+      return dataUri;
+    }
 
     const parsed = this.decodeDataUri(dataUri);
-    if (!parsed) return dataUri;
+    if (!parsed) {
+      this.logStorage("inline", path, dataUri, "preview-data-uri-not-decodable");
+      return dataUri;
+    }
 
     const objectPath = path.replace(/^\/+/, "");
     const uploadUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${objectPath}`;
@@ -32,7 +43,9 @@ export class AssetStorageService {
       throw new Error(`Supabase preview upload failed: ${response.status} ${message}`);
     }
 
-    return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
+    const publicUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
+    this.logStorage("supabase", objectPath, publicUrl, "uploaded");
+    return publicUrl;
   }
 
   async storeFinalNftAsset(path: string, dataUri: string) {
@@ -133,5 +146,18 @@ export class AssetStorageService {
     if (provider === "supabase" && !(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)) {
       throw new Error("Supabase final storage requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
     }
+  }
+
+  private logStorage(storageProvider: string, path: string, uri: string, result: string) {
+    this.logger.log(
+      JSON.stringify({
+        event: "preview_asset_storage_result",
+        storageProvider,
+        path,
+        result,
+        uriKind: uri.startsWith("data:") ? "inline-data-uri" : "remote-url",
+        uriPresent: Boolean(uri)
+      })
+    );
   }
 }

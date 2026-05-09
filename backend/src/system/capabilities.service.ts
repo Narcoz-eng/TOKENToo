@@ -23,6 +23,7 @@ export type SystemCapabilities = {
   programAccountExists: boolean;
   programAccountExecutable: boolean;
   aiGenerationEnabled: boolean;
+  localPreviewProviderEnabled: boolean;
   approvedLayerPackAvailable: boolean;
   demoCuratedLayerPackEnabled: boolean;
   demoCuratedLayerPackAllowed: boolean;
@@ -103,6 +104,7 @@ export class CapabilitiesService {
         programAccountExists: programAccount.exists,
         programAccountExecutable: programAccount.executable,
         aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+        localPreviewProviderEnabled: this.localPreviewProviderEnabled(),
         approvedLayerPackAvailable: this.approvedLayerPackAvailable(),
         demoCuratedLayerPackEnabled: this.demoCuratedLayerPackEnabled(),
         demoCuratedLayerPackAllowed: this.demoCuratedLayerPackAllowed(),
@@ -136,6 +138,7 @@ export class CapabilitiesService {
       programAccountExists: programAccount.exists,
       programAccountExecutable: programAccount.executable,
       aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+      localPreviewProviderEnabled: this.localPreviewProviderEnabled(),
       approvedLayerPackAvailable: this.approvedLayerPackAvailable(),
       demoCuratedLayerPackEnabled: this.demoCuratedLayerPackEnabled(),
       demoCuratedLayerPackAllowed: this.demoCuratedLayerPackAllowed(),
@@ -265,6 +268,10 @@ export class CapabilitiesService {
     return this.demoCuratedLayerPackEnabled() && (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") !== "production";
   }
 
+  private localPreviewProviderEnabled() {
+    return (process.env.AI_CONCEPT_PROVIDER ?? "").trim().toLowerCase() === "local-placeholder" || (process.env.LOCAL_PREVIEW_PROVIDER ?? "").trim().toLowerCase() === "branded-placeholder";
+  }
+
   private tokenMetadataAvailable(heliusAvailable: boolean, programExecutable: boolean) {
     return heliusAvailable && this.productionStorageAvailable() && this.solanaAvailable() && this.devnetProgramConfigured() && programExecutable;
   }
@@ -374,6 +381,12 @@ export class CapabilitiesService {
       "CURATED_LAYER_PACK_ROOT",
       "APPROVED_LAYER_PACK_ID",
       "DEMO_CURATED_LAYER_PACK",
+      "AI_CONCEPT_PROVIDER",
+      "AI_CONCEPT_LOW_COST_MODE",
+      "AI_CONCEPT_MAX_IMAGES_PER_RUN",
+      "AI_CONCEPT_CACHE_TTL",
+      "AI_CONCEPT_REQUIRE_CONFIRMATION_ABOVE_IMAGE_COUNT",
+      "LOCAL_PREVIEW_PROVIDER",
       "PINATA_JWT",
       "IRYS_PRIVATE_KEY",
       "ARWEAVE_KEY",
@@ -497,7 +510,7 @@ export class CapabilitiesService {
   }
 
   private setupModes(capabilities: SystemCapabilities): SetupMode[] {
-    const creativeMissing = [
+    const creativeMissing = capabilities.localPreviewProviderEnabled ? [] : [
       ...(capabilities.aiGenerationEnabled ? [] : ["ENABLE_AI_IMAGE_GENERATION=true"]),
       ...(capabilities.openaiImagesAvailable ? [] : ["OPENAI_API_KEY"])
     ];
@@ -565,16 +578,16 @@ export class CapabilitiesService {
         {
           key: "ENABLE_AI_IMAGE_GENERATION",
           label: "ENABLE_AI_IMAGE_GENERATION",
-          ok: capabilities.aiGenerationEnabled,
+          ok: capabilities.aiGenerationEnabled || capabilities.localPreviewProviderEnabled,
           requiredFor: ["Creative Preview Mode"],
-          fix: "Set ENABLE_AI_IMAGE_GENERATION=true."
+          fix: "Set ENABLE_AI_IMAGE_GENERATION=true or AI_CONCEPT_PROVIDER=local-placeholder for zero-cost planning visuals."
         },
         {
           key: "OPENAI_API_KEY",
           label: "OPENAI_API_KEY",
-          ok: capabilities.openaiImagesAvailable,
+          ok: capabilities.openaiImagesAvailable || capabilities.localPreviewProviderEnabled,
           requiredFor: ["Creative Preview Mode"],
-          fix: "Add an OpenAI API key to the backend environment."
+          fix: "Add an OpenAI API key to the backend environment, or use AI_CONCEPT_PROVIDER=local-placeholder for local planning visuals."
         },
         {
           key: "PROGRAM_ID",

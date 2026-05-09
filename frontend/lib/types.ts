@@ -191,6 +191,7 @@ export type CollectionGeneratorPreview = {
   rarityWeights: Record<string, number>;
   unlocks: Record<string, string[]>;
   assetProvider?: string;
+  conceptRequest?: ConceptRequestSummary;
   previewClassification?: "WIREFRAME_CONCEPT" | "AI_CONCEPT_PREVIEW" | "PRODUCTION_ASSET_PREVIEW";
   productionAssetStatus?: ProductionAssetStatus;
   finalProductionReady?: boolean;
@@ -201,6 +202,7 @@ export type CollectionGeneratorPreview = {
     id: string;
     name: string;
     image: string;
+    provider?: string;
     rarity: string;
     role: string;
     traits: string[];
@@ -230,4 +232,20 @@ export type CollectionGeneratorPreview = {
     visualDiversityScore: number;
     blockers: string[];
   };
+};
+
+export type ConceptRequestSummary = {
+  provider?: string;
+  imageCount?: number;
+  estimatedOpenAIRequestCount?: number;
+  usesPaidOpenAIImageGeneration?: boolean;
+  lowCostMode?: boolean;
+  maxImagesPerRun?: number;
+  cacheTtlSeconds?: number;
+  cachedResultAvailable?: boolean;
+  confirmationRequired?: boolean;
+  confirmationThreshold?: number;
+  model?: string;
+  quality?: string;
+  providerFailureReason?: string;
 };

@@ -10,7 +10,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { apiFetch } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
-import type { CollectionGeneratorPreview } from "@/lib/types";
+import type { CollectionGeneratorPreview, ConceptRequestSummary } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ type SystemCapabilities = {
   programAccountExists?: boolean;
   programAccountExecutable?: boolean;
   aiGenerationEnabled?: boolean;
+  localPreviewProviderEnabled?: boolean;
   approvedLayerPackAvailable?: boolean;
   demoCuratedLayerPackEnabled?: boolean;
   demoCuratedLayerPackAllowed?: boolean;
@@ -154,7 +155,7 @@ type PreviewOnlyResponse = {
   };
   avatarPreviewSpec?: { uri: string };
   bannerPreviewSpec?: { uri: string };
-  samples: Array<{ label: string; uri: string; metadata: Record<string, unknown> }>;
+  samples: Array<{ label: string; uri: string; provider?: string; metadata: Record<string, unknown> }>;
   traitTable: Array<{ category: string; count: number; examples: string[] }>;
   rarityTable: Record<string, number>;
   animationMoments: Array<{ moment: string; spec: string }>;
@@ -184,6 +185,7 @@ type PreviewOnlyResponse = {
     visualDiversityScore: number;
     blockers: string[];
   };
+  conceptRequest?: ConceptRequestSummary;
   warnings: string[];
 };
 
@@ -230,6 +232,7 @@ export default function CreateCollectionPage() {
   const [mood, setMood] = useState("");
   const [run, setRun] = useState<GeneratorRun | null>(null);
   const [previewOnly, setPreviewOnly] = useState<PreviewOnlyResponse | null>(null);
+  const [conceptPlan, setConceptPlan] = useState<ConceptRequestSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [approvalConfirmed, setApprovalConfirmed] = useState(false);
@@ -263,6 +266,29 @@ export default function CreateCollectionPage() {
       })
       .catch((err: Error) => setError(err.message));
   }, [selectedPreset]);
+
+  useEffect(() => {
+    if (!scan) {
+      setConceptPlan(null);
+      return;
+    }
+    let cancelled = false;
+    apiFetch<{ ok: true } & ConceptRequestSummary>("/generator/ai-concept/validate-request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(previewPayload()),
+      timeoutMs: 45_000
+    })
+      .then((data) => {
+        if (!cancelled) setConceptPlan(data);
+      })
+      .catch(() => {
+        if (!cancelled) setConceptPlan(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scan, tokenName, tokenSymbol, tokenMint, logoUri, description, selectedPreset, memes, phrases, mascotPreference, mood]);
 
   async function createRun() {
     await action(async () => {
@@ -310,6 +336,21 @@ export default function CreateCollectionPage() {
         maxResponseBytes: 35_000_000
       });
       setPreviewOnly(data);
+      setConceptPlan(data.conceptRequest ?? null);
+      console.info(
+        "[generator-preview] classification",
+        JSON.stringify({
+          assetProvider: data.assetProvider,
+          previewClassification: data.previewClassification,
+          productionAssetStatus: data.productionAssetStatus,
+          previewAssetCount: (data.bannerPreviewSpec ? 1 : 0) + (data.avatarPreviewSpec ? 1 : 0) + data.samples.length,
+          sampleCount: data.samples.length,
+          provider: data.conceptRequest?.provider,
+          imageCount: data.conceptRequest?.imageCount,
+          cachedResultAvailable: data.conceptRequest?.cachedResultAvailable,
+          usesPaidOpenAIImageGeneration: data.conceptRequest?.usesPaidOpenAIImageGeneration
+        })
+      );
       setRun(null);
     });
   }
@@ -530,6 +571,7 @@ export default function CreateCollectionPage() {
             </SectionCard>
 
             <div className="grid gap-3">
+              <ConceptPlanNotice plan={conceptPlan} />
               <button type="button" onClick={generatePreview} disabled={loading || !canGenerateAiConcept} className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
                 {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate AI Concept Preview
               </button>
@@ -695,6 +737,40 @@ function PublicReadinessItem({ label, value, ready }: { label: string; value: st
       <p className={cn("mt-2 text-sm font-bold", ready ? "text-vault-green" : "text-slate-200")}>{value}</p>
     </div>
   );
+}
+
+function ConceptPlanNotice({ plan }: { plan: ConceptRequestSummary | null }) {
+  if (!plan) {
+    return (
+      <div className="rounded-md border border-vault-line bg-black/25 px-4 py-3 text-xs font-bold text-slate-400">
+        Scan a token to estimate preview image requests.
+      </div>
+    );
+  }
+  const paid = Boolean(plan.usesPaidOpenAIImageGeneration);
+  return (
+    <div className="rounded-md border border-vault-cyan/25 bg-black/30 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusPill accent={paid ? "gold" : "green"}>{paid ? "Paid OpenAI" : "Zero-cost preview"}</StatusPill>
+        {plan.lowCostMode ? <StatusPill accent="cyan">Low-cost mode</StatusPill> : null}
+        {plan.cachedResultAvailable ? <StatusPill accent="green">Cached available</StatusPill> : <StatusPill accent="gold">No cache yet</StatusPill>}
+      </div>
+      <div className="mt-3 grid gap-2 text-xs font-bold text-slate-300">
+        <p>Provider: <span className="text-white">{providerDisplay(plan.provider)}</span></p>
+        <p>Images this run: <span className="text-white">{plan.imageCount ?? 0}</span></p>
+        <p>Estimated OpenAI requests: <span className={paid ? "text-vault-gold" : "text-vault-green"}>{plan.estimatedOpenAIRequestCount ?? 0}</span></p>
+        {plan.model ? <p>Model: <span className="text-white">{plan.model}</span></p> : null}
+      </div>
+    </div>
+  );
+}
+
+function providerDisplay(provider?: string) {
+  if (!provider) return "Automatic fallback";
+  if (/openai/i.test(provider)) return "OpenAI concept art";
+  if (/cached/i.test(provider)) return "Cached concept";
+  if (/local-placeholder|planning/i.test(provider)) return "Branded planning visual";
+  return cleanDisplayText(provider);
 }
 
 function SetupChecklistItem({ item }: { item: SetupChecklist["items"][number] }) {
@@ -997,6 +1073,13 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     rarityWeights: asRecord<number>(profile.traitPack?.rarityWeights ?? profile.rarityStructure),
     unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
     assetProvider: "persisted-generator-run",
+    conceptRequest: {
+      provider: previews.some((asset) => asset.provider === "openai") ? "openai" : previews.some((asset) => asset.provider === "local-placeholder") ? "local-placeholder" : previews.some((asset) => asset.provider === "cached") ? "cached" : "persisted",
+      imageCount: previews.filter((asset) => asset.type === "BANNER" || asset.type === "SAMPLE_NFT").length,
+      estimatedOpenAIRequestCount: 0,
+      usesPaidOpenAIImageGeneration: false,
+      cachedResultAvailable: true
+    },
     previewClassification: previewClassForStatus(profile.productionAssetStatus ?? "WIREFRAME", previews[0]?.previewClassification),
     productionAssetStatus: profile.productionAssetStatus ?? "WIREFRAME",
     finalProductionReady: isProductionStatus(profile.productionAssetStatus),
@@ -1008,6 +1091,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
         id: `${asset.version}-${index}`,
         name: asset.label,
         image: asset.uri,
+        provider: asset.provider ?? undefined,
         rarity: metadata.rarity ?? "Rare",
         role: roles[index] ?? "Raider",
         traits: [
@@ -1062,6 +1146,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     rarityWeights: data.rarityTable,
     unlocks: {},
     assetProvider: data.assetProvider,
+    conceptRequest: data.conceptRequest,
     previewClassification: data.previewClassification ?? previewClassForStatus(data.productionAssetStatus, undefined),
     productionAssetStatus: data.productionAssetStatus,
     finalProductionReady: isProductionStatus(data.productionAssetStatus),
@@ -1072,6 +1157,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
       id: `preview-${index}`,
       name: sample.label,
       image: sample.uri,
+      provider: sample.provider,
       rarity: String(sample.metadata.rarity ?? "Rare"),
       role: roles[index] ?? "Founder",
       traits: [

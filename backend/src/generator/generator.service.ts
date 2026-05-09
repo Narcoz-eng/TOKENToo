@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, GatewayTimeoutException, HttpException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, ConflictException, GatewayTimeoutException, HttpException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import { requireDbForWrite } from "../db/db-safety";
@@ -39,6 +39,8 @@ type NormalizedGenerationRunInput = CreateGenerationRunInput & {
 
 @Injectable()
 export class GeneratorService {
+  private readonly logger = new Logger(GeneratorService.name);
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(LogoAnalysisService) private readonly logoAnalysis: LogoAnalysisService,
@@ -84,11 +86,9 @@ export class GeneratorService {
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
-    let aiUnavailableWarning: string | undefined;
-    const aiPreviews = await this.aiConcepts.generateRequired(style, pack, `${normalized.tokenMint}:preview`, normalized.logoData, normalized.logoUri).catch((error) => {
-      aiUnavailableWarning = this.aiUnavailableWarning(error);
-      return [] as PreviewAssetPlan[];
-    });
+    const conceptSeed = `${normalized.tokenMint}:preview`;
+    const conceptResult = await this.conceptPreviewsWithFallback(normalized.tokenMint, style, pack, conceptSeed, normalized.logoData, normalized.logoUri);
+    const aiPreviews = conceptResult.previews;
     if (aiPreviews.length) {
       style.productionAssetStatus = "AI_CONCEPT";
       style.artSource = "AI_ASSISTED";
@@ -105,7 +105,7 @@ export class GeneratorService {
     return {
       ok: true,
       mode: "preview-only",
-      assetProvider: aiPreviews.length ? "openai-ai-concept-preview" : "wireframe-concept-preview",
+      assetProvider: aiPreviews.length ? this.previewProviderLabel(aiPreviews) : "wireframe-concept-preview",
       previewClassification: aiPreviews.length ? "AI_CONCEPT_PREVIEW" : "WIREFRAME_CONCEPT",
       productionAssetStatus: style.productionAssetStatus,
       finalProductionReady: false,
@@ -147,14 +147,24 @@ export class GeneratorService {
         aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
         productionStorageAvailable: (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") !== "mock" && Boolean(process.env.PINATA_JWT)
       },
+      conceptRequest: conceptResult.conceptRequest,
       warnings: [
         "Preview generated without DB persistence.",
-        aiUnavailableWarning ?? (style.productionAssetStatus === "AI_CONCEPT"
+        ...conceptResult.warnings,
+        conceptResult.warnings.length ? "Planning visual fallback active; this keeps the preview reviewable but is not mintable NFT art." : "",
+        !conceptResult.warnings.length && style.productionAssetStatus === "AI_CONCEPT" && this.previewProviderLabel(aiPreviews) === "openai-ai-concept-preview"
           ? "AI concept preview only; final launch requires curated or artist-approved production assets and permanent storage."
-          : "Wireframe only - enable OpenAI image generation or curated asset provider for professional NFT previews."),
-        ...(aiUnavailableWarning ? ["AI concept generation is unavailable right now; showing the cinematic planning preview so the collection experience is never blank. Retry generation after fixing the OpenAI issue."] : []),
+          : "",
+        !conceptResult.warnings.length && this.previewProviderLabel(aiPreviews) === "local-placeholder-planning-visual"
+          ? "Local branded planning visual provider active; no paid OpenAI image generation was used."
+          : "",
+        !aiPreviews.length
+          ? (style.productionAssetStatus === "AI_CONCEPT"
+          ? "AI concept preview only; final launch requires curated or artist-approved production assets and permanent storage."
+          : "Wireframe only - enable OpenAI image generation or curated asset provider for professional NFT previews.")
+          : "",
         "OpenAI image generation is art direction only and is never used in mint, final render, redeem, stake, or unstake flows."
-      ]
+      ].filter(Boolean)
     };
   }
 
@@ -281,12 +291,8 @@ export class GeneratorService {
     const pack = this.packFromRecord(latest.traitPack);
     const version = Math.max(1, ...latest.previewAssets.map((asset) => asset.version)) + 1;
     const wireframes = this.previews.generate(style, pack, run.seed, version);
-    let aiGenerationFailed = false;
-    const aiPreviews = await this.aiConcepts.generate(style, pack, run.seed, run.logoData ?? undefined, run.logoUri ?? undefined).catch(() => {
-      aiGenerationFailed = true;
-      return [] as PreviewAssetPlan[];
-    });
-    if (aiGenerationFailed && latest.previewAssets.some((asset) => asset.productionAssetStatus === "AI_CONCEPT" || asset.previewClassification === "AI_CONCEPT_PREVIEW")) return this.getRun(id);
+    const conceptResult = await this.conceptPreviewsWithFallback(run.tokenMint, style, pack, run.seed, run.logoData ?? undefined, run.logoUri ?? undefined);
+    const aiPreviews = conceptResult.previews;
     const previews = aiPreviews.length ? aiPreviews : wireframes;
     if (aiPreviews.length) await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
     await this.persistPreviews(id, latest.id, version, previews);
@@ -546,7 +552,8 @@ export class GeneratorService {
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${input.tokenMint}:${version}`, reroll);
-    const aiPreviews = await this.aiConcepts.generate(style, pack, `${input.tokenMint}:${version}`, input.logoData, input.logoUri).catch(() => []);
+    const conceptResult = await this.conceptPreviewsWithFallback(input.tokenMint, style, pack, `${input.tokenMint}:${version}`, input.logoData, input.logoUri);
+    const aiPreviews = conceptResult.previews;
     if (aiPreviews.length) {
       style.productionAssetStatus = "AI_CONCEPT";
       style.artSource = "AI_ASSISTED";
@@ -802,6 +809,159 @@ export class GeneratorService {
       style.productionAssetPolicy.defaultAssetStatus = manifest.productionAssetStatus;
       style.artSource = manifest.productionAssetStatus === "ARTIST_APPROVED" || manifest.productionAssetStatus === "FINAL_PRODUCTION" ? "HANDMADE_PACK" : "CURATED_PACK";
     }
+  }
+
+  private async conceptPreviewsWithFallback(tokenMint: string, style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string) {
+    const conceptRequest = this.aiConcepts.conceptRunSummary(style, pack, seedKey, logoData, logoUri);
+    const cacheKey = String(conceptRequest.cacheKey);
+    const dnaHash = this.aiConcepts.dnaHash(style);
+    const memoryCached = this.aiConcepts.cachedConcepts(cacheKey);
+    if (memoryCached.length) {
+      const result = {
+        previews: memoryCached,
+        warnings: ["Cached AI concept preview reused; no new OpenAI image request was made."],
+        conceptRequest: { ...conceptRequest, provider: "cached", cachedResultAvailable: true, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0 }
+      };
+      this.logPreviewTrace("memory-cache", tokenMint, result.previews, result.conceptRequest);
+      return result;
+    }
+
+    const persistedCached = await this.persistedConceptCache(tokenMint, dnaHash);
+    if (persistedCached.length) {
+      this.aiConcepts.rememberConcepts(cacheKey, persistedCached);
+      const result = {
+        previews: persistedCached,
+        warnings: ["Previous AI concept preview for this token and Creative DNA hash reused; no new OpenAI image request was made."],
+        conceptRequest: { ...conceptRequest, provider: "cached", cachedResultAvailable: true, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0 }
+      };
+      this.logPreviewTrace("persistent-cache", tokenMint, result.previews, result.conceptRequest);
+      return result;
+    }
+
+    if (conceptRequest.provider === "cached-only") {
+      const previews = this.aiConcepts.generateLocalPlaceholder(style, pack, seedKey, logoData, logoUri, "cached-only-no-cache");
+      const result = {
+        previews,
+        warnings: ["AI_CONCEPT_PROVIDER=cached-only is configured, but no cached concept exists. Showing branded planning visuals without calling OpenAI."],
+        conceptRequest: { ...conceptRequest, provider: "local-placeholder", cachedResultAvailable: false, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0 }
+      };
+      this.logPreviewTrace("cached-only-placeholder", tokenMint, result.previews, result.conceptRequest);
+      return result;
+    }
+
+    try {
+      const previews = await this.aiConcepts.generateRequired(style, pack, seedKey, logoData, logoUri);
+      const provider = this.previewProviderLabel(previews);
+      const warnings = provider === "local-placeholder-planning-visual" ? ["Local branded planning visual provider active; no paid OpenAI image generation was used."] : [];
+      const result = {
+        previews,
+        warnings,
+        conceptRequest: { ...conceptRequest, provider, cachedResultAvailable: false, usesPaidOpenAIImageGeneration: provider === "openai-ai-concept-preview", estimatedOpenAIRequestCount: provider === "openai-ai-concept-preview" ? conceptRequest.imageCount : 0 }
+      };
+      this.logPreviewTrace("provider-success", tokenMint, result.previews, result.conceptRequest);
+      return result;
+    } catch (error) {
+      const unavailable = this.aiUnavailableWarning(error);
+      const previews = this.aiConcepts.generateLocalPlaceholder(style, pack, seedKey, logoData, logoUri, "openai-unavailable");
+      const result = {
+        previews,
+        warnings: [
+          unavailable,
+          "OpenAI generation is unavailable right now; showing branded cinematic planning visuals so the collection experience is never blank."
+        ],
+        conceptRequest: { ...conceptRequest, provider: "local-placeholder", cachedResultAvailable: false, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0, providerFailureReason: unavailable }
+      };
+      this.logPreviewTrace("openai-fallback-placeholder", tokenMint, result.previews, result.conceptRequest);
+      return result;
+    }
+  }
+
+  private async persistedConceptCache(tokenMint: string, dnaHash: string): Promise<PreviewAssetPlan[]> {
+    try {
+      const runs = await this.prisma.generationRun.findMany({
+        where: { tokenMint },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: {
+          styleProfiles: {
+            orderBy: { version: "desc" },
+            take: 3,
+            include: {
+              previewAssets: {
+                where: { previewClassification: "AI_CONCEPT_PREVIEW" },
+                orderBy: { createdAt: "desc" }
+              }
+            }
+          }
+        }
+      });
+      for (const run of runs) {
+        for (const profile of run.styleProfiles) {
+          const assets = profile.previewAssets
+            .map((asset): PreviewAssetPlan => {
+              const metadata = this.record(asset.metadata);
+              const generationMetadata = this.record(asset.generationMetadata);
+              return {
+                type: asset.type as PreviewAssetPlan["type"],
+                label: asset.label,
+                uri: asset.uri,
+                productionAssetStatus: (asset.productionAssetStatus ?? "AI_CONCEPT") as ProductionAssetStatus,
+                previewClassification: (asset.previewClassification ?? "AI_CONCEPT_PREVIEW") as PreviewClassification,
+                provider: ((asset.provider as PreviewAssetPlan["provider"] | null) ?? "cached") as PreviewAssetPlan["provider"],
+                promptHash: asset.promptHash ?? undefined,
+                generationMetadata: { ...generationMetadata, servedFromPersistentCache: true },
+                metadata: { ...metadata, servedFromPersistentCache: true }
+              };
+            })
+            .filter((asset) => String(asset.metadata.dnaHash ?? asset.generationMetadata?.dnaHash ?? "") === dnaHash);
+          if (this.aiConcepts.usableConceptSet(assets)) return assets;
+        }
+      }
+      return [];
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: "ai_concept_persistent_cache_lookup_failed",
+          tokenMint: this.shortMint(tokenMint),
+          errorClass: error instanceof Error ? error.name : typeof error,
+          message: error instanceof Error ? error.message : String(error)
+        })
+      );
+      return [];
+    }
+  }
+
+  private previewProviderLabel(previews: PreviewAssetPlan[]) {
+    if (previews.some((preview) => preview.provider === "openai")) return "openai-ai-concept-preview";
+    if (previews.some((preview) => preview.provider === "cached")) return "cached-ai-concept-preview";
+    if (previews.some((preview) => preview.provider === "local-placeholder")) return "local-placeholder-planning-visual";
+    if (previews.some((preview) => preview.provider === "curated")) return "curated-layer-preview";
+    return "wireframe-concept-preview";
+  }
+
+  private logPreviewTrace(stage: string, tokenMint: string, previews: PreviewAssetPlan[], conceptRequest: Record<string, unknown>) {
+    this.logger.log(
+      JSON.stringify({
+        event: "generator_preview_generation_trace",
+        stage,
+        tokenMint: this.shortMint(tokenMint),
+        providerSelected: conceptRequest.provider,
+        model: conceptRequest.model,
+        imageCountRequested: conceptRequest.imageCount,
+        estimatedOpenAIRequestCount: conceptRequest.estimatedOpenAIRequestCount,
+        paidOpenAI: conceptRequest.usesPaidOpenAIImageGeneration,
+        cachedResultAvailable: conceptRequest.cachedResultAvailable,
+        previewAssetCount: previews.length,
+        previewClassification: previews[0]?.previewClassification,
+        productionAssetStatus: previews[0]?.productionAssetStatus,
+        promptHashes: previews.map((preview) => preview.promptHash).filter(Boolean),
+        assetStorageResult: "not-persisted-for-preview-only-or-inline-before-persist"
+      })
+    );
+  }
+
+  private shortMint(value: string) {
+    return value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-6)}` : value;
   }
 
   private aiPreviewException(error: unknown) {

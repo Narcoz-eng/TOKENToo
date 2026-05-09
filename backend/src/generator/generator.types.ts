@@ -405,7 +405,7 @@ export type PreviewAssetPlan = {
   uri: string;
   productionAssetStatus: ProductionAssetStatus;
   previewClassification: PreviewClassification;
-  provider: "wireframe" | "openai" | "curated" | "artist" | "deterministic-render";
+  provider: "wireframe" | "openai" | "local-placeholder" | "cached" | "curated" | "artist" | "deterministic-render";
   promptHash?: string;
   generationMetadata?: Record<string, unknown>;
   metadata: Record<string, unknown>;

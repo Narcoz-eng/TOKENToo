@@ -85,6 +85,27 @@ const tests: TestCase[] = [
       assert(response.message?.includes(`Set OPENAI_IMAGE_MODEL=${DEFAULT_OPENAI_IMAGE_MODEL}`), "Config fix missing from UI message.");
       assert(!response.message?.includes("sk-"), "UI message leaked an API key pattern.");
     }
+  },
+  {
+    name: "OpenAI billing hard limit is preserved as an actionable reason",
+    run: async () => {
+      const request = buildOpenAIImageRequest(baseInput);
+      const exception = await openAiResponseException(
+        jsonResponse(400, {
+          error: {
+            message: "Billing hard limit has been reached.",
+            type: "invalid_request_error",
+            code: "billing_hard_limit_reached"
+          }
+        }),
+        request,
+        silentLogger
+      );
+      const response = exception.getResponse() as { code?: string; message?: string; details?: { raw?: unknown } };
+      assert(response.code === "OPENAI_REQUEST_REJECTED", "Billing hard limit should be classified as an OpenAI request rejection.");
+      assert(response.message?.includes("Billing hard limit has been reached."), "Billing hard limit reason should be visible to the UI.");
+      assert(!JSON.stringify(response).includes("sk-"), "Billing error response leaked an API key pattern.");
+    }
   }
 ];
 

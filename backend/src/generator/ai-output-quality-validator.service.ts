@@ -7,16 +7,19 @@ const famousIpPattern = /\b(bayc|bored\s*ape|degods?|mad\s*lads?|solana\s*monkey
 export class AiOutputQualityValidatorService {
   validate(previews: PreviewAssetPlan[]) {
     const ai = previews.filter((asset) => asset.productionAssetStatus === "AI_CONCEPT");
+    const generatedAi = ai.filter((asset) => asset.provider === "openai");
+    const lowCostMode = ai.some((asset) => asset.generationMetadata?.lowCostMode === true);
+    const requiredRarities = lowCostMode ? ["Common", "Epic", "Legendary"] : ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"];
     const issues: string[] = [];
     if (!ai.length) return issues;
-    if (ai.some((asset) => asset.uri.startsWith("data:image/svg+xml"))) issues.push("AI concept pipeline returned SVG or placeholder output.");
-    if (ai.some((asset) => famousIpPattern.test(JSON.stringify(asset.generationMetadata ?? {})))) issues.push("AI concept prompt references famous NFT IP.");
+    if (generatedAi.some((asset) => asset.uri.startsWith("data:image/svg+xml"))) issues.push("AI concept pipeline returned SVG or placeholder output.");
+    if (generatedAi.some((asset) => famousIpPattern.test(JSON.stringify(asset.generationMetadata ?? {})))) issues.push("AI concept prompt references famous NFT IP.");
     for (const type of ["BANNER"]) {
       if (!ai.some((asset) => asset.type === type)) issues.push(`AI concept set is missing ${type.toLowerCase()} output.`);
     }
     if (!ai.some((asset) => asset.type === "SAMPLE_NFT")) issues.push("AI concept set is missing rarity character outputs.");
     const rarities = ai.filter((asset) => asset.type === "SAMPLE_NFT").map((asset) => String(asset.metadata.rarity));
-    for (const rarity of ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"]) {
+    for (const rarity of requiredRarities) {
       if (!rarities.includes(rarity)) issues.push(`AI concept set is missing ${rarity} rarity exemplar.`);
     }
     const promptTexts = ai.map((asset) => String(asset.generationMetadata?.prompt ?? ""));
