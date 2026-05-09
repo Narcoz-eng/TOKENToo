@@ -17,6 +17,7 @@ import type {
   VisualDesignSystem,
   VisualRarityFrame
 } from "./generator.types";
+import { CreativeDnaService } from "./creative-dna.service";
 import { pick, seedFrom, titleCase, unique } from "./generator.util";
 import { RarityEngineService } from "./rarity-engine.service";
 
@@ -35,7 +36,10 @@ type SemanticHint = {
 
 @Injectable()
 export class StyleProfileGeneratorService {
-  constructor(private readonly rarity: RarityEngineService) {}
+  constructor(
+    private readonly rarity: RarityEngineService,
+    private readonly creativeDnaService: CreativeDnaService = new CreativeDnaService()
+  ) {}
 
   generate(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput, context: CommunityContextOutput, version = 1): GeneratedStyleProfile {
     const seed = seedFrom(`${input.tokenMint}:${input.tokenSymbol}:${version}:${context.extractedVocabulary.join("|")}`);
@@ -174,6 +178,7 @@ export class StyleProfileGeneratorService {
       },
       assetPackId: `creative-dna-${this.categoryId(`${motif}-${universe.creativeDna.visualSystem.rendererFamily}`)}`,
       artSource: "PROCEDURAL_FALLBACK",
+      productionAssetStatus: "WIREFRAME",
       tenKReadiness,
       creativeUniverse: universe,
       productionAssetPolicy: universe.productionAssetPolicy
@@ -334,7 +339,7 @@ export class StyleProfileGeneratorService {
     const moodCulture = this.dynamicMoodCulture(creativeDna, signalProfile, motif, seed);
     const baseSilhouettes = this.dynamicBaseSilhouettes(creativeDna, signalProfile, analysis.shapeLanguage, seed);
     const animationReadiness = this.dynamicAnimationReadiness(creativeDna, signalProfile, moodCulture, `${creativeDna.visualSystem.rendererFamily} ${creativeDna.visualSystem.emotionalRendering}`, seed);
-    const archetype = this.dynamicIdentityKey(motif, signalProfile, seed);
+    const archetype = this.creativeDnaService.identityKey(motif, signalProfile, seed);
     const productionAssetPolicy = this.productionAssetPolicy();
     return {
       archetype,
@@ -450,7 +455,7 @@ export class StyleProfileGeneratorService {
   private generateVisualSystem(signals: CreativeSignalProfile, motif: string, seed: number): VisualDesignSystem {
     const weights = signals.semanticWeights;
     const topKey = this.topWeightKeys(weights)[0] ?? "";
-    const family = this.rendererFamily(signals, seed);
+    const family = this.creativeDnaService.selectRendererMedium(signals, seed);
     const object = pick(signals.objects.length ? signals.objects : [motif], seed + 11);
     const world = pick(signals.worldReferences.length ? signals.worldReferences : ["origin room"], seed + 13);
     const systems: Record<VisualDesignSystem["rendererFamily"], Omit<VisualDesignSystem, "rendererFamily" | "rarityFrames">> = {
@@ -737,14 +742,22 @@ export class StyleProfileGeneratorService {
     };
     const system = systems[family];
     const bodySystem = `${system.bodySystem}; dominant signal ${topKey || "token-native"}; anchor object ${object}`;
-    const legendaryPhilosophy = `${system.legendaryPhilosophy}; built around ${object}`;
-    return {
+    const cameraAnchor = pick(unique([...signals.objects, ...signals.worldReferences, motif]).filter(Boolean), seed + 101);
+    const cultureAnchor = pick(unique([...signals.culturalWords, ...signals.memeLanguage, motif]).filter(Boolean), seed + 103);
+    const emotionAnchor = pick(unique([...signals.emotions, signals.energyLevel, motif]).filter(Boolean), seed + 107);
+    const personalizedSystem = {
       ...system,
-      rendererFamily: family,
       bodySystem,
-      environmentSystem: system.environmentSystem,
-      legendaryPhilosophy,
-      rarityFrames: this.rarityFrames(family, system.renderingEngine, motif, object, world, system, seed)
+      cameraSystem: `${system.cameraSystem}; ${motif} shot grammar follows ${cameraAnchor} through ${world} with ${emotionAnchor} timing`,
+      lightingModel: `${system.lightingModel}; keyed to ${emotionAnchor} and ${cameraAnchor}`,
+      environmentSystem: `${system.environmentSystem}; preserve ${cultureAnchor} and ${cameraAnchor} as production layer cues`,
+      rarityProgression: `${system.rarityProgression}; ${motif} ladder escalates ${cameraAnchor}, ${cultureAnchor}, ${world}, and ${emotionAnchor}`,
+      legendaryPhilosophy: `${system.legendaryPhilosophy}; built around ${object} and the ${cultureAnchor} myth`
+    };
+    return {
+      ...personalizedSystem,
+      rendererFamily: family,
+      rarityFrames: this.rarityFrames(family, personalizedSystem.renderingEngine, motif, object, world, personalizedSystem, seed)
     };
   }
 
@@ -839,21 +852,6 @@ export class StyleProfileGeneratorService {
       }
     ];
     return Object.fromEntries(entries.map((entry) => [entry.rarity, { ...entry, composition: `${engine}: ${entry.composition}` }])) as VisualDesignSystem["rarityFrames"];
-  }
-
-  private rendererFamily(signals: CreativeSignalProfile, seed: number): VisualDesignSystem["rendererFamily"] {
-    const weights = signals.semanticWeights;
-    if ((weights["medical-contamination"] ?? 0) >= 70) return pick(["biohazard-horror", "cinematic-scene", "comic-panel"], seed + 3) as VisualDesignSystem["rendererFamily"];
-    if ((weights["market-stress"] ?? 0) >= 82 && (weights["dream-surreal"] ?? 0) < 90) return pick(["terminal-brutalist", "cinematic-scene", "propaganda-poster"], seed + 5) as VisualDesignSystem["rendererFamily"];
-    if ((weights["machine-intelligence"] ?? 0) >= 72) return pick(["terminal-brutalist", "low-poly", "comic-panel"], seed + 7) as VisualDesignSystem["rendererFamily"];
-    if ((weights["canine-pack"] ?? 0) >= 70 && signals.animals.some((animal) => /dog|doge|shib|inu/.test(animal))) return pick(["anime-portrait", "sticker-pack", "painterly-portrait"], seed + 9) as VisualDesignSystem["rendererFamily"];
-    if ((weights["soft-play"] ?? 0) >= 70 || signals.cueDial.cozy >= 70) return pick(["clay-toy", "children-cartoon", "sticker-pack"], seed + 11) as VisualDesignSystem["rendererFamily"];
-    if ((weights["dream-surreal"] ?? 0) >= 78) return pick(["surreal-collage", "painterly-portrait", "low-poly"], seed + 13) as VisualDesignSystem["rendererFamily"];
-    if ((weights["feline-chaos"] ?? 0) >= 72) return pick(["comic-panel", "retro-arcade", "sticker-pack"], seed + 15) as VisualDesignSystem["rendererFamily"];
-    if ((weights["amphibian-meme"] ?? 0) >= 72 || signals.cueDial.chaos >= 80) return pick(["retro-arcade", "pixel-topdown", "comic-panel"], seed + 17) as VisualDesignSystem["rendererFamily"];
-    if (signals.cueDial.aggressive >= 70) return pick(["cinematic-scene", "comic-panel", "anime-portrait"], seed + 19) as VisualDesignSystem["rendererFamily"];
-    if (signals.cueDial.luxury >= 70) return pick(["painterly-portrait", "propaganda-poster", "cinematic-scene"], seed + 21) as VisualDesignSystem["rendererFamily"];
-    return pick(["pixel-topdown", "anime-portrait", "clay-toy", "terminal-brutalist", "surreal-collage", "sticker-pack", "comic-panel", "cinematic-scene", "retro-arcade", "low-poly"], seed + 17) as VisualDesignSystem["rendererFamily"];
   }
 
   private dynamicTaxonomy(dna: CreativeDNA, signals: CreativeSignalProfile, motif: string, seed: number): TraitCategoryPlan[] {
@@ -1164,8 +1162,6 @@ export class StyleProfileGeneratorService {
 
   private dynamicCategoryLabel(role: TraitCategoryRole, motif: string, signals: CreativeSignalProfile, seed: number) {
     const hint = pick(this.topHints(signals.semanticWeights), seed + 3);
-    const roleWords = hint.roleWords?.[role] ?? [];
-    if (roleWords.length) return `${motif} ${pick(roleWords, seed + 7)}`;
     const suffixes: Record<TraitCategoryRole, string[]> = {
       base: ["Bodies", "Forms", "Vessels", "Avatars"],
       background: ["Worlds", "Rooms", "Weather", "Districts"],
@@ -1276,6 +1272,7 @@ export class StyleProfileGeneratorService {
   private productionAssetPolicy(): ProductionAssetPolicy {
     return {
       launchClassification: "CONCEPT_PREVIEW",
+      defaultAssetStatus: "WIREFRAME",
       commonToRareSource: "approved_layer_pack_required",
       epicLegendaryMythicSource: "curated_composition_required",
       aiFinalImageAllowed: false,

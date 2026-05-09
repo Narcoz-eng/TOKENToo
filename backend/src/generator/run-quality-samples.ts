@@ -2,6 +2,8 @@ import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
 import { CollectionDistinctivenessScorerService } from "./collection-distinctiveness-scorer.service";
 import { CommunityContextService } from "./community-context.service";
 import { CompatibilityEngineService } from "./compatibility-engine.service";
+import { readFileSync } from "node:fs";
+import { CreativeDnaService } from "./creative-dna.service";
 import type { CreateGenerationRunInput, GeneratedStyleProfile, PreviewAssetPlan, TraitPackPlan } from "./generator.types";
 import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
@@ -195,8 +197,10 @@ async function main() {
   const metadata = new MetadataGeneratorService();
   const distinctivenessService = new CollectionDistinctivenessScorerService();
   const qualityService = new QualityValidatorService();
+  const creativeDna = new CreativeDnaService();
   const existing: ExistingStyle[] = [];
   const failures: string[] = [];
+  const generatedStyles: GeneratedStyleProfile[] = [];
 
   const report = samples.map((input) => {
     const source = input.hints?.sourceMetadata;
@@ -218,6 +222,7 @@ async function main() {
     const compatibilityResult = compatibility.validateRules(pack, rules);
     const sampleFailures = verifySample(style, pack, generatedPreviews, metadata, distinctiveness.passed, compatibilityResult.passed);
     failures.push(...sampleFailures.map((failure) => `${style.collection}: ${failure}`));
+    generatedStyles.push(style);
     existing.push({
       id: input.tokenMint,
       collection: style.collection,
@@ -246,6 +251,8 @@ async function main() {
       moodCulture: style.creativeUniverse.moodCulture.map((mood) => ({ name: mood.name, eyes: mood.eyeLanguage, mouth: mood.mouthLanguage, animationState: mood.animationState })),
       animationReadiness: style.creativeUniverse.animationReadiness,
       productionAssetPolicy: style.productionAssetPolicy,
+      productionAssetStatus: style.productionAssetStatus,
+      previewClassifications: generatedPreviews.map((preview) => preview.previewClassification),
       sampleNfts: generatedPreviews.filter((item) => item.type === "SAMPLE_NFT").map((item) => ({
         label: item.label,
         rarity: item.metadata.rarity,
@@ -272,6 +279,8 @@ async function main() {
   });
 
   failures.push(...verifyCollectionSet(report));
+  failures.push(...verifySameRendererPairs(generatedStyles, creativeDna));
+  failures.push(...verifyNoOpenAiInProductionHotPaths());
   console.log(JSON.stringify({ generatedAt: new Date().toISOString(), failures, samples: report }, null, 2));
   if (failures.length) {
     throw new Error(`Generator quality sample failures: ${failures.join("; ")}`);
@@ -397,10 +406,13 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
     ].map(String).join("|");
     visualSignatures.set(signature, [...(visualSignatures.get(signature) ?? []), String(item.collection)]);
     if (!Array.isArray(item.taxonomy) || item.taxonomy.length < 10) failures.push(`${item.collection} does not expose a community-native taxonomy.`);
+    if (/\b(frog|dog|anime|trader|robot)\b/i.test(JSON.stringify(item.taxonomy))) failures.push(`${item.collection} still exposes fixed template taxonomy labels.`);
     if (!Array.isArray(item.moodCulture) || item.moodCulture.length < 3) failures.push(`${item.collection} does not expose community-native mood culture.`);
     if (!item.creativeDna?.artStyle || !item.signalProfile?.semanticWeights) failures.push(`${item.collection} does not expose generated Creative DNA and signal profile.`);
     if (!visual?.renderingEngine || !visual?.bodySystem || !visual?.eyeSystem || !visual?.mouthSystem || !visual?.faceGrammar || !visual?.compositionStyle || !visual?.cameraSystem || !visual?.lightingModel || !visual?.rarityProgression || !visual?.rarityFrames?.Mythic) failures.push(`${item.collection} does not expose a complete visual system.`);
     if (item.productionReady !== false || item.productionAssetPolicy?.launchClassification !== "CONCEPT_PREVIEW") failures.push(`${item.collection} incorrectly marks concept output as production-ready.`);
+    if (item.productionAssetStatus !== "WIREFRAME") failures.push(`${item.collection} wireframe sample must remain WIREFRAME status.`);
+    if (!item.previewClassifications?.every((value: string) => value === "WIREFRAME_CONCEPT")) failures.push(`${item.collection} procedural samples must be labeled WIREFRAME_CONCEPT.`);
     if (item.productionAssetPolicy?.aiFinalImageAllowed !== false) failures.push(`${item.collection} allows fully AI-generated final NFT images.`);
   }
   if (rendererFamilies.size < 5) failures.push("quality samples must exercise at least five renderer families.");
@@ -431,6 +443,56 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
       if (traitOverlap > 0.34) failures.push(`${a.collection} and ${b.collection} share too much trait vocabulary.`);
       if (poseOverlap > 0.62) failures.push(`${a.collection} and ${b.collection} share too much pose/silhouette language.`);
     }
+  }
+  return failures;
+}
+
+function verifySameRendererPairs(styles: GeneratedStyleProfile[], creativeDna: CreativeDnaService) {
+  const failures: string[] = [];
+  const grouped = new Map<string, GeneratedStyleProfile[]>();
+  for (const style of styles) {
+    const renderer = style.creativeUniverse.creativeDna.visualSystem.rendererFamily;
+    grouped.set(renderer, [...(grouped.get(renderer) ?? []), style]);
+  }
+  const pairs = [...grouped.entries()].flatMap(([renderer, entries]) =>
+    entries.length >= 2 ? entries.slice(0, 2).map((style) => ({ renderer, style })) : []
+  );
+  if (!pairs.length) return ["quality samples must include at least one same-renderer pair to prove the renderer is only a medium."];
+
+  for (const [renderer, entries] of grouped) {
+    if (entries.length < 2) continue;
+    for (let left = 0; left < entries.length; left += 1) {
+      for (let right = left + 1; right < entries.length; right += 1) {
+        const a = entries[left];
+        const b = entries[right];
+        const pairIssues = creativeDna.compareCivilizations(a, b);
+        failures.push(...pairIssues.map((issue) => `${a.collection} and ${b.collection} share renderer ${renderer}: ${issue}`));
+        const visualA = a.creativeUniverse.creativeDna.visualSystem;
+        const visualB = b.creativeUniverse.creativeDna.visualSystem;
+        if (a.creativeUniverse.creativeDna.worldConcept === b.creativeUniverse.creativeDna.worldConcept) failures.push(`${a.collection} and ${b.collection} share a world concept under renderer ${renderer}.`);
+        if (a.creativeUniverse.creativeDna.legendaryMythology === b.creativeUniverse.creativeDna.legendaryMythology) failures.push(`${a.collection} and ${b.collection} share mythology under renderer ${renderer}.`);
+        if (visualA.cameraSystem === visualB.cameraSystem) failures.push(`${a.collection} and ${b.collection} share camera language under renderer ${renderer}.`);
+        if (a.creativeUniverse.creativeDna.rarityPhilosophy === b.creativeUniverse.creativeDna.rarityPhilosophy) failures.push(`${a.collection} and ${b.collection} share rarity storytelling under renderer ${renderer}.`);
+      }
+    }
+  }
+  return failures;
+}
+
+function verifyNoOpenAiInProductionHotPaths() {
+  const failures: string[] = [];
+  const hotPathFiles = [
+    "src/vault-mint/vault-mint-orchestrator.service.ts",
+    "src/vault-mint/vault-redeem-orchestrator.service.ts",
+    "src/vault-mint/solana-transaction-adapter.service.ts",
+    "src/staking/staking.service.ts",
+    "src/generator/asset-production-layer.service.ts",
+    "src/generator/deterministic-render.service.ts"
+  ];
+  const forbidden = /\b(AiConceptPipelineService|OpenAIImageProvider|HybridAssetProvider|ENABLE_AI_IMAGE_GENERATION|OPENAI_API_KEY|openai\.generate|aiConcepts\.generate)\b/;
+  for (const file of hotPathFiles) {
+    const source = readFileSync(file, "utf8");
+    if (forbidden.test(source)) failures.push(`${file} must not call or configure OpenAI image generation in mint/final-render/redeem/stake paths.`);
   }
   return failures;
 }

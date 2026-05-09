@@ -1,9 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import type { CompatibilityRulePlan, DistinctivenessReportPlan, GeneratedStyleProfile, PreviewAssetPlan, QualityReportPlan, TraitCategoryRole, TraitPackPlan } from "./generator.types";
+import { CreativeDnaService } from "./creative-dna.service";
 import { average, clamp } from "./generator.util";
 
 @Injectable()
 export class QualityValidatorService {
+  constructor(private readonly creativeDna: CreativeDnaService = new CreativeDnaService()) {}
+
   validate(style: GeneratedStyleProfile, pack: TraitPackPlan, compatibilityRules: CompatibilityRulePlan[], previews: PreviewAssetPlan[], distinctiveness: DistinctivenessReportPlan): QualityReportPlan {
     const issues: string[] = [];
     const categoryScore = this.categoryScore(pack);
@@ -37,6 +40,7 @@ export class QualityValidatorService {
     if (this.usesFixedArchetypeTemplate(style)) issues.push("Generator still exposes a fixed archetype template instead of dynamic Creative DNA.");
     if (!style.productionAssetPolicy || style.productionAssetPolicy.launchClassification !== "CONCEPT_PREVIEW") issues.push("Production asset policy must distinguish concept previews from final approved assets.");
     if (style.productionAssetPolicy?.aiFinalImageAllowed !== false) issues.push("Production policy must not allow fully AI-generated final NFT images.");
+    issues.push(...this.creativeDna.validate(style, pack));
     if (this.poseReuse(previews) > 0.55) issues.push("Too many sample NFTs reuse the same pose; rarity ladder needs visible composition changes.");
     if (this.sameBaseAcrossRarities(previews)) issues.push("All rarity previews share the same base/face language.");
     if (this.sameVisualCompositionAcrossRarities(previews)) issues.push("Rarity previews reuse the same visual composition system without visible progression.");
@@ -50,7 +54,9 @@ export class QualityValidatorService {
 
     const tierScore = average([previewQualityScore, uniquenessScore, colorHarmonyScore, rarityDistributionScore, duplicateRiskScore, compatibilityScore, distinctiveness.score]);
     const computedTier = tierScore >= 92 && distinctiveness.score >= 86 ? "LEGENDARY_READY" : tierScore >= 80 && previewQualityScore >= 78 ? "PREMIUM" : "BASIC";
-    const tier = style.artSource === "PROCEDURAL_FALLBACK" ? "BASIC" : computedTier;
+    const tier = style.productionAssetStatus === "WIREFRAME" || style.artSource === "PROCEDURAL_FALLBACK" ? "BASIC" : computedTier;
+    const productionStatusAllowsPass = style.productionAssetStatus === "CURATED_LAYER_READY" || style.productionAssetStatus === "ARTIST_APPROVED" || style.productionAssetStatus === "FINAL_PRODUCTION";
+    if (style.productionAssetStatus === "AI_CONCEPT") issues.push("AI concept art is professional art direction only; it cannot satisfy mintable production quality.");
 
     return {
       previewQualityScore,
@@ -60,7 +66,7 @@ export class QualityValidatorService {
       duplicateRiskScore,
       compatibilityScore,
       tier,
-      passed: issues.length === 0 && tier !== "BASIC",
+      passed: issues.length === 0 && tier !== "BASIC" && productionStatusAllowsPass,
       issues
     };
   }

@@ -1,12 +1,15 @@
 import { Injectable } from "@nestjs/common";
-import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
 import type { AssetProductionManifest, FinalVaultAsset, FinalVaultAssetInput, ProducedLayerSet } from "./asset-production.types";
 import type { GeneratedStyleProfile, TraitPackPlan } from "./generator.types";
-import { pick, seedFrom } from "./generator.util";
+import { DeterministicRenderService } from "./deterministic-render.service";
+import { ProductionLayerPackService } from "./production-layer-pack.service";
 
 @Injectable()
 export class AssetProductionLayerService {
-  constructor(private readonly fallbackPreviews: ArtPreviewGeneratorService) {}
+  constructor(
+    private readonly productionLayers: ProductionLayerPackService,
+    private readonly deterministicRender: DeterministicRenderService
+  ) {}
 
   manifest(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: AssetProductionManifest["qualityTier"]): AssetProductionManifest {
     const designProvider = this.provider(process.env.DESIGN_MODEL_PROVIDER);
@@ -14,7 +17,9 @@ export class AssetProductionLayerService {
     const legendaryProvider = this.provider(process.env.LEGENDARY_ASSET_PROVIDER ?? process.env.DESIGN_MODEL_PROVIDER);
     const storageIssue = this.storageIssue();
     const providerIssue = this.providerIssue(designProvider, layerProvider, legendaryProvider);
-    const productionReady = !providerIssue && !storageIssue && qualityTier !== "BASIC";
+    const layerPackIssue = this.productionLayers.approvedLayerPackConfigured() ? undefined : "Approved curated layer pack missing: set CURATED_LAYER_PACK_MANIFEST_URI, CURATED_LAYER_PACK_ROOT, or APPROVED_LAYER_PACK_ID.";
+    const productionAssetStatus = this.productionLayers.status(style, pack, qualityTier);
+    const productionReady = this.productionLayers.meetsRequiredStatus(productionAssetStatus, "CURATED_LAYER_READY");
     const availableTraitLayers =
       this.roleValues(pack, "head").length +
       this.roleValues(pack, "eyes").length +
@@ -32,13 +37,14 @@ export class AssetProductionLayerService {
       availableTraitLayers,
       availableLegendaryOverlays: this.roleValues(pack, "legendary").length,
       canProduce10kPremiumOutputs: productionReady && style.tenKReadiness.pass,
-      reasonIfNo: productionReady && style.tenKReadiness.pass ? undefined : [providerIssue, storageIssue, style.tenKReadiness.pass ? undefined : "10k readiness failed."].filter(Boolean).join(" ")
+      reasonIfNo: productionReady && style.tenKReadiness.pass ? undefined : [providerIssue, storageIssue, layerPackIssue, style.tenKReadiness.pass ? undefined : "10k readiness failed."].filter(Boolean).join(" ")
     };
 
     return {
       collection: style.collection,
       standard: (process.env.METAPLEX_NFT_STANDARD as "METAPLEX_CORE" | "TOKEN_METADATA_FALLBACK" | undefined) ?? "METAPLEX_CORE",
       productionReady,
+      productionAssetStatus,
       qualityTier,
       baseMascots: this.layerSet(designProvider, this.roleValues(pack, "base"), "Base mascots must be human-designed pack variants with distinct silhouettes."),
       backgrounds: this.layerSet(designProvider, this.roleValues(pack, "background"), "Backgrounds define the collection world and must not be simple color swaps."),
@@ -53,16 +59,17 @@ export class AssetProductionLayerService {
         ...this.roleValues(pack, "frame")
       ], "Common/uncommon/rare NFTs must assemble from approved curated or handmade layer packs."),
       legendaryAssets: this.layerSet(legendaryProvider, [...this.roleValues(pack, "legendary"), ...this.roleValues(pack, "animation")], "Epic, legendary, and mythic assets require curated composition rules and optional artist review."),
-      productionAssetPolicy: style.productionAssetPolicy,
+      productionAssetPolicy: { ...style.productionAssetPolicy, defaultAssetStatus: productionAssetStatus },
       royaltyPolicy: this.royaltyPolicy(),
       readinessReport,
       warnings: productionReady
         ? [this.royaltyPolicy().note]
         : [
-            "Concept preview only. Current preview output is deterministic SVG direction art and must not be sold as final production art.",
-            "AI-assisted outputs are drafts only unless reviewed and replaced by curated or artist-approved final layer assets.",
+            "Concept preview only. Wireframe SVG direction art must not be sold as final production art.",
+            "Wireframes and AI concepts are review assets only; launch requires curated or artist-approved deterministic layer assets.",
             providerIssue ?? "Asset providers are configured.",
             storageIssue ?? "Permanent storage is configured.",
+            layerPackIssue ?? "Approved curated layer pack is configured.",
             this.royaltyPolicy().note
           ].filter(Boolean)
     };
@@ -70,52 +77,7 @@ export class AssetProductionLayerService {
 
   produceFinalVaultAsset(input: FinalVaultAssetInput): FinalVaultAsset {
     const manifest = this.manifest(input.style, input.pack, input.qualityTier);
-    const seed = seedFrom(`${input.seedKey}:${input.ownerWallet}:${input.lockedAmount}:${input.lockDurationDays}`);
-    const preview = this.fallbackPreviews.generate(input.style, input.pack, input.seedKey, seed).find((asset) => asset.type === "SAMPLE_NFT");
-    const imageDataUri = preview?.uri ?? "";
-    const metadata = this.metadata(input, preview?.metadata ?? {});
-
-    return { imageDataUri, metadata, manifest };
-  }
-
-  private metadata(input: FinalVaultAssetInput, visualTraits: Record<string, unknown>) {
-    const seed = seedFrom(`${input.style.collection}:final:${input.seedKey}`);
-    const role = pick(input.style.roleNames, seed + 1);
-    const rarity = String(visualTraits.rarity ?? pick(["Rare", "Epic", "Legendary"], seed + 2));
-    return {
-      name: `${role} #${1000 + (seed % 9000)}`,
-      collection: input.style.collection,
-      description: `A backed Vault NFT from the ${input.style.collection} community. ${input.style.lore}`,
-      image: "",
-      properties: {
-        category: "image",
-        phew: {
-          metadataSchemaVersion: "phew-v1",
-          nftStandard: "Metaplex Core",
-          assetProductionReady: this.manifest(input.style, input.pack, input.qualityTier).productionReady,
-          royaltyPolicy: this.royaltyPolicy()
-        }
-      },
-      attributes: [
-        { trait_type: "Underlying Token", value: input.style.collection.replace(" Vaults", "") },
-        { trait_type: "Locked Amount", value: input.lockedAmount },
-        { trait_type: "Lock Duration", value: `${input.lockDurationDays} Days` },
-        { trait_type: "Redeemable", value: "No" },
-        { trait_type: "Role", value: role },
-        { trait_type: "Rank", value: rarity === "Legendary" || rarity === "Mythic" ? "Legendary Raider" : "Vault Raider" },
-        { trait_type: "Background", value: visualTraits.background ?? pick(this.roleValues(input.pack, "background"), seed + 3) },
-        { trait_type: "Base Character", value: visualTraits.base ?? pick(this.roleValues(input.pack, "base"), seed + 4) },
-        { trait_type: "Headgear", value: visualTraits.headgear ?? pick(this.roleValues(input.pack, "head"), seed + 5) },
-        { trait_type: "Eyes", value: visualTraits.eyes ?? pick(this.roleValues(input.pack, "eyes"), seed + 6) },
-        { trait_type: "Outfit", value: visualTraits.outfit ?? pick(this.roleValues(input.pack, "body"), seed + 7) },
-        { trait_type: "Aura", value: visualTraits.aura ?? pick(this.roleValues(input.pack, "aura"), seed + 8) },
-        { trait_type: "Accessory", value: visualTraits.accessory ?? pick(this.roleValues(input.pack, "prop"), seed + 9) },
-        { trait_type: "Neck/Chest Accessory", value: visualTraits.neckChestAccessory ?? pick(this.roleValues(input.pack, "neck"), seed + 10) },
-        { trait_type: "Frame/Border", value: visualTraits.frame ?? pick(this.roleValues(input.pack, "frame"), seed + 11) },
-        { trait_type: "Animation Overlay", value: visualTraits.animationOverlay ?? pick(this.roleValues(input.pack, "animation"), seed + 12) },
-        { trait_type: "Rarity", value: rarity }
-      ]
-    };
+    return this.deterministicRender.renderFinalVaultAsset(input, manifest);
   }
 
   private layerSet(provider: ProducedLayerSet["provider"], values: string[], notes: string): ProducedLayerSet {
@@ -151,6 +113,7 @@ export class AssetProductionLayerService {
   private storageIssue() {
     const provider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
     if (provider === "mock") return "Permanent storage missing: set FINAL_ASSET_STORAGE_PROVIDER to pinata, arweave, or irys.";
+    if (!this.productionLayers.renderRoot()) return "FINAL_RENDER_STORAGE_ROOT is missing; minting must reference cached or pre-generated final render outputs.";
     if (provider === "pinata" && !process.env.PINATA_JWT) return "PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata.";
     if ((provider === "arweave" || provider === "irys") && !(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY)) {
       return `${provider} final storage requires IRYS_PRIVATE_KEY or ARWEAVE_KEY.`;

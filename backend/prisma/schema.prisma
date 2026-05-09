@@ -119,6 +119,16 @@ enum PreviewAssetType {
   AVATAR
   BANNER
   SAMPLE_NFT
+  TRAIT_SHEET
+  ANIMATION_KEYFRAME
+}
+
+enum ProductionAssetStatus {
+  WIREFRAME
+  AI_CONCEPT
+  CURATED_LAYER_READY
+  ARTIST_APPROVED
+  FINAL_PRODUCTION
 }
 
 enum TransactionStatus {
@@ -310,6 +320,7 @@ model StyleProfile {
   visualFingerprint  Json?
   assetPackId        String?
   artSource          String             @default("PROCEDURAL_FALLBACK")
+  productionAssetStatus ProductionAssetStatus @default(WIREFRAME)
   tenKReadinessReport Json?
   isApproved         Boolean                @default(false)
   createdAt          DateTime               @default(now())
@@ -373,6 +384,11 @@ model PreviewAsset {
   type            PreviewAssetType
   label           String
   uri             String
+  productionAssetStatus ProductionAssetStatus @default(WIREFRAME)
+  previewClassification String           @default("WIREFRAME_CONCEPT")
+  provider        String?
+  promptHash      String?
+  generationMetadata Json                @default("{}")
   metadata        Json
   version         Int
   createdAt       DateTime         @default(now())

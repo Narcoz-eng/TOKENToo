@@ -188,10 +188,16 @@ export class CapabilitiesService {
 
   private productionStorageAvailable() {
     const provider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER;
-    if (provider === "pinata") return Boolean(process.env.PINATA_JWT);
-    if (provider === "arweave" || provider === "irys") return Boolean(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY);
-    if (provider === "supabase") return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const renderRoot = Boolean(process.env.FINAL_RENDER_STORAGE_ROOT);
+    const layerPack = this.approvedLayerPackAvailable();
+    if (provider === "pinata") return Boolean(process.env.PINATA_JWT) && renderRoot && layerPack;
+    if (provider === "arweave" || provider === "irys") return Boolean(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY) && renderRoot && layerPack;
+    if (provider === "supabase") return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) && renderRoot && layerPack;
     return false;
+  }
+
+  private approvedLayerPackAvailable() {
+    return Boolean(process.env.CURATED_LAYER_PACK_MANIFEST_URI || process.env.CURATED_LAYER_PACK_ROOT || process.env.APPROVED_LAYER_PACK_ID);
   }
 
   private tokenMetadataAvailable(heliusAvailable: boolean, programExecutable: boolean) {
@@ -285,6 +291,10 @@ export class CapabilitiesService {
       "SOLANA_TRANSACTION_PROVIDER",
       "METAPLEX_NFT_STANDARD",
       "FINAL_ASSET_STORAGE_PROVIDER",
+      "FINAL_RENDER_STORAGE_ROOT",
+      "CURATED_LAYER_PACK_MANIFEST_URI",
+      "CURATED_LAYER_PACK_ROOT",
+      "APPROVED_LAYER_PACK_ID",
       "PINATA_JWT",
       "IRYS_PRIVATE_KEY",
       "ARWEAVE_KEY",
@@ -300,6 +310,7 @@ export class CapabilitiesService {
     if (capabilities.heliusConfigured && !capabilities.heliusReachable) warnings.push(`Helius is configured but unreachable or unhealthy${getLastHeliusErrorCode() ? ` (${getLastHeliusErrorCode()})` : ""}.`);
     if (capabilities.aiGenerationEnabled && !capabilities.openaiImagesAvailable) warnings.push("AI image generation is enabled but OPENAI_API_KEY is not configured.");
     if (!capabilities.pinataAvailable) warnings.push("Pinata is not configured; final immutable asset uploads are blocked.");
+    if (!this.approvedLayerPackAvailable()) warnings.push("Approved curated layer pack is missing; production launch is blocked.");
     if (!capabilities.walletConfigured) warnings.push("Founder wallet is not configured; wallet-required actions need a connected wallet.");
     if (!capabilities.devnetProgramConfigured) warnings.push("PROGRAM_ID is missing or placeholder; devnet actions are disabled.");
     if (capabilities.devnetProgramConfigured && !capabilities.programAccountExecutable) warnings.push("PROGRAM_ID is configured but no executable program account was found on the configured RPC/cluster.");

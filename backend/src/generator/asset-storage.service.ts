@@ -11,8 +11,8 @@ export class AssetStorageService {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceRoleKey) return dataUri;
 
-    const svg = this.decodeSvgDataUri(dataUri);
-    if (!svg) return dataUri;
+    const parsed = this.decodeDataUri(dataUri);
+    if (!parsed) return dataUri;
 
     const objectPath = path.replace(/^\/+/, "");
     const uploadUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${objectPath}`;
@@ -21,10 +21,10 @@ export class AssetStorageService {
       headers: {
         authorization: `Bearer ${serviceRoleKey}`,
         apikey: serviceRoleKey,
-        "content-type": "image/svg+xml",
+        "content-type": parsed.mimeType,
         "x-upsert": "true"
       },
-      body: svg
+      body: parsed.bytes
     });
 
     if (!response.ok) {

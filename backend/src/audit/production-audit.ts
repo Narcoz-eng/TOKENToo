@@ -92,6 +92,10 @@ function metadataCheck(issues: string[]) {
     type: "SAMPLE_NFT",
     label: "audit",
     uri: "ipfs://audit",
+    productionAssetStatus: "CURATED_LAYER_READY",
+    previewClassification: "PRODUCTION_ASSET_PREVIEW",
+    provider: "curated",
+    generationMetadata: {},
     metadata: { rarity: "Legendary", base: "Audit Base", background: "Audit World", headgear: "Audit Crown", aura: "Audit Aura", accessory: "Audit Relic", pose: "unique cinematic pose" }
   });
   const attributes = new Map(sample.attributes.map((attribute) => [attribute.trait_type, attribute.value]));
@@ -149,6 +153,7 @@ function styleFixture(): GeneratedStyleProfile {
       },
       productionAssetPolicy: {
         launchClassification: "CONCEPT_PREVIEW",
+        defaultAssetStatus: "CURATED_LAYER_READY",
         commonToRareSource: "approved_layer_pack_required",
         epicLegendaryMythicSource: "curated_composition_required",
         aiFinalImageAllowed: false,
@@ -168,6 +173,7 @@ function styleFixture(): GeneratedStyleProfile {
     visualFingerprint: { archetype: "audit", poseLanguage: ["inspection stance"] },
     assetPackId: "audit",
     artSource: "CURATED_PACK",
+    productionAssetStatus: "CURATED_LAYER_READY",
     tenKReadiness: { possibleUniqueCombinations: "10000", expectedDuplicateRisk: "LOW", weakestTraitCategory: "none", overusedBaseVariantRisk: false, rarityDistributionValid: true, silhouetteDominanceRisk: false, shallowCategories: [], pass: true },
     creativeUniverse: {
       archetype: "audit",
@@ -252,6 +258,7 @@ function styleFixture(): GeneratedStyleProfile {
       },
       productionAssetPolicy: {
         launchClassification: "CONCEPT_PREVIEW",
+        defaultAssetStatus: "CURATED_LAYER_READY",
         commonToRareSource: "approved_layer_pack_required",
         epicLegendaryMythicSource: "curated_composition_required",
         aiFinalImageAllowed: false,
@@ -262,6 +269,7 @@ function styleFixture(): GeneratedStyleProfile {
     },
     productionAssetPolicy: {
       launchClassification: "CONCEPT_PREVIEW",
+      defaultAssetStatus: "CURATED_LAYER_READY",
       commonToRareSource: "approved_layer_pack_required",
       epicLegendaryMythicSource: "curated_composition_required",
       aiFinalImageAllowed: false,

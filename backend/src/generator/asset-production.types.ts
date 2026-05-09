@@ -1,4 +1,4 @@
-import type { GeneratedStyleProfile, TraitPackPlan } from "./generator.types";
+import type { GeneratedStyleProfile, ProductionAssetStatus, TraitPackPlan } from "./generator.types";
 
 export type AssetProviderKind = "mock" | "ai" | "curated" | "handmade";
 
@@ -15,6 +15,7 @@ export type AssetProductionManifest = {
   collection: string;
   standard: "METAPLEX_CORE" | "TOKEN_METADATA_FALLBACK";
   productionReady: boolean;
+  productionAssetStatus: ProductionAssetStatus;
   qualityTier: "BASIC" | "PREMIUM" | "LEGENDARY_READY";
   baseMascots: ProducedLayerSet;
   backgrounds: ProducedLayerSet;
@@ -61,7 +62,8 @@ export type FinalVaultAssetInput = {
 };
 
 export type FinalVaultAsset = {
-  imageDataUri: string;
+  imageDataUri?: string;
+  imageUri?: string;
   metadata: Record<string, unknown>;
   manifest: AssetProductionManifest;
 };

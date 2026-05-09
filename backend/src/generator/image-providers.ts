@@ -5,6 +5,7 @@ export type ImageGenerationInput = {
   referenceImageBase64?: string;
   referenceImageMimeType?: string;
   size?: "1024x1024" | "1024x1536" | "1536x1024";
+  quality?: "low" | "medium" | "high";
 };
 
 export type ImageGenerationOutput = {
@@ -24,7 +25,7 @@ export class OpenAIImageProvider implements ImageProvider {
   async generate(input: ImageGenerationInput): Promise<ImageGenerationOutput> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new ServiceUnavailableException("OpenAI Images is not configured.");
-    const model = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1";
+    const model = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-2";
     const attempts = Math.max(1, Number(process.env.OPENAI_IMAGE_RETRY_ATTEMPTS ?? 2));
     let lastError: unknown;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -48,8 +49,8 @@ export class OpenAIImageProvider implements ImageProvider {
       if (!response.ok) throw new ServiceUnavailableException(`OpenAI image generation failed with status ${response.status}.`);
       const result = (await response.json()) as { data?: Array<{ b64_json?: string; url?: string }> };
       const item = result.data?.[0];
-      if (item?.b64_json) return { provider: "openai", mimeType: "image/png", bytes: Buffer.from(item.b64_json, "base64"), productionReady: true };
-      if (item?.url) return { provider: "openai", mimeType: "image/png", dataUri: item.url, productionReady: true };
+      if (item?.b64_json) return { provider: "openai", mimeType: "image/png", bytes: Buffer.from(item.b64_json, "base64"), productionReady: false };
+      if (item?.url) return { provider: "openai", mimeType: "image/png", dataUri: item.url, productionReady: false };
       throw new ServiceUnavailableException("OpenAI image generation did not return an image.");
     } finally {
       clearTimeout(timeout);
@@ -67,6 +68,7 @@ export class OpenAIImageProvider implements ImageProvider {
         model: input.model,
         prompt: input.prompt,
         size: input.size ?? "1024x1024",
+        quality: input.quality ?? process.env.OPENAI_IMAGE_QUALITY ?? "high",
         n: 1
       }),
       signal
@@ -80,6 +82,7 @@ export class OpenAIImageProvider implements ImageProvider {
     form.append("model", input.model);
     form.append("prompt", input.prompt);
     form.append("size", input.size ?? "1024x1024");
+    form.append("quality", input.quality ?? process.env.OPENAI_IMAGE_QUALITY ?? "high");
     form.append("n", "1");
     form.append("image", new Blob([bytes], { type: mimeType }), `reference.${mimeType.includes("jpeg") ? "jpg" : "png"}`);
     return fetch("https://api.openai.com/v1/images/edits", {

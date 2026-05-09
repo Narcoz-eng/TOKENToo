@@ -170,7 +170,9 @@ export type CollectionCompetition = {
   endsIn: string;
 };
 
-export type GeneratorQualityTier = "Wireframe concept" | "Basic" | "Premium" | "Legendary-ready";
+export type ProductionAssetStatus = "WIREFRAME" | "AI_CONCEPT" | "CURATED_LAYER_READY" | "ARTIST_APPROVED" | "FINAL_PRODUCTION";
+
+export type GeneratorQualityTier = "Wireframe concept" | "AI concept" | "Basic" | "Premium" | "Legendary-ready";
 
 export type CollectionGeneratorPreview = {
   id: string;
@@ -189,7 +191,8 @@ export type CollectionGeneratorPreview = {
   rarityWeights: Record<string, number>;
   unlocks: Record<string, string[]>;
   assetProvider?: string;
-  previewClassification?: "WIREFRAME_CONCEPT" | "PRODUCTION_ASSET_PREVIEW";
+  previewClassification?: "WIREFRAME_CONCEPT" | "AI_CONCEPT_PREVIEW" | "PRODUCTION_ASSET_PREVIEW";
+  productionAssetStatus?: ProductionAssetStatus;
   finalProductionReady?: boolean;
   warnings?: string[];
   avatar: string;

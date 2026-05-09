@@ -22,15 +22,17 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
               <img src={safeImage(preview.avatar, brandAssets.factionMark)} alt={preview.collection} className="aspect-square rounded-lg border border-vault-green/40 object-cover shadow-green" />
               <div className="min-w-0">
                 <div className="flex flex-wrap gap-2">
-                  <StatusPill accent={preview.quality.tier === "Wireframe concept" || preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
+                  <StatusPill accent={preview.quality.tier === "Wireframe concept" || preview.quality.tier === "AI concept" || preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
                   <StatusPill accent="cyan">{preview.theme}</StatusPill>
-                  <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : previewStatusLabel(preview)}</StatusPill>
+                  <StatusPill accent={isProductionStatus(preview.productionAssetStatus) ? "green" : "gold"}>{previewStatusLabel(preview)}</StatusPill>
                 </div>
                 <h2 className="mt-4 text-4xl font-black leading-tight lg:text-5xl">{preview.collection}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{preview.lore}</p>
                 {!preview.finalProductionReady ? (
                   <p className="mt-3 max-w-3xl rounded-md border border-vault-gold/35 bg-vault-gold/10 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
-                    Wireframe concept preview - final collection requires curated or artist-approved asset pack.
+                    {preview.productionAssetStatus === "AI_CONCEPT"
+                      ? "AI concept preview - creator review only. Final minting requires curated or artist-approved layer packs."
+                      : "Wireframe only — enable OpenAI image generation or curated asset provider for professional NFT previews."}
                   </p>
                 ) : null}
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -42,7 +44,7 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
               <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
                 <PreviewMetric label="Vault supply" value="10,000" />
                 <PreviewMetric label="Trait layers" value={String(Object.keys(preview.traitCounts).length || 5)} />
-                <PreviewMetric label="Readiness" value={preview.finalProductionReady ? "Production" : "Wireframe"} />
+                <PreviewMetric label="Readiness" value={assetStatusLabel(preview.productionAssetStatus)} />
               </div>
             </div>
 
@@ -182,8 +184,24 @@ function safeImage(src: string | undefined | null, fallback: string) {
 }
 
 function previewStatusLabel(preview: CollectionGeneratorPreview) {
-  if (preview.previewClassification === "WIREFRAME_CONCEPT" || /wireframe|fallback|preview/i.test(preview.assetProvider ?? "")) return "Wireframe concept preview";
+  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Wireframe preview only";
+  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "AI concept preview";
+  if (preview.productionAssetStatus === "FINAL_PRODUCTION") return "Final production assets";
+  if (preview.productionAssetStatus === "ARTIST_APPROVED") return "Artist approved assets";
+  if (preview.productionAssetStatus === "CURATED_LAYER_READY") return "Curated layer ready";
   return "Concept preview";
+}
+
+function isProductionStatus(status: CollectionGeneratorPreview["productionAssetStatus"]) {
+  return status === "CURATED_LAYER_READY" || status === "ARTIST_APPROVED" || status === "FINAL_PRODUCTION";
+}
+
+function assetStatusLabel(status: CollectionGeneratorPreview["productionAssetStatus"]) {
+  if (status === "FINAL_PRODUCTION") return "Final";
+  if (status === "ARTIST_APPROVED") return "Artist approved";
+  if (status === "CURATED_LAYER_READY") return "Curated layers";
+  if (status === "AI_CONCEPT") return "AI concept";
+  return "Wireframe";
 }
 
 function formatWeight(value: number) {

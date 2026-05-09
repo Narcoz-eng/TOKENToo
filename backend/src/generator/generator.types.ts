@@ -1,5 +1,17 @@
 export type GeneratorMood = "funny" | "aggressive" | "luxury" | "dark" | "cute" | "chaotic" | "cyber" | "fantasy";
 
+export type ProductionAssetStatus =
+  | "WIREFRAME"
+  | "AI_CONCEPT"
+  | "CURATED_LAYER_READY"
+  | "ARTIST_APPROVED"
+  | "FINAL_PRODUCTION";
+
+export type PreviewClassification =
+  | "WIREFRAME_CONCEPT"
+  | "AI_CONCEPT_PREVIEW"
+  | "PRODUCTION_ASSET_PREVIEW";
+
 export type CreateGenerationRunInput = {
   tokenName?: string;
   tokenSymbol?: string;
@@ -143,6 +155,7 @@ export type AnimationReadinessPlan = {
 
 export type ProductionAssetPolicy = {
   launchClassification: "CONCEPT_PREVIEW" | "AI_ASSISTED_DRAFT" | "CURATED_PRODUCTION_READY" | "ARTIST_APPROVED_FINAL";
+  defaultAssetStatus: ProductionAssetStatus;
   commonToRareSource: "approved_layer_pack_required";
   epicLegendaryMythicSource: "curated_composition_required";
   aiFinalImageAllowed: false;
@@ -285,6 +298,7 @@ export type GeneratedStyleProfile = {
   visualFingerprint: Record<string, unknown>;
   assetPackId: string;
   artSource: "PROCEDURAL_FALLBACK" | "CURATED_PACK" | "AI_ASSISTED" | "HANDMADE_PACK";
+  productionAssetStatus: ProductionAssetStatus;
   tenKReadiness: TenKReadinessReport;
   creativeUniverse: CommunityCreativeUniverse;
   productionAssetPolicy: ProductionAssetPolicy;
@@ -386,9 +400,14 @@ export type CompatibilityRulePlan = {
 };
 
 export type PreviewAssetPlan = {
-  type: "AVATAR" | "BANNER" | "SAMPLE_NFT";
+  type: "AVATAR" | "BANNER" | "SAMPLE_NFT" | "TRAIT_SHEET" | "ANIMATION_KEYFRAME";
   label: string;
   uri: string;
+  productionAssetStatus: ProductionAssetStatus;
+  previewClassification: PreviewClassification;
+  provider: "wireframe" | "openai" | "curated" | "artist" | "deterministic-render";
+  promptHash?: string;
+  generationMetadata?: Record<string, unknown>;
   metadata: Record<string, unknown>;
 };
 

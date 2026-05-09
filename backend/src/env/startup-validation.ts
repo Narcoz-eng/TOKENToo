@@ -7,8 +7,10 @@ export function validateStartupEnvironment() {
   const placeholderProgramId = "11111111111111111111111111111111";
   const strict = (process.env.STRICT_STARTUP_VALIDATION ?? "false") === "true";
   const issues: StartupCheck[] = [];
-  process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-1";
+  process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-2";
+  process.env.OPENAI_IMAGE_QUALITY ??= "high";
   process.env.ENABLE_AI_IMAGE_GENERATION ??= "false";
+  process.env.REQUIRED_LAUNCH_ASSET_STATUS ??= appEnv === "production" ? "ARTIST_APPROVED" : "CURATED_LAYER_READY";
   const helius = normalizeHeliusConfig();
   const database = databaseUrlDiagnostics();
   for (const warning of helius.warnings) {
@@ -37,6 +39,10 @@ export function validateStartupEnvironment() {
     if ((process.env.ENABLE_MOCK_MINT ?? "false") === "true") issues.push({ code: "MOCK_MINT_ENABLED", severity: "warning", message: "ENABLE_MOCK_MINT should be false in production." });
     if ((process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "mock") issues.push({ code: "MOCK_SOLANA_PROVIDER", severity: "warning", message: "SOLANA_TRANSACTION_PROVIDER=mock disables production transactions." });
     if ((process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") === "mock") issues.push({ code: "MOCK_FINAL_STORAGE", severity: "warning", message: "FINAL_ASSET_STORAGE_PROVIDER=mock blocks public production launch." });
+    if (!process.env.FINAL_RENDER_STORAGE_ROOT) issues.push({ code: "FINAL_RENDER_CACHE_MISSING", severity: "warning", message: "FINAL_RENDER_STORAGE_ROOT is required so public minting can reference cached/pre-generated final NFT renders." });
+    if (!(process.env.CURATED_LAYER_PACK_MANIFEST_URI || process.env.CURATED_LAYER_PACK_ROOT || process.env.APPROVED_LAYER_PACK_ID)) {
+      issues.push({ code: "CURATED_LAYER_PACK_MISSING", severity: "warning", message: "Approved curated layer pack manifest/root is required before launch." });
+    }
     if (!helius.heliusApiKey) issues.push({ code: "HELIUS_MISSING", severity: "warning", message: "A Helius api-key is required for CA-first token scanning. Set HELIUS_API_KEY key-only, HELIUS_RPC_URL, or a Helius SOLANA_RPC_URL." });
     if (helius.errorCode) issues.push({ code: helius.errorCode, severity: "warning", message: helius.errorMessage ?? "Helius configuration is invalid." });
     if (!process.env.PROGRAM_ID) issues.push({ code: "PROGRAM_ID_MISSING", severity: "warning", message: "PROGRAM_ID is required for devnet/mainnet actions." });

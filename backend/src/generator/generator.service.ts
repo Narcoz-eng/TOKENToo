@@ -3,6 +3,8 @@ import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import { requireDbForWrite } from "../db/db-safety";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
+import { AiConceptPipelineService } from "./ai-concept-pipeline.service";
+import { AiOutputQualityValidatorService } from "./ai-output-quality-validator.service";
 import { AssetProductionLayerService } from "./asset-production-layer.service";
 import { AssetStorageService } from "./asset-storage.service";
 import { CollectionDistinctivenessScorerService } from "./collection-distinctiveness-scorer.service";
@@ -14,6 +16,8 @@ import type {
   GeneratedStyleProfile,
   LaunchCollectionInput,
   PreviewAssetPlan,
+  PreviewClassification,
+  ProductionAssetStatus,
   SubmitCollectionLaunchInput,
   TraitPackPlan
 } from "./generator.types";
@@ -43,6 +47,8 @@ export class GeneratorService {
     private readonly traitPacks: TraitPackGeneratorService,
     private readonly compatibility: CompatibilityEngineService,
     private readonly previews: ArtPreviewGeneratorService,
+    private readonly aiConcepts: AiConceptPipelineService,
+    private readonly aiQuality: AiOutputQualityValidatorService,
     private readonly assetProduction: AssetProductionLayerService,
     private readonly assetStorage: AssetStorageService,
     private readonly distinctiveness: CollectionDistinctivenessScorerService,
@@ -77,17 +83,27 @@ export class GeneratorService {
     const pack = this.traitPacks.generate(style);
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
-    const previews = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
+    const wireframes = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
+    const aiPreviews = await this.aiConcepts.generate(style, pack, `${normalized.tokenMint}:preview`, normalized.logoData).catch(() => []);
+    if (aiPreviews.length) {
+      style.productionAssetStatus = "AI_CONCEPT";
+      style.artSource = "AI_ASSISTED";
+      style.productionAssetPolicy.defaultAssetStatus = "AI_CONCEPT";
+    }
+    this.applyConfiguredProductionStatus(style, pack);
+    const previews = aiPreviews.length ? aiPreviews : wireframes;
     const distinctiveness = this.distinctiveness.score(style, []);
     const quality = this.quality.validate(style, pack, compatibilityRules, previews, distinctiveness);
     if (!compatibilityResult.passed) quality.issues.push(...compatibilityResult.issues);
+    quality.issues.push(...this.aiQuality.validate(previews));
     const readiness = this.tenKReadinessReport(pack, style, quality);
 
     return {
       ok: true,
       mode: "preview-only",
-      assetProvider: "wireframe-concept-preview",
-      previewClassification: "WIREFRAME_CONCEPT",
+      assetProvider: aiPreviews.length ? "openai-ai-concept-preview" : "wireframe-concept-preview",
+      previewClassification: aiPreviews.length ? "AI_CONCEPT_PREVIEW" : "WIREFRAME_CONCEPT",
+      productionAssetStatus: style.productionAssetStatus,
       finalProductionReady: false,
       brandDna: style.brandDna,
       creativeUniverse: style.creativeUniverse,
@@ -113,7 +129,7 @@ export class GeneratorService {
       animationMetadata: style.creativeUniverse.animationReadiness,
       quality: {
         ...quality,
-        issues: [...quality.issues, "Wireframe concept preview only; final collection requires curated or artist-approved asset pack."]
+        issues: [...quality.issues, `${style.productionAssetStatus === "AI_CONCEPT" ? "AI concept preview only" : "Wireframe concept preview only"}; final collection requires curated or artist-approved asset pack.`]
       },
       distinctiveness: {
         ...distinctiveness,
@@ -129,8 +145,10 @@ export class GeneratorService {
       },
       warnings: [
         "Preview generated without DB persistence.",
-        "Wireframe concept preview only; final launch requires curated or artist-approved production assets and permanent storage.",
-        "AI image generation may support concept drafts only and is not a final NFT production dependency."
+        style.productionAssetStatus === "AI_CONCEPT"
+          ? "AI concept preview only; final launch requires curated or artist-approved production assets and permanent storage."
+          : "Wireframe only — enable OpenAI image generation or curated asset provider for professional NFT previews.",
+        "OpenAI image generation is art direction only and is never used in mint, final render, redeem, stake, or unstake flows."
       ]
     };
   }
@@ -248,7 +266,10 @@ export class GeneratorService {
     const style = this.styleFromRecord(latest);
     const pack = this.packFromRecord(latest.traitPack);
     const version = Math.max(1, ...latest.previewAssets.map((asset) => asset.version)) + 1;
-    const previews = this.previews.generate(style, pack, run.seed, version);
+    const wireframes = this.previews.generate(style, pack, run.seed, version);
+    const aiPreviews = await this.aiConcepts.generate(style, pack, run.seed, run.logoData ?? undefined).catch(() => []);
+    const previews = aiPreviews.length ? aiPreviews : wireframes;
+    if (aiPreviews.length) await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
     await this.persistPreviews(id, latest.id, version, previews);
     return this.getRun(id);
   }
@@ -267,8 +288,10 @@ export class GeneratorService {
     if (!input.explicitConfirmation) throw new BadRequestException("Explicit creator confirmation is required before approval.");
     if (!report.passed || report.tier === "BASIC") throw new BadRequestException("Only Premium or Legendary-ready generator outputs can be approved.");
     if (!distinctiveness?.passed || distinctiveness.score < 72) throw new BadRequestException("Collection distinctiveness score is below the approval threshold.");
-    if (latest.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Procedural fallback art can be saved as a draft but cannot be approved for launch.");
-    if (!readiness?.canProduce10kPremiumOutputs) throw new BadRequestException("Asset provider readiness report does not allow 10k premium output approval.");
+    const manifest = pack ? this.assetProduction.manifest(this.styleFromRecord(latest), pack, report.tier) : null;
+    if (latest.productionAssetStatus === "WIREFRAME" || latest.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Wireframe previews are planning/debug assets and cannot be approved for launch.");
+    if (latest.productionAssetStatus === "AI_CONCEPT") throw new BadRequestException("AI concept art can be reviewed as art direction, but cannot be approved for launch without a curated layer pack.");
+    if (!manifest?.productionReady || !readiness?.canProduce10kPremiumOutputs) throw new BadRequestException("Asset provider readiness report does not allow scalable deterministic output approval.");
 
     await this.prisma.styleProfile.updateMany({ where: { generationRunId: id }, data: { isApproved: false } });
     await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { isApproved: true } });
@@ -285,6 +308,7 @@ export class GeneratorService {
           qualityTier: report.tier,
           qualityScore: report.previewQualityScore,
           distinctivenessScore: distinctiveness.score,
+          productionAssetStatus: latest.productionAssetStatus,
           collection: latest.collection,
           mascot: latest.mascot,
           raidTheme: latest.raidTheme
@@ -308,7 +332,8 @@ export class GeneratorService {
     if (!profile?.traitPack || !report?.passed || report.tier === "BASIC" || !distinctiveness?.passed) {
       throw new BadRequestException("Approved run no longer satisfies launch quality gates.");
     }
-    if (profile.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Collection launch requires curated, handmade, or AI-assisted production assets.");
+    if (profile.productionAssetStatus === "WIREFRAME" || profile.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Collection launch requires curated, artist-approved, or final production assets; wireframes cannot launch.");
+    if (profile.productionAssetStatus === "AI_CONCEPT") throw new BadRequestException("AI concepts are art direction only. Configure and approve a curated layer pack before launch.");
     this.assertLaunchProviders(this.styleFromRecord(profile), this.packFromRecord(profile.traitPack), report.tier);
 
     const slug = this.slug(input.slug ?? profile.collection);
@@ -471,7 +496,22 @@ export class GeneratorService {
     const style = this.styleFromRecord(profile);
     const pack = this.packFromRecord(profile.traitPack);
     const preview = profile.previewAssets.find((asset) => asset.type === "SAMPLE_NFT");
-    return this.metadata.sample(style, pack, preview ? { type: "SAMPLE_NFT", label: preview.label, uri: preview.uri, metadata: this.record(preview.metadata) } : undefined);
+    return this.metadata.sample(
+      style,
+      pack,
+      preview
+        ? {
+            type: "SAMPLE_NFT",
+            label: preview.label,
+            uri: preview.uri,
+            productionAssetStatus: (preview.productionAssetStatus ?? "WIREFRAME") as ProductionAssetStatus,
+            previewClassification: (preview.previewClassification ?? "WIREFRAME_CONCEPT") as PreviewClassification,
+            provider: (preview.provider ?? "wireframe") as PreviewAssetPlan["provider"],
+            generationMetadata: this.record(preview.generationMetadata),
+            metadata: this.record(preview.metadata)
+          }
+        : undefined
+    );
   }
 
   private async createProfileVersion(
@@ -486,7 +526,15 @@ export class GeneratorService {
     const pack = this.traitPacks.generate(style);
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
-    const previews = this.previews.generate(style, pack, `${input.tokenMint}:${version}`, reroll);
+    const wireframes = this.previews.generate(style, pack, `${input.tokenMint}:${version}`, reroll);
+    const aiPreviews = await this.aiConcepts.generate(style, pack, `${input.tokenMint}:${version}`, input.logoData).catch(() => []);
+    if (aiPreviews.length) {
+      style.productionAssetStatus = "AI_CONCEPT";
+      style.artSource = "AI_ASSISTED";
+      style.productionAssetPolicy.defaultAssetStatus = "AI_CONCEPT";
+    }
+    this.applyConfiguredProductionStatus(style, pack);
+    const previews = aiPreviews.length ? aiPreviews : wireframes;
     const existing = await this.prisma.styleProfile.findMany({
       where: { generationRunId: { not: runId } },
       orderBy: { createdAt: "desc" },
@@ -496,6 +544,7 @@ export class GeneratorService {
     const distinctiveness = this.distinctiveness.score(style, existing);
     const quality = this.quality.validate(style, pack, compatibilityRules, previews, distinctiveness);
     if (!compatibilityResult.passed) quality.issues.push(...compatibilityResult.issues);
+    quality.issues.push(...this.aiQuality.validate(previews));
 
     const profile = await this.prisma.styleProfile.create({
       data: {
@@ -518,6 +567,7 @@ export class GeneratorService {
         visualFingerprint: this.json(style.visualFingerprint),
         assetPackId: style.assetPackId,
         artSource: style.artSource,
+        productionAssetStatus: style.productionAssetStatus,
         tenKReadinessReport: this.json(style.tenKReadiness)
       }
     });
@@ -593,7 +643,7 @@ export class GeneratorService {
     const storedPreviews = await Promise.all(
       previews.map(async (preview, index) => ({
         ...preview,
-        uri: await this.assetStorage.storePreviewAsset(`${generationRunId}/v${version}/${index + 1}-${preview.type.toLowerCase()}.svg`, preview.uri)
+        uri: await this.assetStorage.storePreviewAsset(`${generationRunId}/v${version}/${index + 1}-${preview.type.toLowerCase()}${this.previewExtension(preview.uri)}`, preview.uri)
       }))
     );
 
@@ -604,10 +654,22 @@ export class GeneratorService {
         type: preview.type,
         label: preview.label,
         uri: preview.uri,
+        productionAssetStatus: preview.productionAssetStatus,
+        previewClassification: preview.previewClassification,
+        provider: preview.provider,
+        promptHash: preview.promptHash,
+        generationMetadata: this.json(preview.generationMetadata ?? {}),
         metadata: this.json(preview.metadata),
         version
       }))
     });
+  }
+
+  private previewExtension(uri: string) {
+    if (uri.startsWith("data:image/png")) return ".png";
+    if (uri.startsWith("data:image/jpeg")) return ".jpg";
+    if (uri.startsWith("data:image/webp")) return ".webp";
+    return ".svg";
   }
 
   private normalize(input: CreateGenerationRunInput): NormalizedGenerationRunInput {
@@ -679,6 +741,8 @@ export class GeneratorService {
     const blockers = [
       ...quality.issues,
       ...(style.artSource === "PROCEDURAL_FALLBACK" ? ["Production asset provider is not configured."] : []),
+      ...(style.productionAssetStatus === "WIREFRAME" ? ["Wireframe previews are planning/debug only."] : []),
+      ...(style.productionAssetStatus === "AI_CONCEPT" ? ["AI concept previews are not mintable final art."] : []),
       ...(!style.tenKReadiness.pass ? ["10k readiness needs logo/reference input and non-generic silhouette validation."] : [])
     ];
     return {
@@ -695,12 +759,22 @@ export class GeneratorService {
     };
   }
 
+  private applyConfiguredProductionStatus(style: GeneratedStyleProfile, pack: TraitPackPlan) {
+    const manifest = this.assetProduction.manifest(style, pack, "PREMIUM");
+    if (manifest.productionReady) {
+      style.productionAssetStatus = manifest.productionAssetStatus;
+      style.productionAssetPolicy.defaultAssetStatus = manifest.productionAssetStatus;
+      style.artSource = manifest.productionAssetStatus === "ARTIST_APPROVED" || manifest.productionAssetStatus === "FINAL_PRODUCTION" ? "HANDMADE_PACK" : "CURATED_PACK";
+    }
+  }
+
   private assertLaunchProviders(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: "BASIC" | "PREMIUM" | "LEGENDARY_READY") {
     const manifest = this.assetProduction.manifest(style, pack, qualityTier);
     const issues = manifest.readinessReport.reasonIfNo ? [manifest.readinessReport.reasonIfNo] : [];
     const storageProvider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
-    if (!manifest.productionReady) issues.push("Real asset provider is missing. Configure DESIGN_MODEL_PROVIDER, LAYER_PACK_PROVIDER, and LEGENDARY_ASSET_PROVIDER as ai, curated, or handmade.");
+    if (!manifest.productionReady) issues.push(`Launch requires ${process.env.REQUIRED_LAUNCH_ASSET_STATUS ?? "CURATED_LAYER_READY/ARTIST_APPROVED"} assets; current status is ${manifest.productionAssetStatus}.`);
     if (storageProvider === "mock") issues.push("Permanent storage is missing. Set FINAL_ASSET_STORAGE_PROVIDER to pinata, arweave, irys, or a supported permanent adapter.");
+    if (!process.env.FINAL_RENDER_STORAGE_ROOT) issues.push("FINAL_RENDER_STORAGE_ROOT is required for cached/pre-generated deterministic render outputs.");
     if (storageProvider === "pinata" && !process.env.PINATA_JWT) issues.push("PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata.");
     if ((storageProvider === "arweave" || storageProvider === "irys") && !(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY)) issues.push(`${storageProvider} requires IRYS_PRIVATE_KEY or ARWEAVE_KEY.`);
     if (issues.length) throw new BadRequestException(`Collection launch blocked: ${[...new Set(issues)].join(" ")}`);
@@ -750,6 +824,7 @@ export class GeneratorService {
       brandDna.productionAssetPolicy ??
       {
         launchClassification: "CONCEPT_PREVIEW",
+        defaultAssetStatus: "WIREFRAME",
         commonToRareSource: "approved_layer_pack_required",
         epicLegendaryMythicSource: "curated_composition_required",
         aiFinalImageAllowed: false,
@@ -786,6 +861,7 @@ export class GeneratorService {
       visualFingerprint: this.record(record.visualFingerprint),
       assetPackId: record.assetPackId ?? "unknown",
       artSource: record.artSource ?? "PROCEDURAL_FALLBACK",
+      productionAssetStatus: record.productionAssetStatus ?? brandDna.productionAssetPolicy?.defaultAssetStatus ?? "WIREFRAME",
       tenKReadiness: this.record(record.tenKReadinessReport) as GeneratedStyleProfile["tenKReadiness"],
       creativeUniverse,
       productionAssetPolicy: productionAssetPolicy as GeneratedStyleProfile["productionAssetPolicy"]

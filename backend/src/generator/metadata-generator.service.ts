@@ -53,8 +53,9 @@ export class MetadataGeneratorService {
         category: "image",
         renderedTraitKeys: Array.isArray(visual.renderedTraitKeys) ? visual.renderedTraitKeys : [],
         animationReadiness: style.creativeUniverse?.animationReadiness,
-        artProductionStatus: style.productionAssetPolicy?.launchClassification ?? "CONCEPT_PREVIEW",
-        conceptPreviewOnly: true
+        artProductionStatus: style.productionAssetStatus,
+        conceptPreviewOnly: style.productionAssetStatus === "WIREFRAME" || style.productionAssetStatus === "AI_CONCEPT",
+        mintableProductionAsset: style.productionAssetStatus === "CURATED_LAYER_READY" || style.productionAssetStatus === "ARTIST_APPROVED" || style.productionAssetStatus === "FINAL_PRODUCTION"
       }
     };
   }

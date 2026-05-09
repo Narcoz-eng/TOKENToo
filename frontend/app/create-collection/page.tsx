@@ -15,6 +15,7 @@ import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
 type Preset = { id: string; name: string; artStyle: string; mood: string };
+type ProductionAssetStatus = "WIREFRAME" | "AI_CONCEPT" | "CURATED_LAYER_READY" | "ARTIST_APPROVED" | "FINAL_PRODUCTION";
 type GeneratorRun = {
   id: string;
   status: string;
@@ -36,6 +37,7 @@ type GeneratorRun = {
     raidTheme: string;
     lore: string;
     roleNames: unknown;
+    productionAssetStatus?: ProductionAssetStatus;
     isApproved: boolean;
     traitPack?: {
       categories: unknown;
@@ -43,10 +45,13 @@ type GeneratorRun = {
       unlockSchedule: unknown;
     } | null;
     previewAssets: Array<{
-      type: "AVATAR" | "BANNER" | "SAMPLE_NFT";
+      type: "AVATAR" | "BANNER" | "SAMPLE_NFT" | "TRAIT_SHEET" | "ANIMATION_KEYFRAME";
       label: string;
       uri: string;
       metadata: unknown;
+      productionAssetStatus?: ProductionAssetStatus;
+      previewClassification?: "WIREFRAME_CONCEPT" | "AI_CONCEPT_PREVIEW" | "PRODUCTION_ASSET_PREVIEW";
+      provider?: string | null;
       version: number;
     }>;
     qualityReports: Array<{
@@ -73,7 +78,8 @@ type GeneratorRun = {
 type PreviewOnlyResponse = {
   ok: true;
   assetProvider: string;
-  previewClassification?: "WIREFRAME_CONCEPT" | "PRODUCTION_ASSET_PREVIEW";
+  previewClassification?: "WIREFRAME_CONCEPT" | "AI_CONCEPT_PREVIEW" | "PRODUCTION_ASSET_PREVIEW";
+  productionAssetStatus: ProductionAssetStatus;
   finalProductionReady: boolean;
   brandDna: Record<string, unknown>;
   collection: {
@@ -426,7 +432,7 @@ export default function CreateCollectionPage() {
                 </div>
                 <label className="mt-4 flex items-start gap-3 rounded-md border border-vault-green/30 bg-vault-green/8 p-4 text-sm text-slate-200">
                   <input className="mt-1 accent-[#baff00]" type="checkbox" checked={approvalConfirmed} onChange={(event) => setApprovalConfirmed(event.target.checked)} />
-                  <span>This identity is final and ready to become the collection launch profile.</span>
+                  <span>I understand concept previews are not mintable final art; approve only production-ready curated or artist assets for launch.</span>
                 </label>
               </SectionCard>
 
@@ -439,7 +445,7 @@ export default function CreateCollectionPage() {
                     <Wand2 className="size-4 text-vault-green" /> Refresh Vault Set
                   </button>
                   <button type="button" onClick={approveRun} disabled={!canApprove || loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-vault-green/50 bg-vault-green/10 text-sm font-bold text-vault-green disabled:opacity-45">
-                    <ShieldCheck className="size-4" /> Approve Review
+                    <ShieldCheck className="size-4" /> Approve Production Assets
                   </button>
                   <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !capabilityState.data?.capabilities?.productionStorageAvailable} className="phew-button phew-button-primary flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black disabled:opacity-45">
                     <Check className="size-4" /> Launch Collection
@@ -467,7 +473,7 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
             <StatusPill accent="green">{preview.preset || "PHEW Launch Studio"}</StatusPill>
-            <StatusPill accent={preview.finalProductionReady ? "green" : "gold"}>{preview.finalProductionReady ? "Production ready" : previewStatusLabel(preview)}</StatusPill>
+            <StatusPill accent={preview.productionAssetStatus === "FINAL_PRODUCTION" || preview.productionAssetStatus === "ARTIST_APPROVED" || preview.productionAssetStatus === "CURATED_LAYER_READY" ? "green" : "gold"}>{previewStatusLabel(preview)}</StatusPill>
             {launchResult ? <StatusPill accent="cyan">Launched</StatusPill> : null}
           </div>
           <h2 className="mt-4 text-4xl font-black leading-tight">{preview.collection}</h2>
@@ -481,7 +487,7 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
           <LaunchStat label="Vault supply" value="10,000" />
           <LaunchStat label="Rarity tiers" value="6" />
-          <LaunchStat label="Readiness" value={preview.finalProductionReady ? "Production" : "Wireframe"} />
+          <LaunchStat label="Readiness" value={assetStatusLabel(preview.productionAssetStatus)} />
         </div>
       </div>
     </section>
@@ -589,6 +595,7 @@ function fallbackPreview(tokenName: string, tokenSymbol: string, description: st
     unlocks: {},
     assetProvider: "phew-curated-preview",
     previewClassification: "WIREFRAME_CONCEPT",
+    productionAssetStatus: "WIREFRAME",
     finalProductionReady: false,
     avatar: brandAssets.factionMark,
     banner: brandAssets.launchHero,
@@ -654,8 +661,9 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     rarityWeights: asRecord<number>(profile.traitPack?.rarityWeights ?? profile.rarityStructure),
     unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
     assetProvider: "persisted-generator-run",
-    previewClassification: "WIREFRAME_CONCEPT",
-    finalProductionReady: false,
+    previewClassification: previewClassForStatus(profile.productionAssetStatus ?? "WIREFRAME", previews[0]?.previewClassification),
+    productionAssetStatus: profile.productionAssetStatus ?? "WIREFRAME",
+    finalProductionReady: isProductionStatus(profile.productionAssetStatus),
     avatar: safeImage(previews.find((asset) => asset.type === "AVATAR")?.uri, brandAssets.factionMark),
     banner: safeImage(previews.find((asset) => asset.type === "BANNER")?.uri, brandAssets.launchHero),
     samples: normalizedSamples(samples.map((asset, index) => {
@@ -683,7 +691,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
       colorHarmonyScore: quality.colorHarmonyScore,
       duplicateRiskScore: quality.duplicateRiskScore,
       compatibilityScore: quality.compatibilityScore,
-      tier: previewTierLabel(quality.tier, false, "persisted-generator-run", "WIREFRAME_CONCEPT"),
+      tier: previewTierLabel(quality.tier, isProductionStatus(profile.productionAssetStatus), "persisted-generator-run", previewClassForStatus(profile.productionAssetStatus, previews[0]?.previewClassification), profile.productionAssetStatus ?? "WIREFRAME"),
       passed: quality.passed
     },
     distinctiveness: {
@@ -717,8 +725,9 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     rarityWeights: data.rarityTable,
     unlocks: {},
     assetProvider: data.assetProvider,
-    previewClassification: data.previewClassification ?? (data.finalProductionReady ? "PRODUCTION_ASSET_PREVIEW" : "WIREFRAME_CONCEPT"),
-    finalProductionReady: data.finalProductionReady,
+    previewClassification: data.previewClassification ?? previewClassForStatus(data.productionAssetStatus, undefined),
+    productionAssetStatus: data.productionAssetStatus,
+    finalProductionReady: isProductionStatus(data.productionAssetStatus),
     warnings: data.warnings,
     avatar: safeImage(data.avatarPreviewSpec?.uri, brandAssets.factionMark),
     banner: safeImage(data.bannerPreviewSpec?.uri, brandAssets.launchHero),
@@ -744,7 +753,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
       colorHarmonyScore: data.quality.colorHarmonyScore,
       duplicateRiskScore: data.quality.duplicateRiskScore,
       compatibilityScore: data.quality.compatibilityScore,
-      tier: previewTierLabel(data.quality.tier, data.finalProductionReady, data.assetProvider, data.previewClassification),
+      tier: previewTierLabel(data.quality.tier, isProductionStatus(data.productionAssetStatus), data.assetProvider, data.previewClassification, data.productionAssetStatus),
       passed: false
     },
     distinctiveness: {
@@ -777,13 +786,37 @@ function safeImage(src: string | undefined | null, fallback: string) {
 }
 
 function previewStatusLabel(preview: CollectionGeneratorPreview) {
-  if (preview.previewClassification === "WIREFRAME_CONCEPT" || /wireframe|fallback|preview/i.test(preview.assetProvider ?? "")) return "Wireframe concept preview";
+  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Wireframe preview only";
+  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "AI concept preview";
+  if (preview.productionAssetStatus === "FINAL_PRODUCTION") return "Final production assets";
+  if (preview.productionAssetStatus === "ARTIST_APPROVED") return "Artist approved assets";
+  if (preview.productionAssetStatus === "CURATED_LAYER_READY") return "Curated layer ready";
   return "Concept preview";
 }
 
-function previewTierLabel(tier: "BASIC" | "PREMIUM" | "LEGENDARY_READY", finalProductionReady: boolean, assetProvider?: string, previewClassification?: string): CollectionGeneratorPreview["quality"]["tier"] {
-  if (!finalProductionReady && (previewClassification === "WIREFRAME_CONCEPT" || /wireframe|fallback|preview|persisted-generator-run/i.test(assetProvider ?? ""))) return "Wireframe concept";
+function previewTierLabel(tier: "BASIC" | "PREMIUM" | "LEGENDARY_READY", finalProductionReady: boolean, assetProvider?: string, previewClassification?: string, productionAssetStatus?: ProductionAssetStatus): CollectionGeneratorPreview["quality"]["tier"] {
+  if (productionAssetStatus === "WIREFRAME" || (!finalProductionReady && (previewClassification === "WIREFRAME_CONCEPT" || /wireframe|fallback|preview|persisted-generator-run/i.test(assetProvider ?? "")))) return "Wireframe concept";
+  if (productionAssetStatus === "AI_CONCEPT" || previewClassification === "AI_CONCEPT_PREVIEW") return "AI concept";
   return tier === "LEGENDARY_READY" ? "Legendary-ready" : tier === "PREMIUM" ? "Premium" : "Basic";
+}
+
+function previewClassForStatus(status: ProductionAssetStatus | undefined, fallback?: string | null): CollectionGeneratorPreview["previewClassification"] {
+  if (fallback === "WIREFRAME_CONCEPT" || fallback === "AI_CONCEPT_PREVIEW" || fallback === "PRODUCTION_ASSET_PREVIEW") return fallback;
+  if (status === "AI_CONCEPT") return "AI_CONCEPT_PREVIEW";
+  if (isProductionStatus(status)) return "PRODUCTION_ASSET_PREVIEW";
+  return "WIREFRAME_CONCEPT";
+}
+
+function isProductionStatus(status: ProductionAssetStatus | undefined) {
+  return status === "CURATED_LAYER_READY" || status === "ARTIST_APPROVED" || status === "FINAL_PRODUCTION";
+}
+
+function assetStatusLabel(status: ProductionAssetStatus | undefined) {
+  if (status === "FINAL_PRODUCTION") return "Final";
+  if (status === "ARTIST_APPROVED") return "Artist approved";
+  if (status === "CURATED_LAYER_READY") return "Curated layers";
+  if (status === "AI_CONCEPT") return "AI concept";
+  return "Wireframe";
 }
 
 function sourceMetadataFromScan(scan: TokenScan) {

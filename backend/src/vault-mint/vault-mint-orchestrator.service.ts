@@ -77,7 +77,8 @@ export class VaultMintOrchestratorService {
       ownerWallet: normalized.walletAddress,
       qualityTier: quality.tier
     });
-    const assetUri = await this.storage.storeFinalNftAsset(`${mintTx.id}/image.svg`, finalAsset.imageDataUri);
+    const assetUri = finalAsset.imageUri ?? (finalAsset.imageDataUri ? await this.storage.storeFinalNftAsset(`${mintTx.id}/image.png`, finalAsset.imageDataUri) : undefined);
+    if (!assetUri) throw new BadRequestException("Final deterministic render did not return a cached or uploadable asset URI.");
     const metadata = { ...finalAsset.metadata, image: assetUri, assetProduction: finalAsset.manifest };
     const metadataUri = await this.storage.storeFinalNftMetadata(`${mintTx.id}/metadata.json`, metadata);
     return this.prisma.mintTransaction.update({
@@ -243,6 +244,7 @@ export class VaultMintOrchestratorService {
     const productionAssetPolicy =
       brandDna.productionAssetPolicy ?? {
         launchClassification: "CONCEPT_PREVIEW",
+        defaultAssetStatus: "WIREFRAME",
         commonToRareSource: "approved_layer_pack_required",
         epicLegendaryMythicSource: "curated_composition_required",
         aiFinalImageAllowed: false,
@@ -279,6 +281,7 @@ export class VaultMintOrchestratorService {
       visualFingerprint: this.record(record.visualFingerprint),
       assetPackId: record.assetPackId ?? "unknown",
       artSource: record.artSource ?? "PROCEDURAL_FALLBACK",
+      productionAssetStatus: record.productionAssetStatus ?? brandDna.productionAssetPolicy?.defaultAssetStatus ?? "WIREFRAME",
       tenKReadiness: this.record(record.tenKReadinessReport) as GeneratedStyleProfile["tenKReadiness"],
       creativeUniverse,
       productionAssetPolicy: productionAssetPolicy as GeneratedStyleProfile["productionAssetPolicy"]
