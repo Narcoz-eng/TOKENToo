@@ -203,6 +203,7 @@ export class ArtPreviewGeneratorService {
     const plan = this.scenePlan(style, rarity, options.mode, options.seed);
     const [primary = "#79f2ff", secondary = "#111827", ink = "#050712", accent = "#f4f7fb"] = style.colors;
     const background = this.engineBackground(plan, style, w, h, primary, secondary, ink, accent, options.seed);
+    const stage = this.engineStage(plan, w, h, primary, secondary, ink, accent, options.seed);
     const subject = this.engineSubject(plan, style, w, h, primary, secondary, ink, accent, options.seed);
     const event = this.engineEvent(plan, style, w, h, primary, secondary, ink, accent, options.seed);
     const text = this.engineText(plan, options.title, String(options.traits?.mood ?? style.backgroundWorld), w, h, primary, secondary, ink, accent);
@@ -214,6 +215,7 @@ export class ArtPreviewGeneratorService {
     <linearGradient id="sceneLight" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${primary}"/><stop offset="0.5" stop-color="${secondary}"/><stop offset="1" stop-color="${accent}"/></linearGradient>
   </defs>
   ${background}
+  ${stage}
   ${subject}
   ${event}
   ${text}
@@ -251,12 +253,13 @@ export class ArtPreviewGeneratorService {
     };
     const offset = {
       Common: [-0.02, 0.02, 0.96, -3],
-      Uncommon: [-0.11, 0.01, 0.92, 8],
-      Rare: [0.1, -0.02, 1.02, -10],
-      Epic: [-0.16, -0.06, 1.08, 14],
-      Legendary: [0.15, -0.09, 0.78, -16],
-      Mythic: [-0.22, -0.12, 0.68, 22]
+      Uncommon: [-0.14, 0.04, 0.9, 8],
+      Rare: [0.13, -0.03, 1.0, -10],
+      Epic: [-0.19, -0.08, 1.03, 14],
+      Legendary: [0.24, -0.13, 0.66, -18],
+      Mythic: [-0.28, -0.16, 0.56, 24]
     }[rarity];
+    const familyShift = this.familyCameraShift(visual.rendererFamily, rarity);
     return {
       rarity,
       mode,
@@ -264,10 +267,10 @@ export class ArtPreviewGeneratorService {
       engine,
       frame,
       intensity,
-      x: 0.5 + offset[0],
-      y: mode === "banner" ? 0.54 : 0.46 + offset[1],
-      scale: mode === "banner" ? offset[2] * 0.75 : offset[2],
-      tilt: offset[3],
+      x: 0.5 + offset[0] + familyShift.x,
+      y: mode === "banner" ? 0.54 + familyShift.y * 0.35 : 0.46 + offset[1] + familyShift.y,
+      scale: mode === "banner" ? offset[2] * 0.75 : offset[2] * familyShift.scale,
+      tilt: offset[3] + familyShift.tilt,
       cameraVariant: `${cameraVariants[rarity]} / ${frame.camera}`,
       faceVariant: `${faceVariants[rarity]} / ${frame.faceTreatment}`,
       eyeVariant: this.eyeVariant(frame.faceTreatment, rarity),
@@ -279,6 +282,27 @@ export class ArtPreviewGeneratorService {
       eventFrame: frame.event,
       animationCue: frame.animationCue
     };
+  }
+
+  private familyCameraShift(family: VisualDesignSystem["rendererFamily"], rarity: Rarity) {
+    const high = rarity === "Legendary" || rarity === "Mythic";
+    const shifts: Partial<Record<VisualDesignSystem["rendererFamily"], { x: number; y: number; scale: number; tilt: number }>> = {
+      "pixel-topdown": { x: high ? -0.04 : 0.02, y: high ? 0.1 : 0.02, scale: high ? 0.82 : 0.94, tilt: 0 },
+      "anime-portrait": { x: high ? 0.1 : -0.03, y: high ? 0.03 : 0, scale: high ? 0.94 : 1.03, tilt: high ? -5 : 1 },
+      "clay-toy": { x: high ? -0.08 : 0.01, y: high ? 0.08 : 0.03, scale: high ? 0.84 : 0.98, tilt: high ? 4 : 0 },
+      "biohazard-horror": { x: high ? 0.13 : -0.02, y: high ? 0.04 : 0, scale: high ? 0.92 : 1, tilt: high ? -9 : 0 },
+      "terminal-brutalist": { x: high ? -0.16 : 0.04, y: high ? 0.08 : 0, scale: high ? 0.72 : 0.9, tilt: high ? 2 : 0 },
+      "surreal-collage": { x: high ? 0.02 : -0.04, y: high ? -0.02 : 0.02, scale: high ? 0.8 : 1, tilt: high ? 12 : -3 },
+      "sticker-pack": { x: high ? -0.12 : 0.03, y: high ? 0.08 : 0.01, scale: high ? 0.78 : 0.98, tilt: high ? 10 : 0 },
+      "comic-panel": { x: high ? 0.18 : -0.02, y: high ? -0.03 : 0.01, scale: high ? 0.88 : 1, tilt: high ? -12 : 0 },
+      "cinematic-scene": { x: high ? 0.2 : 0.04, y: high ? 0.14 : 0.04, scale: high ? 0.7 : 0.96, tilt: high ? -4 : 0 },
+      "propaganda-poster": { x: high ? 0.03 : 0, y: high ? 0.06 : 0, scale: high ? 0.9 : 1, tilt: 0 },
+      "retro-arcade": { x: high ? -0.08 : 0.02, y: high ? 0.06 : 0, scale: high ? 0.82 : 0.98, tilt: 0 },
+      "low-poly": { x: high ? 0.12 : -0.01, y: high ? 0.04 : 0, scale: high ? 0.76 : 1, tilt: high ? 7 : 0 },
+      "painterly-portrait": { x: high ? -0.09 : 0.02, y: high ? 0.02 : 0, scale: high ? 0.92 : 1, tilt: high ? 5 : 0 },
+      "children-cartoon": { x: high ? -0.1 : 0.04, y: high ? 0.05 : 0, scale: high ? 0.76 : 0.96, tilt: high ? 11 : 0 }
+    };
+    return shifts[family] ?? { x: 0, y: 0, scale: 1, tilt: 0 };
   }
 
   private engineBackground(plan: SceneRenderPlan, style: GeneratedStyleProfile, w: number, h: number, primary: string, secondary: string, ink: string, accent: string, seed: number) {
@@ -306,6 +330,34 @@ export class ArtPreviewGeneratorService {
     if (plan.engine === "sticker-engine") return this.stickerSubject(plan, w, h, primary, secondary, ink, accent);
     if (plan.family === "anime-portrait" || plan.family === "painterly-portrait") return this.portraitSubject(plan, w, h, primary, secondary, ink, accent);
     return this.surrealSubject(plan, w, h, primary, secondary, ink, accent, seed);
+  }
+
+  private engineStage(plan: SceneRenderPlan, w: number, h: number, primary: string, secondary: string, ink: string, accent: string, seed: number) {
+    if (plan.mode !== "nft" && plan.intensity < 5) return "";
+    const density = plan.rarity === "Mythic" ? 9 : plan.rarity === "Legendary" ? 6 : plan.rarity === "Epic" ? 4 : 2;
+    if (plan.engine === "cinematic-engine") {
+      return `<g opacity="0.82"><path d="M0 ${h * 0.74} C${w * 0.24} ${h * 0.56} ${w * 0.68} ${h * 0.84} ${w} ${h * 0.58} V${h} H0Z" fill="${ink}" opacity="0.55"/><rect x="${w * 0.08}" y="${h * 0.18}" width="${w * 0.18}" height="${h * 0.52}" fill="${secondary}" opacity="0.5"/><path d="M${w * 0.04} ${h * 0.35} L${w * 0.86} ${h * 0.08}" stroke="${accent}" stroke-width="${plan.intensity >= 5 ? 10 : 4}" opacity="0.35"/></g>`;
+    }
+    if (plan.engine === "terminal-engine") {
+      return `<g font-family="ui-monospace, Consolas, monospace" opacity="0.86">${Array.from({ length: density }, (_, i) => `<rect x="${40 + ((seed + i * 97) % Math.max(80, w - 260))}" y="${140 + ((seed + i * 71) % Math.max(90, h - 360))}" width="${120 + (i % 3) * 68}" height="${70 + (i % 4) * 42}" fill="${i % 2 ? ink : secondary}" stroke="${primary}" stroke-width="2"/><text x="${50 + ((seed + i * 97) % Math.max(80, w - 260))}" y="${166 + ((seed + i * 71) % Math.max(90, h - 360))}" fill="${accent}" font-size="12">event_${i + 1}</text>`).join("")}</g>`;
+    }
+    if (plan.engine === "pixel-engine" || plan.engine === "arcade-engine") {
+      return `<g shape-rendering="crispEdges" opacity="0.88">${Array.from({ length: density * 3 }, (_, i) => `<rect x="${(seed + i * 53) % w}" y="${180 + ((seed + i * 41) % Math.max(80, h - 360))}" width="${24 + (i % 3) * 16}" height="${24 + (i % 2) * 20}" fill="${i % 3 ? secondary : accent}" stroke="${ink}" stroke-width="4"/>`).join("")}</g>`;
+    }
+    if (plan.engine === "comic-panel-engine") {
+      return `<g opacity="0.9"><path d="M32 120 H${w * 0.47} V${h * 0.45} H32Z M${w * 0.5} 90 H${w - 40} V${h * 0.64} H${w * 0.5}Z M70 ${h * 0.68} H${w - 70} V${h - 96} H70Z" fill="none" stroke="${ink}" stroke-width="${plan.intensity >= 5 ? 12 : 7}"/><path d="M${w * 0.12} ${h * 0.22} C${w * 0.34} ${h * 0.18} ${w * 0.62} ${h * 0.58} ${w * 0.84} ${h * 0.2}" stroke="${primary}" stroke-width="12" fill="none"/></g>`;
+    }
+    if (plan.engine === "horror-engine") {
+      return `<g opacity="0.82"><path d="M${w * 0.12} ${h * 0.2} H${w * 0.88} V${h * 0.78} H${w * 0.12}Z" fill="none" stroke="${accent}" stroke-width="8" stroke-dasharray="26 18"/><path d="M${w * 0.18} ${h * 0.78} C${w * 0.24} ${h * 0.5} ${w * 0.58} ${h * 0.56} ${w * 0.72} ${h * 0.22}" stroke="${primary}" stroke-width="16" fill="none" opacity="0.46"/></g>`;
+    }
+    if (plan.engine === "poster-engine") {
+      return `<g opacity="0.88"><path d="M0 ${h * 0.74} L${w} ${h * 0.58} V${h} H0Z" fill="${secondary}"/><circle cx="${w * 0.18}" cy="${h * 0.25}" r="${plan.intensity >= 5 ? 118 : 72}" fill="${primary}" opacity="0.5"/><path d="M${w * 0.66} 0 V${h}" stroke="${ink}" stroke-width="28" opacity="0.55"/></g>`;
+    }
+    return `<g opacity="0.72">${Array.from({ length: density }, (_, i) => {
+      const x = (seed + i * 101) % w;
+      const y = 150 + ((seed + i * 73) % Math.max(120, h - 340));
+      return `<path d="M${x} ${y} q${80 + i * 8} ${-40 + i * 5} ${150 + i * 9} ${30 + i * 7} t${130 - i * 4} ${20 + i * 9}" stroke="${i % 2 ? secondary : primary}" stroke-width="${8 + (i % 4) * 4}" fill="none"/><circle cx="${(x + 80) % w}" cy="${(y + 40) % h}" r="${24 + i * 4}" fill="${i % 2 ? accent : secondary}" opacity="0.58"/>`;
+    }).join("")}</g>`;
   }
 
   private engineEvent(plan: SceneRenderPlan, style: GeneratedStyleProfile, w: number, h: number, primary: string, secondary: string, ink: string, accent: string, seed: number) {

@@ -72,6 +72,13 @@ type FallbackMetadata = {
   warning?: string;
 };
 
+type IdentityConfidence = {
+  metadataConfidence: number;
+  fallbackConfidence: number;
+  inferredIdentityConfidence: number;
+  breakdown: Record<string, number | string | boolean>;
+};
+
 @Injectable()
 export class TokenScannerService {
   constructor(private readonly prisma: PrismaService) {}
@@ -104,8 +111,11 @@ export class TokenScannerService {
       : [null, null, null, null, null];
     const discoveredUri = this.firstString(solanaMetadata?.metadataUri, dexProfile?.metadataUri, dexSearch?.metadataUri);
     const discoveredOffchain = !offchain.data && discoveredUri ? await this.fetchOffchainJson(discoveredUri) : { data: null as OffchainMetadata | null, warning: undefined };
+    const fallbackSources = { dexScreener, dexProfile, dexSearch, jupiter, solanaMetadata };
     resolved = this.resolveMetadata(mintAddress, asset, offchain.data ?? discoveredOffchain.data, rpcMint, dexScreener, dexProfile, dexSearch, jupiter, solanaMetadata);
-    resolved = this.withInferredIdentitySeed(resolved);
+    resolved = this.withFallbackIdentityDefaults(resolved, mintAddress);
+    const confidence = this.identityConfidence(resolved, Boolean(asset), Boolean(offchain.data ?? discoveredOffchain.data), Object.values(fallbackSources));
+    resolved = this.withInferredIdentitySeed(resolved, confidence);
 
     if (!resolved.name || !resolved.symbol) {
       setLastHeliusErrorCode("TOKEN_METADATA_INCOMPLETE");
@@ -126,7 +136,7 @@ export class TokenScannerService {
       });
     }
 
-    const riskNotes = this.riskNotes(resolved, offchain.warning, discoveredOffchain.warning, heliusWarning, dexScreener?.warning, dexProfile?.warning, dexSearch?.warning, jupiter?.warning, solanaMetadata?.warning);
+    const riskNotes = this.riskNotes(resolved, confidence, offchain.warning, discoveredOffchain.warning, heliusWarning, dexScreener?.warning, dexProfile?.warning, dexSearch?.warning, jupiter?.warning, solanaMetadata?.warning);
     const scan: TokenScan = {
       mint: mintAddress,
       symbol: resolved.symbol,
@@ -142,6 +152,10 @@ export class TokenScannerService {
       extensions: resolved.extensions,
       provider: "helius",
       indexed: Boolean(asset),
+      metadataConfidence: confidence.metadataConfidence,
+      fallbackConfidence: confidence.fallbackConfidence,
+      inferredIdentityConfidence: confidence.inferredIdentityConfidence,
+      confidenceBreakdown: confidence.breakdown,
       riskNotes,
       ageHours: 0,
       liquidityUsd: resolved.liquidityUsd ?? 0,
@@ -153,7 +167,7 @@ export class TokenScannerService {
       reasons: riskNotes
     };
 
-    scan.persistenceWarning = await this.persist(scan, asset, offchain.data ?? discoveredOffchain.data, { dexScreener, dexProfile, dexSearch, jupiter, solanaMetadata });
+    scan.persistenceWarning = await this.persist(scan, asset, offchain.data ?? discoveredOffchain.data, fallbackSources);
     return scan;
   }
 
@@ -424,7 +438,13 @@ export class TokenScannerService {
     const imageUri = this.firstString(offchain?.image, content?.links?.image, heliusMetadata.image, content?.files?.find((file) => file.uri)?.uri, ...fallbackSources.map((source) => source?.imageUri));
     const externalUrl = this.firstString(offchain?.external_url, content?.links?.external_url, heliusMetadata.external_url, ...fallbackSources.map((source) => source?.externalUrl));
     const extensions = this.record(offchain?.extensions ?? heliusMetadata.properties ?? {});
-    const socialLinks = Object.assign({}, this.socialLinks(extensions), ...fallbackSources.map((source) => source?.socialLinks ?? {}));
+    const socialLinks = Object.assign(
+      {},
+      this.socialLinks(extensions),
+      this.socialLinks(this.record(offchain ?? {})),
+      this.linksFromText([offchain?.description, offchain?.external_url, heliusMetadata.description, heliusMetadata.external_url].join(" ")),
+      ...fallbackSources.map((source) => source?.socialLinks ?? {})
+    );
     const fallbackExtensions = Object.assign({}, ...fallbackSources.map((source) => source?.extensions ?? {}));
     const marketSource = fallbackSources.find((source) => source?.liquidityUsd || source?.marketCapUsd || source?.volume24hUsd);
     return {
@@ -444,6 +464,8 @@ export class TokenScannerService {
       extensions: {
         ...extensions,
         ...fallbackExtensions,
+        logoSemanticAnalysis: this.logoSemanticAnalysis(imageUri),
+        tokenNameMorphology: this.nameMorphology(this.firstString(offchain?.name, heliusMetadata.name, ...fallbackSources.map((source) => source?.name)), this.stripNullSymbol(this.firstString(offchain?.symbol, heliusMetadata.symbol, ...fallbackSources.map((source) => source?.symbol)))),
         metadataFallbackProviders: fallbackSources.map((source) => source?.provider).filter(Boolean),
         heliusTokenProgram: asset?.token_info?.token_program,
         rpcWarning: rpcMint.warning,
@@ -454,12 +476,41 @@ export class TokenScannerService {
     };
   }
 
-  private withInferredIdentitySeed<T extends { name?: string; symbol?: string; description?: string; extensions?: Record<string, unknown>; socialLinks?: Record<string, string>; imageUri?: string; metadataUri?: string; supply?: string }>(resolved: T): T {
-    if (resolved.description) return resolved;
-    const seed = this.identitySeed(resolved);
+  private withFallbackIdentityDefaults<T extends { mint?: string; name?: string; symbol?: string; description?: string; extensions?: Record<string, unknown>; socialLinks?: Record<string, string>; imageUri?: string; metadataUri?: string; supply?: string }>(resolved: T, mint: string): T {
+    const morphology = this.nameMorphology(resolved.name, resolved.symbol);
+    const logo = this.logoSemanticAnalysis(resolved.imageUri);
+    const fallbackSymbol = resolved.symbol ?? morphology.symbolCandidate ?? mint.slice(0, 4).toUpperCase();
+    const fallbackName = resolved.name ?? morphology.nameCandidate ?? `Mint ${mint.slice(0, 4)} ${mint.slice(-4)}`;
     return {
       ...resolved,
-      description: seed.description,
+      name: fallbackName,
+      symbol: fallbackSymbol,
+      extensions: {
+        ...(resolved.extensions ?? {}),
+        identityFallbackUsed: !resolved.name || !resolved.symbol,
+        logoSemanticAnalysis: logo,
+        tokenNameMorphology: morphology
+      }
+    };
+  }
+
+  private withInferredIdentitySeed<T extends { name?: string; symbol?: string; description?: string; extensions?: Record<string, unknown>; socialLinks?: Record<string, string>; imageUri?: string; metadataUri?: string; supply?: string }>(resolved: T, confidence: IdentityConfidence): T {
+    const seed = this.identitySeed(resolved, confidence);
+    if (resolved.description && confidence.inferredIdentityConfidence < 35) {
+      return {
+        ...resolved,
+        extensions: {
+          ...(resolved.extensions ?? {}),
+          metadataConfidence: confidence.metadataConfidence,
+          fallbackConfidence: confidence.fallbackConfidence,
+          inferredIdentityConfidence: confidence.inferredIdentityConfidence,
+          confidenceBreakdown: confidence.breakdown
+        }
+      };
+    }
+    return {
+      ...resolved,
+      description: resolved.description ?? seed.description,
       extensions: {
         ...(resolved.extensions ?? {}),
         inferredIdentitySeed: seed,
@@ -468,8 +519,10 @@ export class TokenScannerService {
     };
   }
 
-  private identitySeed(input: { name?: string; symbol?: string; imageUri?: string; socialLinks?: Record<string, string> }) {
-    const text = `${input.name ?? ""} ${input.symbol ?? ""} ${input.imageUri ?? ""} ${Object.keys(input.socialLinks ?? {}).join(" ")}`.toLowerCase();
+  private identitySeed(input: { name?: string; symbol?: string; imageUri?: string; socialLinks?: Record<string, string> }, confidence?: IdentityConfidence) {
+    const morphology = this.nameMorphology(input.name, input.symbol);
+    const logo = this.logoSemanticAnalysis(input.imageUri);
+    const text = `${input.name ?? ""} ${input.symbol ?? ""} ${input.imageUri ?? ""} ${Object.keys(input.socialLinks ?? {}).join(" ")} ${morphology.signals.join(" ")} ${logo.signals.join(" ")}`.toLowerCase();
     if (/hanta|hantavirus|virus|viral|biohazard|infection|infect|pathogen|lab|quarantine|mutation|toxic/.test(text)) {
       return {
         signalWeights: {
@@ -477,10 +530,11 @@ export class TokenScannerService {
           contamination: 0.88,
           mutation: 0.72,
           quarantine: 0.7,
-          memeParanoia: 0.64
+          memeParanoia: 0.64,
+          fallbackConfidence: (confidence?.fallbackConfidence ?? 0) / 100
         },
         inferredSignals: ["medical", "contamination", "mutation", "quarantine", "lab", "fever", "meme paranoia"],
-        confidence: "medium",
+        confidence: confidence && confidence.inferredIdentityConfidence >= 70 ? "high" : "medium",
         official: false,
         description: `${input.name ?? input.symbol ?? "This token"} has sparse official metadata. Internal identity seed inferred from name, symbol, logo URI, socials, and fallback market/profile text: medical contamination, mutation, quarantine, lab, fever, microscopic, and paranoid meme signals.`
       };
@@ -490,10 +544,11 @@ export class TokenScannerService {
         tokenNameMorphology: 0.55,
         symbolShape: 0.48,
         logoUriLanguage: input.imageUri ? 0.42 : 0,
-        socialPresence: Object.keys(input.socialLinks ?? {}).length ? 0.38 : 0
+        socialPresence: Object.keys(input.socialLinks ?? {}).length ? 0.38 : 0,
+        fallbackConfidence: (confidence?.fallbackConfidence ?? 0) / 100
       },
-      inferredSignals: ["token name morphology", "symbol", "logo URI language", "social context"],
-      confidence: "low",
+      inferredSignals: [...morphology.signals, ...logo.signals, "token name morphology", "symbol", "social context"],
+      confidence: confidence && confidence.inferredIdentityConfidence >= 55 ? "medium" : "low",
       official: false,
       description: `${input.name ?? input.symbol ?? "This token"} has sparse official metadata. Internal identity seed inferred from token name morphology, symbol, image/logo URI, social context, and fallback market/profile text; not official token metadata.`
     };
@@ -551,20 +606,24 @@ export class TokenScannerService {
       });
       return undefined;
     } catch (error) {
-      if (isDatabaseSetupError(error)) return "Token metadata resolved but could not be persisted: DATABASE_URL password missing or malformed.";
+      if (isDatabaseSetupError(error)) return `Token metadata resolved but could not be persisted: ${this.sanitizeErrorMessage(error instanceof Error ? error.message : String(error))}`;
       if (error instanceof Error) return `Token metadata resolved but could not be persisted: ${this.sanitizeErrorMessage(error.message)}`;
       return "Token metadata resolved but could not be persisted.";
     }
   }
 
-  private riskNotes(input: { metadataUri?: string; imageUri?: string; description?: string; socialLinks?: Record<string, string>; supply?: string }, ...warnings: Array<string | undefined>) {
+  private riskNotes(input: { metadataUri?: string; imageUri?: string; description?: string; socialLinks?: Record<string, string>; supply?: string; liquidityUsd?: number; marketCapUsd?: number; volume24hUsd?: number }, confidence: IdentityConfidence, ...warnings: Array<string | undefined>) {
+    const hasMarketData = Boolean(input.liquidityUsd || input.marketCapUsd || input.volume24hUsd);
     return [
-      "market_data_not_scanned_no_liquidity_holder_or_volume_claims",
-      input.metadataUri ? null : "missing_metadata_uri",
+      hasMarketData ? "market_data_enriched_by_fallback_provider" : "market_data_unavailable_no_liquidity_holder_or_volume_claims",
+      input.metadataUri ? null : confidence.inferredIdentityConfidence >= 55 ? "metadata_uri_absent_identity_inferred_with_confidence" : "missing_metadata_uri",
       input.imageUri ? null : "missing_logo_or_image",
       input.description ? null : "missing_description",
       input.socialLinks && Object.keys(input.socialLinks).length ? null : "no_social_links_found",
-      input.supply ? null : "rpc_supply_unavailable",
+      input.supply ? null : "rpc_supply_unavailable_supply_claims_disabled",
+      `metadata_confidence_${confidence.metadataConfidence}`,
+      `fallback_confidence_${confidence.fallbackConfidence}`,
+      `inferred_identity_confidence_${confidence.inferredIdentityConfidence}`,
       ...warnings.map((warning) => warning ?? null)
     ].filter(Boolean) as string[];
   }
@@ -580,11 +639,98 @@ export class TokenScannerService {
   }
 
   private socialLinks(extensions: Record<string, unknown>) {
-    const keys = ["website", "twitter", "x", "telegram", "discord", "github", "medium", "instagram"];
+    const keys = ["website", "external_url", "externalUrl", "twitter", "x", "telegram", "discord", "github", "medium", "instagram"];
     return Object.fromEntries(keys.flatMap((key) => {
       const value = extensions[key];
-      return typeof value === "string" && value.trim() ? [[key, value.trim()]] : [];
+      return typeof value === "string" && value.trim() ? [[key === "external_url" || key === "externalUrl" ? "website" : key, value.trim()]] : [];
     }));
+  }
+
+  private identityConfidence(input: { metadataUri?: string; imageUri?: string; description?: string; socialLinks?: Record<string, string>; extensions?: Record<string, unknown>; supply?: string; liquidityUsd?: number; marketCapUsd?: number; volume24hUsd?: number }, heliusIndexed: boolean, offchainResolved: boolean, fallbackSources: Array<FallbackMetadata | null>) {
+    const fallbackHits = fallbackSources.filter((source) => source && !source.warning && (source.name || source.symbol || source.imageUri || source.socialLinks || source.liquidityUsd || source.marketCapUsd || source.volume24hUsd)).length;
+    const socialCount = Object.keys(input.socialLinks ?? {}).length;
+    const metadataConfidence = this.clampConfidence((heliusIndexed ? 35 : 0) + (offchainResolved ? 25 : 0) + (input.metadataUri ? 12 : 0) + (input.imageUri ? 10 : 0) + (input.description ? 10 : 0) + Math.min(8, socialCount * 2));
+    const fallbackConfidence = this.clampConfidence(fallbackHits * 18 + (input.liquidityUsd || input.marketCapUsd || input.volume24hUsd ? 18 : 0) + (input.imageUri ? 8 : 0) + Math.min(12, socialCount * 3));
+    const inferredIdentityConfidence = this.clampConfidence(Math.round((metadataConfidence * 0.45) + (fallbackConfidence * 0.45) + (this.record(input.extensions?.tokenNameMorphology).signals ? 6 : 0) + (this.record(input.extensions?.logoSemanticAnalysis).signals ? 6 : 0)));
+    return {
+      metadataConfidence,
+      fallbackConfidence,
+      inferredIdentityConfidence,
+      breakdown: {
+        heliusIndexed,
+        offchainResolved,
+        fallbackProviderHits: fallbackHits,
+        socialLinkCount: socialCount,
+        hasMetadataUri: Boolean(input.metadataUri),
+        hasImage: Boolean(input.imageUri),
+        hasDescription: Boolean(input.description),
+        hasMarketData: Boolean(input.liquidityUsd || input.marketCapUsd || input.volume24hUsd)
+      }
+    };
+  }
+
+  private nameMorphology(name?: string, symbol?: string) {
+    const text = `${name ?? ""} ${symbol ?? ""}`.toLowerCase();
+    const signals = [
+      /hanta|virus|bio|lab|toxic|mutat|fever/.test(text) ? "medical contamination morphology" : null,
+      /dog|doge|shib|inu|paw|bone/.test(text) ? "canine community morphology" : null,
+      /cat|meow|claw|kitty/.test(text) ? "feline community morphology" : null,
+      /frog|pepe|bog|ribbit|pond/.test(text) ? "amphibian meme morphology" : null,
+      /ai|agent|bot|node|reactor|compute/.test(text) ? "machine intelligence morphology" : null,
+      /chart|degen|candle|market|pump|index/.test(text) ? "market stress morphology" : null,
+      /skull|bone|crypt|dark|ash/.test(text) ? "dark ritual morphology" : null,
+      /cute|toy|toast|tiny|soft/.test(text) ? "soft-play morphology" : null,
+      /vapor|dream|liminal|mall|pool/.test(text) ? "surreal dream morphology" : null
+    ].filter(Boolean) as string[];
+    return {
+      signals,
+      symbolLength: symbol?.length ?? 0,
+      nameWordCount: name?.split(/\W+/).filter(Boolean).length ?? 0,
+      symbolCandidate: symbol,
+      nameCandidate: name
+    };
+  }
+
+  private logoSemanticAnalysis(imageUri?: string) {
+    const text = (imageUri ?? "").toLowerCase();
+    const signals = [
+      /hanta|virus|bio|lab|toxic|mutat|fever/.test(text) ? "logo uri medical contamination signal" : null,
+      /dog|doge|shib|inu|paw|bone/.test(text) ? "logo uri canine signal" : null,
+      /cat|meow|claw|kitty/.test(text) ? "logo uri feline signal" : null,
+      /frog|pepe|bog|ribbit|pond/.test(text) ? "logo uri amphibian signal" : null,
+      /ai|agent|bot|node|reactor|compute/.test(text) ? "logo uri machine signal" : null,
+      /chart|degen|candle|market|pump|index/.test(text) ? "logo uri market signal" : null,
+      /skull|bone|crypt|dark|ash/.test(text) ? "logo uri dark ritual signal" : null,
+      /cute|toy|toast|tiny|soft/.test(text) ? "logo uri soft-play signal" : null,
+      /vapor|dream|liminal|mall|pool/.test(text) ? "logo uri surreal signal" : null
+    ].filter(Boolean) as string[];
+    return { signals, hasLogoUri: Boolean(imageUri), uriHost: imageUri ? this.safeHost(imageUri) : undefined };
+  }
+
+  private linksFromText(text: string) {
+    const matches = text.match(/https?:\/\/[^\s"'<>),]+/gi) ?? [];
+    return Object.fromEntries(matches.slice(0, 8).map((url, index) => [this.linkKey(url, index), url]));
+  }
+
+  private linkKey(url: string, index: number) {
+    const lower = url.toLowerCase();
+    if (lower.includes("twitter.com") || lower.includes("x.com")) return "twitter";
+    if (lower.includes("t.me") || lower.includes("telegram")) return "telegram";
+    if (lower.includes("discord")) return "discord";
+    if (lower.includes("github")) return "github";
+    return index === 0 ? "website" : `website${index + 1}`;
+  }
+
+  private safeHost(value: string) {
+    try {
+      return new URL(this.gatewayUrl(value) ?? value).hostname;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private clampConfidence(value: number) {
+    return Math.max(0, Math.min(100, Math.round(value)));
   }
 
   private gatewayUrl(uri: string) {
@@ -635,6 +781,8 @@ export class TokenScannerService {
 
   private sanitizeErrorMessage(message: string) {
     if (/SASL: SCRAM-SERVER-FIRST-MESSAGE|client password must be a string/i.test(message)) return "DATABASE_URL password missing or malformed.";
+    if (/self-signed certificate in certificate chain|unable to verify the first certificate/i.test(message)) return "Database TLS certificate could not be verified. Use sslmode=require with DATABASE_SSL_NO_VERIFY=true only for trusted self-signed environments, or configure a valid sslrootcert.";
+    if (/Invalid `?prisma\.\w+\.\w+\(\)`? invocation/i.test(message)) return "Database write failed. Check DATABASE_URL, TLS settings, and migration status.";
     return message.replace(/api-key=[^&\s]+/gi, "api-key=...").replace(/password=[^&\s]+/gi, "password=...").slice(0, 240);
   }
 

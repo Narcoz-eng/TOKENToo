@@ -17,6 +17,9 @@ export function isDatabaseSetupError(error: unknown) {
     message.includes("ECIRCUITBREAKER") ||
     message.includes("SASL: SCRAM-SERVER-FIRST-MESSAGE") ||
     message.includes("client password must be a string") ||
+    message.includes("self-signed certificate in certificate chain") ||
+    message.includes("unable to verify the first certificate") ||
+    message.includes("certificate has expired") ||
     message.includes("too many authentication failures") ||
     message.includes("Authentication failed against the database server") ||
     message.includes("Can't reach database server") ||
@@ -29,5 +32,6 @@ export function databaseSetupMessage() {
   const diagnostics = databaseUrlDiagnostics();
   if (diagnostics.databaseConnectionStatus === "password-missing-or-malformed") return "DATABASE_URL password missing or malformed.";
   if (diagnostics.databaseConnectionStatus === "invalid-url") return "DATABASE_URL is not a valid PostgreSQL connection URL.";
+  if (diagnostics.databaseSslVerification === "system-ca") return "Database TLS verification failed or database is unreachable. For Supabase/Neon use sslmode=require; for private self-signed Postgres set DATABASE_SSL_NO_VERIFY=true only in trusted environments or configure sslrootcert.";
   return "Database setup required. Check DATABASE_URL and run migrations before using this endpoint.";
 }

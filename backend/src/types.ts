@@ -13,6 +13,10 @@ export type TokenScan = {
   extensions?: Record<string, unknown>;
   provider: "helius";
   indexed: boolean;
+  metadataConfidence?: number;
+  fallbackConfidence?: number;
+  inferredIdentityConfidence?: number;
+  confidenceBreakdown?: Record<string, number | string | boolean>;
   riskNotes: string[];
   persistenceWarning?: string;
   ageHours: number;

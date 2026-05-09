@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { databaseUrlDiagnostics, migrationDatabaseUrl, runtimeDatabaseUrl } from "./database-url";
+import { databasePoolConfig, databaseUrlDiagnostics, migrationDatabaseUrl, normalizeDatabaseUrl, runtimeDatabaseUrl } from "./database-url";
 
 function run() {
   usesValidVercelFallbackWhenDatabaseUrlIsPlaceholder();
   keepsDatabaseUrlWhenItIsValid();
   reportsPasswordProblemWhenNoValidFallbackExists();
   usesDirectUrlFallbacksForMigrations();
+  normalizesSupabaseSslRequire();
+  supportsNoVerifyForTrustedSelfSignedDatabases();
   console.log("database-url tests passed");
 }
 
@@ -49,6 +51,30 @@ function usesDirectUrlFallbacksForMigrations() {
   const diagnostics = databaseUrlDiagnostics(env);
   assert.equal(migrationDatabaseUrl(env), env.POSTGRES_URL_NON_POOLING);
   assert.equal(diagnostics.directUrlSource, "POSTGRES_URL_NON_POOLING");
+}
+
+function normalizesSupabaseSslRequire() {
+  const databaseUrl = "postgresql://postgres.project:primary-pass@aws-0-eu-west-1.pooler.supabase.com:6543/postgres";
+  const env = {
+    DATABASE_URL: databaseUrl
+  } as NodeJS.ProcessEnv;
+  const normalized = normalizeDatabaseUrl(databaseUrl, env);
+  const diagnostics = databaseUrlDiagnostics(env);
+  assert.match(normalized, /sslmode=require/);
+  assert.equal(diagnostics.databaseSslMode, "require");
+  assert.equal(diagnostics.databaseSslVerification, "system-ca");
+}
+
+function supportsNoVerifyForTrustedSelfSignedDatabases() {
+  const databaseUrl = "postgresql://postgres:primary-pass@selfsigned.internal:5432/app?sslmode=require";
+  const env = {
+    DATABASE_URL: databaseUrl,
+    DATABASE_SSL_NO_VERIFY: "true"
+  } as NodeJS.ProcessEnv;
+  const config = databasePoolConfig(databaseUrl, env);
+  assert.equal((config.ssl as { rejectUnauthorized?: boolean }).rejectUnauthorized, false);
+  assert.match(config.connectionString, /uselibpqcompat=true/);
+  assert.equal(databaseUrlDiagnostics(env).databaseSslVerification, "no-verify");
 }
 
 run();
