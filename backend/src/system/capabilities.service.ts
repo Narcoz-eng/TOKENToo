@@ -112,7 +112,7 @@ export class CapabilitiesService {
     };
   }
 
-  async status() {
+  async status(options: { includeTechnicalDiagnostics?: boolean } = {}) {
     const heliusConfig = normalizeHeliusConfig();
     const [databaseAvailable, heliusReachable, programAccount] = await Promise.all([
       this.databaseAvailable(),
@@ -143,18 +143,23 @@ export class CapabilitiesService {
       tokenMetadataAvailable: this.tokenMetadataAvailable(heliusConfigured && heliusReachable, programAccount.executable)
     };
 
-    const warnings = this.warnings(capabilities);
-    const setupModes = this.setupModes(capabilities);
+    const includeTechnicalDiagnostics = options.includeTechnicalDiagnostics ?? this.includeTechnicalDiagnostics();
+    const technicalSetupModes = this.setupModes(capabilities);
+    const warnings = includeTechnicalDiagnostics ? this.warnings(capabilities) : this.publicWarnings(capabilities, technicalSetupModes);
+    const setupModes = includeTechnicalDiagnostics ? technicalSetupModes : this.publicSetupModes(capabilities, technicalSetupModes);
+    const responseCapabilities: Record<string, boolean> = includeTechnicalDiagnostics ? capabilities : this.publicCapabilities(capabilities, technicalSetupModes);
     return {
       ok: true,
       mode: process.env.APP_MODE ?? process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
       singleUserMode: (process.env.SINGLE_USER_MODE ?? "false") === "true",
       rpcUrl: this.sanitizedRpcUrl(),
       cluster: this.cluster(),
-      programId: process.env.PROGRAM_ID ?? null,
+      programId: includeTechnicalDiagnostics ? process.env.PROGRAM_ID ?? null : null,
       setupModes,
-      setupChecklist: this.setupChecklist(capabilities, setupModes),
-      capabilities,
+      setupChecklist: includeTechnicalDiagnostics ? this.setupChecklist(capabilities, technicalSetupModes) : this.publicSetupChecklist(capabilities, technicalSetupModes),
+      publicReadiness: this.publicReadiness(capabilities, technicalSetupModes),
+      technicalDiagnosticsEnabled: includeTechnicalDiagnostics,
+      capabilities: responseCapabilities,
       warnings
     };
   }
@@ -163,7 +168,7 @@ export class CapabilitiesService {
     const heliusConfig = normalizeHeliusConfig();
     const heliusReachable = await this.heliusReachable(heliusConfig);
     const database = databaseUrlDiagnostics();
-    const status = await this.status();
+    const status = await this.status({ includeTechnicalDiagnostics: true });
     const ready = await this.ready();
     return {
       ok: true,
@@ -379,6 +384,116 @@ export class CapabilitiesService {
       "POSTGRES_URL_NON_POOLING",
       "POSTGRES_PASSWORD"
     ];
+  }
+
+  private includeTechnicalDiagnostics() {
+    return (process.env.NODE_ENV ?? "development") !== "production" || (process.env.ENABLE_PUBLIC_TECHNICAL_DIAGNOSTICS ?? "false") === "true";
+  }
+
+  private publicReadiness(capabilities: SystemCapabilities, setupModes: SetupMode[]) {
+    const creativePreviewReady = setupModes.find((mode) => mode.id === "creative-preview")?.ready ?? false;
+    const launchAvailable = Boolean(setupModes.find((mode) => mode.id === "devnet-test-launch")?.ready || setupModes.find((mode) => mode.id === "production-launch")?.ready);
+    return {
+      professionalPreviewReady: creativePreviewReady,
+      launchAvailable,
+      mintingAvailable: launchAvailable && capabilities.productionStorageAvailable,
+      creatorSetupRequired: !launchAvailable,
+      messages: [
+        creativePreviewReady ? "Creative DNA ready" : "Professional preview not ready yet",
+        launchAvailable ? "Launch path available" : "Launch is not available yet",
+        launchAvailable && capabilities.productionStorageAvailable ? "Minting setup ready" : "Minting is temporarily unavailable",
+        launchAvailable ? "Ready for creator review" : "Creator setup required"
+      ]
+    };
+  }
+
+  private publicWarnings(capabilities: SystemCapabilities, setupModes: SetupMode[]) {
+    return this.publicReadiness(capabilities, setupModes).messages.filter((message) =>
+      message === "Professional preview not ready yet" ||
+      message === "Launch is not available yet" ||
+      message === "Minting is temporarily unavailable" ||
+      message === "Creator setup required"
+    );
+  }
+
+  private publicSetupModes(capabilities: SystemCapabilities, setupModes: SetupMode[]): SetupMode[] {
+    const readiness = this.publicReadiness(capabilities, setupModes);
+    return [
+      {
+        id: "creative-preview",
+        label: "Creative Preview",
+        ready: readiness.professionalPreviewReady,
+        output: readiness.professionalPreviewReady ? "Creative DNA ready." : "Professional preview not ready yet.",
+        missing: readiness.professionalPreviewReady ? [] : ["Professional preview not ready yet"],
+        blockedBy: readiness.professionalPreviewReady ? [] : ["Creator setup required"]
+      },
+      {
+        id: "devnet-test-launch",
+        label: "Launch Readiness",
+        ready: readiness.launchAvailable,
+        output: readiness.launchAvailable ? "Launch path available." : "Launch is not available yet.",
+        missing: readiness.launchAvailable ? [] : ["Launch is not available yet"],
+        blockedBy: readiness.launchAvailable ? [] : ["Creator setup required"]
+      },
+      {
+        id: "production-launch",
+        label: "Minting Readiness",
+        ready: readiness.mintingAvailable,
+        output: readiness.mintingAvailable ? "Minting setup ready." : "Minting is temporarily unavailable.",
+        missing: readiness.mintingAvailable ? [] : ["Minting is temporarily unavailable"],
+        blockedBy: readiness.mintingAvailable ? [] : ["Creator setup required"]
+      }
+    ];
+  }
+
+  private publicSetupChecklist(capabilities: SystemCapabilities, setupModes: SetupMode[]) {
+    const readiness = this.publicReadiness(capabilities, setupModes);
+    return {
+      storageProvider: "managed",
+      creativePreviewReady: readiness.professionalPreviewReady,
+      devnetLaunchReady: readiness.launchAvailable,
+      productionLaunchReady: readiness.launchAvailable && readiness.mintingAvailable,
+      items: [
+        {
+          key: "PROFESSIONAL_PREVIEW",
+          label: "Professional preview",
+          ok: readiness.professionalPreviewReady,
+          requiredFor: ["Creative Preview"],
+          fix: "Professional preview not ready yet."
+        },
+        {
+          key: "LAUNCH_AVAILABILITY",
+          label: "Launch availability",
+          ok: readiness.launchAvailable,
+          requiredFor: ["Launch"],
+          fix: "Launch is not available yet."
+        },
+        {
+          key: "MINTING_AVAILABILITY",
+          label: "Minting availability",
+          ok: readiness.mintingAvailable,
+          requiredFor: ["Minting"],
+          fix: "Minting is temporarily unavailable."
+        },
+        {
+          key: "CREATOR_SETUP",
+          label: "Creator setup",
+          ok: !readiness.creatorSetupRequired,
+          requiredFor: ["Creator Review"],
+          fix: "Creator setup required."
+        }
+      ]
+    };
+  }
+
+  private publicCapabilities(capabilities: SystemCapabilities, setupModes: SetupMode[]) {
+    const readiness = this.publicReadiness(capabilities, setupModes);
+    return {
+      professionalPreviewReady: readiness.professionalPreviewReady,
+      launchAvailable: readiness.launchAvailable,
+      mintingAvailable: readiness.mintingAvailable,
+      creatorSetupRequired: readiness.creatorSetupRequired
+    };
   }
 
   private setupModes(capabilities: SystemCapabilities): SetupMode[] {

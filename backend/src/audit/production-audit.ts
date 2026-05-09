@@ -25,8 +25,10 @@ async function main() {
 
   const createPage = readFileSync(resolve(root, "frontend/app/create-collection/page.tsx"), "utf8");
   requireCheck(createPage.includes("Token CA / mint address") && createPage.includes("/tokens/") && createPage.includes("Optional Overrides"), "Create Collection is not CA-first.", issues);
+  requireCheck(createPage.includes("samples: []") && createPage.includes("PublicReadinessPanel") && createPage.includes("showPrivateDiagnostics"), "Create Collection must not fabricate fallback NFT art or expose private setup diagnostics publicly.", issues);
   const collectionPreview = readFileSync(resolve(root, "frontend/components/CollectionPreview.tsx"), "utf8");
-  requireCheck(collectionPreview.includes("Professional Preview Required") && collectionPreview.includes("Wireframe planning/debug assets"), "Wireframe assets must be collapsed behind a debug/planning section in the creator preview.", issues);
+  requireCheck(collectionPreview.includes("Professional Preview Required") && collectionPreview.includes("Wireframe planning specs"), "Wireframe assets must be collapsed behind a debug/planning section in the creator preview.", issues);
+  requireCheck(collectionPreview.includes("PendingVaultVisuals") && collectionPreview.includes("WireframeSpecCard") && !collectionPreview.includes("fallbackSamples"), "Wireframe previews must render as planning specs, not NFT cards or fallback vault art.", issues);
 
   checks.programIds = programIdCheck(root, issues);
   checks.rarity = rarityCheck(issues);

@@ -12,6 +12,7 @@ import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { CollectionGeneratorPreview } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
+import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { cn } from "@/lib/utils";
 
 type Preset = { id: string; name: string; artStyle: string; mood: string };
@@ -33,6 +34,10 @@ type SystemCapabilities = {
   demoCuratedLayerPackEnabled?: boolean;
   demoCuratedLayerPackAllowed?: boolean;
   productionStorageAvailable?: boolean;
+  professionalPreviewReady?: boolean;
+  launchAvailable?: boolean;
+  mintingAvailable?: boolean;
+  creatorSetupRequired?: boolean;
 };
 type SetupMode = {
   id: "creative-preview" | "devnet-test-launch" | "production-launch";
@@ -62,6 +67,14 @@ type SystemCapabilitiesResponse = {
   capabilities: SystemCapabilities;
   setupModes: SetupMode[];
   setupChecklist: SetupChecklist;
+  publicReadiness?: {
+    professionalPreviewReady: boolean;
+    launchAvailable: boolean;
+    mintingAvailable: boolean;
+    creatorSetupRequired: boolean;
+    messages: string[];
+  };
+  technicalDiagnosticsEnabled?: boolean;
   warnings: string[];
 };
 type GeneratorRun = {
@@ -237,7 +250,9 @@ export default function CreateCollectionPage() {
   const activeStep = launchResult ? 4 : run?.status === "APPROVED" ? 3 : preview ? 2 : scan ? 1 : 0;
   const setup = capabilityState.data?.setupChecklist;
   const capabilities = capabilityState.data?.capabilities;
+  const privateDiagnostics = showPrivateDiagnostics(walletAuth.address);
   const canGenerateAiConcept = Boolean(scan && setup?.creativePreviewReady);
+  const canSaveDraft = Boolean(scan && walletAuth.connected && (privateDiagnostics ? capabilities?.databaseAvailable : setup?.creativePreviewReady));
   const launchEnvironmentReady = Boolean(setup?.devnetLaunchReady || setup?.productionLaunchReady);
 
   useEffect(() => {
@@ -436,9 +451,9 @@ export default function CreateCollectionPage() {
 
         {error ? <ProductNotice tone="red" message={error} /> : null}
         {walletAuth.error ? <ProductNotice tone="red" message={walletAuth.error} /> : null}
-        <div className="opacity-80">
+        {privateDiagnostics ? <div className="opacity-80">
           <SetupWarning warnings={previewOnly?.warnings?.slice(0, 1)} />
-        </div>
+        </div> : null}
 
         <div className="grid gap-6 xl:grid-cols-[430px_minmax(0,1fr)]">
           <aside className="space-y-5">
@@ -494,7 +509,7 @@ export default function CreateCollectionPage() {
 
             <SectionCard title="Vault Collection" className="p-5">
               <div className="grid gap-3 sm:grid-cols-3">
-                <MiniControl icon={LockKeyhole} label="Vault NFTs" value="10k-ready" />
+                <MiniControl icon={LockKeyhole} label="Vault visuals" value={isWireframePreview(studioPreview) ? "Pending concept" : "Preview ready"} />
                 <MiniControl icon={Swords} label="Raids" value="Enabled" />
                 <MiniControl icon={Zap} label="Staking" value="Ready" />
               </div>
@@ -516,7 +531,7 @@ export default function CreateCollectionPage() {
               <button type="button" onClick={generatePreview} disabled={loading || !canGenerateAiConcept} className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
                 {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate AI Concept Preview
               </button>
-              <button type="button" onClick={createRun} disabled={loading || !scan || !walletAuth.connected || !capabilityState.data?.capabilities?.databaseAvailable} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-45">
+              <button type="button" onClick={createRun} disabled={loading || !canSaveDraft} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-45">
                 <ShieldCheck className="size-4" /> Save Launch Draft
               </button>
             </div>
@@ -525,25 +540,34 @@ export default function CreateCollectionPage() {
           <main className="space-y-6">
             <LiveLaunchPreview preview={studioPreview} launchResult={launchResult} />
 
-            <SetupChecklistPanel
-              setup={setup}
-              modes={capabilityState.data?.setupModes ?? []}
-              capabilities={capabilities ?? {}}
-              loading={loading || capabilityState.loading}
-              message={setupActionMessage}
-              onGenerateAiConcept={generatePreview}
-              onUseDemoPack={useDemoCuratedLayerPack}
-              onAttachLayerPack={attachCuratedLayerPack}
-              onValidateProgram={() => validateSetup("program")}
-              onValidateStorage={() => validateSetup("storage")}
-              canGenerateAiConcept={canGenerateAiConcept}
-            />
+            {privateDiagnostics ? (
+              <SetupChecklistPanel
+                setup={setup}
+                modes={capabilityState.data?.setupModes ?? []}
+                capabilities={capabilities ?? {}}
+                loading={loading || capabilityState.loading}
+                message={setupActionMessage}
+                onGenerateAiConcept={generatePreview}
+                onUseDemoPack={useDemoCuratedLayerPack}
+                onAttachLayerPack={attachCuratedLayerPack}
+                onValidateProgram={() => validateSetup("program")}
+                onValidateStorage={() => validateSetup("storage")}
+                canGenerateAiConcept={canGenerateAiConcept}
+              />
+            ) : (
+              <PublicReadinessPanel
+                setup={setup}
+                loading={loading || capabilityState.loading}
+                canGenerateAiConcept={canGenerateAiConcept}
+                onGenerateAiConcept={generatePreview}
+              />
+            )}
 
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
               <SectionCard title="Launch Readiness" className="p-5">
                 <div className="grid gap-3 md:grid-cols-2">
                   <ReadinessItem label="Brand direction" complete={Boolean(tokenName || preview)} />
-                  <ReadinessItem label="Vault NFT preview" complete={Boolean(preview)} />
+                  <ReadinessItem label="Professional concept preview" complete={Boolean(preview && !isWireframePreview(preview))} />
                   <ReadinessItem label="Quality reviewed" complete={Boolean(latestQuality?.passed && latestQuality.tier !== "BASIC")} />
                   <ReadinessItem label="Founder approval" complete={approvalConfirmed} />
                 </div>
@@ -571,7 +595,7 @@ export default function CreateCollectionPage() {
               </SectionCard>
             </div>
 
-            <CollectionPreview preview={studioPreview} compact={!preview} />
+            <CollectionPreview preview={studioPreview} compact={!preview} onGenerateAiConcept={generatePreview} canGenerateAiConcept={canGenerateAiConcept} loading={loading} />
           </main>
         </div>
       </div>
@@ -606,7 +630,7 @@ function SetupChecklistPanel({
 }) {
   const checklist = setup?.items ?? defaultSetupItems();
   return (
-    <SectionCard title="Setup Checklist" className="p-5">
+    <SectionCard title="Private Setup Diagnostics" className="p-5">
       <div className="grid gap-3 lg:grid-cols-3">
         {modes.map((mode) => (
           <div key={mode.id} className={cn("rounded-md border p-4", mode.ready ? "border-vault-green/45 bg-vault-green/8" : "border-vault-gold/35 bg-vault-gold/8")}>
@@ -639,6 +663,35 @@ function SetupChecklistPanel({
         <ActionButton icon={ShieldCheck} label="Validate Storage" disabled={loading} onClick={onValidateStorage} />
       </div>
     </SectionCard>
+  );
+}
+
+function PublicReadinessPanel({ setup, loading, canGenerateAiConcept, onGenerateAiConcept }: { setup?: SetupChecklist; loading: boolean; canGenerateAiConcept: boolean; onGenerateAiConcept: () => void }) {
+  const launchReady = Boolean(setup?.devnetLaunchReady || setup?.productionLaunchReady);
+  const creativeReady = Boolean(setup?.creativePreviewReady);
+  return (
+    <SectionCard title="Readiness Summary" className="p-5">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <PublicReadinessItem label="Professional preview" value={creativeReady ? "Creative DNA ready" : "Professional preview not ready yet"} ready={creativeReady} />
+        <PublicReadinessItem label="Launch" value={launchReady ? "Launch path available" : "Launch is not available yet"} ready={launchReady} />
+        <PublicReadinessItem label="Minting" value={launchReady ? "Minting setup ready" : "Minting is temporarily unavailable"} ready={launchReady} />
+        <PublicReadinessItem label="Creator setup" value={launchReady ? "Ready for review" : "Creator setup required"} ready={launchReady} />
+      </div>
+      <div className="mt-5 flex flex-wrap gap-3">
+        <button type="button" onClick={onGenerateAiConcept} disabled={loading || !canGenerateAiConcept} className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
+          <Sparkles className="size-4" /> Generate AI Concept Preview
+        </button>
+      </div>
+    </SectionCard>
+  );
+}
+
+function PublicReadinessItem({ label, value, ready }: { label: string; value: string; ready: boolean }) {
+  return (
+    <div className={cn("rounded-md border p-4", ready ? "border-vault-green/35 bg-vault-green/8" : "border-vault-line bg-black/25")}>
+      <p className="text-xs font-black uppercase text-slate-500">{label}</p>
+      <p className={cn("mt-2 text-sm font-bold", ready ? "text-vault-green" : "text-slate-200")}>{value}</p>
+    </div>
   );
 }
 
@@ -710,9 +763,14 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
           </div>
           <h2 className="mt-4 text-4xl font-black leading-tight">{preview.collection}</h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{preview.lore}</p>
-          {wireframeOnly ? <p className="mt-3 max-w-2xl text-xs font-bold text-vault-gold">Professional concept imagery is not available yet. Creative DNA is ready; wireframes stay in debug review.</p> : null}
+          {wireframeOnly ? (
+            <div className="mt-3 max-w-2xl rounded-md border border-vault-gold/30 bg-vault-gold/8 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
+              <p>Professional concept imagery is not available yet. Creative DNA is ready; wireframes stay in debug review.</p>
+              <p className="mt-1">Vault NFT visuals pending professional concept or curated layer pack.</p>
+            </div>
+          ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
-            {["Vault NFTs", "Raid Rooms", "Staking Hooks", "Faction Identity"].map((tag) => (
+            {(wireframeOnly ? ["Creative DNA", "Rarity Plan", "Trait Taxonomy", "Faction Identity"] : ["Vault NFTs", "Raid Rooms", "Staking Hooks", "Faction Identity"]).map((tag) => (
               <span key={tag} className="rounded-md border border-vault-cyan/25 bg-black/35 px-3 py-2 text-xs font-bold text-vault-cyan">{tag}</span>
             ))}
           </div>
@@ -832,14 +890,7 @@ function fallbackPreview(tokenName: string, tokenSymbol: string, description: st
     finalProductionReady: false,
     avatar: brandAssets.factionMark,
     banner: brandAssets.launchHero,
-    samples: brandAssets.nftVaults.map((image, index) => ({
-      id: `curated-${index}`,
-      name: [`Vault Relic #001`, `Vault Key #014`, `Founder Crown #077`][index],
-      image,
-      rarity: ["Rare", "Epic", "Legendary"][index],
-      role: ["Vault Raider", "Key Bearer", "Founder Guard"][index],
-      traits: [["Lime core", "Obsidian frame"], ["Cyan charge", "Key relic"], ["Gold seal", "Legendary crown"]][index]
-    })),
+    samples: [],
     quality: {
       previewQualityScore: 84,
       uniquenessScore: 82,
@@ -899,7 +950,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     finalProductionReady: isProductionStatus(profile.productionAssetStatus),
     avatar: safeImage(previews.find((asset) => asset.type === "AVATAR")?.uri, brandAssets.factionMark),
     banner: safeImage(previews.find((asset) => asset.type === "BANNER")?.uri, brandAssets.launchHero),
-    samples: normalizedSamples(samples.map((asset, index) => {
+    samples: normalizedSamples(profile.productionAssetStatus ?? "WIREFRAME", samples.map((asset, index) => {
       const metadata = asRecord<string>(asset.metadata);
       return {
         id: `${asset.version}-${index}`,
@@ -964,7 +1015,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     warnings: data.warnings,
     avatar: safeImage(data.avatarPreviewSpec?.uri, brandAssets.factionMark),
     banner: safeImage(data.bannerPreviewSpec?.uri, brandAssets.launchHero),
-    samples: normalizedSamples(data.samples.slice(0, 6).map((sample, index) => ({
+    samples: normalizedSamples(data.productionAssetStatus, data.samples.slice(0, 6).map((sample, index) => ({
       id: `preview-${index}`,
       name: sample.label,
       image: sample.uri,
@@ -1002,13 +1053,14 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
   };
 }
 
-function normalizedSamples(samples: CollectionGeneratorPreview["samples"]) {
-  const curated = fallbackPreview("", "", "", "").samples;
-  const merged = samples.length ? samples : curated;
-  return merged.slice(0, 6).map((sample, index) => ({
-    ...sample,
-    image: safeImage(sample.image, brandAssets.nftVaults[index % brandAssets.nftVaults.length])
-  }));
+function normalizedSamples(status: ProductionAssetStatus, samples: CollectionGeneratorPreview["samples"]) {
+  const visualsAllowed = status === "AI_CONCEPT" || isProductionStatus(status);
+  return samples.slice(0, 6)
+    .map((sample) => ({
+      ...sample,
+      image: visualsAllowed ? safeImage(sample.image, "") : sample.image
+    }))
+    .filter((sample) => !visualsAllowed || Boolean(sample.image));
 }
 
 function safeImage(src: string | undefined | null, fallback: string) {

@@ -7,10 +7,24 @@ import { ChestOpenAnimation, MintRevealAnimation, RewardBurstAnimation } from ".
 import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
-export function CollectionPreview({ preview, compact = false }: { preview: CollectionGeneratorPreview; compact?: boolean }) {
-  const samples = preview.samples.length ? preview.samples : fallbackSamples();
+export function CollectionPreview({
+  preview,
+  compact = false,
+  onGenerateAiConcept,
+  canGenerateAiConcept = false,
+  loading = false
+}: {
+  preview: CollectionGeneratorPreview;
+  compact?: boolean;
+  onGenerateAiConcept?: () => void;
+  canGenerateAiConcept?: boolean;
+  loading?: boolean;
+}) {
+  const samples = preview.samples;
   const wireframeOnly = isWireframePreview(preview);
+  const aiConcept = preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW";
   const professionalPreview = !wireframeOnly;
+  const visualSamples = professionalPreview ? samples.filter((sample) => Boolean(sample.image)) : [];
 
   return (
     <div className="space-y-5">
@@ -58,10 +72,10 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
               </div>
             </div>
 
-            {wireframeOnly ? <ProfessionalPreviewGate preview={preview} /> : null}
+            {wireframeOnly ? <ProfessionalPreviewGate preview={preview} onGenerateAiConcept={onGenerateAiConcept} canGenerateAiConcept={canGenerateAiConcept} loading={loading} /> : null}
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <FeatureTile icon={LockKeyhole} title="Vault NFTs" body="Token-backed identity cards with redeem and marketplace hooks." />
+              <FeatureTile icon={LockKeyhole} title={wireframeOnly ? "Vault visuals pending" : "Vault NFTs"} body={wireframeOnly ? "Vault NFT visuals pending professional concept or curated layer pack." : "Token-backed identity cards with redeem and marketplace hooks."} />
               <FeatureTile icon={Swords} title="Raid Rooms" body={preview.raidTheme || "Faction raids activate after launch."} />
               <FeatureTile icon={Sparkles} title="Staking" body="Reward hooks and role progression are ready for collection rules." />
             </div>
@@ -70,23 +84,32 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
       </SectionCard>
 
       {professionalPreview ? (
-        <SectionCard title="Vault NFT Preview Set">
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-            {samples.slice(0, compact ? 3 : 6).map((sample, index) => (
-              <PreviewNftCard key={sample.id} sample={sample} index={index} />
-            ))}
-          </div>
+        <SectionCard title={aiConcept ? "AI Concept Preview" : "Vault NFT Preview Set"}>
+          {aiConcept ? <p className="mb-4 rounded-md border border-vault-cyan/25 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">AI concept preview - not mintable final art.</p> : null}
+          {visualSamples.length ? (
+            <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+              {visualSamples.slice(0, compact ? 3 : 6).map((sample) => (
+                <PreviewNftCard key={sample.id} sample={sample} />
+              ))}
+            </div>
+          ) : (
+            <PendingVaultVisuals />
+          )}
         </SectionCard>
       ) : (
         <SectionCard title="Professional Preview Required">
-          <ProfessionalPreviewRequirement preview={preview} />
+          <ProfessionalPreviewRequirement preview={preview} onGenerateAiConcept={onGenerateAiConcept} canGenerateAiConcept={canGenerateAiConcept} loading={loading} />
           <details className="mt-4 rounded-md border border-vault-line bg-black/30 p-4">
-            <summary className="cursor-pointer text-sm font-black text-slate-300">Wireframe planning/debug assets</summary>
-            <div className="mt-4 grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-              {samples.slice(0, compact ? 3 : 6).map((sample, index) => (
-                <PreviewNftCard key={sample.id} sample={sample} index={index} debug />
-              ))}
-            </div>
+            <summary className="cursor-pointer text-sm font-black text-slate-300">Wireframe planning specs</summary>
+            {samples.length ? (
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {samples.slice(0, compact ? 3 : 6).map((sample, index) => (
+                  <WireframeSpecCard key={sample.id} sample={sample} index={index} />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 rounded-md border border-white/10 bg-black/25 px-3 py-2 text-sm text-slate-400">No wireframe specs are available for this preview.</p>
+            )}
           </details>
         </SectionCard>
       )}
@@ -138,7 +161,7 @@ export function CollectionPreview({ preview, compact = false }: { preview: Colle
   );
 }
 
-function ProfessionalPreviewGate({ preview }: { preview: CollectionGeneratorPreview }) {
+function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiConcept, loading }: { preview: CollectionGeneratorPreview; onGenerateAiConcept?: () => void; canGenerateAiConcept: boolean; loading: boolean }) {
   const culture = preview.traitLanguage.slice(0, 5);
   return (
     <div className="mt-7 grid gap-4 rounded-lg border border-vault-cyan/25 bg-black/45 p-4 shadow-[0_0_60px_rgba(22,215,210,0.12)] md:grid-cols-[1.2fr_.8fr]">
@@ -149,6 +172,11 @@ function ProfessionalPreviewGate({ preview }: { preview: CollectionGeneratorPrev
         </div>
         <p className="mt-3 text-2xl font-black leading-tight text-white">{preview.backgroundWorld}</p>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{preview.mascot} needs AI concept art or curated production layers before the creator-facing visual preview is meaningful.</p>
+        {onGenerateAiConcept ? (
+          <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
+            <Sparkles className="size-4" /> Generate AI Concept Preview
+          </button>
+        ) : null}
       </div>
       <div className="grid gap-2">
         {culture.map((item) => (
@@ -159,22 +187,51 @@ function ProfessionalPreviewGate({ preview }: { preview: CollectionGeneratorPrev
   );
 }
 
-function ProfessionalPreviewRequirement({ preview }: { preview: CollectionGeneratorPreview }) {
+function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGenerateAiConcept, loading }: { preview: CollectionGeneratorPreview; onGenerateAiConcept?: () => void; canGenerateAiConcept: boolean; loading: boolean }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="rounded-lg border border-vault-gold/30 bg-vault-gold/8 p-5">
-        <p className="text-sm font-black uppercase text-vault-gold">Art Direction Not Rendered</p>
-        <h3 className="mt-2 text-2xl font-black text-white">Enable AI concepts or attach an approved layer pack.</h3>
-        <p className="mt-3 text-sm leading-6 text-slate-300">The generator produced Creative DNA, rarity logic, trait taxonomy, and production rules. It is intentionally not presenting SVG wireframes as collection art.</p>
-      </div>
-      <div className="rounded-lg border border-vault-line bg-black/35 p-5">
-        <p className="text-xs uppercase text-slate-500">Production Path</p>
-        <div className="mt-3 space-y-2 text-sm font-bold text-slate-200">
-          <p>AI_CONCEPT: art direction preview</p>
-          <p>CURATED_LAYER_READY: deterministic mint layers</p>
-          <p>FINAL_PRODUCTION: launch assets</p>
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="rounded-lg border border-vault-gold/30 bg-vault-gold/8 p-5">
+          <p className="text-sm font-black uppercase text-vault-gold">Creative DNA ready</p>
+          <h3 className="mt-2 text-2xl font-black text-white">Professional concept preview required</h3>
+          <p className="mt-3 text-sm leading-6 text-slate-300">The generator produced identity, rarity logic, trait taxonomy, and production rules. It is intentionally not presenting SVG wireframes as collection art.</p>
+          {onGenerateAiConcept ? (
+            <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
+              <Sparkles className="size-4" /> Generate AI Concept Preview
+            </button>
+          ) : null}
+        </div>
+        <div className="rounded-lg border border-vault-line bg-black/35 p-5">
+          <p className="text-xs uppercase text-slate-500">Production path</p>
+          <div className="mt-3 space-y-2 text-sm font-bold text-slate-200">
+            <p>AI concept preview</p>
+            <p>Curated deterministic mint layers</p>
+            <p>Final production assets</p>
+          </div>
         </div>
       </div>
+      <DnaSummaryGrid preview={preview} />
+    </div>
+  );
+}
+
+function DnaSummaryGrid({ preview }: { preview: CollectionGeneratorPreview }) {
+  const rarity = Object.entries(preview.rarityWeights).slice(0, 4).map(([name, value]) => `${name} ${formatWeight(value)}`).join(" / ");
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <SummaryCard title="Identity" body={`${preview.collection} / ${preview.mascot}`} />
+      <SummaryCard title="Mood culture" body={preview.traitLanguage.slice(0, 3).join(", ") || preview.theme} />
+      <SummaryCard title="Rarity plan" body={rarity || "Rarity ladder ready"} />
+      <SummaryCard title="Trait taxonomy" body={`${Object.keys(preview.traitCounts).length || 0} categories mapped`} />
+    </div>
+  );
+}
+
+function SummaryCard({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-md border border-vault-line bg-black/25 p-4">
+      <p className="text-xs font-black uppercase text-slate-500">{title}</p>
+      <p className="mt-2 text-sm font-bold leading-5 text-slate-200">{body}</p>
     </div>
   );
 }
@@ -191,21 +248,16 @@ function DnaMark({ preview }: { preview: CollectionGeneratorPreview }) {
   );
 }
 
-function PreviewNftCard({ sample, index, debug = false }: { sample: CollectionGeneratorPreview["samples"][number]; index: number; debug?: boolean }) {
+function PreviewNftCard({ sample }: { sample: CollectionGeneratorPreview["samples"][number] }) {
   const rarityAccent = sample.rarity === "Legendary" || sample.rarity === "Mythic" ? "gold" : sample.rarity === "Epic" ? "cyan" : "green";
   return (
-    <article className={cn("phew-card-hover overflow-hidden rounded-lg border bg-black/35", debug ? "border-vault-gold/25 opacity-75" : "border-vault-line")}>
+    <article className="phew-card-hover overflow-hidden rounded-lg border border-vault-line bg-black/35">
       <div className="relative aspect-[4/5] overflow-hidden">
-        <img src={safeImage(sample.image, brandAssets.nftVaults[index % brandAssets.nftVaults.length])} alt={sample.name} className="h-full w-full object-cover transition duration-300 hover:scale-105" />
+        <img src={sample.image} alt={sample.name} className="h-full w-full object-cover transition duration-300 hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/10" />
         <div className="absolute left-3 top-3">
           <StatusPill accent={rarityAccent}>{sample.rarity}</StatusPill>
         </div>
-        {debug ? (
-          <div className="absolute right-3 top-3">
-            <StatusPill accent="gold">Debug</StatusPill>
-          </div>
-        ) : null}
         <div className="absolute bottom-3 left-3 right-3">
           <p className="text-sm font-black text-white">{sample.name}</p>
           <p className="mt-1 text-xs font-bold text-vault-green">{sample.role}</p>
@@ -217,6 +269,33 @@ function PreviewNftCard({ sample, index, debug = false }: { sample: CollectionGe
         ))}
       </div>
     </article>
+  );
+}
+
+function WireframeSpecCard({ sample, index }: { sample: CollectionGeneratorPreview["samples"][number]; index: number }) {
+  return (
+    <article className="rounded-md border border-dashed border-vault-gold/30 bg-vault-gold/5 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-black text-slate-200">Planning spec {String(index + 1).padStart(2, "0")}</p>
+        <StatusPill accent="gold">Wireframe</StatusPill>
+      </div>
+      <p className="mt-2 text-xs font-bold text-vault-gold">{sample.rarity} / not collection art</p>
+      <div className="mt-3 grid gap-2">
+        {sample.traits.slice(0, 4).map((trait) => (
+          <span key={trait} className="rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[11px] text-slate-300">{trait}</span>
+        ))}
+      </div>
+      <p className="mt-3 break-words font-mono text-[10px] text-slate-500">{shortSpec(sample.image)}</p>
+    </article>
+  );
+}
+
+function PendingVaultVisuals() {
+  return (
+    <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-6 text-center">
+      <p className="font-black text-white">Vault NFT visuals pending professional concept or curated layer pack.</p>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-slate-400">No placeholder or wireframe artwork is shown as collection art.</p>
+    </div>
   );
 }
 
@@ -249,22 +328,17 @@ function PreviewMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function fallbackSamples(): CollectionGeneratorPreview["samples"] {
-  return brandAssets.nftVaults.map((image, index) => ({
-    id: `fallback-${index}`,
-    name: [`Vault Relic #001`, `Vault Key #014`, `Founder Crown #077`][index],
-    image,
-    rarity: ["Rare", "Epic", "Legendary"][index],
-    role: ["Vault Raider", "Key Bearer", "Founder Guard"][index],
-    traits: [["Lime core", "Obsidian frame"], ["Cyan charge", "Key relic"], ["Gold seal", "Legendary crown"]][index]
-  }));
-}
-
 function safeImage(src: string | undefined | null, fallback: string) {
   if (!src) return fallback;
   const value = src.toLowerCase();
   if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink")) return fallback;
   return src;
+}
+
+function shortSpec(value: string) {
+  if (!value) return "No render URI";
+  if (value.startsWith("data:")) return "Inline SVG planning specification";
+  return value.length > 96 ? `${value.slice(0, 72)}...${value.slice(-16)}` : value;
 }
 
 function isWireframePreview(preview: CollectionGeneratorPreview) {

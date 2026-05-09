@@ -40,6 +40,7 @@ import { ActionCard } from "./ActionCard";
 import { CollectionGrid } from "./CollectionGrid";
 import { MetricGrid, PageLayout } from "./PageLayout";
 import { StakeFlow, UnstakeFlow, ClaimRewardsFlow } from "./StakingFlows";
+import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 
 type ProductData = {
   title?: string;
@@ -72,6 +73,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   const capabilityState = useApiResource<{ mode: string; capabilities: Record<string, boolean>; warnings: string[] }>("/system/capabilities");
   const data = normalizeProductData(endpoint, state.data);
   const warnings = apiWarnings(state.data);
+  const privateDiagnostics = showPrivateDiagnostics(wallet.address);
   const visibleCollections = useMemo(() => {
     const collections = data?.collections ?? (data?.collection ? [data.collection] : []);
     const filtered = collections.filter((collection) => {
@@ -96,7 +98,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   return (
     <AppShell active={active} stats={data?.stats}>
       <div className="space-y-5">
-        {active === "home" ? <FounderStatusPanel status={capabilityState.data} /> : null}
+        {active === "home" && privateDiagnostics ? <FounderStatusPanel status={capabilityState.data} /> : null}
         <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
           <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-y-0 right-0 hidden h-full w-3/5 object-cover opacity-30 mix-blend-screen lg:block" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/35" />
@@ -113,7 +115,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
         </section>
 
         {blockedByWallet ? <WalletDisconnectedState /> : null}
-        <SetupWarning warnings={warnings} />
+        {privateDiagnostics ? <SetupWarning warnings={warnings} /> : null}
         {state.loading ? <LoadingState /> : null}
         {!state.loading && state.error ? <ErrorState error={state.error} retry={state.reload} /> : null}
         {!state.loading && !state.error && !blockedByWallet && data
