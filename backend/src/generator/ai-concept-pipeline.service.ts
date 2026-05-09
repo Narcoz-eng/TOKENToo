@@ -94,7 +94,7 @@ export class AiConceptPipelineService {
       return {
         ready: true,
         code: "LOCAL_PLACEHOLDER_READY",
-        message: "Local branded planning visual provider is ready."
+        message: "Local branded studio planning visual provider is ready."
       };
     }
     if (provider === "cached-only") {
@@ -108,14 +108,14 @@ export class AiConceptPipelineService {
       return {
         ready: false,
         code: "OPENAI_DISABLED",
-        message: "OpenAI disabled. AI concept preview generation is not enabled on this server."
+        message: "OpenAI disabled. AI studio preview generation is not enabled on this server."
       };
     }
     if (!process.env.OPENAI_API_KEY) {
       return {
         ready: false,
         code: "OPENAI_KEY_MISSING",
-        message: "OpenAI key missing. Configure image generation before creating an AI concept preview."
+        message: "OpenAI key missing. Configure image generation before creating an AI studio preview."
       };
     }
     return { ready: true, code: "OPENAI_READY", message: "OpenAI image generation is ready." };
@@ -193,7 +193,7 @@ export class AiConceptPipelineService {
       };
     }));
     if (!this.hasRequiredConceptSet(outputs)) {
-      throw new AiConceptGenerationError("OPENAI_REQUEST_FAILED", "OpenAI request failed: the concept preview did not include the required hero and rarity ladder images.", {
+      throw new AiConceptGenerationError("OPENAI_REQUEST_FAILED", "OpenAI request failed: the studio preview did not include the required hero and rarity ladder images.", {
         stage: "ai_concept_validation",
         outputTypes: outputs.map((asset) => `${asset.type}:${asset.metadata.rarity ?? asset.type}`)
       });
@@ -330,7 +330,7 @@ export class AiConceptPipelineService {
       const rarity = request.rarity;
       return {
         type: request.type,
-        label: request.label.replace("AI concept", "planning visual"),
+        label: request.label.replace("AI concept", "studio planning visual"),
         uri: svgUri(this.placeholderSvg(style, identity, request, index, logoData, logoUri)),
         productionAssetStatus: "AI_CONCEPT",
         previewClassification: "AI_CONCEPT_PREVIEW",
@@ -389,11 +389,11 @@ export class AiConceptPipelineService {
     const lowCost = this.lowCostMode();
     const hero = {
       type: "BANNER" as const,
-      label: `${style.collection} AI hero concept`,
+      label: `${style.collection} AI studio hero preview`,
       kind: "collection-hero",
       size: lowCost ? "1024x1024" as const : "1536x1024" as const,
       prompt: `${base}
-Create collection hero key art for a real civilization with emotional identity.
+Create collection hero key art for a real civilization with near-final emotional identity.
 Hero story: ${identity.civilization} gathered at the edge of ${identity.world}, caught in the exact moment their faction myth becomes visible.
 Camera angle: ${heroCinema.cameraAngle}
 Lens style: ${heroCinema.lensStyle}
@@ -415,12 +415,12 @@ No text, no logos, no watermark.`
       const emotion = this.emotionalDirection(style, rarity, index);
       return {
         type: "SAMPLE_NFT" as const,
-        label: `${style.collection} ${rarity} AI concept`,
+        label: `${style.collection} ${rarity} AI studio preview`,
         kind: "rarity-exemplar",
         rarity,
         size: lowCost ? "1024x1024" as const : "1024x1536" as const,
         prompt: `${base}
-Create a ${rarity} rarity character concept as premium cinematic character art.
+Create a ${rarity} rarity character preview as premium cinematic character art that is close enough for creator art-direction approval.
 Emotional narrative: ${emotion.thesis}
 Rarity escalation: ${this.rarityNarrative(rarity)}
 Camera angle: ${cinema.cameraAngle}
@@ -446,7 +446,7 @@ No text, no logos, no watermark.`
   private baseBrief(style: GeneratedStyleProfile, identity: AuthoredIdentityBrief, seedKey: string) {
     const dna = style.creativeUniverse.creativeDna;
     const visual = dna.visualSystem;
-    return `Premium cinematic NFT collection concept art direction.
+    return `Premium AI-powered NFT art studio preview.
 Collection: ${style.collection}
 Seed key: ${seedKey}
 Civilization: ${identity.civilization}
@@ -470,9 +470,11 @@ Visual identity authoring rules:
 - Build a recognizable faction culture with rituals, clothing wear, body language, and environmental history.
 - Make the character emotionally iconic before adding surface detail.
 - Prioritize silhouette clarity, face readability, cinematic hierarchy, and mood-first identity at thumbnail size.
+- Make the preview feel close to final collection identity, final emotional quality, and final rarity storytelling.
+- Design as if the creator will lock art direction, approve trait families, refine rarity tiers, and selectively curate final production assets from this direction.
 - Avoid generic mascot poses, flat trading-card composition, sterile game-ad polish, low-effort AI gloss, random neon clutter, and disconnected accessories.
-Production note: this is AI_CONCEPT art direction only, not mintable final art; final NFTs require curated layer packs and deterministic rendering.
-Quality bar: polished character design, strong silhouette, clean face/expression, visible emotion and body language, intentional detail placement, consistent collection style, premium collectible framing, no messy artifacts, no random text, no fake logos, no malformed anatomy.
+Production note: this is an AI_CONCEPT studio preview for creator refinement. It is not automatically mintable public art; final NFTs require locked creator approval, layered or curated exports, permanent storage, and artist cleanup or manual curation when needed.
+Quality bar: mint-worthy direction, polished character design, strong silhouette, clean face/expression, visible emotion and body language, intentional detail placement, consistent collection style, premium collectible framing, no messy artifacts, no random text, no fake logos, no malformed anatomy.
 Do not output placeholder cards, abstract boxes, UI mockups, SVG-like blocks, wireframe diagrams, fake badges, fake interface labels, mobile game ad layouts, or production-looking final mints.
 Every image must read as a scene from a real civilization with emotional identity, not as keywords turned into props.
 IP safety: do not copy or imitate famous NFT collections, apes, monkeys, skeleton traits, known collection poses, recognizable backgrounds, or trademarked designs.
@@ -663,7 +665,7 @@ Do not mention or reference any famous NFT collection names in the image.`;
     const mood = request.rarity ? this.moodFor(style, request.rarity, index) : this.moodFor(style, "Legendary", index);
     const logo = this.safeImageReference(logoData) ?? this.safeImageReference(logoUri);
     const title = escapeXml(style.collection.replace(/^\$/, "").slice(0, 36));
-    const subtitle = escapeXml((request.rarity ? `${request.rarity} planning visual` : "Hero planning visual").slice(0, 40));
+    const subtitle = escapeXml((request.rarity ? `${request.rarity} studio preview` : "Hero studio preview").slice(0, 40));
     const culture = escapeXml(identity.culture.slice(0, 72));
     const moodLabel = escapeXml(`${mood.name}: ${mood.expression}`.slice(0, 82));
     const shake = intensity >= 5 ? 24 : intensity >= 4 ? 14 : intensity >= 3 ? 8 : 3;

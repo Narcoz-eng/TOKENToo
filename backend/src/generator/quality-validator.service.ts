@@ -27,7 +27,7 @@ export class QualityValidatorService {
     if (!style.brandDna) issues.push("Brand DNA is required before approval.");
     if (!style.tenKReadiness?.pass) issues.push("10k collection readiness validation failed.");
     if (style.artSource === "PROCEDURAL_FALLBACK") {
-      issues.push("Wireframe concept preview only; final collection requires curated or artist-approved asset pack.");
+      issues.push("Wireframe concept preview only; final collection requires locked creator approval plus curated, layered, or artist-approved asset pack.");
       issues.push("Procedural SVG fallback art cannot be approved for production launch.");
     }
     if (this.hasGenericTraitNames(style, pack)) issues.push("Trait names are too generic for premium collection identity.");
@@ -56,7 +56,7 @@ export class QualityValidatorService {
     const computedTier = tierScore >= 92 && distinctiveness.score >= 86 ? "LEGENDARY_READY" : tierScore >= 80 && previewQualityScore >= 78 ? "PREMIUM" : "BASIC";
     const tier = style.productionAssetStatus === "WIREFRAME" || style.artSource === "PROCEDURAL_FALLBACK" ? "BASIC" : computedTier;
     const productionStatusAllowsPass = style.productionAssetStatus === "CURATED_LAYER_READY" || style.productionAssetStatus === "ARTIST_APPROVED" || style.productionAssetStatus === "FINAL_PRODUCTION";
-    if (style.productionAssetStatus === "AI_CONCEPT") issues.push("AI concept art is professional art direction only; it cannot satisfy mintable production quality.");
+    if (style.productionAssetStatus === "AI_CONCEPT") issues.push("AI studio preview art is professional art direction only; it cannot satisfy mintable production quality until creator approval, layered exports, and final storage are configured.");
 
     return {
       previewQualityScore,

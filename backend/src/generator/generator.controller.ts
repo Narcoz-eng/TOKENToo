@@ -2,7 +2,7 @@ import { Body, Controller, Get, Inject, Param, Post, UseGuards } from "@nestjs/c
 import { z } from "zod";
 import { WalletAddress } from "../auth/wallet-address.decorator";
 import { WalletAuthGuard } from "../auth/wallet-auth.guard";
-import type { ApproveGenerationRunInput, CreateGenerationRunInput, LaunchCollectionInput, SubmitCollectionLaunchInput } from "./generator.types";
+import type { ApproveGenerationRunInput, CreateGenerationRunInput, LaunchCollectionInput, StudioWorkflowInput, SubmitCollectionLaunchInput } from "./generator.types";
 import { GeneratorService } from "./generator.service";
 
 const runSchema = z.object({
@@ -19,6 +19,24 @@ const runSchema = z.object({
 const approveSchema = z.object({
   explicitConfirmation: z.boolean(),
   acceptedVersion: z.number().int().positive().optional()
+});
+
+const studioActionSchema = z.object({
+  action: z.enum([
+    "lock-art-direction",
+    "lock-style",
+    "lock-mood",
+    "lock-rarity-direction",
+    "regenerate-rarity-tier",
+    "regenerate-mood-set",
+    "regenerate-legendary-scene",
+    "approve-silhouette-system",
+    "approve-faction-culture",
+    "approve-trait-family",
+    "approve-cinematic-direction"
+  ]),
+  target: z.string().optional(),
+  note: z.string().optional()
 });
 
 const launchSchema = z.object({
@@ -76,6 +94,12 @@ export class GeneratorController {
   @UseGuards(WalletAuthGuard)
   regeneratePreviews(@Param("id") id: string, @WalletAddress() walletAddress: string) {
     return this.generator.regeneratePreviews(id, walletAddress);
+  }
+
+  @Post("runs/:id/studio-action")
+  @UseGuards(WalletAuthGuard)
+  studioAction(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.generator.studioAction(id, { ...(studioActionSchema.parse(body) as StudioWorkflowInput), walletAddress });
   }
 
   @Post("runs/:id/approve")

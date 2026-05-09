@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { Check, ChevronDown, Loader2, LockKeyhole, Palette, RadioTower, RefreshCcw, Search, ShieldCheck, Sparkles, Swords, Upload, Wand2, Zap } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { CollectionPreview } from "@/components/CollectionPreview";
@@ -10,13 +11,25 @@ import { StatusPill } from "@/components/StatusPill";
 import { apiFetch } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
-import type { CollectionGeneratorPreview, ConceptRequestSummary } from "@/lib/types";
+import type { CollectionGeneratorPreview, ConceptRequestSummary, StudioWorkflowState } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { cn } from "@/lib/utils";
 
 type Preset = { id: string; name: string; artStyle: string; mood: string };
 type ProductionAssetStatus = "WIREFRAME" | "AI_CONCEPT" | "CURATED_LAYER_READY" | "ARTIST_APPROVED" | "FINAL_PRODUCTION";
+type StudioWorkflowActionName =
+  | "lock-art-direction"
+  | "lock-style"
+  | "lock-mood"
+  | "lock-rarity-direction"
+  | "regenerate-rarity-tier"
+  | "regenerate-mood-set"
+  | "regenerate-legendary-scene"
+  | "approve-silhouette-system"
+  | "approve-faction-culture"
+  | "approve-trait-family"
+  | "approve-cinematic-direction";
 type SystemCapabilities = {
   databaseAvailable?: boolean;
   openaiImagesAvailable?: boolean;
@@ -82,6 +95,7 @@ type GeneratorRun = {
   id: string;
   status: string;
   tokenSymbol: string;
+  communityHints?: unknown;
   approvedVersion?: number | null;
   styleProfiles: Array<{
     id: string;
@@ -244,7 +258,8 @@ export default function CreateCollectionPage() {
   const latestProfile = run?.styleProfiles[0];
   const latestQuality = latestProfile?.qualityReports[0];
   const latestDistinctiveness = latestProfile?.distinctivenessReports[0];
-  const canApprove = Boolean(run && approvalConfirmed && latestQuality?.passed && latestQuality.tier !== "BASIC" && latestDistinctiveness?.passed && capabilityState.data?.capabilities?.databaseAvailable);
+  const studioApprovalsComplete = Boolean(preview?.studioWorkflow?.locks.artDirection && preview.studioWorkflow.approvals.silhouetteSystem && preview.studioWorkflow.approvals.factionCulture && preview.studioWorkflow.approvals.traitFamily && preview.studioWorkflow.approvals.cinematicDirection);
+  const canApprove = Boolean(run && approvalConfirmed && studioApprovalsComplete && latestQuality?.passed && latestQuality.tier !== "BASIC" && latestDistinctiveness?.passed && capabilityState.data?.capabilities?.databaseAvailable);
   const effectiveTokenName = tokenName.trim() || scan?.name || "";
   const effectiveTokenSymbol = tokenSymbol.trim() || scan?.symbol || "";
   const effectiveDescription = description.trim() || scan?.description || (effectiveTokenName ? `${effectiveTokenName} holder community built from verified Solana token metadata.` : "");
@@ -359,6 +374,17 @@ export default function CreateCollectionPage() {
     if (!run) return;
     await action(async () => {
       const data = await walletAuth.authFetch<GeneratorRun>(`/generator/runs/${run.id}/${path}`, { method: "POST" });
+      setRun(data);
+    });
+  }
+
+  async function studioAction(actionName: StudioWorkflowActionName, target?: string) {
+    if (!run) return;
+    await action(async () => {
+      const data = await walletAuth.authFetch<GeneratorRun>(`/generator/runs/${run.id}/studio-action`, {
+        method: "POST",
+        body: JSON.stringify({ action: actionName, target })
+      });
       setRun(data);
     });
   }
@@ -552,7 +578,7 @@ export default function CreateCollectionPage() {
 
             <SectionCard title="Vault Collection" className="p-5">
               <div className="grid gap-3 sm:grid-cols-3">
-                <MiniControl icon={LockKeyhole} label="Vault visuals" value={isWireframePreview(studioPreview) ? "Pending concept" : "Preview ready"} />
+                <MiniControl icon={LockKeyhole} label="Vault visuals" value={isWireframePreview(studioPreview) ? "Pending studio" : "Preview ready"} />
                 <MiniControl icon={Swords} label="Raids" value="Enabled" />
                 <MiniControl icon={Zap} label="Staking" value="Ready" />
               </div>
@@ -573,7 +599,7 @@ export default function CreateCollectionPage() {
             <div className="grid gap-3">
               <ConceptPlanNotice plan={conceptPlan} />
               <button type="button" onClick={generatePreview} disabled={loading || !canGenerateAiConcept} className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate AI Concept Preview
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate AI Studio Preview
               </button>
               <button type="button" onClick={createRun} disabled={loading || !canSaveDraft} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-45">
                 <ShieldCheck className="size-4" /> Save Launch Draft
@@ -607,17 +633,25 @@ export default function CreateCollectionPage() {
               />
             )}
 
+            <StudioWorkflowPanel
+              workflow={studioPreview.studioWorkflow}
+              disabled={!run || loading}
+              hasRun={Boolean(run)}
+              onAction={studioAction}
+            />
+
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
               <SectionCard title="Launch Readiness" className="p-5">
                 <div className="grid gap-3 md:grid-cols-2">
                   <ReadinessItem label="Brand direction" complete={Boolean(tokenName || preview)} />
-                  <ReadinessItem label="Professional concept preview" complete={Boolean(preview && !isWireframePreview(preview))} />
+                  <ReadinessItem label="AI studio preview" complete={Boolean(preview && !isWireframePreview(preview))} />
                   <ReadinessItem label="Quality reviewed" complete={Boolean(latestQuality?.passed && latestQuality.tier !== "BASIC")} />
+                  <ReadinessItem label="Studio approvals" complete={studioApprovalsComplete} />
                   <ReadinessItem label="Founder approval" complete={approvalConfirmed} />
                 </div>
                 <label className="mt-4 flex items-start gap-3 rounded-md border border-vault-green/30 bg-vault-green/8 p-4 text-sm text-slate-200">
                   <input className="mt-1 accent-[#baff00]" type="checkbox" checked={approvalConfirmed} onChange={(event) => setApprovalConfirmed(event.target.checked)} />
-                  <span>I understand concept previews are not mintable final art; approve only production-ready curated or artist assets for launch.</span>
+                  <span>I understand studio previews need locked creator approval plus layered, curated, or artist-approved production assets before launch.</span>
                 </label>
               </SectionCard>
 
@@ -627,7 +661,7 @@ export default function CreateCollectionPage() {
                     <RefreshCcw className="size-4" /> Refine Style
                   </button>
                   <button type="button" onClick={() => mutateRun("regenerate-previews")} disabled={!run || loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-vault-line bg-black/30 text-sm font-bold disabled:opacity-45">
-                    <Wand2 className="size-4 text-vault-green" /> Refresh Vault Set
+                    <Wand2 className="size-4 text-vault-green" /> Rerender Vault Set
                   </button>
                   <button type="button" onClick={approveRun} disabled={!canApprove || loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-vault-green/50 bg-vault-green/10 text-sm font-bold text-vault-green disabled:opacity-45">
                     <ShieldCheck className="size-4" /> Approve Production Assets
@@ -700,7 +734,7 @@ function SetupChecklistPanel({
       {message ? <p className="mt-4 rounded-md border border-vault-cyan/30 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">{message}</p> : null}
 
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <ActionButton icon={Sparkles} label="Generate AI Concept Preview" disabled={loading || !canGenerateAiConcept} onClick={onGenerateAiConcept} primary />
+        <ActionButton icon={Sparkles} label="Generate AI Studio Preview" disabled={loading || !canGenerateAiConcept} onClick={onGenerateAiConcept} primary />
         <ActionButton icon={Wand2} label="Use Demo Curated Layer Pack for Devnet" disabled={loading} onClick={onUseDemoPack} />
         <ActionButton icon={Upload} label="Upload/Attach Curated Layer Pack" disabled={loading} onClick={onAttachLayerPack} />
         <ActionButton icon={RadioTower} label="Validate Program ID" disabled={loading} onClick={onValidateProgram} />
@@ -716,14 +750,14 @@ function PublicReadinessPanel({ setup, loading, canGenerateAiConcept, onGenerate
   return (
     <SectionCard title="Readiness Summary" className="p-5">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <PublicReadinessItem label="Professional preview" value={creativeReady ? "Creative DNA ready" : "Professional preview not ready yet"} ready={creativeReady} />
+        <PublicReadinessItem label="Studio preview" value={creativeReady ? "Creative DNA ready" : "Studio preview not ready yet"} ready={creativeReady} />
         <PublicReadinessItem label="Launch" value={launchReady ? "Launch path available" : "Launch is not available yet"} ready={launchReady} />
         <PublicReadinessItem label="Minting" value={launchReady ? "Minting setup ready" : "Minting is temporarily unavailable"} ready={launchReady} />
         <PublicReadinessItem label="Creator setup" value={launchReady ? "Ready for review" : "Creator setup required"} ready={launchReady} />
       </div>
       <div className="mt-5 flex flex-wrap gap-3">
         <button type="button" onClick={onGenerateAiConcept} disabled={loading || !canGenerateAiConcept} className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
-          <Sparkles className="size-4" /> Generate AI Concept Preview
+          <Sparkles className="size-4" /> Generate AI Studio Preview
         </button>
       </div>
     </SectionCard>
@@ -737,6 +771,77 @@ function PublicReadinessItem({ label, value, ready }: { label: string; value: st
       <p className={cn("mt-2 text-sm font-bold", ready ? "text-vault-green" : "text-slate-200")}>{value}</p>
     </div>
   );
+}
+
+function StudioWorkflowPanel({ workflow, disabled, hasRun, onAction }: { workflow?: StudioWorkflowState; disabled: boolean; hasRun: boolean; onAction: (action: StudioWorkflowActionName, target?: string) => void }) {
+  const state = workflow ?? defaultStudioWorkflow();
+  const lockItems = [
+    ["Art direction", state.locks.artDirection, "lock-art-direction"],
+    ["Style", state.locks.style, "lock-style"],
+    ["Mood", state.locks.mood, "lock-mood"],
+    ["Rarity direction", state.locks.rarityDirection, "lock-rarity-direction"]
+  ] as const;
+  const approvalItems = [
+    ["Silhouette system", state.approvals.silhouetteSystem, "approve-silhouette-system"],
+    ["Faction culture", state.approvals.factionCulture, "approve-faction-culture"],
+    ["Trait family", state.approvals.traitFamily, "approve-trait-family"],
+    ["Cinematic direction", state.approvals.cinematicDirection, "approve-cinematic-direction"]
+  ] as const;
+  return (
+    <SectionCard title="Premium Studio Workflow" className="p-5">
+      {!hasRun ? <p className="mb-4 rounded-md border border-vault-line bg-black/25 px-3 py-2 text-xs font-bold text-slate-400">Draft not saved</p> : null}
+      <div className="grid gap-5 xl:grid-cols-[1fr_1fr_.9fr]">
+        <StudioGroup title="Locks">
+          {lockItems.map(([label, active, actionName]) => (
+            <StudioActionButton key={actionName} icon={LockKeyhole} label={active ? `${label} locked` : `Lock ${label.toLowerCase()}`} active={active} disabled={disabled || active} onClick={() => onAction(actionName)} />
+          ))}
+        </StudioGroup>
+        <StudioGroup title="Approvals">
+          {approvalItems.map(([label, active, actionName]) => (
+            <StudioActionButton key={actionName} icon={ShieldCheck} label={active ? `${label} approved` : `Approve ${label.toLowerCase()}`} active={active} disabled={disabled || active} onClick={() => onAction(actionName)} />
+          ))}
+        </StudioGroup>
+        <StudioGroup title="Selective Regeneration">
+          <div className="grid grid-cols-3 gap-2">
+            {["Rare", "Epic", "Legendary"].map((rarity) => (
+              <button key={rarity} type="button" onClick={() => onAction("regenerate-rarity-tier", rarity)} disabled={disabled || state.locks.rarityDirection} className="min-h-10 rounded-md border border-vault-cyan/35 bg-vault-cyan/8 px-2 text-xs font-black text-vault-cyan disabled:opacity-45">
+                {rarity}
+              </button>
+            ))}
+          </div>
+          <StudioActionButton icon={RefreshCcw} label={`Regenerate mood set${state.rerolls.moodSet ? ` (${state.rerolls.moodSet})` : ""}`} active={false} disabled={disabled || state.locks.mood} onClick={() => onAction("regenerate-mood-set")} />
+          <StudioActionButton icon={Sparkles} label={`Regenerate legendary scene${state.rerolls.legendaryScene ? ` (${state.rerolls.legendaryScene})` : ""}`} active={false} disabled={disabled || state.approvals.cinematicDirection} onClick={() => onAction("regenerate-legendary-scene")} />
+          {state.lastAction ? <p className="rounded-md border border-vault-line bg-black/25 px-3 py-2 text-[11px] font-bold uppercase text-slate-500">Last: {cleanDisplayText(state.lastAction.action)}{state.lastAction.target ? ` / ${state.lastAction.target}` : ""}</p> : null}
+        </StudioGroup>
+      </div>
+    </SectionCard>
+  );
+}
+
+function StudioGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-2 rounded-md border border-vault-line bg-black/25 p-3">
+      <p className="text-xs font-black uppercase text-slate-500">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function StudioActionButton({ icon: Icon, label, active, disabled, onClick }: { icon: typeof LockKeyhole; label: string; active: boolean; disabled: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-black disabled:opacity-45", active ? "border-vault-green/50 bg-vault-green/12 text-vault-green" : "border-vault-line bg-black/30 text-slate-200 hover:border-vault-cyan/45")}>
+      <Icon className={cn("size-4 shrink-0", active ? "text-vault-green" : "text-vault-cyan")} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function defaultStudioWorkflow(): StudioWorkflowState {
+  return {
+    locks: { artDirection: false, style: false, mood: false, rarityDirection: false },
+    approvals: { silhouetteSystem: false, factionCulture: false, traitFamily: false, cinematicDirection: false },
+    rerolls: { rarityTiers: {}, moodSet: 0, legendaryScene: 0 }
+  };
 }
 
 function ConceptPlanNotice({ plan }: { plan: ConceptRequestSummary | null }) {
@@ -767,9 +872,9 @@ function ConceptPlanNotice({ plan }: { plan: ConceptRequestSummary | null }) {
 
 function providerDisplay(provider?: string) {
   if (!provider) return "Automatic fallback";
-  if (/openai/i.test(provider)) return "OpenAI concept art";
-  if (/cached/i.test(provider)) return "Cached concept";
-  if (/local-placeholder|planning/i.test(provider)) return "Branded planning visual";
+  if (/openai/i.test(provider)) return "OpenAI studio art";
+  if (/cached/i.test(provider)) return "Cached studio preview";
+  if (/local-placeholder|planning/i.test(provider)) return "Branded studio planning visual";
   return cleanDisplayText(provider);
 }
 
@@ -844,8 +949,8 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{culturePitch(preview)}</p>
           {wireframeOnly ? (
             <div className="mt-3 max-w-2xl rounded-md border border-vault-gold/30 bg-vault-gold/8 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
-              <p>Professional concept preview required. Generate AI concept imagery before reviewing collection visuals.</p>
-              <p className="mt-1">Vault NFT visuals pending professional concept or curated layer pack.</p>
+              <p>AI studio preview required. Generate premium preview imagery before reviewing collection visuals.</p>
+              <p className="mt-1">Vault NFT visuals pending studio preview or curated layer pack.</p>
             </div>
           ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
@@ -1046,11 +1151,63 @@ function fallbackPreview(tokenName: string, tokenSymbol: string, description: st
   };
 }
 
+function activePreviewAssets(assets: GeneratorRun["styleProfiles"][number]["previewAssets"]) {
+  const seen = new Set<string>();
+  return assets
+    .slice()
+    .sort((left, right) => right.version - left.version)
+    .filter((asset) => {
+      const metadata = asRecord<string>(asset.metadata);
+      const key = `${asset.type}:${asset.type === "SAMPLE_NFT" ? metadata.rarity ?? asset.label : asset.type}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function studioWorkflowFromHints(value: unknown): StudioWorkflowState | undefined {
+  const hints = asRecord<unknown>(value);
+  const raw = asRecord<unknown>(hints.studioWorkflow);
+  if (!Object.keys(raw).length) return undefined;
+  const locks = asRecord<unknown>(raw.locks);
+  const approvals = asRecord<unknown>(raw.approvals);
+  const rerolls = asRecord<unknown>(raw.rerolls);
+  const lastAction = asRecord<unknown>(raw.lastAction);
+  return {
+    locks: {
+      artDirection: locks.artDirection === true,
+      style: locks.style === true,
+      mood: locks.mood === true,
+      rarityDirection: locks.rarityDirection === true
+    },
+    approvals: {
+      silhouetteSystem: approvals.silhouetteSystem === true,
+      factionCulture: approvals.factionCulture === true,
+      traitFamily: approvals.traitFamily === true,
+      cinematicDirection: approvals.cinematicDirection === true
+    },
+    rerolls: {
+      rarityTiers: asRecord<number>(rerolls.rarityTiers),
+      moodSet: Number(rerolls.moodSet ?? 0),
+      legendaryScene: Number(rerolls.legendaryScene ?? 0)
+    },
+    lastAction: typeof lastAction.action === "string" && typeof lastAction.at === "string"
+      ? {
+          action: lastAction.action,
+          target: typeof lastAction.target === "string" ? lastAction.target : undefined,
+          note: typeof lastAction.note === "string" ? lastAction.note : undefined,
+          walletAddress: typeof lastAction.walletAddress === "string" ? lastAction.walletAddress : undefined,
+          at: lastAction.at
+        }
+      : undefined
+  };
+}
+
 function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGeneratorPreview {
   const profile = run.styleProfiles[0];
   const categories = asRecord<string[]>(profile.traitPack?.categories);
-  const previews = profile.previewAssets;
-  const samples = previews.filter((asset) => asset.type === "SAMPLE_NFT").slice(-6);
+  const previews = activePreviewAssets(profile.previewAssets);
+  const samples = previews.filter((asset) => asset.type === "SAMPLE_NFT").slice(0, 6);
   const avatarUri = previews.find((asset) => asset.type === "AVATAR")?.uri ?? samples[0]?.uri;
   const quality = profile.qualityReports[0];
   const distinctiveness = profile.distinctivenessReports[0];
@@ -1083,6 +1240,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     previewClassification: previewClassForStatus(profile.productionAssetStatus ?? "WIREFRAME", previews[0]?.previewClassification),
     productionAssetStatus: profile.productionAssetStatus ?? "WIREFRAME",
     finalProductionReady: isProductionStatus(profile.productionAssetStatus),
+    studioWorkflow: studioWorkflowFromHints(run.communityHints),
     avatar: safeImage(avatarUri, brandAssets.factionMark),
     banner: safeImage(previews.find((asset) => asset.type === "BANNER")?.uri, brandAssets.launchHero),
     samples: normalizedSamples(profile.productionAssetStatus ?? "WIREFRAME", samples.map((asset, index) => {
@@ -1210,8 +1368,8 @@ function safeImage(src: string | undefined | null, fallback: string) {
 }
 
 function previewStatusLabel(preview: CollectionGeneratorPreview) {
-  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Professional preview pending";
-  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "AI concept preview";
+  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Studio preview pending";
+  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "AI studio preview";
   if (preview.productionAssetStatus === "FINAL_PRODUCTION") return "Final production assets";
   if (preview.productionAssetStatus === "ARTIST_APPROVED") return "Artist approved assets";
   if (preview.productionAssetStatus === "CURATED_LAYER_READY") return "Curated layer ready";
@@ -1220,7 +1378,7 @@ function previewStatusLabel(preview: CollectionGeneratorPreview) {
 
 function previewTierLabel(tier: "BASIC" | "PREMIUM" | "LEGENDARY_READY", finalProductionReady: boolean, assetProvider?: string, previewClassification?: string, productionAssetStatus?: ProductionAssetStatus): CollectionGeneratorPreview["quality"]["tier"] {
   if (productionAssetStatus === "WIREFRAME" || (!finalProductionReady && (previewClassification === "WIREFRAME_CONCEPT" || /wireframe|fallback|preview|persisted-generator-run/i.test(assetProvider ?? "")))) return "Wireframe concept";
-  if (productionAssetStatus === "AI_CONCEPT" || previewClassification === "AI_CONCEPT_PREVIEW") return "AI concept";
+  if (productionAssetStatus === "AI_CONCEPT" || previewClassification === "AI_CONCEPT_PREVIEW") return "AI studio";
   return tier === "LEGENDARY_READY" ? "Legendary-ready" : tier === "PREMIUM" ? "Premium" : "Basic";
 }
 
@@ -1243,7 +1401,7 @@ function assetStatusLabel(status: ProductionAssetStatus | undefined) {
   if (status === "FINAL_PRODUCTION") return "Final";
   if (status === "ARTIST_APPROVED") return "Artist approved";
   if (status === "CURATED_LAYER_READY") return "Curated layers";
-  if (status === "AI_CONCEPT") return "AI concept";
+  if (status === "AI_CONCEPT") return "AI studio";
   return "Pending art";
 }
 

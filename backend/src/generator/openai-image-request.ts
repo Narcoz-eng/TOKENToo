@@ -135,7 +135,7 @@ export function validateOpenAIImageRequest(request: OpenAIImageRequest): OpenAII
       code: "OPENAI_IMAGE_PROMPT_TOO_LONG",
       field: "prompt",
       message: `Image prompt is ${request.promptLength} characters; maximum is ${OPENAI_IMAGE_PROMPT_MAX_LENGTH}.`,
-      fix: "Shorten the generated AI concept prompt before calling OpenAI."
+      fix: "Shorten the generated AI studio prompt before calling OpenAI."
     });
   }
   for (const field of ["model", "prompt", "size", "quality", "n"]) {

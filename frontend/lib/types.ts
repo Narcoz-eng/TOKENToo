@@ -172,7 +172,34 @@ export type CollectionCompetition = {
 
 export type ProductionAssetStatus = "WIREFRAME" | "AI_CONCEPT" | "CURATED_LAYER_READY" | "ARTIST_APPROVED" | "FINAL_PRODUCTION";
 
-export type GeneratorQualityTier = "Wireframe concept" | "AI concept" | "Basic" | "Premium" | "Legendary-ready";
+export type GeneratorQualityTier = "Wireframe concept" | "AI concept" | "AI studio" | "Basic" | "Premium" | "Legendary-ready";
+
+export type StudioWorkflowState = {
+  locks: {
+    artDirection: boolean;
+    style: boolean;
+    mood: boolean;
+    rarityDirection: boolean;
+  };
+  approvals: {
+    silhouetteSystem: boolean;
+    factionCulture: boolean;
+    traitFamily: boolean;
+    cinematicDirection: boolean;
+  };
+  rerolls: {
+    rarityTiers: Record<string, number>;
+    moodSet: number;
+    legendaryScene: number;
+  };
+  lastAction?: {
+    action: string;
+    target?: string;
+    note?: string;
+    walletAddress?: string;
+    at: string;
+  };
+};
 
 export type CollectionGeneratorPreview = {
   id: string;
@@ -195,6 +222,7 @@ export type CollectionGeneratorPreview = {
   previewClassification?: "WIREFRAME_CONCEPT" | "AI_CONCEPT_PREVIEW" | "PRODUCTION_ASSET_PREVIEW";
   productionAssetStatus?: ProductionAssetStatus;
   finalProductionReady?: boolean;
+  studioWorkflow?: StudioWorkflowState;
   warnings?: string[];
   avatar: string;
   banner: string;

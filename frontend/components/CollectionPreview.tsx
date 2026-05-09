@@ -28,7 +28,7 @@ export function CollectionPreview({
   const visualSamples = professionalPreview ? samples.filter((sample) => Boolean(sample.image)) : [];
   const tags = identityTags(preview);
   const pitch = culturePitch(preview);
-  const generationUnavailable = preview.warnings?.some((warning) => /AI concept generation unavailable/i.test(warning)) ?? false;
+  const generationUnavailable = preview.warnings?.some((warning) => /AI (?:concept|studio) generation unavailable/i.test(warning)) ?? false;
   const planningVisual = /local-placeholder|planning-visual/i.test(preview.assetProvider ?? "") || preview.samples.some((sample) => /local-placeholder/i.test(sample.provider ?? ""));
   const conceptRequest = preview.conceptRequest;
 
@@ -52,7 +52,7 @@ export function CollectionPreview({
               )}
               <div className="min-w-0">
                 <div className="flex flex-wrap gap-2">
-                  <StatusPill accent={preview.quality.tier === "Wireframe concept" || preview.quality.tier === "AI concept" || preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
+                  <StatusPill accent={preview.quality.tier === "Wireframe concept" || preview.quality.tier === "AI concept" || preview.quality.tier === "AI studio" || preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
                   <StatusPill accent="cyan">{cleanDisplayText(preview.theme)}</StatusPill>
                   <StatusPill accent={isProductionStatus(preview.productionAssetStatus) ? "green" : "gold"}>{previewStatusLabel(preview)}</StatusPill>
                   {generationUnavailable ? <StatusPill accent="gold">Generation unavailable</StatusPill> : null}
@@ -63,12 +63,12 @@ export function CollectionPreview({
                 {!preview.finalProductionReady ? (
                   <p className="mt-3 max-w-3xl rounded-md border border-vault-gold/35 bg-vault-gold/10 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
                     {generationUnavailable
-                      ? exactGenerationReason(preview) ?? "AI concept generation is unavailable right now. A cinematic planning preview is shown so the collection experience stays reviewable; retry after the OpenAI issue is fixed."
+                      ? exactGenerationReason(preview) ?? "AI studio generation is unavailable right now. A cinematic planning preview is shown so the collection experience stays reviewable; retry after the OpenAI issue is fixed."
                       : planningVisual
-                      ? "Branded planning visuals are shown instead of paid AI concept art. They keep the collection reviewable and are not mintable NFT art."
+                      ? "Branded studio planning visuals are shown instead of paid AI preview art. They keep the collection reviewable while final assets are curated."
                       : preview.productionAssetStatus === "AI_CONCEPT"
-                      ? "AI concept preview - creator review only. Final minting requires curated or artist-approved layer packs."
-                      : "Professional concept preview required. Generate AI concept imagery before reviewing collection visuals."}
+                      ? "AI studio preview - creator refinement only. Final minting requires locked approval plus layered, curated, or artist-approved production assets."
+                      : "AI studio preview required. Generate premium preview imagery before reviewing collection visuals."}
                   </p>
                 ) : null}
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -89,7 +89,7 @@ export function CollectionPreview({
             {conceptRequest ? <ConceptRunStatus conceptRequest={conceptRequest} provider={preview.assetProvider} planningVisual={planningVisual} /> : null}
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <FeatureTile icon={LockKeyhole} title={wireframeOnly ? "Vault visuals pending" : "Vault NFTs"} body={wireframeOnly ? "Vault NFT visuals pending professional concept or curated layer pack." : "Token-backed identity cards with redeem and marketplace hooks."} />
+              <FeatureTile icon={LockKeyhole} title={wireframeOnly ? "Vault visuals pending" : "Vault NFTs"} body={wireframeOnly ? "Vault NFT visuals pending AI studio preview or curated layer pack." : "Token-backed identity cards with redeem and marketplace hooks."} />
               <FeatureTile icon={Swords} title="Raid Rooms" body={cleanDisplayText(preview.raidTheme || "Faction raids activate after launch.")} />
               <FeatureTile icon={Sparkles} title="Staking" body="Reward hooks and role progression are ready for collection rules." />
             </div>
@@ -98,8 +98,8 @@ export function CollectionPreview({
       </SectionCard>
 
       {professionalPreview ? (
-        <SectionCard title={planningVisual ? "Planning Visual Preview" : aiConcept ? "AI Concept Preview" : "Vault NFT Preview Set"}>
-          {aiConcept ? <p className="mb-4 rounded-md border border-vault-cyan/25 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">{planningVisual ? "Planning visual - branded placeholder for review, not generated concept art and not mintable final art." : "AI concept preview - not mintable final art."}</p> : null}
+        <SectionCard title={planningVisual ? "Studio Planning Preview" : aiConcept ? "AI Studio Preview" : "Vault NFT Preview Set"}>
+          {aiConcept ? <p className="mb-4 rounded-md border border-vault-cyan/25 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">{planningVisual ? "Studio planning visual - branded placeholder for review." : "AI studio preview - refine, lock, and curate before launch."}</p> : null}
           {visualSamples.length ? (
             <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
               {visualSamples.slice(0, compact ? 3 : 6).map((sample) => (
@@ -117,12 +117,13 @@ export function CollectionPreview({
       )}
 
       <CreatorReadinessGrid preview={preview} wireframeOnly={wireframeOnly} />
+      <StudioApprovalStatus preview={preview} />
       <AdvancedCreativeDnaPanel preview={preview} samples={samples} compact={compact} />
 
       {!compact ? (
         <div className="grid gap-5 xl:grid-cols-3">
           <SectionCard title="Mint Motion">
-            <MintRevealAnimation rarity="Epic" label="Mint Vault" />
+            <MintRevealAnimation rarity="Epic" label="Studio Mint" />
           </SectionCard>
           <SectionCard title="Stake Motion">
             <RewardBurstAnimation rarity="Rare" label="Stake Rewards" />
@@ -145,11 +146,11 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
           <Wand2 className="size-4" />
           <p className="text-xs font-black uppercase tracking-[0.18em]">Creative DNA Ready</p>
         </div>
-        <p className="mt-3 text-2xl font-black leading-tight text-white">{generationUnavailable ? "Generation unavailable - planning preview active" : "Professional concept preview required"}</p>
+        <p className="mt-3 text-2xl font-black leading-tight text-white">{generationUnavailable ? "Generation unavailable - studio planning preview active" : "AI studio preview required"}</p>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{culturePitch(preview)}</p>
         {onGenerateAiConcept ? (
           <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
-            <Sparkles className="size-4" /> {generationUnavailable ? "Retry AI Concept Preview" : "Generate AI Concept Preview"}
+            <Sparkles className="size-4" /> {generationUnavailable ? "Retry AI Studio Preview" : "Generate AI Studio Preview"}
           </button>
         ) : null}
       </div>
@@ -175,25 +176,25 @@ function ConceptRunStatus({ conceptRequest, provider, planningVisual }: { concep
 }
 
 function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGenerateAiConcept, loading }: { preview: CollectionGeneratorPreview; onGenerateAiConcept?: () => void; canGenerateAiConcept: boolean; loading: boolean }) {
-  const generationUnavailable = preview.warnings?.some((warning) => /AI concept generation unavailable/i.test(warning)) ?? false;
+  const generationUnavailable = preview.warnings?.some((warning) => /AI (?:concept|studio) generation unavailable/i.test(warning)) ?? false;
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="rounded-lg border border-vault-gold/30 bg-vault-gold/8 p-5">
           <p className="text-sm font-black uppercase text-vault-gold">Creative DNA ready</p>
-          <h3 className="mt-2 text-2xl font-black text-white">Professional concept preview required</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-300">{generationUnavailable ? "AI generation is currently unavailable, but the cinematic planning preview remains available for review. Retry after the OpenAI issue is fixed." : "A polished identity direction is ready. Generate AI concept imagery to review hero art and sample rarities before any launch decision."}</p>
+          <h3 className="mt-2 text-2xl font-black text-white">AI studio preview required</h3>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{generationUnavailable ? "AI generation is currently unavailable, but the cinematic studio planning preview remains available for review. Retry after the OpenAI issue is fixed." : "A polished identity direction is ready. Generate premium studio imagery to review hero art, mood, and rarity storytelling before any launch decision."}</p>
           {onGenerateAiConcept ? (
             <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
-              <Sparkles className="size-4" /> {generationUnavailable ? "Retry AI Concept Preview" : "Generate AI Concept Preview"}
+              <Sparkles className="size-4" /> {generationUnavailable ? "Retry AI Studio Preview" : "Generate AI Studio Preview"}
             </button>
           ) : null}
         </div>
         <div className="rounded-lg border border-vault-line bg-black/35 p-5">
           <p className="text-xs uppercase text-slate-500">Production path</p>
           <div className="mt-3 space-y-2 text-sm font-bold text-slate-200">
-            <p>AI concept preview</p>
-            <p>Curated deterministic mint layers</p>
+            <p>AI studio preview</p>
+            <p>Layered curated or artist-cleaned production assets</p>
             <p>Final production assets</p>
           </div>
         </div>
@@ -242,7 +243,7 @@ function CreatorReadinessGrid({ preview, wireframeOnly }: { preview: CollectionG
         <ReviewItem icon={BadgeCheck} label="Collection" value={publicCollectionName(preview)} />
         <ReviewItem icon={Palette} label="Visual direction" value={cleanDisplayText(preview.artStyle)} />
         <ReviewItem icon={Swords} label="Raids" value={cleanDisplayText(preview.raidTheme || "Raid rooms ready")} />
-        <ReviewItem icon={ShieldCheck} label="Preview status" value={wireframeOnly ? "Professional concept required" : `${preview.quality.previewQualityScore}% preview score`} />
+        <ReviewItem icon={ShieldCheck} label="Preview status" value={wireframeOnly ? "AI studio preview required" : `${preview.quality.previewQualityScore}% preview score`} />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {identityTags(preview).map((tag) => (
@@ -250,6 +251,43 @@ function CreatorReadinessGrid({ preview, wireframeOnly }: { preview: CollectionG
         ))}
       </div>
     </SectionCard>
+  );
+}
+
+function StudioApprovalStatus({ preview }: { preview: CollectionGeneratorPreview }) {
+  const workflow = preview.studioWorkflow;
+  const locks = [
+    ["Art direction", workflow?.locks.artDirection],
+    ["Style", workflow?.locks.style],
+    ["Mood", workflow?.locks.mood],
+    ["Rarity direction", workflow?.locks.rarityDirection]
+  ] as const;
+  const approvals = [
+    ["Silhouette system", workflow?.approvals.silhouetteSystem],
+    ["Faction culture", workflow?.approvals.factionCulture],
+    ["Trait family", workflow?.approvals.traitFamily],
+    ["Cinematic direction", workflow?.approvals.cinematicDirection]
+  ] as const;
+  return (
+    <SectionCard title="Studio Approval Track">
+      <div className="grid gap-3 md:grid-cols-2">
+        <ApprovalGroup title="Locked Direction" items={locks} activeSuffix="locked" />
+        <ApprovalGroup title="Creator Approvals" items={approvals} activeSuffix="approved" />
+      </div>
+    </SectionCard>
+  );
+}
+
+function ApprovalGroup({ title, items, activeSuffix }: { title: string; items: readonly (readonly [string, boolean | undefined])[]; activeSuffix: string }) {
+  return (
+    <div className="rounded-md border border-vault-line bg-black/25 p-4">
+      <p className="mb-3 text-xs font-black uppercase text-slate-500">{title}</p>
+      <div className="flex flex-wrap gap-2">
+        {items.map(([label, active]) => (
+          <span key={label} className={cn("rounded-md border px-3 py-2 text-xs font-bold", active ? "border-vault-green/35 bg-vault-green/10 text-vault-green" : "border-white/10 bg-white/5 text-slate-400")}>{active ? `${label} ${activeSuffix}` : label}</span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -380,7 +418,7 @@ function WireframeSpecCard({ sample, index }: { sample: CollectionGeneratorPrevi
 function PendingVaultVisuals() {
   return (
     <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-6 text-center">
-      <p className="font-black text-white">Vault NFT visuals pending professional concept or curated layer pack.</p>
+      <p className="font-black text-white">Vault NFT visuals pending AI studio preview or curated layer pack.</p>
       <p className="mx-auto mt-2 max-w-xl text-sm text-slate-400">No placeholder or wireframe artwork is shown as collection art.</p>
     </div>
   );
@@ -483,16 +521,16 @@ function safeImage(src: string | undefined | null, fallback: string) {
 }
 
 function exactGenerationReason(preview: CollectionGeneratorPreview) {
-  const warning = preview.warnings?.find((item) => /AI concept generation unavailable/i.test(item));
+  const warning = preview.warnings?.find((item) => /AI (?:concept|studio) generation unavailable/i.test(item));
   if (!warning) return undefined;
-  return warning.replace(/^AI concept generation unavailable:\s*/i, "OpenAI generation unavailable: ");
+  return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "OpenAI generation unavailable: ");
 }
 
 function providerLabel(provider?: string) {
   if (!provider) return "Automatic fallback";
-  if (/openai/i.test(provider)) return "OpenAI concept";
-  if (/cached/i.test(provider)) return "Cached concept";
-  if (/local-placeholder|planning/i.test(provider)) return "Branded planning visual";
+  if (/openai/i.test(provider)) return "OpenAI studio preview";
+  if (/cached/i.test(provider)) return "Cached studio preview";
+  if (/local-placeholder|planning/i.test(provider)) return "Branded studio planning visual";
   return cleanDisplayText(provider);
 }
 
@@ -507,8 +545,8 @@ function isWireframePreview(preview: CollectionGeneratorPreview) {
 }
 
 function previewStatusLabel(preview: CollectionGeneratorPreview) {
-  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Professional preview pending";
-  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "AI concept preview";
+  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Studio preview pending";
+  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "AI studio preview";
   if (preview.productionAssetStatus === "FINAL_PRODUCTION") return "Final production assets";
   if (preview.productionAssetStatus === "ARTIST_APPROVED") return "Artist approved assets";
   if (preview.productionAssetStatus === "CURATED_LAYER_READY") return "Curated layer ready";
@@ -523,7 +561,7 @@ function assetStatusLabel(status: CollectionGeneratorPreview["productionAssetSta
   if (status === "FINAL_PRODUCTION") return "Final";
   if (status === "ARTIST_APPROVED") return "Artist approved";
   if (status === "CURATED_LAYER_READY") return "Curated layers";
-  if (status === "AI_CONCEPT") return "AI concept";
+  if (status === "AI_CONCEPT") return "AI studio";
   return "Pending art";
 }
 

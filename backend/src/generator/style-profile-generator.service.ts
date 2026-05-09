@@ -1313,13 +1313,23 @@ export class StyleProfileGeneratorService {
       commonToRareSource: "approved_layer_pack_required",
       epicLegendaryMythicSource: "curated_composition_required",
       aiFinalImageAllowed: false,
+      aiAssistedFinalOutputsAllowed: true,
+      layeredExportsAllowed: true,
+      artistCleanupAllowed: true,
+      selectiveManualCurationAllowed: true,
+      creatorApprovalRequiredBeforeMint: true,
+      massAutomaticPublicMintGeneration: false,
+      previewQualityTarget: "MINT_WORTHY_STUDIO_PREVIEW",
       artistReviewRequiredFor: ["Epic", "Legendary", "Mythic"],
       productionReadyRequires: [
-        "human-designed base pack",
-        "approved trait layer pack",
-        "curated rarity composition rules",
+        "locked art direction",
+        "approved silhouette system",
+        "approved faction culture",
+        "approved trait families",
+        "approved cinematic direction",
+        "curated or artist-cleaned layered exports",
         "permanent final asset storage",
-        "artist-approved final assets for public launch"
+        "creator-approved final assets for public launch"
       ]
     };
   }

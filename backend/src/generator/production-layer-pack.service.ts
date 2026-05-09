@@ -15,12 +15,14 @@ export class ProductionLayerPackService {
   status(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: "BASIC" | "PREMIUM" | "LEGENDARY_READY"): ProductionAssetStatus {
     if (qualityTier === "BASIC" || !style.tenKReadiness.pass) return "WIREFRAME";
     const providers = [this.provider(process.env.DESIGN_MODEL_PROVIDER), this.provider(process.env.LAYER_PACK_PROVIDER), this.provider(process.env.LEGENDARY_ASSET_PROVIDER)];
-    if (providers.some((provider) => provider === "mock" || provider === "ai")) return style.productionAssetStatus === "AI_CONCEPT" ? "AI_CONCEPT" : "WIREFRAME";
+    if (providers.some((provider) => provider === "mock")) return style.productionAssetStatus === "AI_CONCEPT" ? "AI_CONCEPT" : "WIREFRAME";
+    const hasAiAssistedProvider = providers.some((provider) => provider === "ai");
+    if (hasAiAssistedProvider && !this.aiAssistedFinalApproved()) return style.productionAssetStatus === "AI_CONCEPT" ? "AI_CONCEPT" : "WIREFRAME";
     if (!this.permanentStorageAvailable() || !this.renderRoot()) return "WIREFRAME";
     if (!this.approvedLayerPackConfigured()) return "WIREFRAME";
     if (!this.layerCoverageValid(pack)) return "WIREFRAME";
     if ((process.env.FINAL_PRODUCTION_ASSETS_APPROVED ?? "false") === "true") return "FINAL_PRODUCTION";
-    if (providers.every((provider) => provider === "handmade") || (process.env.ARTIST_APPROVED_ASSETS ?? "false") === "true") return "ARTIST_APPROVED";
+    if (providers.every((provider) => provider === "handmade") || (process.env.ARTIST_APPROVED_ASSETS ?? "false") === "true" || this.aiAssistedFinalApproved()) return "ARTIST_APPROVED";
     return "CURATED_LAYER_READY";
   }
 
@@ -30,7 +32,7 @@ export class ProductionLayerPackService {
     const required = this.requiredLaunchStatus();
     if (!this.meetsRequiredStatus(status, required)) issues.push(`Production asset status ${status} does not satisfy required launch status ${required}.`);
     if (status === "WIREFRAME") issues.push("Approved curated layer pack is missing; wireframes cannot launch.");
-    if (status === "AI_CONCEPT") issues.push("AI concepts are art direction only and cannot launch without a curated layer pack.");
+    if (status === "AI_CONCEPT") issues.push("AI studio previews are art direction only and cannot launch without locked creator approval, curated/layered exports, and final storage.");
     if (!this.approvedLayerPackConfigured()) issues.push("Approved curated layer pack manifest/root is required before launch.");
     if (!this.renderRoot()) issues.push("FINAL_RENDER_STORAGE_ROOT is required so minting can reference cached or pre-generated render outputs.");
     if (!this.permanentStorageAvailable()) issues.push("Permanent storage is required for production NFT assets.");
@@ -74,6 +76,10 @@ export class ProductionLayerPackService {
     if (provider === "arweave" || provider === "irys") return Boolean(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY);
     if (provider === "supabase") return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
     return false;
+  }
+
+  private aiAssistedFinalApproved() {
+    return (process.env.AI_ASSISTED_FINAL_ASSETS_APPROVED ?? "false") === "true";
   }
 
   private provider(value?: string): AssetProviderKind {

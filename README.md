@@ -7,7 +7,9 @@ TOKENToo is a CA-first Solana vault NFT platform. A creator enters only a Solana
 - No mock token scanning. `GET /tokens/:mint/scan` requires `HELIUS_API_KEY`, validates the mint as a Solana `PublicKey`, and returns provider errors for missing keys, auth failures, rate limits, unreachable Helius, or incomplete metadata.
 - Program IDs must match across `Anchor.toml`, `declare_id!`, backend `PROGRAM_ID`, and optional `NEXT_PUBLIC_PROGRAM_ID`.
 - The intended devnet program ID is `8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6`.
-- Launch is blocked unless production asset providers and permanent storage are configured. Preview SVG/data URI fallbacks are not final assets.
+- The art workflow is an AI-powered premium NFT art studio. Creators refine, rerender, lock, and approve the collection before mint.
+- Launch is blocked unless production asset providers, creator approval gates, and permanent storage are configured. Preview SVG/data URI fallbacks are not final assets.
+- Refined AI-assisted outputs can inform production when paired with layered exports, artist cleanup, selective manual curation, and explicit final approval. Fully automatic public mass mint generation is not allowed.
 - Staking and reward claims are blocked until NFT custody/freeze or on-chain Core ownership verification is implemented.
 - Metaplex Core is the current asset path, but this adapter does not configure a royalty plugin. Do not claim marketplace royalty enforcement. Default creator royalty policy is documented as 500 bps only where the selected NFT standard can express/enforce it.
 
@@ -61,6 +63,7 @@ Production asset generation:
 DESIGN_MODEL_PROVIDER=ai
 LAYER_PACK_PROVIDER=ai
 LEGENDARY_ASSET_PROVIDER=ai
+AI_ASSISTED_FINAL_ASSETS_APPROVED=false
 OPENAI_API_KEY=
 OPENAI_IMAGE_MODEL=gpt-image-1.5
 ENABLE_AI_IMAGE_GENERATION=true

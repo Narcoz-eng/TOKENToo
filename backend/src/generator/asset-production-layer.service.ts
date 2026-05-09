@@ -66,7 +66,7 @@ export class AssetProductionLayerService {
         ? [this.demoLayerPackWarning(), this.royaltyPolicy().note].filter((value): value is string => Boolean(value))
         : [
             "Concept preview only. Wireframe SVG direction art must not be sold as final production art.",
-            "Wireframes and AI concepts are review assets only; launch requires curated or artist-approved deterministic layer assets.",
+            "Wireframes and AI studio previews are review assets only; launch requires locked creator approval plus layered, curated, or artist-approved production assets.",
             this.demoLayerPackWarning(),
             providerIssue ?? "Asset providers are configured.",
             storageIssue ?? "Permanent storage is configured.",
@@ -82,10 +82,11 @@ export class AssetProductionLayerService {
   }
 
   private layerSet(provider: ProducedLayerSet["provider"], values: string[], notes: string): ProducedLayerSet {
+    const approvedAi = provider === "ai" && (process.env.AI_ASSISTED_FINAL_ASSETS_APPROVED ?? "false") === "true";
     return {
       provider,
-      productionReady: provider === "curated" || provider === "handmade",
-      classification: provider === "handmade" ? "artist-approved final asset" : provider === "curated" ? "curated production-ready asset" : provider === "ai" ? "AI-assisted draft" : "concept preview",
+      productionReady: provider === "curated" || provider === "handmade" || approvedAi,
+      classification: provider === "handmade" ? "artist-approved final asset" : provider === "curated" ? "curated production-ready asset" : approvedAi ? "approved AI-assisted final asset" : provider === "ai" ? "AI-assisted draft" : "concept preview",
       count: values.length,
       examples: values.slice(0, 6),
       notes
@@ -108,7 +109,7 @@ export class AssetProductionLayerService {
     if (layer === "ai") draftOnly.push("LAYER_PACK_PROVIDER");
     if (legendary === "ai") draftOnly.push("LEGENDARY_ASSET_PROVIDER");
     if (missing.length) return `Real asset provider missing: configure ${missing.join(", ")} as curated or handmade.`;
-    if (draftOnly.length) return `AI provider configured for ${draftOnly.join(", ")}; AI-assisted assets are draft-only and cannot mark final production ready.`;
+    if (draftOnly.length && (process.env.AI_ASSISTED_FINAL_ASSETS_APPROVED ?? "false") !== "true") return `AI provider configured for ${draftOnly.join(", ")}; AI-assisted assets need creator approval, layered/curated exports, and AI_ASSISTED_FINAL_ASSETS_APPROVED=true before they can mark final production ready.`;
     return undefined;
   }
 

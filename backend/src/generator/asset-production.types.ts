@@ -5,7 +5,7 @@ export type AssetProviderKind = "mock" | "ai" | "curated" | "handmade";
 export type ProducedLayerSet = {
   provider: AssetProviderKind;
   productionReady: boolean;
-  classification: "concept preview" | "AI-assisted draft" | "curated production-ready asset" | "artist-approved final asset";
+  classification: "concept preview" | "AI-assisted draft" | "approved AI-assisted final asset" | "curated production-ready asset" | "artist-approved final asset";
   count: number;
   examples: string[];
   notes: string;

@@ -38,7 +38,7 @@ export class OpenAIImageProvider implements ImageProvider {
 
   async generate(input: ImageGenerationInput): Promise<ImageGenerationOutput> {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw openAiProviderException("OPENAI_KEY_MISSING", "OpenAI key missing. Configure image generation before creating an AI concept preview.");
+    if (!apiKey) throw openAiProviderException("OPENAI_KEY_MISSING", "OpenAI key missing. Configure image generation before creating an AI studio preview.");
     const request = buildOpenAIImageRequest(input);
     const validation = validateOpenAIImageRequest(request);
     if (!validation.valid) {
@@ -70,7 +70,7 @@ export class OpenAIImageProvider implements ImageProvider {
     if (lastError instanceof ServiceUnavailableException) throw lastError;
     if (lastError instanceof BadRequestException) throw lastError;
     if (lastError instanceof GatewayTimeoutException) throw lastError;
-    throw openAiProviderException("OPENAI_REQUEST_FAILED", "OpenAI request failed while creating the AI concept preview.", lastError);
+    throw openAiProviderException("OPENAI_REQUEST_FAILED", "OpenAI request failed while creating the AI studio preview.", lastError);
   }
 
   private async requestImage(request: OpenAIImageRequest, apiKey: string): Promise<ImageGenerationOutput> {

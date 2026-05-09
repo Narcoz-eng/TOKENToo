@@ -18,6 +18,8 @@ import type {
   PreviewAssetPlan,
   PreviewClassification,
   ProductionAssetStatus,
+  StudioWorkflowInput,
+  StudioWorkflowState,
   SubmitCollectionLaunchInput,
   TraitPackPlan
 } from "./generator.types";
@@ -133,7 +135,7 @@ export class GeneratorService {
       animationMetadata: style.creativeUniverse.animationReadiness,
       quality: {
         ...quality,
-        issues: [...quality.issues, `${style.productionAssetStatus === "AI_CONCEPT" ? "AI concept preview only" : "Wireframe concept preview only"}; final collection requires curated or artist-approved asset pack.`]
+        issues: [...quality.issues, `${style.productionAssetStatus === "AI_CONCEPT" ? "AI studio preview only" : "Wireframe concept preview only"}; final collection requires locked creator approval plus curated, layered, or artist-approved production assets.`]
       },
       distinctiveness: {
         ...distinctiveness,
@@ -151,16 +153,16 @@ export class GeneratorService {
       warnings: [
         "Preview generated without DB persistence.",
         ...conceptResult.warnings,
-        conceptResult.warnings.length ? "Planning visual fallback active; this keeps the preview reviewable but is not mintable NFT art." : "",
+        conceptResult.warnings.length ? "Studio planning visual fallback active; this keeps the preview reviewable while final assets are curated." : "",
         !conceptResult.warnings.length && style.productionAssetStatus === "AI_CONCEPT" && this.previewProviderLabel(aiPreviews) === "openai-ai-concept-preview"
-          ? "AI concept preview only; final launch requires curated or artist-approved production assets and permanent storage."
+          ? "AI studio preview only; final launch requires locked creator approval, curated/layered or artist-approved production assets, and permanent storage."
           : "",
         !conceptResult.warnings.length && this.previewProviderLabel(aiPreviews) === "local-placeholder-planning-visual"
-          ? "Local branded planning visual provider active; no paid OpenAI image generation was used."
+          ? "Local branded studio planning visual provider active; no paid OpenAI image generation was used."
           : "",
         !aiPreviews.length
           ? (style.productionAssetStatus === "AI_CONCEPT"
-          ? "AI concept preview only; final launch requires curated or artist-approved production assets and permanent storage."
+          ? "AI studio preview only; final launch requires curated/layered or artist-approved production assets and permanent storage."
           : "Wireframe only - enable OpenAI image generation or curated asset provider for professional NFT previews.")
           : "",
         "OpenAI image generation is art direction only and is never used in mint, final render, redeem, stake, or unstake flows."
@@ -268,6 +270,8 @@ export class GeneratorService {
     const run = await this.getRun(id);
     this.assertOwner(run, walletAddress);
     if (run.status === "APPROVED") throw new ConflictException("Approved generator runs are immutable. Regenerate before approval or create a new run.");
+    const workflow = this.studioWorkflowState(this.record(run.communityHints).studioWorkflow);
+    if (workflow.locks.artDirection || workflow.locks.style) throw new ConflictException("Art direction or style is locked. Use selective rerenders or create a new run to replace the locked style.");
     if (!run.logoAnalysis || !run.communityContext) throw new NotFoundException("Generation run is missing analysis data");
     const version = (run.styleProfiles[0]?.version ?? 0) + 1;
     const input = this.inputFromRun(run);
@@ -299,6 +303,49 @@ export class GeneratorService {
     return this.getRun(id);
   }
 
+  async studioAction(id: string, input: StudioWorkflowInput) {
+    await requireDbForWrite(this.prisma);
+    const run = await this.getRun(id);
+    this.assertOwner(run, input.walletAddress);
+    if (run.status === "APPROVED") throw new ConflictException("Approved generator runs are immutable. Studio refinements must happen before final approval.");
+
+    const latest = run.styleProfiles[0];
+    if (!latest?.traitPack) throw new NotFoundException("Generation run has no style profile to refine");
+
+    const communityHints = this.record(run.communityHints);
+    const currentWorkflow = this.studioWorkflowState(communityHints.studioWorkflow);
+    if (input.action === "regenerate-mood-set" && currentWorkflow.locks.mood) throw new ConflictException("Mood set is locked. Unlocking requires creating a new draft run.");
+    if (input.action === "regenerate-rarity-tier" && currentWorkflow.locks.rarityDirection) throw new ConflictException("Rarity direction is locked. Unlocking requires creating a new draft run.");
+    if (input.action === "regenerate-legendary-scene" && currentWorkflow.approvals.cinematicDirection) throw new ConflictException("Cinematic direction is already approved. Create a new draft run to replace the approved scene language.");
+    const studioWorkflow = this.nextStudioWorkflow(currentWorkflow, input);
+    await this.prisma.generationRun.update({
+      where: { id },
+      data: { communityHints: this.json({ ...communityHints, studioWorkflow }) }
+    });
+
+    if (this.isStudioRegeneration(input.action)) {
+      const style = this.styleFromRecord(latest);
+      const pack = this.packFromRecord(latest.traitPack);
+      const version = this.nextPreviewVersion(latest.previewAssets);
+      const seedKey = `${run.seed}:${input.action}:${input.target ?? "set"}:${version}`;
+      const wireframes = this.previews.generate(style, pack, seedKey, version);
+      const conceptResult = await this.conceptPreviewsWithFallback(run.tokenMint, style, pack, seedKey, run.logoData ?? undefined, run.logoUri ?? undefined, { bypassCache: true });
+      const generated = conceptResult.previews.length ? conceptResult.previews : wireframes;
+      const previews = this.annotateStudioPreviews(this.selectStudioPreviews(generated, input), input, studioWorkflow);
+      if (!previews.length) throw new BadRequestException("Studio refinement did not produce any preview assets.");
+      if (previews.some((preview) => preview.productionAssetStatus === "AI_CONCEPT")) {
+        await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
+        style.artSource = "AI_ASSISTED";
+        style.productionAssetStatus = "AI_CONCEPT";
+        style.productionAssetPolicy.defaultAssetStatus = "AI_CONCEPT";
+      }
+      await this.persistPreviews(id, latest.id, version, previews);
+      await this.persistPreviewQualityReport(id, latest.id, style, pack, latest, previews);
+    }
+
+    return this.getRun(id);
+  }
+
   async approve(id: string, input: ApproveGenerationRunInput = {}) {
     await requireDbForWrite(this.prisma);
     const run = await this.getRun(id);
@@ -311,11 +358,13 @@ export class GeneratorService {
     const readiness = pack ? this.assetProduction.manifest(this.styleFromRecord(latest), pack, report.tier).readinessReport : null;
     if (input.acceptedVersion && input.acceptedVersion !== latest.version) throw new ConflictException("The accepted version is no longer the latest generated version.");
     if (!input.explicitConfirmation) throw new BadRequestException("Explicit creator confirmation is required before approval.");
+    const studioIssues = this.studioApprovalIssues(this.studioWorkflowState(this.record(run.communityHints).studioWorkflow));
+    if (studioIssues.length) throw new BadRequestException(`Studio approval incomplete: ${studioIssues.join(", ")}.`);
     if (!report.passed || report.tier === "BASIC") throw new BadRequestException("Only Premium or Legendary-ready generator outputs can be approved.");
     if (!distinctiveness?.passed || distinctiveness.score < 72) throw new BadRequestException("Collection distinctiveness score is below the approval threshold.");
     const manifest = pack ? this.assetProduction.manifest(this.styleFromRecord(latest), pack, report.tier) : null;
     if (latest.productionAssetStatus === "WIREFRAME" || latest.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Wireframe previews are planning/debug assets and cannot be approved for launch.");
-    if (latest.productionAssetStatus === "AI_CONCEPT") throw new BadRequestException("AI concept art can be reviewed as art direction, but cannot be approved for launch without a curated layer pack.");
+    if (latest.productionAssetStatus === "AI_CONCEPT") throw new BadRequestException("AI studio previews can be reviewed and refined as art direction, but cannot be approved for launch until layered, curated, or artist-approved production assets are configured.");
     if (!manifest?.productionReady || !readiness?.canProduce10kPremiumOutputs) throw new BadRequestException("Asset provider readiness report does not allow scalable deterministic output approval.");
 
     await this.prisma.styleProfile.updateMany({ where: { generationRunId: id }, data: { isApproved: false } });
@@ -336,7 +385,8 @@ export class GeneratorService {
           productionAssetStatus: latest.productionAssetStatus,
           collection: latest.collection,
           mascot: latest.mascot,
-          raidTheme: latest.raidTheme
+          raidTheme: latest.raidTheme,
+          studioWorkflow: this.studioWorkflowState(this.record(run.communityHints).studioWorkflow)
         })
       }
     });
@@ -358,7 +408,7 @@ export class GeneratorService {
       throw new BadRequestException("Approved run no longer satisfies launch quality gates.");
     }
     if (profile.productionAssetStatus === "WIREFRAME" || profile.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Collection launch requires curated, artist-approved, or final production assets; wireframes cannot launch.");
-    if (profile.productionAssetStatus === "AI_CONCEPT") throw new BadRequestException("AI concepts are art direction only. Configure and approve a curated layer pack before launch.");
+    if (profile.productionAssetStatus === "AI_CONCEPT") throw new BadRequestException("AI studio previews are art direction only. Configure locked creator approval plus layered, curated, or artist-approved production assets before launch.");
     this.assertLaunchProviders(this.styleFromRecord(profile), this.packFromRecord(profile.traitPack), report.tier);
 
     const slug = this.slug(input.slug ?? profile.collection);
@@ -665,6 +715,210 @@ export class GeneratorService {
     });
   }
 
+  private async persistPreviewQualityReport(
+    generationRunId: string,
+    styleProfileId: string,
+    style: GeneratedStyleProfile,
+    pack: TraitPackPlan,
+    latest: any,
+    refreshedPreviews: PreviewAssetPlan[]
+  ) {
+    const compatibilityRules = this.traitPacks.compatibilityRules(pack);
+    const distinctivenessRecord = latest.distinctivenessReports?.[0];
+    const distinctiveness = distinctivenessRecord
+      ? {
+          silhouetteUniqueness: distinctivenessRecord.silhouetteUniqueness,
+          paletteUniqueness: distinctivenessRecord.paletteUniqueness,
+          mascotUniqueness: distinctivenessRecord.mascotUniqueness,
+          backgroundWorldUniqueness: distinctivenessRecord.backgroundWorldUniqueness,
+          traitLanguageUniqueness: distinctivenessRecord.traitLanguageUniqueness,
+          score: distinctivenessRecord.score,
+          passed: distinctivenessRecord.passed,
+          nearestCollection: this.record(distinctivenessRecord.nearestCollection)
+        }
+      : this.distinctiveness.score(style, []);
+    const activePreviews = this.activePreviewSet(latest.previewAssets, refreshedPreviews);
+    const quality = this.quality.validate(style, pack, compatibilityRules, activePreviews, distinctiveness);
+    quality.issues.push(...this.aiQuality.validate(activePreviews));
+    await this.prisma.qualityReport.create({
+      data: {
+        generationRunId,
+        styleProfileId,
+        previewQualityScore: quality.previewQualityScore,
+        uniquenessScore: quality.uniquenessScore,
+        colorHarmonyScore: quality.colorHarmonyScore,
+        rarityDistributionScore: quality.rarityDistributionScore,
+        duplicateRiskScore: quality.duplicateRiskScore,
+        compatibilityScore: quality.compatibilityScore,
+        tier: quality.tier,
+        passed: quality.passed,
+        issues: this.json([
+          ...quality.issues,
+          `Studio action ${String(refreshedPreviews[0]?.metadata.studioAction ?? "selective-regeneration")} refreshed selected preview assets.`
+        ])
+      }
+    });
+  }
+
+  private activePreviewSet(records: any[], overrides: PreviewAssetPlan[] = []) {
+    const seen = new Set<string>();
+    const all = [
+      ...overrides,
+      ...records
+        .slice()
+        .sort((left, right) => Number(right.version ?? 0) - Number(left.version ?? 0))
+        .map((record) => this.previewAssetFromRecord(record))
+    ];
+    return all.filter((asset) => {
+      const key = `${asset.type}:${asset.type === "SAMPLE_NFT" ? String(asset.metadata.rarity ?? asset.label) : asset.type}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  private previewAssetFromRecord(record: any): PreviewAssetPlan {
+    return {
+      type: record.type as PreviewAssetPlan["type"],
+      label: record.label,
+      uri: record.uri,
+      productionAssetStatus: (record.productionAssetStatus ?? "WIREFRAME") as ProductionAssetStatus,
+      previewClassification: (record.previewClassification ?? "WIREFRAME_CONCEPT") as PreviewClassification,
+      provider: ((record.provider as PreviewAssetPlan["provider"] | null) ?? "wireframe") as PreviewAssetPlan["provider"],
+      promptHash: record.promptHash ?? undefined,
+      generationMetadata: this.record(record.generationMetadata),
+      metadata: this.record(record.metadata)
+    };
+  }
+
+  private nextPreviewVersion(records: Array<{ version?: number }>) {
+    return Math.max(1, ...records.map((asset) => Number(asset.version ?? 1))) + 1;
+  }
+
+  private isStudioRegeneration(action: StudioWorkflowInput["action"]) {
+    return action === "regenerate-rarity-tier" || action === "regenerate-mood-set" || action === "regenerate-legendary-scene";
+  }
+
+  private selectStudioPreviews(previews: PreviewAssetPlan[], input: StudioWorkflowInput) {
+    if (input.action === "regenerate-rarity-tier") {
+      const target = this.rarityTarget(input.target);
+      return previews.filter((preview) => preview.type === "SAMPLE_NFT" && String(preview.metadata.rarity) === target);
+    }
+    if (input.action === "regenerate-mood-set") {
+      return previews.filter((preview) => preview.type === "SAMPLE_NFT");
+    }
+    if (input.action === "regenerate-legendary-scene") {
+      return previews.filter((preview) => preview.type === "SAMPLE_NFT" && /Legendary|Mythic/.test(String(preview.metadata.rarity)));
+    }
+    return [];
+  }
+
+  private annotateStudioPreviews(previews: PreviewAssetPlan[], input: StudioWorkflowInput, workflow: StudioWorkflowState) {
+    return previews.map((preview) => ({
+      ...preview,
+      label: `${preview.label} / ${this.studioActionLabel(input)}`,
+      generationMetadata: {
+        ...(preview.generationMetadata ?? {}),
+        studioWorkflow: workflow,
+        studioAction: input.action,
+        studioTarget: input.target,
+        selectiveRegeneration: true
+      },
+      metadata: {
+        ...preview.metadata,
+        studioWorkflow: workflow,
+        studioAction: input.action,
+        studioTarget: input.target,
+        selectiveRegeneration: true
+      }
+    }));
+  }
+
+  private studioActionLabel(input: StudioWorkflowInput) {
+    if (input.action === "regenerate-rarity-tier") return `${this.rarityTarget(input.target)} rerender`;
+    if (input.action === "regenerate-mood-set") return "mood set rerender";
+    if (input.action === "regenerate-legendary-scene") return "legendary scene rerender";
+    return input.action.replace(/-/g, " ");
+  }
+
+  private rarityTarget(target?: string) {
+    const normalized = String(target ?? "Legendary").trim().toLowerCase();
+    const match = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"].find((rarity) => rarity.toLowerCase() === normalized);
+    return match ?? "Legendary";
+  }
+
+  private studioWorkflowState(value: unknown): StudioWorkflowState {
+    const raw = this.record(value);
+    const locks = this.record(raw.locks);
+    const approvals = this.record(raw.approvals);
+    const rerolls = this.record(raw.rerolls);
+    return {
+      locks: {
+        artDirection: locks.artDirection === true,
+        style: locks.style === true,
+        mood: locks.mood === true,
+        rarityDirection: locks.rarityDirection === true
+      },
+      approvals: {
+        silhouetteSystem: approvals.silhouetteSystem === true,
+        factionCulture: approvals.factionCulture === true,
+        traitFamily: approvals.traitFamily === true,
+        cinematicDirection: approvals.cinematicDirection === true
+      },
+      rerolls: {
+        rarityTiers: this.record(rerolls.rarityTiers) as Record<string, number>,
+        moodSet: Number(rerolls.moodSet ?? 0),
+        legendaryScene: Number(rerolls.legendaryScene ?? 0)
+      },
+      lastAction: raw.lastAction && typeof raw.lastAction === "object" ? raw.lastAction as StudioWorkflowState["lastAction"] : undefined
+    };
+  }
+
+  private nextStudioWorkflow(current: StudioWorkflowState, input: StudioWorkflowInput): StudioWorkflowState {
+    const next: StudioWorkflowState = {
+      locks: { ...current.locks },
+      approvals: { ...current.approvals },
+      rerolls: {
+        rarityTiers: { ...current.rerolls.rarityTiers },
+        moodSet: current.rerolls.moodSet,
+        legendaryScene: current.rerolls.legendaryScene
+      },
+      lastAction: {
+        action: input.action,
+        target: input.target,
+        note: input.note,
+        walletAddress: input.walletAddress,
+        at: new Date().toISOString()
+      }
+    };
+
+    if (input.action === "lock-art-direction") next.locks.artDirection = true;
+    if (input.action === "lock-style") next.locks.style = true;
+    if (input.action === "lock-mood") next.locks.mood = true;
+    if (input.action === "lock-rarity-direction") next.locks.rarityDirection = true;
+    if (input.action === "approve-silhouette-system") next.approvals.silhouetteSystem = true;
+    if (input.action === "approve-faction-culture") next.approvals.factionCulture = true;
+    if (input.action === "approve-trait-family") next.approvals.traitFamily = true;
+    if (input.action === "approve-cinematic-direction") next.approvals.cinematicDirection = true;
+    if (input.action === "regenerate-rarity-tier") {
+      const target = this.rarityTarget(input.target);
+      next.rerolls.rarityTiers[target] = Number(next.rerolls.rarityTiers[target] ?? 0) + 1;
+    }
+    if (input.action === "regenerate-mood-set") next.rerolls.moodSet += 1;
+    if (input.action === "regenerate-legendary-scene") next.rerolls.legendaryScene += 1;
+    return next;
+  }
+
+  private studioApprovalIssues(workflow: StudioWorkflowState) {
+    return [
+      workflow.locks.artDirection ? "" : "lock art direction",
+      workflow.approvals.silhouetteSystem ? "" : "approve silhouette system",
+      workflow.approvals.factionCulture ? "" : "approve faction culture",
+      workflow.approvals.traitFamily ? "" : "approve trait family",
+      workflow.approvals.cinematicDirection ? "" : "approve cinematic direction"
+    ].filter(Boolean);
+  }
+
   private async persistPreviews(generationRunId: string, styleProfileId: string, version: number, previews: PreviewAssetPlan[]) {
     const storedPreviews = await Promise.all(
       previews.map(async (preview, index) => {
@@ -677,7 +931,7 @@ export class GeneratorService {
           const aiConcept = preview.productionAssetStatus === "AI_CONCEPT";
           throw new ServiceUnavailableException({
             code: aiConcept ? "AI_PREVIEW_STORAGE_FAILED" : "PREVIEW_STORAGE_FAILED",
-            message: aiConcept ? "Storage failed while saving the generated concept preview." : "Storage failed while saving the preview asset.",
+            message: aiConcept ? "Storage failed while saving the generated studio preview." : "Storage failed while saving the preview asset.",
             details: {
               stage: "preview_asset_storage",
               assetType: preview.type,
@@ -785,7 +1039,7 @@ export class GeneratorService {
       ...quality.issues,
       ...(style.artSource === "PROCEDURAL_FALLBACK" ? ["Production asset provider is not configured."] : []),
       ...(style.productionAssetStatus === "WIREFRAME" ? ["Wireframe previews are planning/debug only."] : []),
-      ...(style.productionAssetStatus === "AI_CONCEPT" ? ["AI concept previews are not mintable final art."] : []),
+      ...(style.productionAssetStatus === "AI_CONCEPT" ? ["AI studio previews need creator approval plus curated/layered or artist-approved production assets before mint."] : []),
       ...(!style.tenKReadiness.pass ? ["10k readiness needs logo/reference input and non-generic silhouette validation."] : [])
     ];
     return {
@@ -811,27 +1065,27 @@ export class GeneratorService {
     }
   }
 
-  private async conceptPreviewsWithFallback(tokenMint: string, style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string) {
+  private async conceptPreviewsWithFallback(tokenMint: string, style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string, options: { bypassCache?: boolean } = {}) {
     const conceptRequest = this.aiConcepts.conceptRunSummary(style, pack, seedKey, logoData, logoUri);
     const cacheKey = String(conceptRequest.cacheKey);
     const dnaHash = this.aiConcepts.dnaHash(style);
-    const memoryCached = this.aiConcepts.cachedConcepts(cacheKey);
+    const memoryCached = options.bypassCache ? [] : this.aiConcepts.cachedConcepts(cacheKey);
     if (memoryCached.length) {
       const result = {
         previews: memoryCached,
-        warnings: ["Cached AI concept preview reused; no new OpenAI image request was made."],
+        warnings: ["Cached AI studio preview reused; no new OpenAI image request was made."],
         conceptRequest: { ...conceptRequest, provider: "cached", cachedResultAvailable: true, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0 }
       };
       this.logPreviewTrace("memory-cache", tokenMint, result.previews, result.conceptRequest);
       return result;
     }
 
-    const persistedCached = await this.persistedConceptCache(tokenMint, dnaHash);
+    const persistedCached = options.bypassCache ? [] : await this.persistedConceptCache(tokenMint, dnaHash);
     if (persistedCached.length) {
       this.aiConcepts.rememberConcepts(cacheKey, persistedCached);
       const result = {
         previews: persistedCached,
-        warnings: ["Previous AI concept preview for this token and Creative DNA hash reused; no new OpenAI image request was made."],
+        warnings: ["Previous AI studio preview for this token and Creative DNA hash reused; no new OpenAI image request was made."],
         conceptRequest: { ...conceptRequest, provider: "cached", cachedResultAvailable: true, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0 }
       };
       this.logPreviewTrace("persistent-cache", tokenMint, result.previews, result.conceptRequest);
@@ -842,7 +1096,7 @@ export class GeneratorService {
       const previews = this.aiConcepts.generateLocalPlaceholder(style, pack, seedKey, logoData, logoUri, "cached-only-no-cache");
       const result = {
         previews,
-        warnings: ["AI_CONCEPT_PROVIDER=cached-only is configured, but no cached concept exists. Showing branded planning visuals without calling OpenAI."],
+        warnings: ["AI_CONCEPT_PROVIDER=cached-only is configured, but no cached studio preview exists. Showing branded studio planning visuals without calling OpenAI."],
         conceptRequest: { ...conceptRequest, provider: "local-placeholder", cachedResultAvailable: false, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0 }
       };
       this.logPreviewTrace("cached-only-placeholder", tokenMint, result.previews, result.conceptRequest);
@@ -852,7 +1106,7 @@ export class GeneratorService {
     try {
       const previews = await this.aiConcepts.generateRequired(style, pack, seedKey, logoData, logoUri);
       const provider = this.previewProviderLabel(previews);
-      const warnings = provider === "local-placeholder-planning-visual" ? ["Local branded planning visual provider active; no paid OpenAI image generation was used."] : [];
+      const warnings = provider === "local-placeholder-planning-visual" ? ["Local branded studio planning visual provider active; no paid OpenAI image generation was used."] : [];
       const result = {
         previews,
         warnings,
@@ -867,7 +1121,7 @@ export class GeneratorService {
         previews,
         warnings: [
           unavailable,
-          "OpenAI generation is unavailable right now; showing branded cinematic planning visuals so the collection experience is never blank."
+          "OpenAI generation is unavailable right now; showing branded cinematic studio planning visuals so the collection experience is never blank."
         ],
         conceptRequest: { ...conceptRequest, provider: "local-placeholder", cachedResultAvailable: false, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0, providerFailureReason: unavailable }
       };
@@ -981,7 +1235,7 @@ export class GeneratorService {
     }
     return new ServiceUnavailableException({
       code: "OPENAI_REQUEST_FAILED",
-      message: "OpenAI request failed while creating the AI concept preview.",
+      message: "OpenAI request failed while creating the AI studio preview.",
       details: {
         stage: "ai_concept_preview",
         errorClass: error instanceof Error ? error.name : typeof error,
@@ -991,7 +1245,7 @@ export class GeneratorService {
   }
 
   private aiUnavailableWarning(error: unknown) {
-    return `AI concept generation unavailable: ${this.publicErrorMessage(error)}`;
+    return `AI studio generation unavailable: ${this.publicErrorMessage(error)}`;
   }
 
   private publicErrorMessage(error: unknown) {
@@ -1006,7 +1260,7 @@ export class GeneratorService {
     }
     if (error instanceof AiConceptGenerationError) return this.sanitizePublicError(error.message);
     if (error instanceof Error) return this.sanitizePublicError(error.message);
-    return "OpenAI did not return a usable concept preview.";
+    return "OpenAI did not return a usable studio preview.";
   }
 
   private sanitizePublicError(value: string) {
@@ -1016,7 +1270,7 @@ export class GeneratorService {
       .replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/gi, "data:image/...;base64,...")
       .replace(/\s+/g, " ")
       .trim()
-      .slice(0, 600) || "OpenAI did not return a usable concept preview.";
+      .slice(0, 600) || "OpenAI did not return a usable studio preview.";
   }
 
   private assertLaunchProviders(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: "BASIC" | "PREMIUM" | "LEGENDARY_READY") {
@@ -1083,8 +1337,15 @@ export class GeneratorService {
         commonToRareSource: "approved_layer_pack_required",
         epicLegendaryMythicSource: "curated_composition_required",
         aiFinalImageAllowed: false,
+        aiAssistedFinalOutputsAllowed: true,
+        layeredExportsAllowed: true,
+        artistCleanupAllowed: true,
+        selectiveManualCurationAllowed: true,
+        creatorApprovalRequiredBeforeMint: true,
+        massAutomaticPublicMintGeneration: false,
+        previewQualityTarget: "MINT_WORTHY_STUDIO_PREVIEW",
         artistReviewRequiredFor: ["Epic", "Legendary", "Mythic"],
-        productionReadyRequires: ["approved layer pack", "curated final assets"]
+        productionReadyRequires: ["locked art direction", "approved trait families", "approved cinematic direction", "curated final assets"]
       };
     const creativeUniverse = {
       archetype: String((record.visualFingerprint as Record<string, unknown> | undefined)?.archetype ?? "legacy"),

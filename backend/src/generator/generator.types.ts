@@ -159,8 +159,62 @@ export type ProductionAssetPolicy = {
   commonToRareSource: "approved_layer_pack_required";
   epicLegendaryMythicSource: "curated_composition_required";
   aiFinalImageAllowed: false;
+  aiAssistedFinalOutputsAllowed?: boolean;
+  layeredExportsAllowed?: boolean;
+  artistCleanupAllowed?: boolean;
+  selectiveManualCurationAllowed?: boolean;
+  creatorApprovalRequiredBeforeMint?: boolean;
+  massAutomaticPublicMintGeneration?: false;
+  previewQualityTarget?: "MINT_WORTHY_STUDIO_PREVIEW";
   artistReviewRequiredFor: string[];
   productionReadyRequires: string[];
+};
+
+export type StudioWorkflowAction =
+  | "lock-art-direction"
+  | "lock-style"
+  | "lock-mood"
+  | "lock-rarity-direction"
+  | "regenerate-rarity-tier"
+  | "regenerate-mood-set"
+  | "regenerate-legendary-scene"
+  | "approve-silhouette-system"
+  | "approve-faction-culture"
+  | "approve-trait-family"
+  | "approve-cinematic-direction";
+
+export type StudioWorkflowInput = {
+  action: StudioWorkflowAction;
+  target?: string;
+  note?: string;
+  walletAddress?: string;
+};
+
+export type StudioWorkflowState = {
+  locks: {
+    artDirection: boolean;
+    style: boolean;
+    mood: boolean;
+    rarityDirection: boolean;
+  };
+  approvals: {
+    silhouetteSystem: boolean;
+    factionCulture: boolean;
+    traitFamily: boolean;
+    cinematicDirection: boolean;
+  };
+  rerolls: {
+    rarityTiers: Record<string, number>;
+    moodSet: number;
+    legendaryScene: number;
+  };
+  lastAction?: {
+    action: StudioWorkflowAction;
+    target?: string;
+    note?: string;
+    walletAddress?: string;
+    at: string;
+  };
 };
 
 export type CreativeSignalProfile = {

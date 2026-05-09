@@ -276,6 +276,14 @@ export class CapabilitiesService {
     return heliusAvailable && this.productionStorageAvailable() && this.solanaAvailable() && this.devnetProgramConfigured() && programExecutable;
   }
 
+  private finalAssetApprovalGateSatisfied() {
+    return (
+      (process.env.FINAL_PRODUCTION_ASSETS_APPROVED ?? "false") === "true" ||
+      (process.env.ARTIST_APPROVED_ASSETS ?? "false") === "true" ||
+      (process.env.AI_ASSISTED_FINAL_ASSETS_APPROVED ?? "false") === "true"
+    );
+  }
+
   private async heliusReachable(config = normalizeHeliusConfig()) {
     if (!config.heliusApiKey || !config.heliusRpcUrl || config.errorCode) {
       setLastHeliusErrorCode(config.errorCode);
@@ -381,6 +389,7 @@ export class CapabilitiesService {
       "CURATED_LAYER_PACK_ROOT",
       "APPROVED_LAYER_PACK_ID",
       "DEMO_CURATED_LAYER_PACK",
+      "AI_ASSISTED_FINAL_ASSETS_APPROVED",
       "AI_CONCEPT_PROVIDER",
       "AI_CONCEPT_LOW_COST_MODE",
       "AI_CONCEPT_MAX_IMAGES_PER_RUN",
@@ -529,14 +538,14 @@ export class CapabilitiesService {
       ...(capabilities.solanaRpcConfigured ? [] : ["SOLANA_RPC_URL"]),
       ...(capabilities.permanentStorageConfigured ? [] : ["PINATA_JWT or permanent storage provider credentials"]),
       ...(this.realApprovedLayerPackAvailable() ? [] : ["approved curated layer pack"]),
-      ...((process.env.FINAL_PRODUCTION_ASSETS_APPROVED ?? "false") === "true" || (process.env.ARTIST_APPROVED_ASSETS ?? "false") === "true" ? [] : ["launch gate status satisfied"])
+      ...(this.finalAssetApprovalGateSatisfied() ? [] : ["launch gate status satisfied"])
     ];
     return [
       {
         id: "creative-preview",
         label: "Creative Preview Mode",
         ready: creativeMissing.length === 0,
-        output: "Professional AI concept preview, clearly labeled and not mintable.",
+        output: "Premium AI studio preview for creator refinement and approval, clearly separated from automatic minting.",
         missing: creativeMissing,
         blockedBy: creativeMissing
       },
@@ -580,14 +589,14 @@ export class CapabilitiesService {
           label: "ENABLE_AI_IMAGE_GENERATION",
           ok: capabilities.aiGenerationEnabled || capabilities.localPreviewProviderEnabled,
           requiredFor: ["Creative Preview Mode"],
-          fix: "Set ENABLE_AI_IMAGE_GENERATION=true or AI_CONCEPT_PROVIDER=local-placeholder for zero-cost planning visuals."
+          fix: "Set ENABLE_AI_IMAGE_GENERATION=true or AI_CONCEPT_PROVIDER=local-placeholder for zero-cost studio planning visuals."
         },
         {
           key: "OPENAI_API_KEY",
           label: "OPENAI_API_KEY",
           ok: capabilities.openaiImagesAvailable || capabilities.localPreviewProviderEnabled,
           requiredFor: ["Creative Preview Mode"],
-          fix: "Add an OpenAI API key to the backend environment, or use AI_CONCEPT_PROVIDER=local-placeholder for local planning visuals."
+          fix: "Add an OpenAI API key to the backend environment, or use AI_CONCEPT_PROVIDER=local-placeholder for local studio planning visuals."
         },
         {
           key: "PROGRAM_ID",
