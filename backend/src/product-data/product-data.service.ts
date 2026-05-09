@@ -189,7 +189,7 @@ export class ProductDataService {
       participants: raid.participations.map((participation) => ({
         id: participation.userId,
         name: participation.user.username ?? participation.user.walletAddress.slice(0, 6),
-        avatar: participation.user.avatarUrl ?? "/art/frog-vault.png",
+        avatar: participation.user.avatarUrl ?? "/art/phew-faction-mark.png",
         role: "Raider",
         xp: participation.xpEarned,
         vaults: 0,
@@ -422,7 +422,7 @@ export class ProductDataService {
       id: log.id,
       collectionId: log.collectionId,
       actor: log.user?.username ?? log.user?.walletAddress.slice(0, 6) ?? "Phew.run",
-      avatar: log.user?.avatarUrl ?? "/art/frog-vault.png",
+      avatar: log.user?.avatarUrl ?? "/art/phew-faction-mark.png",
       role: log.source,
       action: log.reason,
       xp: log.amount,
@@ -445,8 +445,8 @@ export class ProductDataService {
       subtitle: collection.theme,
       tokenMint: token.mint ?? "",
       description: collection.lore ?? collection.vibe ?? collection.theme,
-      image: collection.logoUri ?? "/art/frog-vault.png",
-      banner: collection.bannerUri ?? "/art/hero-frog.png",
+      image: collection.logoUri ?? "/art/phew-faction-mark.png",
+      banner: collection.bannerUri ?? "/art/phew-launch-hero.png",
       mascot: collection.mascot,
       theme: collection.theme,
       vibe: collection.vibe,
@@ -566,11 +566,10 @@ export class ProductDataService {
   }
 
   private mascotType(value: string) {
-    if (/dog/i.test(value)) return "dog";
-    if (/cat/i.test(value)) return "cat";
-    if (/alien/i.test(value)) return "alien";
-    if (/samurai/i.test(value)) return "samurai";
-    return "frog";
+    if (/patient|carrier|subject|avatar|mascot|character/i.test(value)) return "symbolic character";
+    if (/relic|artifact|object|mask|badge/i.test(value)) return "relic carrier";
+    if (/scene|civilization|world|city|district/i.test(value)) return "world actor";
+    return "dynamic subject";
   }
 
   private collectionColorSystem(palette: string[]) {

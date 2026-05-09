@@ -25,6 +25,8 @@ async function main() {
 
   const createPage = readFileSync(resolve(root, "frontend/app/create-collection/page.tsx"), "utf8");
   requireCheck(createPage.includes("Token CA / mint address") && createPage.includes("/tokens/") && createPage.includes("Optional Overrides"), "Create Collection is not CA-first.", issues);
+  const collectionPreview = readFileSync(resolve(root, "frontend/components/CollectionPreview.tsx"), "utf8");
+  requireCheck(collectionPreview.includes("Professional Preview Required") && collectionPreview.includes("Wireframe planning/debug assets"), "Wireframe assets must be collapsed behind a debug/planning section in the creator preview.", issues);
 
   checks.programIds = programIdCheck(root, issues);
   checks.rarity = rarityCheck(issues);

@@ -66,7 +66,7 @@ export const comicRenderer: PreviewRenderer = {
 
 export const cinematicRenderer: PreviewRenderer = {
   pipeline: "cinematic-renderer",
-  families: ["cinematic-scene", "biohazard-horror"],
+  families: ["cinematic-scene", "horror-poster"],
   engines: ["cinematic-engine", "horror-engine"],
   render(ctx) {
     const { primary, secondary, ink, accent } = ctx.palette;
@@ -115,7 +115,7 @@ export const cinematicRenderer: PreviewRenderer = {
 
 export const portraitRenderer: PreviewRenderer = {
   pipeline: "portrait-renderer",
-  families: ["anime-portrait", "painterly-portrait"],
+  families: ["cel-portrait", "painterly-portrait"],
   engines: ["portrait-engine"],
   render(ctx) {
     const { primary, secondary, ink, accent } = ctx.palette;
@@ -135,11 +135,11 @@ export const portraitRenderer: PreviewRenderer = {
     const brush = Array.from({ length: 12 + ctx.intensity * 5 }, (_, i) => `<path d="M${mod(ctx.seed, i * 19, ctx.width)} ${mod(ctx.seed, i * 31, ctx.height)} q${jitter(ctx.seed, i + 7, 170)} ${jitter(ctx.seed, i + 11, 120)} ${jitter(ctx.seed, i + 17, 260)} ${jitter(ctx.seed, i + 23, 180)}" stroke="${i % 3 === 0 ? primary : i % 3 === 1 ? secondary : accent}" stroke-width="${10 + (i % 5) * 6}" opacity="0.24" fill="none"/>`).join("");
     const bustFace = `<g transform="rotate(${pose.tilt / 3} ${cx} ${cy})" filter="url(#softShadow)">
       <path d="M${cx - 160 * s} ${cy + 110 * s} C${cx - 96 * s} ${cy - 28 * s} ${cx + 130 * s} ${cy - 48 * s} ${cx + 210 * s} ${cy + 142 * s} L${cx + 238 * s} ${cy + 385 * s} H${cx - 238 * s}Z" fill="${secondary}" opacity="0.92"/>
-      <path d="M${cx - 132 * s} ${cy - 170 * s} Q${cx - 12 * s} ${cy - 270 * s} ${cx + 146 * s} ${cy - 158 * s} Q${cx + 184 * s} ${cy + 12 * s} ${cx + 62 * s} ${cy + 154 * s} Q${cx - 54 * s} ${cy + 220 * s} ${cx - 140 * s} ${cy + 102 * s} Q${cx - 210 * s} ${cy - 18 * s} ${cx - 132 * s} ${cy - 170 * s}Z" fill="${primary}" stroke="${ink}" stroke-width="${ctx.family === "anime-portrait" ? 10 : 4}" opacity="0.95"/>
+      <path d="M${cx - 132 * s} ${cy - 170 * s} Q${cx - 12 * s} ${cy - 270 * s} ${cx + 146 * s} ${cy - 158 * s} Q${cx + 184 * s} ${cy + 12 * s} ${cx + 62 * s} ${cy + 154 * s} Q${cx - 54 * s} ${cy + 220 * s} ${cx - 140 * s} ${cy + 102 * s} Q${cx - 210 * s} ${cy - 18 * s} ${cx - 132 * s} ${cy - 170 * s}Z" fill="${primary}" stroke="${ink}" stroke-width="${ctx.family === "cel-portrait" ? 10 : 4}" opacity="0.95"/>
       <path d="M${cx - 208 * s} ${cy - 150 * s} C${cx - 84 * s} ${cy - 288 * s} ${cx + 132 * s} ${cy - 254 * s} ${cx + 214 * s} ${cy - 84 * s} C${cx + 74 * s} ${cy - 144 * s} ${cx - 38 * s} ${cy - 152 * s} ${cx - 208 * s} ${cy - 150 * s}Z" fill="${secondary}" opacity="0.85"/>
-      <ellipse cx="${cx - 62 * s}" cy="${cy - 18 * s + pose.asymmetry / 9}" rx="${42 * pose.eyeScale}" ry="${ctx.family === "anime-portrait" ? 34 * pose.eyeScale : 18 * pose.eyeScale}" fill="${accent}" stroke="${ink}" stroke-width="6"/>
-      <ellipse cx="${cx + 80 * s}" cy="${cy - 26 * s - pose.asymmetry / 10}" rx="${high ? 58 : 40}" ry="${ctx.family === "anime-portrait" ? 30 : 18}" fill="${accent}" stroke="${ink}" stroke-width="6"/>
-      <path d="M${cx - 34 * s} ${cy + 84 * s} q${pose.mouthOpen ? 44 : 58} ${pose.mouthOpen ? 48 : 18} ${pose.mouthOpen ? 104 : 120} ${pose.mouthOpen ? -4 : -14}" stroke="${ink}" stroke-width="${ctx.family === "anime-portrait" ? 10 : 7}" fill="none"/>
+      <ellipse cx="${cx - 62 * s}" cy="${cy - 18 * s + pose.asymmetry / 9}" rx="${42 * pose.eyeScale}" ry="${ctx.family === "cel-portrait" ? 34 * pose.eyeScale : 18 * pose.eyeScale}" fill="${accent}" stroke="${ink}" stroke-width="6"/>
+      <ellipse cx="${cx + 80 * s}" cy="${cy - 26 * s - pose.asymmetry / 10}" rx="${high ? 58 : 40}" ry="${ctx.family === "cel-portrait" ? 30 : 18}" fill="${accent}" stroke="${ink}" stroke-width="6"/>
+      <path d="M${cx - 34 * s} ${cy + 84 * s} q${pose.mouthOpen ? 44 : 58} ${pose.mouthOpen ? 48 : 18} ${pose.mouthOpen ? 104 : 120} ${pose.mouthOpen ? -4 : -14}" stroke="${ink}" stroke-width="${ctx.family === "cel-portrait" ? 10 : 7}" fill="none"/>
     </g>`;
     const profile = `<g transform="rotate(-6 ${ctx.width * 0.42} ${ctx.height * 0.5})" filter="url(#softShadow)">
       <path d="M${ctx.width * 0.26} ${ctx.height * 0.18} C${ctx.width * 0.5} ${ctx.height * 0.06} ${ctx.width * 0.66} ${ctx.height * 0.34} ${ctx.width * 0.48} ${ctx.height * 0.56} L${ctx.width * 0.62} ${ctx.height * 0.88} H${ctx.width * 0.22} L${ctx.width * 0.32} ${ctx.height * 0.58} C${ctx.width * 0.16} ${ctx.height * 0.48} ${ctx.width * 0.16} ${ctx.height * 0.28} ${ctx.width * 0.26} ${ctx.height * 0.18}Z" fill="${primary}" stroke="${ink}" stroke-width="7"/>

@@ -10,31 +10,34 @@ const palettes = [
   ["#ff4f70", "#f4c542", "#23070d"]
 ];
 
-const artStyles = ["pixel", "cartoon", "cyberpunk", "abstract", "meme", "anime", "low-poly"] as const;
+const artStyles = ["pixel medium", "comic medium", "cinematic medium", "painterly medium", "clay medium", "surreal medium", "poster medium", "arcade medium", "low-poly medium"] as const;
 const shapeLanguages = ["rounded", "sharp", "glitch", "organic", "geometric"] as const;
 const textures = ["clean", "grain", "scanlines", "painted", "posterized"] as const;
+const subjectRoles = ["signal citizen", "myth carrier", "relic witness", "culture avatar", "world actor", "meme envoy"] as const;
 
 @Injectable()
 export class IdentityEngineService {
   createCommunityProfile(token: TokenScan): CommunityProfile {
     const clean = token.symbol.replace(/[^a-z0-9]/gi, "").toLowerCase() || "vault";
     const index = [...clean].reduce((sum, char) => sum + char.charCodeAt(0), 0) % palettes.length;
-    const root = this.rootWord(clean);
+    const root = this.identityRoot(token);
+    const titleRoot = this.title(root);
+    const subjectRole = subjectRoles[index % subjectRoles.length];
 
     return {
       name: `${token.symbol} Vaults`,
       symbol: token.symbol,
-      theme: `${root} citadel`,
-      mascot: `${this.title(root)} Warden`,
-      vibe: `${root} raids, locked yield, collection-first progression`,
+      theme: `${root} civilization`,
+      mascot: `${titleRoot} ${this.title(subjectRole)}`,
+      vibe: `${root} culture, token-backed rituals, collection-first progression`,
       palette: palettes[index],
       communityTraits: {
-        background: [`${this.title(root)} Gate`, `${this.title(root)} Treasury`, `${this.title(root)} Moonroom`],
-        role: [`${this.title(root)} Raider`, `${this.title(root)} Keeper`, `${this.title(root)} Prophet`],
-        aura: [`${this.title(root)} Glow`, `${this.title(root)} Static`, `${this.title(root)} Mist`],
-        accessory: [`${this.title(root)} Staff`, `${this.title(root)} Crown`, `${this.title(root)} Sigil`],
-        rank: [`${this.title(root)} Initiate`, `${this.title(root)} Marshal`, `${this.title(root)} Mythic`],
-        legendaryTrait: `${this.title(root)} Eternal Standard`
+        background: [`${titleRoot} District`, `${titleRoot} Ritual Room`, `${titleRoot} Origin Site`],
+        role: [`${titleRoot} Witness`, `${titleRoot} Operator`, `${titleRoot} Mythkeeper`],
+        aura: [`${titleRoot} Pressure`, `${titleRoot} Static`, `${titleRoot} Weather`],
+        accessory: [`${titleRoot} Relic`, `${titleRoot} Signal`, `${titleRoot} Mark`],
+        rank: [`${titleRoot} Initiate`, `${titleRoot} Keeper`, `${titleRoot} Mythic`],
+        legendaryTrait: `${titleRoot} Origin Incident`
       },
       rarityTable: {
         common: 5200,
@@ -45,44 +48,42 @@ export class IdentityEngineService {
         mythic: 10
       },
       traitLayers: {
-        base: [`${this.title(root)} Base`, `${this.title(root)} Veteran`, `${this.title(root)} Mythic`],
-        headgear: [`${this.title(root)} Crown`, `${this.title(root)} Hood`, `${this.title(root)} Helm`],
-        eyes: [`${this.title(root)} Glow`, `${this.title(root)} Focus`, `${this.title(root)} Scan`],
-        aura: [`${this.title(root)} Mist`, `${this.title(root)} Pulse`, `${this.title(root)} Static`],
-        accessory: [`${this.title(root)} Staff`, `${this.title(root)} Banner`, `${this.title(root)} Key`],
-        background: [`${this.title(root)} Gate`, `${this.title(root)} Vault`, `${this.title(root)} Raid Room`]
+        base: [`${titleRoot} Common Subject`, `${titleRoot} Altered Subject`, `${titleRoot} Mythic Subject`],
+        headgear: [`${titleRoot} Head Mark`, `${titleRoot} Signal Hood`, `${titleRoot} Origin Helm`],
+        eyes: [`${titleRoot} Glow`, `${titleRoot} Focus`, `${titleRoot} Scan`],
+        aura: [`${titleRoot} Weather`, `${titleRoot} Pulse`, `${titleRoot} Static`],
+        accessory: [`${titleRoot} Relic`, `${titleRoot} Banner`, `${titleRoot} Key`],
+        background: [`${titleRoot} District`, `${titleRoot} Vault`, `${titleRoot} Raid Room`]
       },
       styleProfile: {
         artStyle: artStyles[index % artStyles.length],
         colorPalette: palettes[index],
         shapeLanguage: shapeLanguages[index % shapeLanguages.length],
-        mascotType: this.mascotType(clean),
+        mascotType: this.subjectType(index),
         visualFx: this.visualFx(index),
         texture: textures[index % textures.length],
         silhouetteRules: [
           `Use a ${shapeLanguages[index % shapeLanguages.length]} silhouette language`,
-          `Anchor the mascot around ${this.rootWord(clean)} identity`,
+          `Anchor the subject around ${root} culture and token metadata`,
           "Do not reuse base pose across the first 20 generated NFTs"
         ]
       }
     };
   }
 
-  private rootWord(symbol: string) {
-    if (symbol.includes("frog")) return "swamp";
-    if (symbol.includes("dog")) return "kennel";
-    if (symbol.includes("cat")) return "neon alley";
-    if (symbol.includes("pepe")) return "mire empire";
-    return `${symbol} vault`;
+  private identityRoot(token: TokenScan) {
+    const stop = new Set(["the", "and", "for", "with", "token", "coin", "official", "community", "vault", "nft", "solana"]);
+    const words = [token.symbol, token.name, token.description ?? ""]
+      .join(" ")
+      .split(/[^a-z0-9]+/i)
+      .map((word) => word.toLowerCase())
+      .filter((word) => word.length > 2 && !stop.has(word))
+      .slice(0, 3);
+    return words.length ? words.join(" ") : "origin culture";
   }
 
-  private mascotType(symbol: string) {
-    if (symbol.includes("frog")) return "frog" as const;
-    if (symbol.includes("dog")) return "dog" as const;
-    if (symbol.includes("cat")) return "cat" as const;
-    if (symbol.includes("pepe")) return "alien" as const;
-    if (symbol.includes("shib")) return "samurai" as const;
-    return "robot" as const;
+  private subjectType(index: number) {
+    return ["dynamic subject", "symbolic character", "culture avatar", "myth witness", "ritual actor"][index % 5];
   }
 
   private visualFx(index: number) {

@@ -67,8 +67,8 @@ export class ArtGeneratorService {
 
     return Array.from({ length: 32 }, (_, index) => ({
       id: `${profile.symbol.replace("$", "").toLowerCase()}-base-${index + 1}`,
-      name: `${profile.styleProfile.mascotType} ${profile.styleProfile.shapeLanguage} base ${index + 1}`,
-      silhouette: `${profile.styleProfile.shapeLanguage} ${profile.styleProfile.mascotType} silhouette with ${profile.styleProfile.visualFx[index % profile.styleProfile.visualFx.length]}`,
+      name: `${profile.styleProfile.mascotType} ${profile.styleProfile.shapeLanguage} variant ${index + 1}`,
+      silhouette: `${profile.styleProfile.shapeLanguage} subject silhouette with ${profile.styleProfile.visualFx[index % profile.styleProfile.visualFx.length]}`,
       pose: poses[index % poses.length],
       rarityBias: biases[index % biases.length]
     }));

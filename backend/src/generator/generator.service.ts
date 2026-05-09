@@ -147,7 +147,7 @@ export class GeneratorService {
         "Preview generated without DB persistence.",
         style.productionAssetStatus === "AI_CONCEPT"
           ? "AI concept preview only; final launch requires curated or artist-approved production assets and permanent storage."
-          : "Wireframe only — enable OpenAI image generation or curated asset provider for professional NFT previews.",
+          : "Wireframe only - enable OpenAI image generation or curated asset provider for professional NFT previews.",
         "OpenAI image generation is art direction only and is never used in mint, final render, redeem, stake, or unstake flows."
       ]
     };

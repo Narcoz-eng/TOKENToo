@@ -67,10 +67,10 @@ export type GeneratedArt = {
 };
 
 export type StyleProfile = {
-  artStyle: "pixel" | "cartoon" | "cyberpunk" | "abstract" | "meme" | "anime" | "low-poly";
+  artStyle: string;
   colorPalette: string[];
   shapeLanguage: "rounded" | "sharp" | "glitch" | "organic" | "geometric";
-  mascotType: "frog" | "dog" | "cat" | "alien" | "robot" | "samurai" | "spirit";
+  mascotType: string;
   visualFx: string[];
   texture: "clean" | "grain" | "scanlines" | "painted" | "posterized";
   silhouetteRules: string[];

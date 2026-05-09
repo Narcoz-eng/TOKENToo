@@ -245,9 +245,9 @@ export class StyleProfileGeneratorService {
   private visualTypographyDirection(visual: VisualDesignSystem) {
     const directions: Record<VisualDesignSystem["rendererFamily"], string> = {
       "pixel-topdown": "pixel HUD labels, tiny map captions, no luxury serif badges",
-      "anime-portrait": "cinematic poster type with asymmetric title placement",
+      "cel-portrait": "cinematic cel poster type with asymmetric title placement",
       "clay-toy": "soft toy packaging labels with small handmade captions",
-      "biohazard-horror": "specimen-file labeling, warning tape, surveillance timestamps",
+      "horror-poster": "specimen-file labeling, warning tape, surveillance timestamps",
       "terminal-brutalist": "monospace terminal UI, receipt rows, command-line captions",
       "surreal-collage": "cut-paper captions, album-cover labels, displaced text fragments",
       "sticker-pack": "die-cut sticker labels, small punchline captions, pack-sheet numbering",
@@ -408,6 +408,7 @@ export class StyleProfileGeneratorService {
     const hints = this.topHints(signals.semanticWeights);
     const primary = hints[0];
     const secondary = hints[1] ?? primary;
+    const primaryObjects = (primary.objects?.length ? primary.objects : unique([...signals.objects, motif])).filter(Boolean);
     const visualSystem = this.generateVisualSystem(signals, motif, seed);
     const texture = pick(unique([visualSystem.lightingModel, ...hints.flatMap((hint) => hint.textures), "inked grain", "cut-paper shadows", "sticker gloss", "screenprint noise"]), seed + 23);
     const styleBase = `${visualSystem.rendererFamily.replace(/-/g, " ")} ${visualSystem.compositionStyle}`;
@@ -417,10 +418,11 @@ export class StyleProfileGeneratorService {
     const mascotOrSubject = `${motif} ${pick([...primary.silhouettes, ...secondary.silhouettes, analysis.mascot], seed + 43)} ${titleCase(subjectWord)}`.toLowerCase();
     const baseSilhouetteRules = unique([
       `${visualSystem.bodySystem}; ${visualSystem.proportionSystem}; ${analysis.shapeLanguage} ${pick(primary.silhouettes, seed + 47)}`,
-      `${visualSystem.headShape}; ${visualSystem.eyeSystem}; ${pick(secondary.silhouettes, seed + 53)} with ${pick(signals.objects.length ? signals.objects : [motif], seed + 59)} readability`,
+      `${visualSystem.headShape}; ${visualSystem.eyeSystem}; ${pick(primary.silhouettes, seed + 53)} with ${pick(primaryObjects, seed + 59)} readability`,
       `${visualSystem.compositionStyle}; ${visualSystem.cameraFraming}; rarity-specific silhouette changes`
     ]);
-    const moodCulture = unique([...signals.emotions, ...hints.flatMap((hint) => hint.expressions)]).slice(0, 8);
+    const primaryMoods = unique([input.hints?.mood ?? "", ...primary.expressions]).filter(Boolean);
+    const moodCulture = (primaryMoods.length >= 4 ? primaryMoods : unique([...primaryMoods, ...secondary.expressions, ...signals.emotions])).slice(0, 8);
     const expressionLanguage = unique([
       `${motif} ${pick(moodCulture.length ? moodCulture : ["focus"], seed + 67)}`,
       `${pick(signals.humorType.split(/\s+/), seed + 71)} reaction`,
@@ -440,7 +442,7 @@ export class StyleProfileGeneratorService {
       expressionLanguage,
       traitCategories,
       rarityPhilosophy: `${motif} rarity follows ${visualSystem.rarityProgression}; silhouette, environment, posture, lighting, and emotional rendering must all change.`,
-      legendaryMythology: `${motif} ${pick(signals.worldReferences.length ? signals.worldReferences : [worldConcept], seed + 83)} becomes ${visualSystem.legendaryPhilosophy}, where ${pick(signals.objects.length ? signals.objects : [motif], seed + 89)} changes the scene, camera, anatomy, lighting, and emotional snapshot.`,
+      legendaryMythology: `${motif} ${pick(signals.worldReferences.length ? signals.worldReferences : [worldConcept], seed + 83)} becomes ${visualSystem.legendaryPhilosophy}, where ${pick(primaryObjects, seed + 89)} changes the scene, camera, anatomy, lighting, and emotional snapshot.`,
       animationLanguage: `${motif} ${visualSystem.emotionalRendering} loops with ${texture} motion.`,
       forbiddenSimilarities: [
         "No fixed frog, dog, cat, robot, trader, or virus template selection.",
@@ -455,9 +457,12 @@ export class StyleProfileGeneratorService {
   private generateVisualSystem(signals: CreativeSignalProfile, motif: string, seed: number): VisualDesignSystem {
     const weights = signals.semanticWeights;
     const topKey = this.topWeightKeys(weights)[0] ?? "";
+    const primaryHint = this.topHints(weights)[0];
     const family = this.creativeDnaService.selectRendererMedium(signals, seed);
-    const object = pick(signals.objects.length ? signals.objects : [motif], seed + 11);
-    const world = pick(signals.worldReferences.length ? signals.worldReferences : ["origin room"], seed + 13);
+    const objectPool = (primaryHint?.objects?.length ? primaryHint.objects : unique([...signals.objects, motif])).filter(Boolean);
+    const worldPool = (primaryHint?.worlds?.length ? primaryHint.worlds : unique([...signals.worldReferences, "origin room"])).filter(Boolean);
+    const object = pick(objectPool, seed + 11);
+    const world = pick(worldPool, seed + 13);
     const systems: Record<VisualDesignSystem["rendererFamily"], Omit<VisualDesignSystem, "rendererFamily" | "rarityFrames">> = {
       "pixel-topdown": {
         renderingEngine: "pixel-engine",
@@ -479,14 +484,14 @@ export class StyleProfileGeneratorService {
         legendaryPhilosophy: "a full playable incident map frozen at the decisive frame",
         cardStructure: "edge-to-edge pixel map, no centered portrait frame"
       },
-      "anime-portrait": {
+      "cel-portrait": {
         renderingEngine: "portrait-engine",
         bodySystem: `${motif} shoulder-up character acting with hair/cloth silhouette breaks`,
         headShape: "angular portrait head with jawline, cheek planes, and non-circular crop",
         eyeSystem: "large cinematic eyes with highlights, tears, glare cuts, and blink layers",
         mouthSystem: "asymmetric lips, clenched teeth, whisper mouth, or trembling expression",
         proportionSystem: "portrait proportions, visible shoulders, dramatic neck and hand gesture",
-        anatomyModel: "anime portrait anatomy with hair masses, neck tension, hand acting, and shoulder silhouette",
+        anatomyModel: "cel portrait anatomy with hair masses, neck tension, hand acting, and shoulder silhouette",
         faceGrammar: "eyes, brow, mouth, and hand tension all change per rarity and mood",
         compositionStyle: "cinematic portrait with off-center gaze and foreground object",
         cameraFraming: "shoulder-up emotional close-up",
@@ -519,7 +524,7 @@ export class StyleProfileGeneratorService {
         legendaryPhilosophy: "a handmade diorama event with one-off sculpt and set",
         cardStructure: "photographic diorama crop, no graphic card border"
       },
-      "biohazard-horror": {
+      "horror-poster": {
         renderingEngine: "horror-engine",
         bodySystem: `${motif} mutated anatomy with infection growths and uneven limb mass`,
         headShape: "asymmetric specimen skull, swollen jaw, cracked mask, or parasite crown",
@@ -742,9 +747,11 @@ export class StyleProfileGeneratorService {
     };
     const system = systems[family];
     const bodySystem = `${system.bodySystem}; dominant signal ${topKey || "token-native"}; anchor object ${object}`;
-    const cameraAnchor = pick(unique([...signals.objects, ...signals.worldReferences, motif]).filter(Boolean), seed + 101);
-    const cultureAnchor = pick(unique([...signals.culturalWords, ...signals.memeLanguage, motif]).filter(Boolean), seed + 103);
-    const emotionAnchor = pick(unique([...signals.emotions, signals.energyLevel, motif]).filter(Boolean), seed + 107);
+    const cameraAnchor = pick(unique([...objectPool, ...worldPool, motif]).filter(Boolean), seed + 101);
+    const culturePool = unique([...(primaryHint?.danger ?? []), ...(primaryHint?.expressions ?? []), ...signals.memeLanguage, motif]).filter(Boolean);
+    const emotionPool = (primaryHint?.expressions?.length ? primaryHint.expressions : unique([...signals.emotions, signals.energyLevel, motif])).filter(Boolean);
+    const cultureAnchor = pick(culturePool, seed + 103);
+    const emotionAnchor = pick(emotionPool, seed + 107);
     const personalizedSystem = {
       ...system,
       bodySystem,
@@ -877,9 +884,9 @@ export class StyleProfileGeneratorService {
     const fallbackPoseVerbs = ["off-axis acting", "prop-driven leaning", "environment-reacting", "camera-aware turning", "scene-breaking"];
     const poseVerbs: Partial<Record<VisualDesignSystem["rendererFamily"], string[]>> = {
       "pixel-topdown": ["tile-dashing", "corner-camping", "item-carrying", "hazard-dodging", "crowd-bumping"],
-      "anime-portrait": ["over-shoulder glaring", "hand-clenched reacting", "tearline holding", "jaw-tight turning", "foreground-reaching"],
+      "cel-portrait": ["over-shoulder glaring", "hand-clenched reacting", "tearline holding", "jaw-tight turning", "foreground-reaching"],
       "clay-toy": ["slumped tabletop", "tiny-hand waving", "head-tilted wobbling", "squash-foot planted", "prop-hugging"],
-      "biohazard-horror": ["tremor-crouched", "limb-dragging", "glass-pressed", "warning-lit recoiling", "growth-burst twisting"],
+      "horror-poster": ["tremor-crouched", "limb-dragging", "glass-pressed", "warning-lit recoiling", "growth-burst twisting"],
       "terminal-brutalist": ["desk-collapsing", "screen-hunched", "cursor-staring", "receipt-folded", "chart-lit frozen"],
       "surreal-collage": ["scale-slipping", "object-swapping", "cutout-drifting", "mask-displaced", "perspective-falling"],
       "sticker-pack": ["die-cut bending", "misprint leaning", "prop-hugging", "sheet-peeling", "caption-biting"],
@@ -894,9 +901,9 @@ export class StyleProfileGeneratorService {
     const fallbackFrames = ["off-axis scene crop", "wide environment frame", visual.cameraFraming];
     const frames: Partial<Record<VisualDesignSystem["rendererFamily"], string[]>> = {
       "pixel-topdown": ["orthographic tile viewport", "mini-map crowd read", visual.cameraFraming],
-      "anime-portrait": ["off-center shoulder portrait", "foreground hand crop", visual.cameraFraming],
+      "cel-portrait": ["off-center shoulder portrait", "foreground hand crop", visual.cameraFraming],
       "clay-toy": ["macro tabletop crop", "toy shelf diorama crop", visual.cameraFraming],
-      "biohazard-horror": ["surveillance specimen crop", "low containment angle", visual.cameraFraming],
+      "horror-poster": ["surveillance specimen crop", "low containment angle", visual.cameraFraming],
       "terminal-brutalist": ["desk-cam layout", "wide terminal viewport", visual.cameraFraming],
       "surreal-collage": ["album-cover crop", "layered paper stage", visual.cameraFraming],
       "sticker-pack": ["sticker sheet flat lay", "die-cut single crop", visual.cameraFraming],
@@ -911,9 +918,9 @@ export class StyleProfileGeneratorService {
     const fallbackRoles = ["Actor", "Subject", "Event", "Variant"];
     const roles: Partial<Record<VisualDesignSystem["rendererFamily"], string[]>> = {
       "pixel-topdown": ["Sprite", "NPC", "Map Event", "Pickup"],
-      "anime-portrait": ["Lead", "Witness", "Rival", "Closeup"],
+      "cel-portrait": ["Lead", "Witness", "Rival", "Closeup"],
       "clay-toy": ["Figurine", "Shelf Friend", "Miniature", "Plush"],
-      "biohazard-horror": ["Specimen", "Patient", "Carrier", "Incident"],
+      "horror-poster": ["Specimen", "Patient", "Carrier", "Incident"],
       "terminal-brutalist": ["Operator", "Screen", "Desk Ghost", "Terminal"],
       "surreal-collage": ["Cutout", "Mask", "Dream Body", "Fragment"],
       "sticker-pack": ["Sticker", "Peel", "Decal", "Misprint"],
@@ -946,14 +953,16 @@ export class StyleProfileGeneratorService {
     return Array.from({ length: Math.max(3, Math.min(4, moods.length || 3)) }, (_, index) => {
       const mood = pick(moods.length ? moods : ["focused signal"], seed + index * 13);
       const object = pick(objects, seed + index * 17);
+      const stanceWord = pick(["braced", "tilted", "cornered", "floating", "locked-in", "soft"], seed + index * 31);
+      const auraWord = pick(signals.dangerSafetyCues.length ? signals.dangerSafetyCues : signals.worldReferences.length ? signals.worldReferences : ["signal"], seed + index * 41);
       return {
-        name: `${motif} ${titleCase(mood)} ${index + 1}`,
+        name: `${motif} ${titleCase(mood)} ${titleCase(object)} ${titleCase(stanceWord)}`,
         expression: `${mood} ${signals.humorType}`,
         eyeLanguage: `${titleCase(pick(signals.visualShapes.length ? signals.visualShapes : ["signal"], seed + index * 19))} ${pick(["stare", "blink", "glare", "squint", "wide-eye"], seed + index * 23)}`,
         mouthLanguage: `${titleCase(pick(dna.expressionLanguage.length ? dna.expressionLanguage : [mood], seed + index * 29))} mouth`,
-        stance: `${pick(["braced", "tilted", "cornered", "floating", "locked-in", "soft"], seed + index * 31)} ${object} stance`,
+        stance: `${stanceWord} ${object} stance`,
         gesture: `${object} ${pick(["grip", "point", "lift", "shield", "clutch", "offer"], seed + index * 37)}`,
-        auraBehavior: `${pick(signals.dangerSafetyCues.length ? signals.dangerSafetyCues : signals.worldReferences.length ? signals.worldReferences : ["signal"], seed + index * 41)} ${pick(["pulse", "drift", "flash", "spark", "haze"], seed + index * 43)}`,
+        auraBehavior: `${auraWord} ${pick(["pulse", "drift", "flash", "spark", "haze"], seed + index * 43)}`,
         animationState: this.categoryId(`${motif}-${mood}-${index}`)
       };
     });

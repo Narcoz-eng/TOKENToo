@@ -86,6 +86,7 @@ Create one clean avatar concept for the collection lead subject. Strong silhouet
     };
     const samples = rarityLadder.map((rarity) => {
       const rule = style.brandDna.rarityVisualRules[rarity];
+      const frame = style.creativeUniverse.creativeDna.visualSystem.rarityFrames?.[rarity];
       return {
         type: "SAMPLE_NFT" as const,
         label: `${style.collection} ${rarity} AI concept`,
@@ -97,6 +98,15 @@ Create a ${rarity} rarity exemplar.
 Rarity story: ${rule?.composition ?? style.creativeUniverse.creativeDna.rarityPhilosophy}
 Pose rule: ${rule?.pose ?? "unique pose for this rarity"}
 Environment rule: ${rule?.background ?? style.backgroundWorld}
+Creative DNA rarity frame:
+- Composition: ${frame?.composition ?? "use the rarity progression"}
+- Camera: ${frame?.camera ?? "distinct camera"}
+- Face/emotion: ${frame?.faceTreatment ?? "readable emotional face"}
+- Body language: ${frame?.bodyLanguage ?? "non-neutral body language"}
+- Environment: ${frame?.environment ?? style.backgroundWorld}
+- Lighting: ${frame?.lighting ?? style.creativeUniverse.creativeDna.visualSystem.lightingModel}
+- Event: ${frame?.event ?? style.creativeUniverse.creativeDna.legendaryMythology}
+- Silhouette change: ${frame?.silhouetteMutation ?? "rarity-specific silhouette"}
 Trait stack intensity: ${rule?.minTraits ?? 2} to ${rule?.maxTraits ?? 12} visible curated traits.
 Common must be clean and simple. Epic must be richer and more expressive. Legendary must be cinematic scene-level art. Mythic must be a near-one-of-one unique composition.
 This ${rarity} sample must use a visibly different pose, camera, expression, and composition from every other rarity. No text, no logos, no watermark.`
@@ -124,10 +134,22 @@ Create animation keyframe concept art for idle, reveal, reward, and legendary ev
   private baseBrief(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string) {
     const dna = style.creativeUniverse.creativeDna;
     const visual = dna.visualSystem;
+    const signals = style.creativeUniverse.signalProfile;
+    const dominantSignals = Object.entries(signals.semanticWeights ?? {})
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .filter(([, value]) => Number(value) > 0)
+      .slice(0, 4)
+      .map(([key, value]) => `${key} ${value}`)
+      .join(", ");
     return `Professional NFT collection concept art direction.
 Collection: ${style.collection}
 Seed key: ${seedKey}
 Creative DNA world: ${dna.worldConcept}
+Dominant creative signals: ${dominantSignals || "collection metadata only"}
+Object anchors: ${signals.objects.slice(0, 10).join(", ")}
+World anchors: ${signals.worldReferences.slice(0, 10).join(", ")}
+Meme/culture cues: ${signals.memeLanguage.slice(0, 8).join(", ")}
+Danger/emotion cues: ${signals.dangerSafetyCues.slice(0, 8).join(", ")}
 Subject/silhouette language: ${dna.mascotOrSubject}; ${dna.baseSilhouetteRules.join("; ")}
 Emotional culture: ${style.creativeUniverse.moodCulture.map((mood) => `${mood.name}: ${mood.expression}`).join("; ")}
 Trait taxonomy: ${style.creativeUniverse.taxonomy.map((category) => `${category.role}: ${category.label} (${category.nouns.slice(0, 4).join(", ")})`).join("; ")}
@@ -140,7 +162,9 @@ Composition rules: ${style.brandDna.compositionRules.join("; ")}
 Palette direction: ${dna.palette.join(", ")}
 Animation language: ${dna.animationLanguage}
 Production note: this is AI_CONCEPT art direction only, not mintable final art; final NFTs require curated layer packs and deterministic rendering.
-Quality bar: polished character design, strong silhouette, clean face/expression, intentional trait placement, consistent collection style, premium collectible framing, no messy artifacts, no random text, no fake logos, no malformed anatomy.
+Quality bar: polished character design, strong silhouette, clean face/expression, visible emotion and body language, intentional trait placement, consistent collection style, premium collectible framing, no messy artifacts, no random text, no fake logos, no malformed anatomy.
+Do not output placeholder cards, abstract boxes, UI mockups, SVG-like blocks, wireframe diagrams, fake badges, fake interface labels, or production-looking final mints.
+Every image must visibly communicate the Creative DNA world, emotional culture, rarity story, and collection-specific object anchors. Secondary metadata may add texture but must not overpower the dominant creative signals.
 IP safety: do not copy or imitate famous NFT collections, apes, monkeys, skeleton traits, known collection poses, recognizable backgrounds, or trademarked designs.
 Available scalable trait categories for later curated layers: ${Object.keys(pack.categories).join(", ")}.`;
   }

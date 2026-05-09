@@ -96,7 +96,7 @@ export class QualityValidatorService {
     const hasAvatar = previews.some((preview) => preview.type === "AVATAR");
     const languageScore = style.traitLanguage.filter((trait) => trait.split(" ").length >= 2 && !/green|red|blue|hat|background/i.test(trait)).length >= 10 ? 94 : 70;
     const assetScore = sampleCount >= 5 && hasBanner && hasAvatar ? 94 : 65;
-    const styleScore = /premium|cinematic|fantasy|cyber|luxury|poster|anime|cartoon/i.test(style.artStyle) ? 90 : 72;
+    const styleScore = /premium|cinematic|fantasy|cyber|luxury|poster|cel|portrait|cartoon/i.test(style.artStyle) ? 90 : 72;
     return average([languageScore, assetScore, styleScore]);
   }
 

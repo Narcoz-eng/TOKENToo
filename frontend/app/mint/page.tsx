@@ -355,7 +355,7 @@ function fallbackMintCollection(): VaultCollection {
     qualityTier: "Premium",
     instantSellEnabled: false,
     palette: ["#baff00", "#16d7d2", "#071017", "#f4c542"],
-    mascotType: "alien",
+    mascotType: "symbolic subject",
     silhouette: "Vault relic",
     activeUsers24h: 0,
     raidSuccessRate: 0,

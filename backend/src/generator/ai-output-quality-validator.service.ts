@@ -11,11 +11,17 @@ export class AiOutputQualityValidatorService {
     if (!ai.length) return issues;
     if (ai.some((asset) => asset.uri.startsWith("data:image/svg+xml"))) issues.push("AI concept pipeline returned SVG or placeholder output.");
     if (ai.some((asset) => famousIpPattern.test(JSON.stringify(asset.generationMetadata ?? {})))) issues.push("AI concept prompt references famous NFT IP.");
+    for (const type of ["BANNER", "AVATAR", "TRAIT_SHEET", "ANIMATION_KEYFRAME"]) {
+      if (!ai.some((asset) => asset.type === type)) issues.push(`AI concept set is missing ${type.toLowerCase()} output.`);
+    }
     const rarities = ai.filter((asset) => asset.type === "SAMPLE_NFT").map((asset) => String(asset.metadata.rarity));
     for (const rarity of ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"]) {
       if (!rarities.includes(rarity)) issues.push(`AI concept set is missing ${rarity} rarity exemplar.`);
     }
     const promptTexts = ai.map((asset) => String(asset.generationMetadata?.prompt ?? ""));
+    if (promptTexts.some((prompt) => !/Dominant creative signals|Object anchors|World anchors/i.test(prompt))) issues.push("AI concept prompts do not lock onto Creative DNA signal anchors.");
+    if (promptTexts.some((prompt) => !/placeholder cards|abstract boxes|wireframe diagrams/i.test(prompt))) issues.push("AI concept prompts do not explicitly reject placeholder/wireframe visual language.");
+    if (promptTexts.some((prompt) => !/visible emotion and body language/i.test(prompt))) issues.push("AI concept prompts do not require visible emotional acting.");
     const samePoseCount = promptTexts.filter((prompt) => !/different pose|unique pose|new camera|one-of-one|scene-level|near-one/i.test(prompt)).length;
     if (samePoseCount > 2) issues.push("AI rarity prompts do not force enough pose and composition variation.");
     const legendary = ai.find((asset) => asset.metadata.rarity === "Legendary");

@@ -407,6 +407,7 @@ function verifyCollectionSet(report: Array<Record<string, any>>) {
     visualSignatures.set(signature, [...(visualSignatures.get(signature) ?? []), String(item.collection)]);
     if (!Array.isArray(item.taxonomy) || item.taxonomy.length < 10) failures.push(`${item.collection} does not expose a community-native taxonomy.`);
     if (/\b(frog|dog|anime|trader|robot)\b/i.test(JSON.stringify(item.taxonomy))) failures.push(`${item.collection} still exposes fixed template taxonomy labels.`);
+    if (/\b(frog|dog|anime|trader|robot)\b/i.test(String(visual?.rendererFamily ?? ""))) failures.push(`${item.collection} renderer family still exposes a fixed template key.`);
     if (!Array.isArray(item.moodCulture) || item.moodCulture.length < 3) failures.push(`${item.collection} does not expose community-native mood culture.`);
     if (!item.creativeDna?.artStyle || !item.signalProfile?.semanticWeights) failures.push(`${item.collection} does not expose generated Creative DNA and signal profile.`);
     if (!visual?.renderingEngine || !visual?.bodySystem || !visual?.eyeSystem || !visual?.mouthSystem || !visual?.faceGrammar || !visual?.compositionStyle || !visual?.cameraSystem || !visual?.lightingModel || !visual?.rarityProgression || !visual?.rarityFrames?.Mythic) failures.push(`${item.collection} does not expose a complete visual system.`);

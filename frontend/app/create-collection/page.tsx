@@ -463,13 +463,23 @@ export default function CreateCollectionPage() {
 }
 
 function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGeneratorPreview; launchResult: string | null }) {
+  const wireframeOnly = isWireframePreview(preview);
   return (
     <section className="phew-panel relative overflow-hidden rounded-lg">
-      <img src={safeImage(preview.banner, brandAssets.launchHero)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
+      <img src={wireframeOnly ? brandAssets.emptyVaultPremium : safeImage(preview.banner, brandAssets.launchHero)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
       <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/88 to-[#020806]/30" />
       <div className="absolute inset-0 grid-mask opacity-25" />
       <div className="relative grid gap-6 p-6 lg:grid-cols-[150px_minmax(0,1fr)_260px] lg:p-7">
-        <img src={safeImage(preview.avatar, brandAssets.factionMark)} alt="" className="aspect-square rounded-lg border border-vault-green/40 object-cover shadow-green" />
+        {wireframeOnly ? (
+          <div className="grid aspect-square place-items-center rounded-lg border border-vault-cyan/35 bg-black/55 shadow-[0_0_40px_rgba(22,215,210,0.18)]">
+            <div className="text-center">
+              <Wand2 className="mx-auto size-7 text-vault-cyan" />
+              <p className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-slate-400">Art Direction</p>
+            </div>
+          </div>
+        ) : (
+          <img src={safeImage(preview.avatar, brandAssets.factionMark)} alt="" className="aspect-square rounded-lg border border-vault-green/40 object-cover shadow-green" />
+        )}
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
             <StatusPill accent="green">{preview.preset || "PHEW Launch Studio"}</StatusPill>
@@ -478,6 +488,7 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
           </div>
           <h2 className="mt-4 text-4xl font-black leading-tight">{preview.collection}</h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{preview.lore}</p>
+          {wireframeOnly ? <p className="mt-3 max-w-2xl text-xs font-bold text-vault-gold">Professional concept imagery is not available yet. Creative DNA is ready; wireframes stay in debug review.</p> : null}
           <div className="mt-5 flex flex-wrap gap-2">
             {["Vault NFTs", "Raid Rooms", "Staking Hooks", "Faction Identity"].map((tag) => (
               <span key={tag} className="rounded-md border border-vault-cyan/25 bg-black/35 px-3 py-2 text-xs font-bold text-vault-cyan">{tag}</span>
@@ -786,7 +797,7 @@ function safeImage(src: string | undefined | null, fallback: string) {
 }
 
 function previewStatusLabel(preview: CollectionGeneratorPreview) {
-  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Wireframe preview only";
+  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Professional preview pending";
   if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "AI concept preview";
   if (preview.productionAssetStatus === "FINAL_PRODUCTION") return "Final production assets";
   if (preview.productionAssetStatus === "ARTIST_APPROVED") return "Artist approved assets";
@@ -811,12 +822,16 @@ function isProductionStatus(status: ProductionAssetStatus | undefined) {
   return status === "CURATED_LAYER_READY" || status === "ARTIST_APPROVED" || status === "FINAL_PRODUCTION";
 }
 
+function isWireframePreview(preview: Pick<CollectionGeneratorPreview, "productionAssetStatus" | "previewClassification">) {
+  return preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT";
+}
+
 function assetStatusLabel(status: ProductionAssetStatus | undefined) {
   if (status === "FINAL_PRODUCTION") return "Final";
   if (status === "ARTIST_APPROVED") return "Artist approved";
   if (status === "CURATED_LAYER_READY") return "Curated layers";
   if (status === "AI_CONCEPT") return "AI concept";
-  return "Wireframe";
+  return "Pending art";
 }
 
 function sourceMetadataFromScan(scan: TokenScan) {

@@ -52,12 +52,7 @@ export class CommunityContextService {
   private fallbackWords(analysis: LogoAnalysisOutput) {
     const mascot = analysis.mascot.toLowerCase();
     if (/infected|lab|virus|biohazard|pathogen/.test(mascot)) return ["viral", "biohazard", "outbreak", "quarantine", "mutation", "lab", "fever", "microscope"];
-    if (/frog|swamp/.test(mascot)) return ["swamp", "bog", "lily", "mire", "ritual", "toxic"];
-    if (/dog|samurai/.test(mascot)) return ["kennel", "moon", "crown", "bark", "marshal", "kingdom"];
-    if (/cat/.test(mascot)) return ["neon", "alley", "static", "claw", "syndicate", "hacker"];
-    if (/robot/.test(mascot)) return ["reactor", "mech", "warband", "signal", "factory", "core"];
-    if (/alien/.test(mascot)) return ["nebula", "casino", "jackpot", "orbit", "plasma", "vault"];
-    return unique([...analysis.visualKeywords, mascot, "origin", "signal", "holder", "myth"])
+    return unique([...analysis.visualKeywords, mascot, "origin", "signal", "culture", "myth"])
       .flatMap((word) => word.split(/\W+/))
       .filter((word) => word.length > 2)
       .slice(0, 8);

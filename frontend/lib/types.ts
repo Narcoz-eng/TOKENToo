@@ -32,7 +32,7 @@ export type VaultCollection = {
   qualityTier: "Basic" | "Premium" | "Legendary-ready";
   instantSellEnabled: boolean;
   palette: string[];
-  mascotType: "frog" | "dog" | "cat" | "alien" | "samurai";
+  mascotType: string;
   silhouette: string;
   activeUsers24h: number;
   raidSuccessRate: number;

@@ -231,9 +231,9 @@ export type VisualRarityFrame = {
 export type VisualDesignSystem = {
   rendererFamily:
     | "pixel-topdown"
-    | "anime-portrait"
+    | "cel-portrait"
     | "clay-toy"
-    | "biohazard-horror"
+    | "horror-poster"
     | "terminal-brutalist"
     | "surreal-collage"
     | "sticker-pack"

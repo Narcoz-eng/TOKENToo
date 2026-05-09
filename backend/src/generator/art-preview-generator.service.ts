@@ -223,14 +223,14 @@ export class ArtPreviewGeneratorService {
     if (family === "pixel-topdown") return "pixel-engine";
     if (family === "retro-arcade") return "arcade-engine";
     if (family === "clay-toy") return "clay-render-engine";
-    if (family === "biohazard-horror") return "horror-engine";
+    if (family === "horror-poster") return "horror-engine";
     if (family === "terminal-brutalist") return "terminal-engine";
     if (family === "comic-panel") return "comic-panel-engine";
     if (family === "cinematic-scene") return "cinematic-engine";
     if (family === "propaganda-poster") return "poster-engine";
     if (family === "sticker-pack" || family === "children-cartoon") return "sticker-engine";
     if (family === "low-poly") return "low-poly-engine";
-    if (family === "anime-portrait" || family === "painterly-portrait") return "portrait-engine";
+    if (family === "cel-portrait" || family === "painterly-portrait") return "portrait-engine";
     return "surreal-engine";
   }
 
