@@ -63,6 +63,7 @@ async function getServer(trace: ProxyTrace) {
     } catch (error) {
       recordStartupFailure(error);
       bootPromise = undefined;
+      logProxyFailure("embedded_boot", error, trace, trace.startedAt);
       throw error;
     }
   })();
@@ -84,16 +85,24 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   };
   response.setHeader?.("x-request-id", requestId);
 
-  const backendBase = resolveBackendBaseUrl();
+  let backendBase: URL | null;
+  try {
+    trace.stage = "resolve_backend_url";
+    backendBase = resolveBackendBaseUrl();
+  } catch (error) {
+    logProxyFailure("resolve_backend_url", error, trace, startedAt);
+    return writeProxyError(response, classifyProxyError(error), trace, startedAt);
+  }
+
   if (backendBase) {
     trace.mode = "upstream";
-    trace.stage = "resolve_backend_url";
     const target = buildTargetUrl(backendBase, incomingPath, request.url);
     trace.target = sanitizeTarget(target);
     try {
       await proxyToBackend(request, response, target, requestId, trace);
       return;
     } catch (error) {
+      logProxyFailure("upstream", error, trace, startedAt);
       return writeProxyError(response, classifyProxyError(error), trace, startedAt);
     }
   }
@@ -105,6 +114,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     trace.stage = "dispatch_embedded";
     return instance(request, response);
   } catch (error) {
+    logProxyFailure("embedded", error, trace, startedAt);
     return writeProxyError(response, classifyProxyError(error), trace, startedAt);
   }
 }
@@ -216,6 +226,7 @@ function classifyProxyError(error: unknown) {
 
 function writeProxyError(response: ApiResponse, error: ProxyFailure, trace: ProxyTrace, startedAt: number) {
   const elapsedMs = Date.now() - startedAt;
+  logStructuredProxyError(error, trace, elapsedMs);
   response.status?.(error.status);
   response.setHeader?.("content-type", "application/json; charset=utf-8");
   response.setHeader?.("x-request-id", trace.requestId);
@@ -261,6 +272,38 @@ function timeoutMs() {
 function requestIdFrom(request: ApiRequest) {
   const header = request.headers?.["x-request-id"];
   return (Array.isArray(header) ? header[0] : header) ?? `proxy_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function logProxyFailure(scope: string, error: unknown, trace: ProxyTrace, startedAt: number) {
+  const elapsedMs = Date.now() - startedAt;
+  const detail = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack?.split("\n").slice(0, 4).join("\n") } : { message: String(error) };
+  console.error("[api-proxy] failure", {
+    scope,
+    requestId: trace.requestId,
+    stage: trace.stage,
+    incomingUrl: trace.incomingUrl,
+    forwardedPath: trace.forwardedPath,
+    target: trace.target,
+    status: trace.status,
+    elapsedMs,
+    error: detail
+  });
+}
+
+function logStructuredProxyError(error: ProxyFailure, trace: ProxyTrace, elapsedMs: number) {
+  console.error("[api-proxy] response", {
+    requestId: trace.requestId,
+    code: error.code,
+    status: error.status,
+    stage: trace.stage,
+    mode: trace.mode,
+    incomingUrl: trace.incomingUrl,
+    forwardedPath: trace.forwardedPath,
+    target: trace.target,
+    upstreamStatus: trace.status,
+    elapsedMs,
+    detail: process.env.NODE_ENV === "production" ? undefined : error.detail
+  });
 }
 
 function looksLikeHtml(contentType: string, raw: string) {

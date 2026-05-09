@@ -24,6 +24,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path?: s
     target = targetUrl(forwardedPath, request.nextUrl.search);
     trace.target = sanitizeTarget(target);
   } catch (error) {
+    logProxyFailure("resolve_backend_url", error, trace, startedAt);
     return jsonError(classify(error), trace, startedAt);
   }
 
@@ -55,6 +56,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path?: s
       }
     });
   } catch (error) {
+    logProxyFailure("upstream", error, trace, startedAt);
     return jsonError(classify(error), trace, startedAt);
   } finally {
     clearTimeout(timeout);
@@ -110,6 +112,8 @@ function classify(error: unknown) {
 }
 
 function jsonError(error: ProxyFailure, trace: ProxyTrace, startedAt: number) {
+  const elapsedMs = Date.now() - startedAt;
+  logStructuredProxyError(error, trace, elapsedMs);
   return Response.json(
     {
       ok: false,
@@ -128,7 +132,7 @@ function jsonError(error: ProxyFailure, trace: ProxyTrace, startedAt: number) {
         target: trace.target,
         status: trace.status,
         contentType: trace.contentType,
-        elapsedMs: Date.now() - startedAt
+        elapsedMs
       }
     },
     {
@@ -136,6 +140,36 @@ function jsonError(error: ProxyFailure, trace: ProxyTrace, startedAt: number) {
       headers: { "x-request-id": trace.requestId }
     }
   );
+}
+
+function logProxyFailure(scope: string, error: unknown, trace: ProxyTrace, startedAt: number) {
+  const elapsedMs = Date.now() - startedAt;
+  const detail = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack?.split("\n").slice(0, 4).join("\n") } : { message: String(error) };
+  console.error("[next-api-proxy] failure", {
+    scope,
+    requestId: trace.requestId,
+    stage: trace.stage,
+    forwardedPath: trace.forwardedPath,
+    target: trace.target,
+    status: trace.status,
+    elapsedMs,
+    error: detail
+  });
+}
+
+function logStructuredProxyError(error: ProxyFailure, trace: ProxyTrace, elapsedMs: number) {
+  console.error("[next-api-proxy] response", {
+    requestId: trace.requestId,
+    code: error.code,
+    status: error.status,
+    stage: trace.stage,
+    mode: trace.mode,
+    forwardedPath: trace.forwardedPath,
+    target: trace.target,
+    upstreamStatus: trace.status,
+    elapsedMs,
+    detail: process.env.NODE_ENV === "production" ? undefined : error.detail
+  });
 }
 
 function looksLikeHtml(contentType: string, raw: string) {

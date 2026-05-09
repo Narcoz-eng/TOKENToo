@@ -178,6 +178,8 @@ export class CapabilitiesService {
           METAPLEX_NFT_STANDARD: process.env.METAPLEX_NFT_STANDARD ?? null,
           FINAL_ASSET_STORAGE_PROVIDER: process.env.FINAL_ASSET_STORAGE_PROVIDER ?? null,
           ASSET_STORAGE_PROVIDER: process.env.ASSET_STORAGE_PROVIDER ?? null,
+          DATABASE_URL_SOURCE: database.databaseUrlSource ?? null,
+          DIRECT_URL_SOURCE: database.directUrlSource ?? null,
           PROGRAM_ID: process.env.PROGRAM_ID ?? null,
           SOLANA_RPC_URL: this.sanitizedRpcUrl()
         }
@@ -309,11 +311,24 @@ export class CapabilitiesService {
     try {
       const key = new PublicKey(programId);
       if (key.equals(SystemProgram.programId)) return { exists: false, executable: false };
-      const info = await new Connection(this.rpcUrl(), "confirmed").getAccountInfo(key, "confirmed");
+      const info = await Promise.race([
+        new Connection(this.rpcUrl(), "confirmed").getAccountInfo(key, "confirmed"),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), this.capabilityTimeoutMs()))
+      ]);
       return { exists: Boolean(info), executable: Boolean(info?.executable) };
-    } catch {
+    } catch (error) {
+      this.logCapabilityFailure("program_account_status", error, { programId, rpcUrl: this.sanitizedRpcUrl() });
       return { exists: false, executable: false };
     }
+  }
+
+  private capabilityTimeoutMs() {
+    return Number(process.env.CAPABILITY_CHECK_TIMEOUT_MS ?? 2500);
+  }
+
+  private logCapabilityFailure(stage: string, error: unknown, context: Record<string, unknown> = {}) {
+    const detail = error instanceof Error ? { name: error.name, message: error.message } : { message: String(error) };
+    console.error("[capabilities] check failed", { stage, ...context, error: detail });
   }
 
   private cluster() {
@@ -358,7 +373,11 @@ export class CapabilitiesService {
       "IRYS_PRIVATE_KEY",
       "ARWEAVE_KEY",
       "DATABASE_URL",
-      "DIRECT_URL"
+      "DIRECT_URL",
+      "POSTGRES_URL",
+      "POSTGRES_PRISMA_URL",
+      "POSTGRES_URL_NON_POOLING",
+      "POSTGRES_PASSWORD"
     ];
   }
 
