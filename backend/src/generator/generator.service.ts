@@ -774,10 +774,14 @@ export class GeneratorService {
     const storageProvider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
     if (!manifest.productionReady) issues.push(`Launch requires ${process.env.REQUIRED_LAUNCH_ASSET_STATUS ?? "CURATED_LAYER_READY/ARTIST_APPROVED"} assets; current status is ${manifest.productionAssetStatus}.`);
     if (storageProvider === "mock") issues.push("Permanent storage is missing. Set FINAL_ASSET_STORAGE_PROVIDER to pinata, arweave, irys, or a supported permanent adapter.");
-    if (!process.env.FINAL_RENDER_STORAGE_ROOT) issues.push("FINAL_RENDER_STORAGE_ROOT is required for cached/pre-generated deterministic render outputs.");
+    if (!process.env.FINAL_RENDER_STORAGE_ROOT && !this.demoLayerPackAllowed()) issues.push("FINAL_RENDER_STORAGE_ROOT is required for cached/pre-generated deterministic render outputs.");
     if (storageProvider === "pinata" && !process.env.PINATA_JWT) issues.push("PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata.");
     if ((storageProvider === "arweave" || storageProvider === "irys") && !(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY)) issues.push(`${storageProvider} requires IRYS_PRIVATE_KEY or ARWEAVE_KEY.`);
     if (issues.length) throw new BadRequestException(`Collection launch blocked: ${[...new Set(issues)].join(" ")}`);
+  }
+
+  private demoLayerPackAllowed() {
+    return (process.env.DEMO_CURATED_LAYER_PACK ?? "false") === "true" && (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") !== "production";
   }
 
   private inputFromRun(run: any): CreateGenerationRunInput {

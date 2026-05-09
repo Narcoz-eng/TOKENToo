@@ -14,14 +14,29 @@ export type SystemCapabilities = {
   heliusAvailable: boolean;
   openaiImagesAvailable: boolean;
   pinataAvailable: boolean;
+  permanentStorageConfigured: boolean;
   solanaAvailable: boolean;
+  solanaRpcConfigured: boolean;
+  solanaTransactionProviderDevnet: boolean;
   walletConfigured: boolean;
   devnetProgramConfigured: boolean;
   programAccountExists: boolean;
   programAccountExecutable: boolean;
   aiGenerationEnabled: boolean;
+  approvedLayerPackAvailable: boolean;
+  demoCuratedLayerPackEnabled: boolean;
+  demoCuratedLayerPackAllowed: boolean;
   productionStorageAvailable: boolean;
   tokenMetadataAvailable: boolean;
+};
+
+type SetupMode = {
+  id: "creative-preview" | "devnet-test-launch" | "production-launch";
+  label: string;
+  ready: boolean;
+  output: string;
+  missing: string[];
+  blockedBy: string[];
 };
 
 const PLACEHOLDER_PROGRAM_ID = "11111111111111111111111111111111";
@@ -79,12 +94,18 @@ export class CapabilitiesService {
         heliusAvailable: heliusConfigured && heliusReachable,
         openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
         pinataAvailable: Boolean(process.env.PINATA_JWT),
+        permanentStorageConfigured: this.permanentStorageConfigured(),
         solanaAvailable: this.solanaAvailable(),
+        solanaRpcConfigured: this.solanaRpcConfigured(),
+        solanaTransactionProviderDevnet: this.solanaTransactionProviderDevnet(),
         walletConfigured: Boolean(process.env.DEVNET_TEST_WALLET_PUBLIC_KEY || process.env.ANCHOR_WALLET),
         devnetProgramConfigured: this.devnetProgramConfigured(),
         programAccountExists: programAccount.exists,
         programAccountExecutable: programAccount.executable,
         aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+        approvedLayerPackAvailable: this.approvedLayerPackAvailable(),
+        demoCuratedLayerPackEnabled: this.demoCuratedLayerPackEnabled(),
+        demoCuratedLayerPackAllowed: this.demoCuratedLayerPackAllowed(),
         productionStorageAvailable: this.productionStorageAvailable(),
         tokenMetadataAvailable: this.tokenMetadataAvailable(heliusConfigured && heliusReachable, programAccount.executable)
       })
@@ -106,17 +127,24 @@ export class CapabilitiesService {
       heliusAvailable: heliusConfigured && heliusReachable,
       openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
       pinataAvailable: Boolean(process.env.PINATA_JWT),
+      permanentStorageConfigured: this.permanentStorageConfigured(),
       solanaAvailable: this.solanaAvailable(),
+      solanaRpcConfigured: this.solanaRpcConfigured(),
+      solanaTransactionProviderDevnet: this.solanaTransactionProviderDevnet(),
       walletConfigured: Boolean(process.env.DEVNET_TEST_WALLET_PUBLIC_KEY || process.env.ANCHOR_WALLET),
       devnetProgramConfigured: this.devnetProgramConfigured(),
       programAccountExists: programAccount.exists,
       programAccountExecutable: programAccount.executable,
       aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+      approvedLayerPackAvailable: this.approvedLayerPackAvailable(),
+      demoCuratedLayerPackEnabled: this.demoCuratedLayerPackEnabled(),
+      demoCuratedLayerPackAllowed: this.demoCuratedLayerPackAllowed(),
       productionStorageAvailable: this.productionStorageAvailable(),
       tokenMetadataAvailable: this.tokenMetadataAvailable(heliusConfigured && heliusReachable, programAccount.executable)
     };
 
     const warnings = this.warnings(capabilities);
+    const setupModes = this.setupModes(capabilities);
     return {
       ok: true,
       mode: process.env.APP_MODE ?? process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
@@ -124,6 +152,8 @@ export class CapabilitiesService {
       rpcUrl: this.sanitizedRpcUrl(),
       cluster: this.cluster(),
       programId: process.env.PROGRAM_ID ?? null,
+      setupModes,
+      setupChecklist: this.setupChecklist(capabilities, setupModes),
       capabilities,
       warnings
     };
@@ -181,6 +211,14 @@ export class CapabilitiesService {
     return Boolean(process.env.SOLANA_RPC_URL || process.env.ANCHOR_PROVIDER_URL || process.env.PROGRAM_ID);
   }
 
+  private solanaRpcConfigured() {
+    return Boolean(process.env.SOLANA_RPC_URL || process.env.ANCHOR_PROVIDER_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
+  }
+
+  private solanaTransactionProviderDevnet() {
+    return (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "devnet";
+  }
+
   private devnetProgramConfigured() {
     const programId = process.env.PROGRAM_ID;
     return Boolean(programId && programId !== PLACEHOLDER_PROGRAM_ID);
@@ -188,7 +226,7 @@ export class CapabilitiesService {
 
   private productionStorageAvailable() {
     const provider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER;
-    const renderRoot = Boolean(process.env.FINAL_RENDER_STORAGE_ROOT);
+    const renderRoot = Boolean(process.env.FINAL_RENDER_STORAGE_ROOT || this.demoCuratedLayerPackAllowed());
     const layerPack = this.approvedLayerPackAvailable();
     if (provider === "pinata") return Boolean(process.env.PINATA_JWT) && renderRoot && layerPack;
     if (provider === "arweave" || provider === "irys") return Boolean(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY) && renderRoot && layerPack;
@@ -196,8 +234,28 @@ export class CapabilitiesService {
     return false;
   }
 
+  private permanentStorageConfigured() {
+    const provider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER;
+    if (provider === "pinata") return Boolean(process.env.PINATA_JWT);
+    if (provider === "arweave" || provider === "irys") return Boolean(process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY);
+    if (provider === "supabase") return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    return false;
+  }
+
   private approvedLayerPackAvailable() {
+    return Boolean(process.env.CURATED_LAYER_PACK_MANIFEST_URI || process.env.CURATED_LAYER_PACK_ROOT || process.env.APPROVED_LAYER_PACK_ID || this.demoCuratedLayerPackAllowed());
+  }
+
+  private realApprovedLayerPackAvailable() {
     return Boolean(process.env.CURATED_LAYER_PACK_MANIFEST_URI || process.env.CURATED_LAYER_PACK_ROOT || process.env.APPROVED_LAYER_PACK_ID);
+  }
+
+  private demoCuratedLayerPackEnabled() {
+    return (process.env.DEMO_CURATED_LAYER_PACK ?? "false") === "true";
+  }
+
+  private demoCuratedLayerPackAllowed() {
+    return this.demoCuratedLayerPackEnabled() && (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") !== "production";
   }
 
   private tokenMetadataAvailable(heliusAvailable: boolean, programExecutable: boolean) {
@@ -295,6 +353,7 @@ export class CapabilitiesService {
       "CURATED_LAYER_PACK_MANIFEST_URI",
       "CURATED_LAYER_PACK_ROOT",
       "APPROVED_LAYER_PACK_ID",
+      "DEMO_CURATED_LAYER_PACK",
       "PINATA_JWT",
       "IRYS_PRIVATE_KEY",
       "ARWEAVE_KEY",
@@ -303,14 +362,141 @@ export class CapabilitiesService {
     ];
   }
 
+  private setupModes(capabilities: SystemCapabilities): SetupMode[] {
+    const creativeMissing = [
+      ...(capabilities.aiGenerationEnabled ? [] : ["ENABLE_AI_IMAGE_GENERATION=true"]),
+      ...(capabilities.openaiImagesAvailable ? [] : ["OPENAI_API_KEY"])
+    ];
+    const devnetLayerPackReady = this.realApprovedLayerPackAvailable() || capabilities.demoCuratedLayerPackAllowed;
+    const devnetMissing = [
+      ...(capabilities.devnetProgramConfigured ? [] : ["PROGRAM_ID"]),
+      ...(capabilities.programAccountExecutable ? [] : ["deployed executable program account"]),
+      ...(capabilities.solanaRpcConfigured ? [] : ["SOLANA_RPC_URL"]),
+      ...(capabilities.solanaTransactionProviderDevnet ? [] : ["SOLANA_TRANSACTION_PROVIDER=devnet"]),
+      ...(capabilities.permanentStorageConfigured ? [] : ["PINATA_JWT or permanent storage provider credentials"]),
+      ...(devnetLayerPackReady ? [] : ["approved curated layer pack or DEMO_CURATED_LAYER_PACK=true"])
+    ];
+    const productionMissing = [
+      ...(capabilities.devnetProgramConfigured ? [] : ["PROGRAM_ID"]),
+      ...(capabilities.programAccountExecutable ? [] : ["deployed executable program account"]),
+      ...(capabilities.solanaRpcConfigured ? [] : ["SOLANA_RPC_URL"]),
+      ...(capabilities.permanentStorageConfigured ? [] : ["PINATA_JWT or permanent storage provider credentials"]),
+      ...(this.realApprovedLayerPackAvailable() ? [] : ["approved curated layer pack"]),
+      ...((process.env.FINAL_PRODUCTION_ASSETS_APPROVED ?? "false") === "true" || (process.env.ARTIST_APPROVED_ASSETS ?? "false") === "true" ? [] : ["launch gate status satisfied"])
+    ];
+    return [
+      {
+        id: "creative-preview",
+        label: "Creative Preview Mode",
+        ready: creativeMissing.length === 0,
+        output: "Professional AI concept preview, clearly labeled and not mintable.",
+        missing: creativeMissing,
+        blockedBy: creativeMissing
+      },
+      {
+        id: "devnet-test-launch",
+        label: "Devnet Test Launch Mode",
+        ready: devnetMissing.length === 0,
+        output: "Test collection launch on devnet with curated demo/final layer rendering.",
+        missing: devnetMissing,
+        blockedBy: devnetMissing
+      },
+      {
+        id: "production-launch",
+        label: "Production Launch Mode",
+        ready: productionMissing.length === 0 && !capabilities.demoCuratedLayerPackEnabled,
+        output: "Production-ready collection launch using real curated or artist-approved assets.",
+        missing: capabilities.demoCuratedLayerPackEnabled ? [...productionMissing, "disable DEMO_CURATED_LAYER_PACK"] : productionMissing,
+        blockedBy: capabilities.demoCuratedLayerPackEnabled ? [...productionMissing, "DEMO_CURATED_LAYER_PACK is devnet demo only"] : productionMissing
+      }
+    ];
+  }
+
+  private setupChecklist(capabilities: SystemCapabilities, setupModes: SetupMode[]) {
+    const storageProvider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
+    const storageCredential =
+      storageProvider === "pinata"
+        ? "PINATA_JWT"
+        : storageProvider === "supabase"
+          ? "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY"
+          : storageProvider === "arweave" || storageProvider === "irys"
+            ? "IRYS_PRIVATE_KEY or ARWEAVE_KEY"
+            : "FINAL_ASSET_STORAGE_PROVIDER=pinata plus PINATA_JWT";
+    return {
+      storageProvider,
+      creativePreviewReady: setupModes.find((mode) => mode.id === "creative-preview")?.ready ?? false,
+      devnetLaunchReady: setupModes.find((mode) => mode.id === "devnet-test-launch")?.ready ?? false,
+      productionLaunchReady: setupModes.find((mode) => mode.id === "production-launch")?.ready ?? false,
+      items: [
+        {
+          key: "ENABLE_AI_IMAGE_GENERATION",
+          label: "ENABLE_AI_IMAGE_GENERATION",
+          ok: capabilities.aiGenerationEnabled,
+          requiredFor: ["Creative Preview Mode"],
+          fix: "Set ENABLE_AI_IMAGE_GENERATION=true."
+        },
+        {
+          key: "OPENAI_API_KEY",
+          label: "OPENAI_API_KEY",
+          ok: capabilities.openaiImagesAvailable,
+          requiredFor: ["Creative Preview Mode"],
+          fix: "Add an OpenAI API key to the backend environment."
+        },
+        {
+          key: "PROGRAM_ID",
+          label: "PROGRAM_ID",
+          ok: capabilities.devnetProgramConfigured,
+          requiredFor: ["Devnet Test Launch Mode", "Production Launch Mode"],
+          fix: "Set PROGRAM_ID to the deployed program id; do not use 11111111111111111111111111111111."
+        },
+        {
+          key: "SOLANA_RPC_URL",
+          label: "SOLANA_RPC_URL",
+          ok: capabilities.solanaRpcConfigured,
+          requiredFor: ["Devnet Test Launch Mode", "Production Launch Mode"],
+          fix: "Set SOLANA_RPC_URL to a devnet/mainnet RPC endpoint."
+        },
+        {
+          key: "SOLANA_TRANSACTION_PROVIDER",
+          label: "SOLANA_TRANSACTION_PROVIDER",
+          ok: capabilities.solanaTransactionProviderDevnet,
+          requiredFor: ["Devnet Test Launch Mode"],
+          fix: "Set SOLANA_TRANSACTION_PROVIDER=devnet."
+        },
+        {
+          key: "PINATA_JWT_OR_STORAGE_PROVIDER",
+          label: "PINATA_JWT or storage provider",
+          ok: capabilities.permanentStorageConfigured,
+          requiredFor: ["Devnet Test Launch Mode", "Production Launch Mode"],
+          fix: `Configure permanent storage. Current provider is ${storageProvider}; required credential is ${storageCredential}.`
+        },
+        {
+          key: "APPROVED_CURATED_LAYER_PACK",
+          label: "approved curated layer pack",
+          ok: this.realApprovedLayerPackAvailable(),
+          requiredFor: ["Production Launch Mode"],
+          fix: "Set CURATED_LAYER_PACK_MANIFEST_URI, CURATED_LAYER_PACK_ROOT, or APPROVED_LAYER_PACK_ID."
+        },
+        {
+          key: "DEMO_CURATED_LAYER_PACK",
+          label: "DEMO_CURATED_LAYER_PACK",
+          ok: capabilities.demoCuratedLayerPackAllowed,
+          requiredFor: ["Devnet Test Launch Mode"],
+          fix: "For local/devnet testing only, set DEMO_CURATED_LAYER_PACK=true. It is blocked in production."
+        }
+      ]
+    };
+  }
+
   private warnings(capabilities: SystemCapabilities) {
     const warnings: string[] = [];
     if (!capabilities.databaseAvailable) warnings.push("Database is unavailable; public reads use empty states and writes are blocked.");
     if (!capabilities.heliusConfigured) warnings.push("HELIUS_API_KEY is missing; CA-first token scanning is blocked.");
     if (capabilities.heliusConfigured && !capabilities.heliusReachable) warnings.push(`Helius is configured but unreachable or unhealthy${getLastHeliusErrorCode() ? ` (${getLastHeliusErrorCode()})` : ""}.`);
     if (capabilities.aiGenerationEnabled && !capabilities.openaiImagesAvailable) warnings.push("AI image generation is enabled but OPENAI_API_KEY is not configured.");
-    if (!capabilities.pinataAvailable) warnings.push("Pinata is not configured; final immutable asset uploads are blocked.");
-    if (!this.approvedLayerPackAvailable()) warnings.push("Approved curated layer pack is missing; production launch is blocked.");
+    if (!capabilities.permanentStorageConfigured) warnings.push("Permanent storage is not configured; launch and final mint assets are blocked.");
+    if (!this.realApprovedLayerPackAvailable()) warnings.push(capabilities.demoCuratedLayerPackAllowed ? "Using devnet demo layer pack; production launch remains blocked until a real curated or artist-approved layer pack is configured." : "Approved curated layer pack is missing; production launch is blocked.");
+    if (capabilities.demoCuratedLayerPackEnabled && !capabilities.demoCuratedLayerPackAllowed) warnings.push("DEMO_CURATED_LAYER_PACK is enabled but blocked in production.");
     if (!capabilities.walletConfigured) warnings.push("Founder wallet is not configured; wallet-required actions need a connected wallet.");
     if (!capabilities.devnetProgramConfigured) warnings.push("PROGRAM_ID is missing or placeholder; devnet actions are disabled.");
     if (capabilities.devnetProgramConfigured && !capabilities.programAccountExecutable) warnings.push("PROGRAM_ID is configured but no executable program account was found on the configured RPC/cluster.");

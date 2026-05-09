@@ -16,6 +16,54 @@ import { cn } from "@/lib/utils";
 
 type Preset = { id: string; name: string; artStyle: string; mood: string };
 type ProductionAssetStatus = "WIREFRAME" | "AI_CONCEPT" | "CURATED_LAYER_READY" | "ARTIST_APPROVED" | "FINAL_PRODUCTION";
+type SystemCapabilities = {
+  databaseAvailable?: boolean;
+  openaiImagesAvailable?: boolean;
+  pinataAvailable?: boolean;
+  permanentStorageConfigured?: boolean;
+  solanaAvailable?: boolean;
+  solanaRpcConfigured?: boolean;
+  solanaTransactionProviderDevnet?: boolean;
+  walletConfigured?: boolean;
+  devnetProgramConfigured?: boolean;
+  programAccountExists?: boolean;
+  programAccountExecutable?: boolean;
+  aiGenerationEnabled?: boolean;
+  approvedLayerPackAvailable?: boolean;
+  demoCuratedLayerPackEnabled?: boolean;
+  demoCuratedLayerPackAllowed?: boolean;
+  productionStorageAvailable?: boolean;
+};
+type SetupMode = {
+  id: "creative-preview" | "devnet-test-launch" | "production-launch";
+  label: string;
+  ready: boolean;
+  output: string;
+  missing: string[];
+  blockedBy: string[];
+};
+type SetupChecklist = {
+  storageProvider: string;
+  creativePreviewReady: boolean;
+  devnetLaunchReady: boolean;
+  productionLaunchReady: boolean;
+  items: Array<{
+    key: string;
+    label: string;
+    ok: boolean;
+    requiredFor: string[];
+    fix: string;
+  }>;
+};
+type SystemCapabilitiesResponse = {
+  mode: string;
+  cluster: string;
+  programId: string | null;
+  capabilities: SystemCapabilities;
+  setupModes: SetupMode[];
+  setupChecklist: SetupChecklist;
+  warnings: string[];
+};
 type GeneratorRun = {
   id: string;
   status: string;
@@ -154,7 +202,7 @@ const rarityRows = [
 
 export default function CreateCollectionPage() {
   const walletAuth = useWalletAuth();
-  const capabilityState = useApiResource<{ mode: string; capabilities: Record<string, boolean>; warnings: string[] }>("/system/capabilities");
+  const capabilityState = useApiResource<SystemCapabilitiesResponse>("/system/capabilities");
   const [presets, setPresets] = useState<Preset[]>([]);
   const [selectedPreset, setSelectedPreset] = useState("");
   const [tokenName, setTokenName] = useState("");
@@ -174,6 +222,7 @@ export default function CreateCollectionPage() {
   const [approvalConfirmed, setApprovalConfirmed] = useState(false);
   const [launchResult, setLaunchResult] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [setupActionMessage, setSetupActionMessage] = useState<string | null>(null);
   const presetName = selectedPresetName(presets, selectedPreset);
   const preview = useMemo(() => (run ? mapRunToPreview(run, presetName) : previewOnly ? mapPreviewOnly(previewOnly, presetName) : null), [run, previewOnly, presetName]);
   const latestProfile = run?.styleProfiles[0];
@@ -186,6 +235,10 @@ export default function CreateCollectionPage() {
   const effectiveLogoUri = logoUri.trim() || scan?.imageUri || scan?.logoUri || "";
   const studioPreview = preview ?? fallbackPreview(effectiveTokenName, effectiveTokenSymbol, effectiveDescription, presetName);
   const activeStep = launchResult ? 4 : run?.status === "APPROVED" ? 3 : preview ? 2 : scan ? 1 : 0;
+  const setup = capabilityState.data?.setupChecklist;
+  const capabilities = capabilityState.data?.capabilities;
+  const canGenerateAiConcept = Boolean(scan && setup?.creativePreviewReady);
+  const launchEnvironmentReady = Boolean(setup?.devnetLaunchReady || setup?.productionLaunchReady);
 
   useEffect(() => {
     apiFetch<Preset[]>("/generator/presets")
@@ -274,6 +327,56 @@ export default function CreateCollectionPage() {
         body: JSON.stringify({})
       });
       setLaunchResult(`/collections/${data.slug}`);
+    });
+  }
+
+  async function useDemoCuratedLayerPack() {
+    if (!capabilities?.demoCuratedLayerPackAllowed) {
+      setSetupActionMessage("Set DEMO_CURATED_LAYER_PACK=true in local/devnet env, then restart the backend. This mode is devnet demo only and blocked in production.");
+      return;
+    }
+    const devnetMode = capabilityState.data?.setupModes.find((mode) => mode.id === "devnet-test-launch");
+    if (devnetMode && !devnetMode.ready) {
+      setSetupActionMessage(`Demo pack is enabled, but Devnet Test Launch Mode still needs: ${devnetMode.missing.join(", ")}.`);
+      return;
+    }
+    if (!walletAuth.connected) {
+      setSetupActionMessage("Connect a wallet before creating or regenerating a devnet launch draft with the demo curated layer pack.");
+      return;
+    }
+    if (run) {
+      await mutateRun("regenerate-style");
+      setSetupActionMessage("Demo curated layer pack is active for this regenerated devnet draft. It remains labeled devnet demo only.");
+      return;
+    }
+    if (!scan) {
+      setSetupActionMessage("Scan a token first, then use the devnet demo curated layer pack on a saved launch draft.");
+      return;
+    }
+    await createRun();
+    setSetupActionMessage("Demo curated layer pack is active for the new devnet launch draft. It remains labeled devnet demo only.");
+  }
+
+  function attachCuratedLayerPack() {
+    setSetupActionMessage("Attach real curated assets by setting CURATED_LAYER_PACK_MANIFEST_URI, CURATED_LAYER_PACK_ROOT, or APPROVED_LAYER_PACK_ID. Demo packs do not satisfy Production Launch Mode.");
+  }
+
+  async function validateSetup(kind: "program" | "storage") {
+    await action(async () => {
+      const data = await apiFetch<SystemCapabilitiesResponse>("/system/capabilities", { cache: "no-store" });
+      capabilityState.reload();
+      if (kind === "program") {
+        const ok = data.capabilities.devnetProgramConfigured && data.capabilities.solanaRpcConfigured && data.capabilities.programAccountExecutable;
+        const missing = [
+          data.capabilities.devnetProgramConfigured ? "" : "PROGRAM_ID",
+          data.capabilities.solanaRpcConfigured ? "" : "SOLANA_RPC_URL",
+          data.capabilities.programAccountExecutable ? "" : "executable program account"
+        ].filter(Boolean);
+        setSetupActionMessage(ok ? `Program ID validated on ${data.cluster}: ${short(data.programId ?? "")}.` : `Program validation failed. Missing or invalid: ${missing.join(", ")}.`);
+        return;
+      }
+      const ok = data.capabilities.permanentStorageConfigured;
+      setSetupActionMessage(ok ? `Storage validated using ${data.setupChecklist.storageProvider}.` : "Storage validation failed. Configure PINATA_JWT or another permanent storage provider credential.");
     });
   }
 
@@ -410,8 +513,8 @@ export default function CreateCollectionPage() {
             </SectionCard>
 
             <div className="grid gap-3">
-              <button type="button" onClick={generatePreview} disabled={loading || !scan} className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate Preview
+              <button type="button" onClick={generatePreview} disabled={loading || !canGenerateAiConcept} className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Generate AI Concept Preview
               </button>
               <button type="button" onClick={createRun} disabled={loading || !scan || !walletAuth.connected || !capabilityState.data?.capabilities?.databaseAvailable} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan disabled:opacity-45">
                 <ShieldCheck className="size-4" /> Save Launch Draft
@@ -421,6 +524,20 @@ export default function CreateCollectionPage() {
 
           <main className="space-y-6">
             <LiveLaunchPreview preview={studioPreview} launchResult={launchResult} />
+
+            <SetupChecklistPanel
+              setup={setup}
+              modes={capabilityState.data?.setupModes ?? []}
+              capabilities={capabilities ?? {}}
+              loading={loading || capabilityState.loading}
+              message={setupActionMessage}
+              onGenerateAiConcept={generatePreview}
+              onUseDemoPack={useDemoCuratedLayerPack}
+              onAttachLayerPack={attachCuratedLayerPack}
+              onValidateProgram={() => validateSetup("program")}
+              onValidateStorage={() => validateSetup("storage")}
+              canGenerateAiConcept={canGenerateAiConcept}
+            />
 
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
               <SectionCard title="Launch Readiness" className="p-5">
@@ -447,7 +564,7 @@ export default function CreateCollectionPage() {
                   <button type="button" onClick={approveRun} disabled={!canApprove || loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-vault-green/50 bg-vault-green/10 text-sm font-bold text-vault-green disabled:opacity-45">
                     <ShieldCheck className="size-4" /> Approve Production Assets
                   </button>
-                  <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !capabilityState.data?.capabilities?.productionStorageAvailable} className="phew-button phew-button-primary flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black disabled:opacity-45">
+                  <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !launchEnvironmentReady} className="phew-button phew-button-primary flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black disabled:opacity-45">
                     <Check className="size-4" /> Launch Collection
                   </button>
                 </div>
@@ -460,6 +577,111 @@ export default function CreateCollectionPage() {
       </div>
     </AppShell>
   );
+}
+
+function SetupChecklistPanel({
+  setup,
+  modes,
+  capabilities,
+  loading,
+  message,
+  canGenerateAiConcept,
+  onGenerateAiConcept,
+  onUseDemoPack,
+  onAttachLayerPack,
+  onValidateProgram,
+  onValidateStorage
+}: {
+  setup?: SetupChecklist;
+  modes: SetupMode[];
+  capabilities: SystemCapabilities;
+  loading: boolean;
+  message: string | null;
+  canGenerateAiConcept: boolean;
+  onGenerateAiConcept: () => void;
+  onUseDemoPack: () => void;
+  onAttachLayerPack: () => void;
+  onValidateProgram: () => void;
+  onValidateStorage: () => void;
+}) {
+  const checklist = setup?.items ?? defaultSetupItems();
+  return (
+    <SectionCard title="Setup Checklist" className="p-5">
+      <div className="grid gap-3 lg:grid-cols-3">
+        {modes.map((mode) => (
+          <div key={mode.id} className={cn("rounded-md border p-4", mode.ready ? "border-vault-green/45 bg-vault-green/8" : "border-vault-gold/35 bg-vault-gold/8")}>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-black text-white">{mode.label}</p>
+              <StatusPill accent={mode.ready ? "green" : "gold"}>{mode.ready ? "Ready" : "Setup needed"}</StatusPill>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-slate-300">{mode.output}</p>
+            {mode.missing.length ? <p className="mt-3 text-xs font-bold text-vault-gold">Missing: {mode.missing.join(", ")}</p> : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-2 md:grid-cols-2">
+        {checklist.map((item) => (
+          <SetupChecklistItem key={item.key} item={item} />
+        ))}
+      </div>
+
+      {capabilities.demoCuratedLayerPackAllowed ? (
+        <p className="mt-4 rounded-md border border-vault-gold/30 bg-vault-gold/8 px-3 py-2 text-xs font-bold text-vault-gold">DEMO_CURATED_LAYER_PACK is active: devnet demo only. Production launch remains blocked until real curated or artist-approved assets are attached.</p>
+      ) : null}
+      {message ? <p className="mt-4 rounded-md border border-vault-cyan/30 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">{message}</p> : null}
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <ActionButton icon={Sparkles} label="Generate AI Concept Preview" disabled={loading || !canGenerateAiConcept} onClick={onGenerateAiConcept} primary />
+        <ActionButton icon={Wand2} label="Use Demo Curated Layer Pack for Devnet" disabled={loading} onClick={onUseDemoPack} />
+        <ActionButton icon={Upload} label="Upload/Attach Curated Layer Pack" disabled={loading} onClick={onAttachLayerPack} />
+        <ActionButton icon={RadioTower} label="Validate Program ID" disabled={loading} onClick={onValidateProgram} />
+        <ActionButton icon={ShieldCheck} label="Validate Storage" disabled={loading} onClick={onValidateStorage} />
+      </div>
+    </SectionCard>
+  );
+}
+
+function SetupChecklistItem({ item }: { item: SetupChecklist["items"][number] }) {
+  return (
+    <div className={cn("rounded-md border p-3", item.ok ? "border-vault-green/35 bg-vault-green/8" : "border-vault-line bg-black/25")}>
+      <div className="flex items-start gap-3">
+        <span className={cn("mt-0.5 grid size-7 shrink-0 place-items-center rounded-md", item.ok ? "bg-vault-green text-black" : "bg-white/5 text-slate-500")}>{item.ok ? <Check className="size-4" /> : <RadioTower className="size-4" />}</span>
+        <div className="min-w-0">
+          <p className="font-mono text-xs font-black text-white">{item.label}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-400">{item.ok ? "Configured" : item.fix}</p>
+          <p className="mt-1 text-[11px] font-bold uppercase text-slate-500">{item.requiredFor.join(" / ")}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({ icon: Icon, label, disabled, onClick, primary = false }: { icon: typeof Sparkles; label: string; disabled: boolean; onClick: () => void; primary?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={cn("flex min-h-11 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-black disabled:opacity-45", primary ? "phew-button phew-button-primary text-black" : "border border-vault-cyan/35 bg-vault-cyan/8 text-vault-cyan")}>
+      <Icon className="size-4 shrink-0" />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function defaultSetupItems(): SetupChecklist["items"] {
+  return [
+    "OPENAI_API_KEY",
+    "ENABLE_AI_IMAGE_GENERATION",
+    "PROGRAM_ID",
+    "SOLANA_RPC_URL",
+    "SOLANA_TRANSACTION_PROVIDER",
+    "PINATA_JWT or storage provider",
+    "approved curated layer pack"
+  ].map((label) => ({
+    key: label,
+    label,
+    ok: false,
+    requiredFor: ["Setup"],
+    fix: "Capability data is loading."
+  }));
 }
 
 function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGeneratorPreview; launchResult: string | null }) {

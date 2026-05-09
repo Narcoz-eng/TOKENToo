@@ -49,11 +49,19 @@ export class ProductionLayerPackService {
   }
 
   renderRoot() {
-    return process.env.FINAL_RENDER_STORAGE_ROOT?.replace(/\/$/, "");
+    return process.env.FINAL_RENDER_STORAGE_ROOT?.replace(/\/$/, "") ?? (this.demoLayerPackAllowed() ? "devnet-demo-layer-pack/rendered" : undefined);
   }
 
   approvedLayerPackConfigured() {
-    return Boolean(process.env.CURATED_LAYER_PACK_MANIFEST_URI || process.env.CURATED_LAYER_PACK_ROOT || process.env.APPROVED_LAYER_PACK_ID);
+    return Boolean(process.env.CURATED_LAYER_PACK_MANIFEST_URI || process.env.CURATED_LAYER_PACK_ROOT || process.env.APPROVED_LAYER_PACK_ID || this.demoLayerPackAllowed());
+  }
+
+  demoLayerPackEnabled() {
+    return (process.env.DEMO_CURATED_LAYER_PACK ?? "false") === "true";
+  }
+
+  demoLayerPackAllowed() {
+    return this.demoLayerPackEnabled() && (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") !== "production";
   }
 
   private layerCoverageValid(pack: TraitPackPlan) {
@@ -70,6 +78,7 @@ export class ProductionLayerPackService {
 
   private provider(value?: string): AssetProviderKind {
     if (value === "ai" || value === "curated" || value === "handmade") return value;
+    if (this.demoLayerPackAllowed()) return "curated";
     return "mock";
   }
 

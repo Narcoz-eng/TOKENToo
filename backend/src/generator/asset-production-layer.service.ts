@@ -63,15 +63,16 @@ export class AssetProductionLayerService {
       royaltyPolicy: this.royaltyPolicy(),
       readinessReport,
       warnings: productionReady
-        ? [this.royaltyPolicy().note]
+        ? [this.demoLayerPackWarning(), this.royaltyPolicy().note].filter((value): value is string => Boolean(value))
         : [
             "Concept preview only. Wireframe SVG direction art must not be sold as final production art.",
             "Wireframes and AI concepts are review assets only; launch requires curated or artist-approved deterministic layer assets.",
+            this.demoLayerPackWarning(),
             providerIssue ?? "Asset providers are configured.",
             storageIssue ?? "Permanent storage is configured.",
             layerPackIssue ?? "Approved curated layer pack is configured.",
             this.royaltyPolicy().note
-          ].filter(Boolean)
+          ].filter((value): value is string => Boolean(value))
     };
   }
 
@@ -93,6 +94,7 @@ export class AssetProductionLayerService {
 
   private provider(value?: string): ProducedLayerSet["provider"] {
     if (value === "ai" || value === "curated" || value === "handmade") return value;
+    if (this.productionLayers.demoLayerPackAllowed()) return "curated";
     return "mock";
   }
 
@@ -119,6 +121,10 @@ export class AssetProductionLayerService {
       return `${provider} final storage requires IRYS_PRIVATE_KEY or ARWEAVE_KEY.`;
     }
     return undefined;
+  }
+
+  private demoLayerPackWarning() {
+    return this.productionLayers.demoLayerPackAllowed() ? "DEMO_CURATED_LAYER_PACK is active: devnet demo only, blocked for production launch." : undefined;
   }
 
   private royaltyPolicy() {

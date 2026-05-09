@@ -34,6 +34,9 @@ export function validateStartupEnvironment() {
   if ((process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && !process.env.OPENAI_API_KEY) {
     issues.push({ code: "OPENAI_MISSING", severity: appEnv === "production" ? "warning" : "info", message: "OPENAI_API_KEY is required when ENABLE_AI_IMAGE_GENERATION=true." });
   }
+  if ((process.env.DEMO_CURATED_LAYER_PACK ?? "false") === "true" && appEnv === "production") {
+    issues.push({ code: "DEMO_LAYER_PACK_IN_PRODUCTION", severity: "fatal", message: "DEMO_CURATED_LAYER_PACK is devnet demo only and must be disabled in production." });
+  }
 
   if (appEnv === "production") {
     if ((process.env.ENABLE_MOCK_MINT ?? "false") === "true") issues.push({ code: "MOCK_MINT_ENABLED", severity: "warning", message: "ENABLE_MOCK_MINT should be false in production." });
