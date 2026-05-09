@@ -24,6 +24,8 @@ export type ApiErrorDiagnostics = {
   endpointPath?: string;
   proxyStage?: string;
   targetHost?: string;
+  backendUrlSource?: string;
+  preparationErrorClass?: string;
   details?: unknown;
 };
 
@@ -170,6 +172,8 @@ function apiErrorFromParsed(response: Response, url: string, requestId: string, 
       endpointPath: endpointPathFrom(body, url),
       proxyStage: proxyStageFrom(body),
       targetHost: targetHostFrom(body, response.headers.get("x-upstream-target")),
+      backendUrlSource: backendUrlSourceFrom(body),
+      preparationErrorClass: preparationErrorClassFrom(body),
       details: errorRecord.details,
       bodyPreview: isDevMode() ? previewBody(parsed.raw) : undefined
     }
@@ -195,7 +199,7 @@ function looksLikeHtml(contentType: string, raw: string) {
 }
 
 function sanitizeMessage(message: string) {
-  if (/failed before the backend could handle the request/i.test(message)) return "The API proxy returned a structured setup error.";
+  if (/failed (?:before the backend could handle the request|while preparing the backend request)/i.test(message)) return "The API proxy returned a structured setup error.";
   if (looksLikeHtml("text/plain", message)) return "The backend returned an HTML error page instead of API data.";
   return message.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim().slice(0, 500) || "The request failed.";
 }
@@ -231,6 +235,16 @@ function targetHostFrom(body: unknown, upstreamTarget?: string | null) {
   } catch {
     return undefined;
   }
+}
+
+function backendUrlSourceFrom(body: unknown) {
+  const source = traceRecord(body).backendUrlSource;
+  return typeof source === "string" ? source : undefined;
+}
+
+function preparationErrorClassFrom(body: unknown) {
+  const errorClass = traceRecord(body).preparationErrorClass;
+  return typeof errorClass === "string" ? errorClass : undefined;
 }
 
 function previewBody(raw: string) {

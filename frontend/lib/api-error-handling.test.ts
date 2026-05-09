@@ -71,7 +71,10 @@ const tests: TestCase[] = [
             trace: {
               stage: "resolve_backend_url",
               forwardedPath: "/product/home",
-              target: "http://127.0.0.1:4000/product/home?secret=hidden"
+              target: "http://127.0.0.1:4000/product/home?secret=hidden",
+              targetHost: "127.0.0.1:4000",
+              backendUrlSource: "BACKEND_URL",
+              preparationErrorClass: "TypeError"
             }
           })
         )
@@ -81,6 +84,8 @@ const tests: TestCase[] = [
       assert(error.diagnostics.endpointPath === "/product/home", "Endpoint path missing from diagnostics");
       assert(error.diagnostics.proxyStage === "resolve_backend_url", "Proxy stage missing from diagnostics");
       assert(error.diagnostics.targetHost === "127.0.0.1:4000", "Target host was not sanitized");
+      assert(error.diagnostics.backendUrlSource === "BACKEND_URL", "Backend URL source missing from diagnostics");
+      assert(error.diagnostics.preparationErrorClass === "TypeError", "Preparation error class missing from diagnostics");
     }
   },
   {

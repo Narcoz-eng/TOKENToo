@@ -6,6 +6,19 @@ import { DatabaseExceptionFilter } from "../backend/src/db/database-exception.fi
 import { loadLocalEnv } from "../backend/src/env/load-local-env";
 import { validateStartupEnvironment } from "../backend/src/env/startup-validation";
 import { recordStartupComplete, recordStartupFailure, recordStartupModules, startupState } from "../backend/src/env/startup-state";
+import {
+  ProxyFailure,
+  buildTargetUrl,
+  classifyProxyError,
+  errorClassFrom,
+  forwardedHeaders,
+  methodAllowsBody,
+  normalizeIncomingRequest,
+  resolveBackendBaseUrl,
+  sanitizeTarget,
+  targetHost,
+  timeoutMs
+} from "./proxy-core";
 
 export const config = {
   api: {
@@ -74,21 +87,22 @@ async function getServer(trace: ProxyTrace) {
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   const startedAt = Date.now();
   const requestId = requestIdFrom(request);
-  const incomingPath = normalizeIncomingPath(request.url);
+  const incoming = normalizeIncomingRequest(request.url, request.query);
   const trace: ProxyTrace = {
     requestId,
     stage: "received",
     incomingUrl: request.url ?? "/api",
-    forwardedPath: incomingPath,
+    forwardedPath: incoming.forwardedPath,
     mode: "embedded",
     startedAt
   };
   response.setHeader?.("x-request-id", requestId);
 
-  let backendBase: URL | null;
+  let backendBase: ReturnType<typeof resolveBackendBaseUrl>;
   try {
     trace.stage = "resolve_backend_url";
     backendBase = resolveBackendBaseUrl();
+    trace.backendUrlSource = backendBase?.source ?? "embedded";
   } catch (error) {
     logProxyFailure("resolve_backend_url", error, trace, startedAt);
     return writeProxyError(response, classifyProxyError(error), trace, startedAt);
@@ -96,8 +110,9 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
   if (backendBase) {
     trace.mode = "upstream";
-    const target = buildTargetUrl(backendBase, incomingPath, request.url);
+    const target = buildTargetUrl(backendBase.url, incoming.forwardedPath, incoming.search);
     trace.target = sanitizeTarget(target);
+    trace.targetHost = targetHost(target);
     try {
       await proxyToBackend(request, response, target, requestId, trace);
       return;
@@ -109,7 +124,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
   try {
     trace.stage = "rewrite_for_embedded";
-    request.url = incomingPath || "/";
+    request.url = incoming.forwardedPath || "/";
     const instance = await withTimeout(getServer(trace), timeoutMs(), "embedded_bootstrap_timeout");
     trace.stage = "dispatch_embedded";
     return instance(request, response);
@@ -122,10 +137,11 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 async function proxyToBackend(request: ApiRequest, response: ApiResponse, target: URL, requestId: string, trace: ProxyTrace) {
   trace.stage = "read_request_body";
   const body = await requestBody(request);
+  trace.stage = "prepare_headers";
+  const headers = forwardedHeaders(request.headers, requestId);
   trace.stage = "fetch_upstream";
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(new Error("upstream_timeout")), timeoutMs());
-  const headers = forwardedHeaders(request.headers, requestId);
   try {
     const upstream = await fetch(target, {
       method: request.method ?? "GET",
@@ -154,47 +170,6 @@ async function proxyToBackend(request: ApiRequest, response: ApiResponse, target
   }
 }
 
-function resolveBackendBaseUrl() {
-  const value = process.env.BACKEND_URL ?? process.env.API_BACKEND_URL ?? process.env.NEXT_PRIVATE_BACKEND_URL;
-  if (!value?.trim()) return null;
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new ProxyFailure("INVALID_BACKEND_URL", "BACKEND_URL is not a valid URL.", 500);
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new ProxyFailure("INVALID_BACKEND_PROTOCOL", "BACKEND_URL must use http or https.", 500);
-  }
-  url.pathname = url.pathname.replace(/\/+$/, "");
-  return url;
-}
-
-function buildTargetUrl(base: URL, forwardedPath: string, originalUrl?: string) {
-  const target = new URL(base.toString());
-  const path = forwardedPath.startsWith("/") ? forwardedPath : `/${forwardedPath}`;
-  target.pathname = `${base.pathname}${path}`.replace(/\/{2,}/g, "/");
-  const query = originalUrl?.split("?")[1];
-  target.search = query ? `?${query}` : "";
-  return target;
-}
-
-function forwardedHeaders(headers: ApiRequest["headers"], requestId: string) {
-  const forwarded = new Headers();
-  for (const [key, value] of Object.entries(headers ?? {})) {
-    if (Array.isArray(value)) forwarded.set(key, value.join(","));
-    else if (value !== undefined) forwarded.set(key, value);
-  }
-  forwarded.set("x-request-id", requestId);
-  forwarded.delete("host");
-  forwarded.delete("content-length");
-  return forwarded;
-}
-
-function methodAllowsBody(method?: string) {
-  return !["GET", "HEAD"].includes((method ?? "GET").toUpperCase());
-}
-
 function requestBody(request: ApiRequest) {
   if (!methodAllowsBody(request.method) || !request.on) return undefined;
   return new Promise<Buffer>((resolve, reject) => {
@@ -203,29 +178,13 @@ function requestBody(request: ApiRequest) {
       if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     });
     request.on?.("end", () => resolve(Buffer.concat(chunks)));
-    request.on?.("error", (error?: Buffer) => reject(error));
+    request.on?.("error", (error?: unknown) => reject(error));
   });
-}
-
-function normalizeIncomingPath(url?: string) {
-  const value = url ?? "/";
-  return value.replace(/^\/api(?=\/|$)/, "") || "/";
-}
-
-function classifyProxyError(error: unknown) {
-  if (error instanceof ProxyFailure) return error;
-  const message = error instanceof Error ? error.message : String(error);
-  const cause = error instanceof Error ? (error as Error & { cause?: { code?: string } }).cause : undefined;
-  const code = cause?.code ?? (error instanceof Error ? (error as Error & { code?: string }).code : undefined);
-  if (message.includes("embedded_bootstrap_timeout")) return new ProxyFailure("EMBEDDED_BOOT_TIMEOUT", "The embedded backend bootstrap timed out.", 504, message);
-  if (message.includes("upstream_timeout") || error instanceof DOMException && error.name === "AbortError") return new ProxyFailure("UPSTREAM_TIMEOUT", "The backend request timed out before a controller handled it.", 504, message);
-  if (code === "ECONNREFUSED") return new ProxyFailure("BACKEND_CONNECTION_REFUSED", "The backend process is not accepting connections.", 502, message);
-  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return new ProxyFailure("BACKEND_DNS_FAILURE", "The backend hostname could not be resolved.", 502, message);
-  return new ProxyFailure("API_ROUTE_FAILED", "The API route failed while preparing the backend request.", 500, message);
 }
 
 function writeProxyError(response: ApiResponse, error: ProxyFailure, trace: ProxyTrace, startedAt: number) {
   const elapsedMs = Date.now() - startedAt;
+  trace.preparationErrorClass = error.errorClass ?? trace.preparationErrorClass;
   logStructuredProxyError(error, trace, elapsedMs);
   response.status?.(error.status);
   response.setHeader?.("content-type", "application/json; charset=utf-8");
@@ -250,6 +209,9 @@ function errorBody(code: string, message: string, trace: ProxyTrace, elapsedMs: 
       incomingUrl: trace.incomingUrl,
       forwardedPath: trace.forwardedPath,
       target: trace.target,
+      targetHost: trace.targetHost,
+      backendUrlSource: trace.backendUrlSource,
+      preparationErrorClass: trace.preparationErrorClass,
       status: trace.status,
       contentType: trace.contentType,
       elapsedMs,
@@ -265,10 +227,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, code: string) {
   ]);
 }
 
-function timeoutMs() {
-  return Number(process.env.API_PROXY_TIMEOUT_MS ?? process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? 12_000);
-}
-
 function requestIdFrom(request: ApiRequest) {
   const header = request.headers?.["x-request-id"];
   return (Array.isArray(header) ? header[0] : header) ?? `proxy_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
@@ -276,6 +234,7 @@ function requestIdFrom(request: ApiRequest) {
 
 function logProxyFailure(scope: string, error: unknown, trace: ProxyTrace, startedAt: number) {
   const elapsedMs = Date.now() - startedAt;
+  trace.preparationErrorClass = errorClassFrom(error);
   const detail = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack?.split("\n").slice(0, 4).join("\n") } : { message: String(error) };
   console.error(
     "[api-proxy] failure",
@@ -286,6 +245,9 @@ function logProxyFailure(scope: string, error: unknown, trace: ProxyTrace, start
       incomingUrl: trace.incomingUrl,
       forwardedPath: trace.forwardedPath,
       target: trace.target,
+      targetHost: trace.targetHost,
+      backendUrlSource: trace.backendUrlSource,
+      preparationErrorClass: trace.preparationErrorClass,
       status: trace.status,
       elapsedMs,
       error: detail
@@ -305,6 +267,9 @@ function logStructuredProxyError(error: ProxyFailure, trace: ProxyTrace, elapsed
       incomingUrl: trace.incomingUrl,
       forwardedPath: trace.forwardedPath,
       target: trace.target,
+      targetHost: trace.targetHost,
+      backendUrlSource: trace.backendUrlSource,
+      preparationErrorClass: trace.preparationErrorClass,
       upstreamStatus: trace.status,
       elapsedMs,
       detail: process.env.NODE_ENV === "production" ? undefined : error.detail
@@ -318,18 +283,6 @@ function looksLikeHtml(contentType: string, raw: string) {
   return lower.includes("text/html") || trimmed.startsWith("<!doctype html") || trimmed.startsWith("<html") || trimmed.includes("<body");
 }
 
-function sanitizeTarget(target: URL) {
-  const clone = new URL(target.toString());
-  if (clone.search) clone.search = "?...";
-  return clone.toString();
-}
-
-class ProxyFailure extends Error {
-  constructor(readonly code: string, message: string, readonly status: number, readonly detail?: string) {
-    super(message);
-  }
-}
-
 type ProxyTrace = {
   requestId: string;
   stage: string;
@@ -338,6 +291,9 @@ type ProxyTrace = {
   mode: "embedded" | "upstream";
   startedAt: number;
   target?: string;
+  targetHost?: string;
+  backendUrlSource?: string;
+  preparationErrorClass?: string;
   status?: number;
   contentType?: string;
 };

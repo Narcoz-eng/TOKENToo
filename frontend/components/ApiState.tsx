@@ -43,6 +43,8 @@ export function ErrorState({ error, retry }: { error: string | ApiError; retry?:
                   <DiagnosticLine label="Proxy stage" value={apiError.diagnostics.proxyStage ?? "n/a"} />
                   <DiagnosticLine label="Error code" value={apiError.code} />
                   <DiagnosticLine label="Target host" value={apiError.diagnostics.targetHost ?? "n/a"} />
+                  <DiagnosticLine label="Backend source" value={apiError.diagnostics.backendUrlSource ?? "n/a"} />
+                  <DiagnosticLine label="Error class" value={apiError.diagnostics.preparationErrorClass ?? "n/a"} />
                 </div>
                 <details className="mt-3">
                   <summary className="cursor-pointer font-bold text-slate-200">Developer diagnostics</summary>
