@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import type { GeneratedStyleProfile, PreviewAssetPlan, TraitPackPlan } from "./generator.types";
 import { OpenAIImageProvider, type ImageGenerationInput } from "./image-providers";
+import { buildOpenAIImageRequest, resolveOpenAIImageModel, resolveOpenAIImageQuality, summarizeOpenAIImageRequest, validateOpenAIImageRequest } from "./openai-image-request";
 import type { Rarity } from "./renderers/render-types";
 
 type ConceptRequest = {
@@ -50,23 +51,25 @@ export class AiConceptPipelineService {
     return { ready: true, code: "OPENAI_READY", message: "OpenAI image generation is ready." };
   }
 
-  async generate(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string): Promise<PreviewAssetPlan[]> {
+  async generate(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string): Promise<PreviewAssetPlan[]> {
     if (!this.enabled()) return [];
-    return this.generateRequired(style, pack, seedKey, logoData);
+    return this.generateRequired(style, pack, seedKey, logoData, logoUri);
   }
 
-  async generateRequired(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string): Promise<PreviewAssetPlan[]> {
+  async generateRequired(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string): Promise<PreviewAssetPlan[]> {
     const availability = this.availability();
     if (!availability.ready) throw new AiConceptGenerationError(availability.code, availability.message, { stage: "ai_concept_configuration" });
-    const reference = this.parseReference(logoData);
+    const reference = this.parseReference(logoData, logoUri);
     const requests = this.requests(style, pack, seedKey);
+    const quality = resolveOpenAIImageQuality() as ImageGenerationInput["quality"];
     const outputs: PreviewAssetPlan[] = await Promise.all(requests.map(async (request): Promise<PreviewAssetPlan> => {
       const output = await this.openai.generate({
         prompt: request.prompt,
         size: request.size,
-        quality: "high",
+        quality,
         referenceImageBase64: reference?.base64,
-        referenceImageMimeType: reference?.mimeType
+        referenceImageMimeType: reference?.mimeType,
+        referenceImageUrl: reference?.url
       });
       const uri = output.dataUri ?? `data:${output.mimeType};base64,${output.bytes?.toString("base64") ?? ""}`;
       return {
@@ -79,8 +82,8 @@ export class AiConceptPipelineService {
         promptHash: this.hash(request.prompt),
         generationMetadata: {
           kind: request.kind,
-          model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5",
-          quality: "high",
+          model: resolveOpenAIImageModel(),
+          quality,
           size: request.size,
           seedKey,
           prompt: request.prompt
@@ -104,6 +107,43 @@ export class AiConceptPipelineService {
       });
     }
     return outputs;
+  }
+
+  validateRequestPlan(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string) {
+    const reference = this.parseReference(logoData, logoUri);
+    const quality = resolveOpenAIImageQuality() as ImageGenerationInput["quality"];
+    const requests = this.requests(style, pack, seedKey).map((request) => {
+      const openaiRequest = buildOpenAIImageRequest({
+        prompt: request.prompt,
+        size: request.size,
+        quality,
+        referenceImageBase64: reference?.base64,
+        referenceImageMimeType: reference?.mimeType,
+        referenceImageUrl: reference?.url
+      });
+      const validation = validateOpenAIImageRequest(openaiRequest);
+      return {
+        type: request.type,
+        label: request.label,
+        kind: request.kind,
+        rarity: request.rarity,
+        ...summarizeOpenAIImageRequest(openaiRequest),
+        valid: validation.valid,
+        issues: validation.issues
+      };
+    });
+    const issues = requests.flatMap((request) => request.issues.map((issue) => ({ ...issue, requestLabel: request.label, requestKind: request.kind })));
+    return {
+      ok: true,
+      valid: issues.length === 0,
+      model: resolveOpenAIImageModel(),
+      quality,
+      requestCount: requests.length,
+      referenceImageBase64Present: Boolean(reference?.base64),
+      referenceImageUrlPresent: Boolean(reference?.url),
+      requests,
+      issues
+    };
   }
 
   private requests(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string): ConceptRequest[] {
@@ -192,10 +232,12 @@ Available scalable trait categories for later curated layers: ${Object.keys(pack
     return hasHero && rarities.has("Common") && rarities.has("Epic") && rarities.has("Legendary");
   }
 
-  private parseReference(logoData?: string) {
+  private parseReference(logoData?: string, logoUri?: string) {
     const match = /^data:([^;,]+);base64,(.+)$/s.exec(logoData ?? "");
-    if (!match) return undefined;
-    return { mimeType: match[1], base64: match[2] };
+    if (match) return { mimeType: match[1], base64: match[2], url: undefined };
+    const url = logoUri?.trim();
+    if (url) return { mimeType: undefined, base64: undefined, url };
+    return undefined;
   }
 
   private hash(value: string) {

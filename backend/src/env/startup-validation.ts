@@ -7,7 +7,7 @@ export function validateStartupEnvironment() {
   const placeholderProgramId = "11111111111111111111111111111111";
   const strict = (process.env.STRICT_STARTUP_VALIDATION ?? "false") === "true";
   const issues: StartupCheck[] = [];
-  process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-2";
+  process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-1.5";
   process.env.OPENAI_IMAGE_QUALITY ??= "high";
   process.env.ENABLE_AI_IMAGE_GENERATION ??= "false";
   process.env.REQUIRED_LAUNCH_ASSET_STATUS ??= appEnv === "production" ? "ARTIST_APPROVED" : "CURATED_LAYER_READY";

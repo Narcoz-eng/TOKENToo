@@ -84,7 +84,7 @@ export class GeneratorService {
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
-    const aiPreviews = await this.aiConcepts.generateRequired(style, pack, `${normalized.tokenMint}:preview`, normalized.logoData).catch((error) => {
+    const aiPreviews = await this.aiConcepts.generateRequired(style, pack, `${normalized.tokenMint}:preview`, normalized.logoData, normalized.logoUri).catch((error) => {
       throw this.aiPreviewException(error);
     });
     if (aiPreviews.length) {
@@ -209,6 +209,15 @@ export class GeneratorService {
     return this.getRun(run.id);
   }
 
+  validateAiConceptRequest(input: CreateGenerationRunInput) {
+    const normalized = this.normalizePreviewInput(input);
+    const analysis = this.logoAnalysis.analyze(normalized);
+    const context = this.communityContext.build(normalized.tokenSymbol, normalized.description, normalized.hints, analysis);
+    const style = this.styleProfiles.generate(normalized, analysis, context, 1);
+    const pack = this.traitPacks.generate(style);
+    return this.aiConcepts.validateRequestPlan(style, pack, `${normalized.tokenMint}:preview`, normalized.logoData, normalized.logoUri);
+  }
+
   async getRun(id: string) {
     const run = await this.prisma.generationRun.findUnique({
       where: { id },
@@ -269,7 +278,7 @@ export class GeneratorService {
     const pack = this.packFromRecord(latest.traitPack);
     const version = Math.max(1, ...latest.previewAssets.map((asset) => asset.version)) + 1;
     const wireframes = this.previews.generate(style, pack, run.seed, version);
-    const aiPreviews = await this.aiConcepts.generate(style, pack, run.seed, run.logoData ?? undefined).catch(() => []);
+    const aiPreviews = await this.aiConcepts.generate(style, pack, run.seed, run.logoData ?? undefined, run.logoUri ?? undefined).catch(() => []);
     const previews = aiPreviews.length ? aiPreviews : wireframes;
     if (aiPreviews.length) await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
     await this.persistPreviews(id, latest.id, version, previews);
@@ -529,7 +538,7 @@ export class GeneratorService {
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${input.tokenMint}:${version}`, reroll);
-    const aiPreviews = await this.aiConcepts.generate(style, pack, `${input.tokenMint}:${version}`, input.logoData).catch(() => []);
+    const aiPreviews = await this.aiConcepts.generate(style, pack, `${input.tokenMint}:${version}`, input.logoData, input.logoUri).catch(() => []);
     if (aiPreviews.length) {
       style.productionAssetStatus = "AI_CONCEPT";
       style.artSource = "AI_ASSISTED";

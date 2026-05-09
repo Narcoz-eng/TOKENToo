@@ -54,6 +54,12 @@ export class GeneratorController {
     return this.generator.preview(parsed as CreateGenerationRunInput);
   }
 
+  @Post("ai-concept/validate-request")
+  validateAiConceptRequest(@Body() body: unknown) {
+    const parsed = runSchema.parse(body);
+    return this.generator.validateAiConceptRequest(parsed as CreateGenerationRunInput);
+  }
+
   @Get("runs/:id")
   @UseGuards(WalletAuthGuard)
   getRun(@Param("id") id: string, @WalletAddress() walletAddress: string) {

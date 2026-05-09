@@ -14,6 +14,7 @@
     "typecheck": "npm --workspace frontend run typecheck && npm --workspace backend run typecheck",
     "test:api-errors": "tsx frontend/lib/api-error-handling.test.ts",
     "test:api-regression": "tsx backend/src/env/startup-validation.test.ts && tsx backend/src/system/api-route-regression.test.ts && tsx scripts/api-proxy-regression.test.ts",
+    "test:ai-concept": "npm --workspace backend run test:openai-image-request",
     "db:generate": "npm --workspace backend run db:generate",
     "db:migrate:deploy": "npm --workspace backend run db:migrate:deploy",
     "db:verify:generator": "npm --workspace backend run db:verify:generator",

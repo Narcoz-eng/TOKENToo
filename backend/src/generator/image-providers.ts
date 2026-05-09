@@ -1,11 +1,22 @@
-import { BadRequestException, GatewayTimeoutException, Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, GatewayTimeoutException, Inject, Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
+import {
+  buildOpenAIImageRequest,
+  openAIImageConfigFix,
+  sanitizedOpenAIImagePayload,
+  summarizeOpenAIImageRequest,
+  validateOpenAIImageRequest,
+  type OpenAIImageQuality,
+  type OpenAIImageRequest,
+  type OpenAIImageSize
+} from "./openai-image-request";
 
 export type ImageGenerationInput = {
   prompt: string;
   referenceImageBase64?: string;
   referenceImageMimeType?: string;
-  size?: "1024x1024" | "1024x1536" | "1536x1024";
-  quality?: "low" | "medium" | "high";
+  referenceImageUrl?: string;
+  size?: OpenAIImageSize;
+  quality?: OpenAIImageQuality;
 };
 
 export type ImageGenerationOutput = {
@@ -22,16 +33,34 @@ export interface ImageProvider {
 
 @Injectable()
 export class OpenAIImageProvider implements ImageProvider {
+  private readonly logger = new Logger(OpenAIImageProvider.name);
+
   async generate(input: ImageGenerationInput): Promise<ImageGenerationOutput> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw openAiProviderException("OPENAI_KEY_MISSING", "OpenAI key missing. Configure image generation before creating an AI concept preview.");
-    const model = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5";
+    const request = buildOpenAIImageRequest(input);
+    const validation = validateOpenAIImageRequest(request);
+    if (!validation.valid) {
+      this.logger.warn(
+        JSON.stringify({
+          event: "openai_image_request_validation_failed",
+          request: summarizeOpenAIImageRequest(request),
+          issues: validation.issues
+        })
+      );
+      const firstIssue = validation.issues[0];
+      throw openAiProviderException("OPENAI_IMAGE_REQUEST_INVALID", `OpenAI image request rejected: ${firstIssue ? `${firstIssue.message}${firstIssue.fix ? ` ${firstIssue.fix}` : ""}` : "request payload is invalid"}`, {
+        request: summarizeOpenAIImageRequest(request),
+        issues: validation.issues
+      }, "bad_request");
+    }
     const attempts = Math.max(1, Number(process.env.OPENAI_IMAGE_RETRY_ATTEMPTS ?? 2));
     let lastError: unknown;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
-        return await this.requestImage({ ...input, model, apiKey });
+        return await this.requestImage(request, apiKey);
       } catch (error) {
+        if (error instanceof BadRequestException) throw error;
         lastError = error;
         if (attempt === attempts) break;
         await new Promise((resolve) => setTimeout(resolve, attempt * 750));
@@ -43,12 +72,12 @@ export class OpenAIImageProvider implements ImageProvider {
     throw openAiProviderException("OPENAI_REQUEST_FAILED", "OpenAI request failed while creating the AI concept preview.", lastError);
   }
 
-  private async requestImage(input: ImageGenerationInput & { apiKey: string; model: string }): Promise<ImageGenerationOutput> {
+  private async requestImage(request: OpenAIImageRequest, apiKey: string): Promise<ImageGenerationOutput> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Number(process.env.OPENAI_IMAGE_TIMEOUT_MS ?? 120_000));
     try {
-      const response = input.referenceImageBase64 ? await this.editRequest(input, controller.signal) : await this.generationRequest(input, controller.signal);
-      if (!response.ok) throw await openAiResponseException(response);
+      const response = await this.imageRequest(request, apiKey, controller.signal);
+      if (!response.ok) throw await openAiResponseException(response, request, this.logger);
       const result = (await response.json()) as { data?: Array<{ b64_json?: string; url?: string }> };
       const item = result.data?.[0];
       if (item?.b64_json) return { provider: "openai", mimeType: "image/png", bytes: Buffer.from(item.b64_json, "base64"), productionReady: false };
@@ -64,38 +93,14 @@ export class OpenAIImageProvider implements ImageProvider {
     }
   }
 
-  private generationRequest(input: ImageGenerationInput & { apiKey: string; model: string }, signal: AbortSignal) {
-    return fetch("https://api.openai.com/v1/images/generations", {
+  private imageRequest(request: OpenAIImageRequest, apiKey: string, signal: AbortSignal) {
+    return fetch(request.endpoint, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${input.apiKey}`,
+        authorization: `Bearer ${apiKey}`,
         "content-type": "application/json"
       },
-      body: JSON.stringify({
-        model: input.model,
-        prompt: input.prompt,
-        size: input.size ?? "1024x1024",
-        quality: input.quality ?? process.env.OPENAI_IMAGE_QUALITY ?? "high",
-        n: 1
-      }),
-      signal
-    });
-  }
-
-  private editRequest(input: ImageGenerationInput & { apiKey: string; model: string }, signal: AbortSignal) {
-    const mimeType = input.referenceImageMimeType ?? "image/png";
-    const bytes = Buffer.from(input.referenceImageBase64 ?? "", "base64");
-    const form = new FormData();
-    form.append("model", input.model);
-    form.append("prompt", input.prompt);
-    form.append("size", input.size ?? "1024x1024");
-    form.append("quality", input.quality ?? process.env.OPENAI_IMAGE_QUALITY ?? "high");
-    form.append("n", "1");
-    form.append("image", new Blob([bytes], { type: mimeType }), `reference.${mimeType.includes("jpeg") ? "jpg" : "png"}`);
-    return fetch("https://api.openai.com/v1/images/edits", {
-      method: "POST",
-      headers: { authorization: `Bearer ${input.apiKey}` },
-      body: form,
+      body: JSON.stringify(request.payload),
       signal
     });
   }
@@ -156,19 +161,32 @@ function escapeXml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char] ?? char);
 }
 
-async function openAiResponseException(response: Response) {
+export async function openAiResponseException(response: Response, request: OpenAIImageRequest, logger = new Logger(OpenAIImageProvider.name)) {
   const body = await response.text().catch(() => "");
   const parsed = safeJson(body);
-  const message = openAiErrorText(parsed) || body.slice(0, 240);
-  const moderationIssue = /moderation|content policy|safety|policy|blocked|rejected/i.test(`${response.status} ${message}`);
-  const code = moderationIssue ? "OPENAI_PROMPT_REJECTED" : "OPENAI_REQUEST_FAILED";
-  const publicMessage = moderationIssue
-    ? "OpenAI rejected the image prompt or moderation policy."
-    : `OpenAI request failed while creating the AI concept preview (${response.status}).`;
-  return openAiProviderException(code, publicMessage, { status: response.status, message });
+  const openaiError = openAiErrorDetail(parsed, body);
+  logger.error(
+    JSON.stringify({
+      event: "openai_image_request_failed",
+      status: response.status,
+      request: sanitizedOpenAIImagePayload(request),
+      openaiError
+    })
+  );
+  const reason = openaiError.message || `OpenAI returned HTTP ${response.status}`;
+  const moderationIssue = /moderation|content policy|safety|policy|blocked|rejected/i.test(`${response.status} ${reason} ${openaiError.code ?? ""} ${openaiError.type ?? ""}`);
+  const unsupportedModel = /unsupported_model|model_not_found|does not exist|unsupported model|invalid model/i.test(`${openaiError.code ?? ""} ${openaiError.type ?? ""} ${reason}`);
+  const code = unsupportedModel ? "OPENAI_UNSUPPORTED_MODEL" : moderationIssue ? "OPENAI_PROMPT_REJECTED" : response.status >= 400 && response.status < 500 ? "OPENAI_REQUEST_REJECTED" : "OPENAI_REQUEST_FAILED";
+  const publicReason = unsupportedModel ? `${reason} ${openAIImageConfigFix(request.model)}` : reason;
+  const publicMessage = `OpenAI image request rejected: ${publicReason}`;
+  return openAiProviderException(code, publicMessage, {
+    status: response.status,
+    request: summarizeOpenAIImageRequest(request),
+    openaiError
+  }, response.status >= 400 && response.status < 500 && response.status !== 429 ? "bad_request" : "service_unavailable");
 }
 
-function openAiProviderException(code: string, message: string, cause?: unknown) {
+function openAiProviderException(code: string, message: string, cause?: unknown, kind?: "bad_request" | "gateway_timeout" | "service_unavailable") {
   const payload = {
     code,
     message,
@@ -179,8 +197,8 @@ function openAiProviderException(code: string, message: string, cause?: unknown)
       raw: sanitizeProviderDetail(cause)
     }
   };
-  if (code === "OPENAI_PROMPT_REJECTED") return new BadRequestException(payload);
-  if (code === "OPENAI_IMAGE_TIMEOUT") return new GatewayTimeoutException(payload);
+  if (kind === "bad_request" || code === "OPENAI_PROMPT_REJECTED" || code === "OPENAI_REQUEST_REJECTED" || code === "OPENAI_UNSUPPORTED_MODEL") return new BadRequestException(payload);
+  if (kind === "gateway_timeout" || code === "OPENAI_IMAGE_TIMEOUT") return new GatewayTimeoutException(payload);
   return new ServiceUnavailableException(payload);
 }
 
@@ -192,16 +210,36 @@ function safeJson(value: string) {
   }
 }
 
-function openAiErrorText(value?: Record<string, unknown>) {
+function openAiErrorDetail(value: Record<string, unknown> | undefined, body: string) {
   const error = value?.error;
-  if (!error || typeof error !== "object") return undefined;
-  const message = (error as Record<string, unknown>).message;
-  return typeof message === "string" ? message : undefined;
+  if (!error || typeof error !== "object") {
+    return {
+      message: sanitizeOpenAiText(body.slice(0, 500))
+    };
+  }
+  const record = error as Record<string, unknown>;
+  return {
+    code: typeof record.code === "string" ? sanitizeOpenAiText(record.code) : undefined,
+    type: typeof record.type === "string" ? sanitizeOpenAiText(record.type) : undefined,
+    message: typeof record.message === "string" ? sanitizeOpenAiText(record.message) : undefined,
+    param: typeof record.param === "string" ? sanitizeOpenAiText(record.param) : undefined
+  };
 }
 
 function sanitizeProviderDetail(value: unknown) {
   if (!value) return undefined;
-  if (value instanceof Error) return value.message.replace(/sk-[A-Za-z0-9_-]+/g, "sk-...");
-  if (typeof value === "object") return JSON.stringify(value).replace(/sk-[A-Za-z0-9_-]+/g, "sk-...").slice(0, 500);
-  return String(value).replace(/sk-[A-Za-z0-9_-]+/g, "sk-...").slice(0, 500);
+  if (value instanceof Error) return sanitizeOpenAiText(value.message);
+  if (typeof value === "object") return sanitizeOpenAiText(JSON.stringify(value));
+  return sanitizeOpenAiText(String(value));
+}
+
+function sanitizeOpenAiText(value: string) {
+  return value
+    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-...")
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer ...")
+    .replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/gi, "data:image/...;base64,...")
+    .replace(/https?:\/\/[^\s"'<>]+/gi, "https://...")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 1_000);
 }
