@@ -71,7 +71,7 @@ export class LogoAnalysisService {
     if (/coin|gold|cash|bank|vault/.test(source)) return "value-symbol subject";
     if (/wizard|mage|spell|magic/.test(source)) return "ritual magic subject";
     const subject = pick(words.filter((word) => !/token|coin|official|metadata|image|website|twitter|discord|telegram/.test(word)).length ? words : ["origin", "signal", "holder"], seed);
-    return `${subject} token-native subject`;
+    return `${subject} signal bearer`;
   }
 
   private palette(input: CreateGenerationRunInput, seed: number) {

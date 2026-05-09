@@ -251,7 +251,7 @@ export default function CreateCollectionPage() {
   const setup = capabilityState.data?.setupChecklist;
   const capabilities = capabilityState.data?.capabilities;
   const privateDiagnostics = showPrivateDiagnostics(walletAuth.address);
-  const canGenerateAiConcept = Boolean(scan && setup?.creativePreviewReady);
+  const canGenerateAiConcept = Boolean(scan);
   const canSaveDraft = Boolean(scan && walletAuth.connected && (privateDiagnostics ? capabilities?.databaseAvailable : setup?.creativePreviewReady));
   const launchEnvironmentReady = Boolean(setup?.devnetLaunchReady || setup?.productionLaunchReady);
 
@@ -280,7 +280,7 @@ export default function CreateCollectionPage() {
             overrides: overridePayload(scan, tokenName, tokenSymbol, description, logoUri),
             memes: splitList(memes),
             phrases: splitList(phrases),
-            slogans: ["join the faction"],
+            slogans: splitList(phrases).slice(0, 2),
             mascotPreference,
             mood
           }
@@ -305,7 +305,9 @@ export default function CreateCollectionPage() {
       const data = await apiFetch<PreviewOnlyResponse>("/generator/preview", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(previewPayload())
+        body: JSON.stringify(previewPayload()),
+        timeoutMs: 180_000,
+        maxResponseBytes: 35_000_000
       });
       setPreviewOnly(data);
       setRun(null);
@@ -420,7 +422,7 @@ export default function CreateCollectionPage() {
         overrides: overridePayload(scan, tokenName, tokenSymbol, description, logoUri),
         memes: splitList(memes),
         phrases: splitList(phrases),
-        slogans: ["join the faction"],
+        slogans: splitList(phrases).slice(0, 2),
         mascotPreference,
         mood
       }
@@ -463,7 +465,7 @@ export default function CreateCollectionPage() {
                 <button type="button" onClick={scanToken} disabled={loading || tokenMint.trim().length < 32} className="phew-button phew-button-primary inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-60">
                   {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />} Scan Token
                 </button>
-                {scan ? <ResolvedTokenCard scan={scan} /> : null}
+                {scan ? <ResolvedTokenCard scan={scan} showDiagnostics={privateDiagnostics} /> : null}
               </div>
             </SectionCard>
 
@@ -739,6 +741,7 @@ function defaultSetupItems(): SetupChecklist["items"] {
 
 function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGeneratorPreview; launchResult: string | null }) {
   const wireframeOnly = isWireframePreview(preview);
+  const tags = identityTags(preview);
   return (
     <section className="phew-panel relative overflow-hidden rounded-lg">
       <img src={wireframeOnly ? brandAssets.emptyVaultPremium : safeImage(preview.banner, brandAssets.launchHero)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
@@ -762,15 +765,15 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
             {launchResult ? <StatusPill accent="cyan">Launched</StatusPill> : null}
           </div>
           <h2 className="mt-4 text-4xl font-black leading-tight">{preview.collection}</h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{preview.lore}</p>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{culturePitch(preview)}</p>
           {wireframeOnly ? (
             <div className="mt-3 max-w-2xl rounded-md border border-vault-gold/30 bg-vault-gold/8 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
-              <p>Professional concept imagery is not available yet. Creative DNA is ready; wireframes stay in debug review.</p>
+              <p>Professional concept preview required. Generate AI concept imagery before reviewing collection visuals.</p>
               <p className="mt-1">Vault NFT visuals pending professional concept or curated layer pack.</p>
             </div>
           ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
-            {(wireframeOnly ? ["Creative DNA", "Rarity Plan", "Trait Taxonomy", "Faction Identity"] : ["Vault NFTs", "Raid Rooms", "Staking Hooks", "Faction Identity"]).map((tag) => (
+            {tags.map((tag) => (
               <span key={tag} className="rounded-md border border-vault-cyan/25 bg-black/35 px-3 py-2 text-xs font-bold text-vault-cyan">{tag}</span>
             ))}
           </div>
@@ -829,7 +832,7 @@ function ProductNotice({ tone, message }: { tone: "red" | "gold"; message: strin
   return <div className={cn("rounded-md border p-4 text-sm", tone === "red" ? "border-vault-red/40 bg-vault-red/10 text-vault-red" : "border-vault-gold/40 bg-vault-gold/10 text-vault-gold")}>{message}</div>;
 }
 
-function ResolvedTokenCard({ scan }: { scan: TokenScan }) {
+function ResolvedTokenCard({ scan, showDiagnostics }: { scan: TokenScan; showDiagnostics: boolean }) {
   return (
     <div className="rounded-md border border-vault-green/35 bg-vault-green/8 p-4">
       <div className="flex gap-3">
@@ -846,14 +849,14 @@ function ResolvedTokenCard({ scan }: { scan: TokenScan }) {
         <TokenFact label="Decimals" value={String(scan.decimals)} />
         <TokenFact label="Supply" value={scan.supply || "Unavailable"} />
       </div>
-      {scan.riskNotes.length ? (
+      {showDiagnostics && scan.riskNotes.length ? (
         <div className="mt-4 flex flex-wrap gap-2">
           {scan.riskNotes.slice(0, 5).map((note) => (
             <span key={note} className="rounded-md border border-vault-gold/25 bg-vault-gold/8 px-2 py-1 text-[11px] font-bold text-vault-gold">{note}</span>
           ))}
         </div>
       ) : null}
-      {scan.persistenceWarning ? <p className="mt-3 text-xs text-vault-gold">{scan.persistenceWarning}</p> : null}
+      {showDiagnostics && scan.persistenceWarning ? <p className="mt-3 text-xs text-vault-gold">{scan.persistenceWarning}</p> : null}
     </div>
   );
 }
@@ -865,6 +868,54 @@ function TokenFact({ label, value }: { label: string; value: string }) {
       <span className="truncate font-semibold">{value}</span>
     </div>
   );
+}
+
+function publicCollectionName(preview: CollectionGeneratorPreview) {
+  return cleanDisplayText(preview.collection.replace(/^\$/, "")) || "Collection";
+}
+
+function culturePitch(preview: CollectionGeneratorPreview) {
+  const name = publicCollectionName(preview);
+  const source = `${preview.collection} ${preview.theme} ${preview.mascot} ${preview.artStyle} ${preview.backgroundWorld} ${preview.lore} ${preview.traitLanguage.join(" ")}`.toLowerCase();
+  if (/hanta|hantavirus|virus|viral|biohazard|quarantine|mutation|containment|toxic|lab/.test(source)) return `${name} is forming a containment faction around quarantine energy, mutated silhouettes, and high-voltage meme lore.`;
+  if (/aura|glow|pulse|motion|signal|energy/.test(source)) return `${name} is forming a signal-born faction around motion, glow, and market energy.`;
+  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) return `${name} is forming a market-native faction around liquidity pressure, raid momentum, and visible holder status.`;
+  const anchors = identityTags(preview).filter((tag) => !/ready|staking|raid/i.test(tag)).slice(0, 3).map((tag) => tag.toLowerCase());
+  return `${name} is forming a ${cleanDisplayText(preview.theme).toLowerCase()} around ${joinNatural(anchors.length ? anchors : ["identity", "community energy", "ownership status"])}.`;
+}
+
+function identityTags(preview: CollectionGeneratorPreview) {
+  const source = `${preview.collection} ${preview.theme} ${preview.mascot} ${preview.artStyle} ${preview.backgroundWorld} ${preview.lore} ${preview.traitLanguage.join(" ")}`.toLowerCase();
+  const tags: string[] = [];
+  if (/hanta|hantavirus|virus|viral|biohazard|quarantine|mutation|containment|toxic|lab/.test(source)) tags.push("Containment Culture", "Mutation Glow", "Raid Energy");
+  if (/aura|glow|pulse|motion|signal|energy/.test(source)) tags.push("Signal Glow", "Motion Aura", "Market Energy");
+  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) tags.push("Liquidity Pressure", "Chart Energy", "Holder Status");
+  if (/dream|vapor|liminal|surreal/.test(source)) tags.push("Dream Logic", "Surreal World", "Collector Myth");
+  if (/cute|toy|soft|sticker|cozy/.test(source)) tags.push("Soft Culture", "Sticker Energy", "Cozy Holders");
+  tags.push("Raid-ready", "Staking-ready");
+  return [...new Set(tags.map(cleanDisplayText).filter(Boolean))].slice(0, 6);
+}
+
+function cleanDisplayText(value: string | undefined | null) {
+  const raw = String(value ?? "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b(has sparse official metadata|sparse official metadata|internal identity seed|inferred token native subject|token native subject|fallback market signals|fallback provider|source metadata|metadata confidence|inferred identity|join the faction)\b/gi, "")
+    .replace(/\b(metadata|internal|inferred|fallback|provider|confidence|context)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw) return "";
+  const clipped = raw.length > 110 ? `${raw.slice(0, 106).trim()}...` : raw;
+  return clipped.includes(".") ? clipped : titleCase(clipped);
+}
+
+function titleCase(value: string) {
+  return value.replace(/\s+/g, " ").trim().replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function joinNatural(items: string[]) {
+  if (items.length <= 1) return items[0] ?? "community energy";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
 function fallbackPreview(tokenName: string, tokenSymbol: string, description: string, preset: string): CollectionGeneratorPreview {
@@ -924,6 +975,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
   const categories = asRecord<string[]>(profile.traitPack?.categories);
   const previews = profile.previewAssets;
   const samples = previews.filter((asset) => asset.type === "SAMPLE_NFT").slice(-6);
+  const avatarUri = previews.find((asset) => asset.type === "AVATAR")?.uri ?? samples[0]?.uri;
   const quality = profile.qualityReports[0];
   const distinctiveness = profile.distinctivenessReports[0];
   const roles = asArray(profile.roleNames);
@@ -948,7 +1000,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     previewClassification: previewClassForStatus(profile.productionAssetStatus ?? "WIREFRAME", previews[0]?.previewClassification),
     productionAssetStatus: profile.productionAssetStatus ?? "WIREFRAME",
     finalProductionReady: isProductionStatus(profile.productionAssetStatus),
-    avatar: safeImage(previews.find((asset) => asset.type === "AVATAR")?.uri, brandAssets.factionMark),
+    avatar: safeImage(avatarUri, brandAssets.factionMark),
     banner: safeImage(previews.find((asset) => asset.type === "BANNER")?.uri, brandAssets.launchHero),
     samples: normalizedSamples(profile.productionAssetStatus ?? "WIREFRAME", samples.map((asset, index) => {
       const metadata = asRecord<string>(asset.metadata);
@@ -992,6 +1044,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
 
 function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGeneratorPreview {
   const roles = asArray(data.brandDna.roleLanguage);
+  const avatarUri = data.avatarPreviewSpec?.uri ?? data.samples[0]?.uri;
   return {
     id: "preview-only",
     collection: data.collection.name,
@@ -1013,7 +1066,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     productionAssetStatus: data.productionAssetStatus,
     finalProductionReady: isProductionStatus(data.productionAssetStatus),
     warnings: data.warnings,
-    avatar: safeImage(data.avatarPreviewSpec?.uri, brandAssets.factionMark),
+    avatar: safeImage(avatarUri, brandAssets.factionMark),
     banner: safeImage(data.bannerPreviewSpec?.uri, brandAssets.launchHero),
     samples: normalizedSamples(data.productionAssetStatus, data.samples.slice(0, 6).map((sample, index) => ({
       id: `preview-${index}`,

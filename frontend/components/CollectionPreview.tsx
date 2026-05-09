@@ -1,4 +1,5 @@
-import { BadgeCheck, Layers3, LockKeyhole, Palette, ShieldCheck, Sparkles, Swords, Wand2 } from "lucide-react";
+import { BadgeCheck, LockKeyhole, Palette, ShieldCheck, Sparkles, Swords, Wand2 } from "lucide-react";
+import type { ReactNode } from "react";
 import type { CollectionGeneratorPreview } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
 import { SectionCard } from "./SectionCard";
@@ -25,6 +26,8 @@ export function CollectionPreview({
   const aiConcept = preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW";
   const professionalPreview = !wireframeOnly;
   const visualSamples = professionalPreview ? samples.filter((sample) => Boolean(sample.image)) : [];
+  const tags = identityTags(preview);
+  const pitch = culturePitch(preview);
 
   return (
     <div className="space-y-5">
@@ -47,20 +50,20 @@ export function CollectionPreview({
               <div className="min-w-0">
                 <div className="flex flex-wrap gap-2">
                   <StatusPill accent={preview.quality.tier === "Wireframe concept" || preview.quality.tier === "AI concept" || preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
-                  <StatusPill accent="cyan">{preview.theme}</StatusPill>
+                  <StatusPill accent="cyan">{cleanDisplayText(preview.theme)}</StatusPill>
                   <StatusPill accent={isProductionStatus(preview.productionAssetStatus) ? "green" : "gold"}>{previewStatusLabel(preview)}</StatusPill>
                 </div>
                 <h2 className="mt-4 text-4xl font-black leading-tight lg:text-5xl">{preview.collection}</h2>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{preview.lore}</p>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{pitch}</p>
                 {!preview.finalProductionReady ? (
                   <p className="mt-3 max-w-3xl rounded-md border border-vault-gold/35 bg-vault-gold/10 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
                     {preview.productionAssetStatus === "AI_CONCEPT"
                       ? "AI concept preview - creator review only. Final minting requires curated or artist-approved layer packs."
-                      : "Professional preview requires OpenAI image generation or an approved curated asset pack. Wireframes are hidden below as planning/debug assets only."}
+                      : "Professional concept preview required. Generate AI concept imagery before reviewing collection visuals."}
                   </p>
                 ) : null}
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {["Overview", "Vault NFTs", "Staking", "Raids", "Traits"].map((tab, index) => (
+                  {tags.map((tab, index) => (
                     <span key={tab} className={cn("rounded-md border px-3 py-2 text-xs font-bold", index === 0 ? "border-vault-green bg-vault-green/12 text-vault-green" : "border-vault-line bg-black/30 text-slate-400")}>{tab}</span>
                   ))}
                 </div>
@@ -76,7 +79,7 @@ export function CollectionPreview({
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <FeatureTile icon={LockKeyhole} title={wireframeOnly ? "Vault visuals pending" : "Vault NFTs"} body={wireframeOnly ? "Vault NFT visuals pending professional concept or curated layer pack." : "Token-backed identity cards with redeem and marketplace hooks."} />
-              <FeatureTile icon={Swords} title="Raid Rooms" body={preview.raidTheme || "Faction raids activate after launch."} />
+              <FeatureTile icon={Swords} title="Raid Rooms" body={cleanDisplayText(preview.raidTheme || "Faction raids activate after launch.")} />
               <FeatureTile icon={Sparkles} title="Staking" body="Reward hooks and role progression are ready for collection rules." />
             </div>
           </div>
@@ -99,50 +102,11 @@ export function CollectionPreview({
       ) : (
         <SectionCard title="Professional Preview Required">
           <ProfessionalPreviewRequirement preview={preview} onGenerateAiConcept={onGenerateAiConcept} canGenerateAiConcept={canGenerateAiConcept} loading={loading} />
-          <details className="mt-4 rounded-md border border-vault-line bg-black/30 p-4">
-            <summary className="cursor-pointer text-sm font-black text-slate-300">Wireframe planning specs</summary>
-            {samples.length ? (
-              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {samples.slice(0, compact ? 3 : 6).map((sample, index) => (
-                  <WireframeSpecCard key={sample.id} sample={sample} index={index} />
-                ))}
-              </div>
-            ) : (
-              <p className="mt-4 rounded-md border border-white/10 bg-black/25 px-3 py-2 text-sm text-slate-400">No wireframe specs are available for this preview.</p>
-            )}
-          </details>
         </SectionCard>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <SectionCard title="Launch Review">
-          <div className="grid gap-3 md:grid-cols-2">
-            <ReviewItem icon={BadgeCheck} label="Brand kit" value={preview.preset || "PHEW curated"} />
-            <ReviewItem icon={Palette} label="Visual system" value={preview.artStyle} />
-            <ReviewItem icon={Layers3} label="Trait depth" value={`${Object.values(preview.traitCounts).reduce((sum, value) => sum + Number(value), 0)} traits`} />
-            <ReviewItem icon={ShieldCheck} label="Quality" value={wireframeOnly ? "Awaiting AI/curated art" : `${preview.quality.previewQualityScore}% preview score`} />
-          </div>
-          <div className="mt-4 grid gap-2">
-            {preview.traitLanguage.slice(0, 8).map((trait) => (
-              <span key={trait} className="rounded-md border border-vault-cyan/20 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">{trait}</span>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Rarity Table">
-          <div className="space-y-4">
-            {Object.entries(preview.rarityWeights).slice(0, 5).map(([rarity, weight]) => (
-              <div key={rarity}>
-                <div className="mb-1 flex justify-between text-sm">
-                  <span className="font-bold text-slate-200">{rarity}</span>
-                  <span className={rarity === "Legendary" || rarity === "Mythic" ? "text-vault-gold" : "text-vault-green"}>{formatWeight(weight)}</span>
-                </div>
-                <ProgressBar value={Number(weight)} max={10000} color={rarity === "Legendary" || rarity === "Mythic" ? "gold" : rarity === "Epic" ? "purple" : "green"} />
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      </div>
+      <CreatorReadinessGrid preview={preview} wireframeOnly={wireframeOnly} />
+      <AdvancedCreativeDnaPanel preview={preview} samples={samples} compact={compact} />
 
       {!compact ? (
         <div className="grid gap-5 xl:grid-cols-3">
@@ -162,7 +126,7 @@ export function CollectionPreview({
 }
 
 function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiConcept, loading }: { preview: CollectionGeneratorPreview; onGenerateAiConcept?: () => void; canGenerateAiConcept: boolean; loading: boolean }) {
-  const culture = preview.traitLanguage.slice(0, 5);
+  const culture = identityTags(preview);
   return (
     <div className="mt-7 grid gap-4 rounded-lg border border-vault-cyan/25 bg-black/45 p-4 shadow-[0_0_60px_rgba(22,215,210,0.12)] md:grid-cols-[1.2fr_.8fr]">
       <div>
@@ -170,8 +134,8 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
           <Wand2 className="size-4" />
           <p className="text-xs font-black uppercase tracking-[0.18em]">Creative DNA Ready</p>
         </div>
-        <p className="mt-3 text-2xl font-black leading-tight text-white">{preview.backgroundWorld}</p>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{preview.mascot} needs AI concept art or curated production layers before the creator-facing visual preview is meaningful.</p>
+        <p className="mt-3 text-2xl font-black leading-tight text-white">Professional concept preview required</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{culturePitch(preview)}</p>
         {onGenerateAiConcept ? (
           <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
             <Sparkles className="size-4" /> Generate AI Concept Preview
@@ -194,7 +158,7 @@ function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGener
         <div className="rounded-lg border border-vault-gold/30 bg-vault-gold/8 p-5">
           <p className="text-sm font-black uppercase text-vault-gold">Creative DNA ready</p>
           <h3 className="mt-2 text-2xl font-black text-white">Professional concept preview required</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-300">The generator produced identity, rarity logic, trait taxonomy, and production rules. It is intentionally not presenting SVG wireframes as collection art.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-300">A polished identity direction is ready. Generate AI concept imagery to review hero art and sample rarities before any launch decision.</p>
           {onGenerateAiConcept ? (
             <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
               <Sparkles className="size-4" /> Generate AI Concept Preview
@@ -210,19 +174,18 @@ function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGener
           </div>
         </div>
       </div>
-      <DnaSummaryGrid preview={preview} />
+      <CreatorSignalGrid preview={preview} />
     </div>
   );
 }
 
-function DnaSummaryGrid({ preview }: { preview: CollectionGeneratorPreview }) {
-  const rarity = Object.entries(preview.rarityWeights).slice(0, 4).map(([name, value]) => `${name} ${formatWeight(value)}`).join(" / ");
+function CreatorSignalGrid({ preview }: { preview: CollectionGeneratorPreview }) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard title="Identity" body={`${preview.collection} / ${preview.mascot}`} />
-      <SummaryCard title="Mood culture" body={preview.traitLanguage.slice(0, 3).join(", ") || preview.theme} />
-      <SummaryCard title="Rarity plan" body={rarity || "Rarity ladder ready"} />
-      <SummaryCard title="Trait taxonomy" body={`${Object.keys(preview.traitCounts).length || 0} categories mapped`} />
+      <SummaryCard title="Identity" body={publicCollectionName(preview)} />
+      <SummaryCard title="Culture pitch" body={culturePitch(preview)} />
+      <SummaryCard title="Raid readiness" body={cleanDisplayText(preview.raidTheme || "Raid rooms ready")} />
+      <SummaryCard title="Staking readiness" body="Reward hooks and holder progression are ready for creator review." />
     </div>
   );
 }
@@ -244,6 +207,104 @@ function DnaMark({ preview }: { preview: CollectionGeneratorPreview }) {
         <p className="text-3xl font-black text-vault-cyan">{initials}</p>
         <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">DNA</p>
       </div>
+    </div>
+  );
+}
+
+function CreatorReadinessGrid({ preview, wireframeOnly }: { preview: CollectionGeneratorPreview; wireframeOnly: boolean }) {
+  return (
+    <SectionCard title="Creator Snapshot">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <ReviewItem icon={BadgeCheck} label="Collection" value={publicCollectionName(preview)} />
+        <ReviewItem icon={Palette} label="Visual direction" value={cleanDisplayText(preview.artStyle)} />
+        <ReviewItem icon={Swords} label="Raids" value={cleanDisplayText(preview.raidTheme || "Raid rooms ready")} />
+        <ReviewItem icon={ShieldCheck} label="Preview status" value={wireframeOnly ? "Professional concept required" : `${preview.quality.previewQualityScore}% preview score`} />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {identityTags(preview).map((tag) => (
+          <span key={tag} className="rounded-md border border-vault-cyan/20 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">{tag}</span>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function AdvancedCreativeDnaPanel({ preview, samples, compact }: { preview: CollectionGeneratorPreview; samples: CollectionGeneratorPreview["samples"]; compact: boolean }) {
+  const wireframeOnly = isWireframePreview(preview);
+  const taxonomy = Object.entries(preview.traitCounts).slice(0, compact ? 6 : 12);
+  const promptSpecs = [
+    cleanDisplayText(preview.artStyle),
+    cleanDisplayText(preview.backgroundWorld),
+    cleanDisplayText(preview.raidTheme)
+  ].filter(Boolean);
+  return (
+    <details className="rounded-lg border border-vault-line bg-black/25 p-4">
+      <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-black text-slate-200">
+        <span>Advanced Creative DNA</span>
+        <span className="text-xs font-bold uppercase text-slate-500">Collapsed by default</span>
+      </summary>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <AdvancedBlock title="Mood Culture">
+          <div className="flex flex-wrap gap-2">
+            {identityTags(preview).map((tag) => (
+              <span key={tag} className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-slate-200">{tag}</span>
+            ))}
+          </div>
+        </AdvancedBlock>
+        <AdvancedBlock title="Rarity Plan">
+          <div className="space-y-3">
+            {Object.entries(preview.rarityWeights).slice(0, 5).map(([rarity, weight]) => (
+              <div key={rarity}>
+                <div className="mb-1 flex justify-between text-sm">
+                  <span className="font-bold text-slate-200">{rarity}</span>
+                  <span className={rarity === "Legendary" || rarity === "Mythic" ? "text-vault-gold" : "text-vault-green"}>{formatWeight(weight)}</span>
+                </div>
+                <ProgressBar value={Number(weight)} max={10000} color={rarity === "Legendary" || rarity === "Mythic" ? "gold" : rarity === "Epic" ? "purple" : "green"} />
+              </div>
+            ))}
+          </div>
+        </AdvancedBlock>
+        <AdvancedBlock title="Trait Taxonomy">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {taxonomy.map(([name, count]) => (
+              <div key={name} className="rounded-md border border-white/10 bg-black/25 px-3 py-2">
+                <p className="text-xs font-bold text-slate-300">{cleanDisplayText(name)}</p>
+                <p className="mt-1 text-[11px] uppercase text-slate-500">{count} planned variants</p>
+              </div>
+            ))}
+          </div>
+        </AdvancedBlock>
+        <AdvancedBlock title="Prompt Specs">
+          <div className="space-y-2">
+            {promptSpecs.map((spec) => (
+              <p key={spec} className="rounded-md border border-white/10 bg-black/25 px-3 py-2 text-xs leading-5 text-slate-300">{spec}</p>
+            ))}
+          </div>
+        </AdvancedBlock>
+      </div>
+      {wireframeOnly ? (
+        <details className="mt-4 rounded-md border border-vault-line bg-black/30 p-4">
+          <summary className="cursor-pointer text-sm font-black text-slate-300">Wireframe planning specs</summary>
+          {samples.length ? (
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {samples.slice(0, compact ? 3 : 6).map((sample, index) => (
+                <WireframeSpecCard key={sample.id} sample={sample} index={index} />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-md border border-white/10 bg-black/25 px-3 py-2 text-sm text-slate-400">No wireframe specs are available for this preview.</p>
+          )}
+        </details>
+      ) : null}
+    </details>
+  );
+}
+
+function AdvancedBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-md border border-vault-line bg-black/25 p-4">
+      <p className="mb-3 text-xs font-black uppercase text-slate-500">{title}</p>
+      {children}
     </div>
   );
 }
@@ -326,6 +387,66 @@ function PreviewMetric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-xl font-black">{value}</p>
     </div>
   );
+}
+
+function publicCollectionName(preview: CollectionGeneratorPreview) {
+  return cleanDisplayText(preview.collection.replace(/^\$/, "")) || "Collection";
+}
+
+function culturePitch(preview: CollectionGeneratorPreview) {
+  const name = publicCollectionName(preview);
+  const source = `${preview.collection} ${preview.theme} ${preview.mascot} ${preview.artStyle} ${preview.backgroundWorld} ${preview.lore} ${preview.traitLanguage.join(" ")}`.toLowerCase();
+  if (/hanta|hantavirus|virus|viral|biohazard|quarantine|mutation|containment|toxic|lab/.test(source)) {
+    return `${name} is forming a containment faction around quarantine energy, mutated silhouettes, and high-voltage meme lore.`;
+  }
+  if (/aura|glow|pulse|motion|signal|energy/.test(source)) {
+    return `${name} is forming a signal-born faction around motion, glow, and market energy.`;
+  }
+  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) {
+    return `${name} is forming a market-native faction around liquidity pressure, raid momentum, and visible holder status.`;
+  }
+  const anchors = identityTags(preview)
+    .filter((tag) => !/ready|staking|raid/i.test(tag))
+    .slice(0, 3)
+    .map((tag) => tag.toLowerCase());
+  return `${name} is forming a ${cleanDisplayText(preview.theme).toLowerCase()} around ${joinNatural(anchors.length ? anchors : ["identity", "community energy", "ownership status"])}.`;
+}
+
+function identityTags(preview: CollectionGeneratorPreview) {
+  const source = `${preview.collection} ${preview.theme} ${preview.mascot} ${preview.artStyle} ${preview.backgroundWorld} ${preview.lore} ${preview.traitLanguage.join(" ")}`.toLowerCase();
+  const tags: string[] = [];
+  if (/hanta|hantavirus|virus|viral|biohazard|quarantine|mutation|containment|toxic|lab/.test(source)) tags.push("Containment Culture", "Mutation Glow", "Raid Energy");
+  if (/aura|glow|pulse|motion|signal|energy/.test(source)) tags.push("Signal Glow", "Motion Aura", "Market Energy");
+  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) tags.push("Liquidity Pressure", "Chart Energy", "Holder Status");
+  if (/dream|vapor|liminal|surreal/.test(source)) tags.push("Dream Logic", "Surreal World", "Collector Myth");
+  if (/cute|toy|soft|sticker|cozy/.test(source)) tags.push("Soft Culture", "Sticker Energy", "Cozy Holders");
+  tags.push("Raid-ready", "Staking-ready");
+  return [...new Set(tags.map(cleanDisplayText).filter(Boolean))].slice(0, 6);
+}
+
+function cleanDisplayText(value: string | undefined | null) {
+  const raw = String(value ?? "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b(has sparse official metadata|sparse official metadata|internal identity seed|inferred token native subject|token native subject|fallback market signals|fallback provider|source metadata|metadata confidence|inferred identity|join the faction)\b/gi, "")
+    .replace(/\b(metadata|internal|inferred|fallback|provider|confidence|context)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw) return "";
+  const clipped = raw.length > 110 ? `${raw.slice(0, 106).trim()}...` : raw;
+  return clipped.includes(".") ? clipped : titleCase(clipped);
+}
+
+function titleCase(value: string) {
+  return value
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function joinNatural(items: string[]) {
+  if (items.length <= 1) return items[0] ?? "community energy";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
 function safeImage(src: string | undefined | null, fallback: string) {

@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import type { GeneratedStyleProfile, PreviewAssetPlan, TraitPackPlan } from "./generator.types";
 import { OpenAIImageProvider, type ImageGenerationInput } from "./image-providers";
-import { rarityLadder, type Rarity } from "./renderers/render-types";
+import type { Rarity } from "./renderers/render-types";
 
 type ConceptRequest = {
   type: PreviewAssetPlan["type"];
@@ -13,6 +13,17 @@ type ConceptRequest = {
   prompt: string;
 };
 
+export class AiConceptGenerationError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly details: Record<string, unknown> = {}
+  ) {
+    super(message);
+    this.name = "AiConceptGenerationError";
+  }
+}
+
 @Injectable()
 export class AiConceptPipelineService {
   constructor(@Inject(OpenAIImageProvider) private readonly openai: OpenAIImageProvider) {}
@@ -21,12 +32,35 @@ export class AiConceptPipelineService {
     return (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && Boolean(process.env.OPENAI_API_KEY);
   }
 
+  availability() {
+    if ((process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") !== "true") {
+      return {
+        ready: false,
+        code: "OPENAI_DISABLED",
+        message: "OpenAI disabled. AI concept preview generation is not enabled on this server."
+      };
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      return {
+        ready: false,
+        code: "OPENAI_KEY_MISSING",
+        message: "OpenAI key missing. Configure image generation before creating an AI concept preview."
+      };
+    }
+    return { ready: true, code: "OPENAI_READY", message: "OpenAI image generation is ready." };
+  }
+
   async generate(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string): Promise<PreviewAssetPlan[]> {
     if (!this.enabled()) return [];
+    return this.generateRequired(style, pack, seedKey, logoData);
+  }
+
+  async generateRequired(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string): Promise<PreviewAssetPlan[]> {
+    const availability = this.availability();
+    if (!availability.ready) throw new AiConceptGenerationError(availability.code, availability.message, { stage: "ai_concept_configuration" });
     const reference = this.parseReference(logoData);
     const requests = this.requests(style, pack, seedKey);
-    const outputs: PreviewAssetPlan[] = [];
-    for (const request of requests) {
+    const outputs: PreviewAssetPlan[] = await Promise.all(requests.map(async (request): Promise<PreviewAssetPlan> => {
       const output = await this.openai.generate({
         prompt: request.prompt,
         size: request.size,
@@ -35,7 +69,7 @@ export class AiConceptPipelineService {
         referenceImageMimeType: reference?.mimeType
       });
       const uri = output.dataUri ?? `data:${output.mimeType};base64,${output.bytes?.toString("base64") ?? ""}`;
-      outputs.push({
+      return {
         type: request.type,
         label: request.label,
         uri,
@@ -45,7 +79,7 @@ export class AiConceptPipelineService {
         promptHash: this.hash(request.prompt),
         generationMetadata: {
           kind: request.kind,
-          model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-2",
+          model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5",
           quality: "high",
           size: request.size,
           seedKey,
@@ -61,6 +95,12 @@ export class AiConceptPipelineService {
           promptHash: this.hash(request.prompt),
           visualSystem: style.creativeUniverse.creativeDna.visualSystem
         }
+      };
+    }));
+    if (!this.hasRequiredConceptSet(outputs)) {
+      throw new AiConceptGenerationError("OPENAI_REQUEST_FAILED", "OpenAI request failed: the concept preview did not include the required hero, common, epic, and legendary images.", {
+        stage: "ai_concept_validation",
+        outputTypes: outputs.map((asset) => `${asset.type}:${asset.metadata.rarity ?? asset.type}`)
       });
     }
     return outputs;
@@ -76,15 +116,8 @@ export class AiConceptPipelineService {
       prompt: `${base}
 Create collection hero key art. Show the civilization, subject silhouette, atmosphere, and mythology in one polished scene. No text, no logos, no watermark.`
     };
-    const avatar = {
-      type: "AVATAR" as const,
-      label: `${style.collection} AI avatar concept`,
-      kind: "collection-avatar",
-      size: "1024x1024" as const,
-      prompt: `${base}
-Create one clean avatar concept for the collection lead subject. Strong silhouette, readable face, intentional expression, collectible-ready crop. No text, no logos, no watermark.`
-    };
-    const samples = rarityLadder.map((rarity) => {
+    const requiredRarities: Rarity[] = ["Common", "Epic", "Legendary"];
+    const samples = requiredRarities.map((rarity) => {
       const rule = style.brandDna.rarityVisualRules[rarity];
       const frame = style.creativeUniverse.creativeDna.visualSystem.rarityFrames?.[rarity];
       return {
@@ -112,23 +145,7 @@ Common must be clean and simple. Epic must be richer and more expressive. Legend
 This ${rarity} sample must use a visibly different pose, camera, expression, and composition from every other rarity. No text, no logos, no watermark.`
       };
     });
-    const traitSheet = {
-      type: "TRAIT_SHEET" as const,
-      label: `${style.collection} AI trait sheet concept`,
-      kind: "trait-sheet",
-      size: "1536x1024" as const,
-      prompt: `${base}
-Create a professional text-free trait sheet concept showing how curated production layers should be organized: base silhouettes, heads, eyes, mouths, bodies, props, aura effects, frames, and legendary scene overlays. Do not include labels or text.`
-    };
-    const animation = {
-      type: "ANIMATION_KEYFRAME" as const,
-      label: `${style.collection} AI animation keyframe concept`,
-      kind: "animation-keyframe",
-      size: "1536x1024" as const,
-      prompt: `${base}
-Create animation keyframe concept art for idle, reveal, reward, and legendary event moments. Show motion intent through poses and staging, but no text, no logos, no UI labels, no watermark.`
-    };
-    return [hero, avatar, ...samples, traitSheet, animation];
+    return [hero, ...samples];
   }
 
   private baseBrief(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string) {
@@ -167,6 +184,12 @@ Do not output placeholder cards, abstract boxes, UI mockups, SVG-like blocks, wi
 Every image must visibly communicate the Creative DNA world, emotional culture, rarity story, and collection-specific object anchors. Secondary metadata may add texture but must not overpower the dominant creative signals.
 IP safety: do not copy or imitate famous NFT collections, apes, monkeys, skeleton traits, known collection poses, recognizable backgrounds, or trademarked designs.
 Available scalable trait categories for later curated layers: ${Object.keys(pack.categories).join(", ")}.`;
+  }
+
+  private hasRequiredConceptSet(outputs: PreviewAssetPlan[]) {
+    const hasHero = outputs.some((asset) => asset.type === "BANNER" && asset.uri);
+    const rarities = new Set(outputs.filter((asset) => asset.type === "SAMPLE_NFT" && asset.uri).map((asset) => asset.metadata.rarity));
+    return hasHero && rarities.has("Common") && rarities.has("Epic") && rarities.has("Legendary");
   }
 
   private parseReference(logoData?: string) {

@@ -1,9 +1,9 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, GatewayTimeoutException, HttpException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import { requireDbForWrite } from "../db/db-safety";
 import { ArtPreviewGeneratorService } from "./art-preview-generator.service";
-import { AiConceptPipelineService } from "./ai-concept-pipeline.service";
+import { AiConceptGenerationError, AiConceptPipelineService } from "./ai-concept-pipeline.service";
 import { AiOutputQualityValidatorService } from "./ai-output-quality-validator.service";
 import { AssetProductionLayerService } from "./asset-production-layer.service";
 import { AssetStorageService } from "./asset-storage.service";
@@ -84,7 +84,9 @@ export class GeneratorService {
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
-    const aiPreviews = await this.aiConcepts.generate(style, pack, `${normalized.tokenMint}:preview`, normalized.logoData).catch(() => []);
+    const aiPreviews = await this.aiConcepts.generateRequired(style, pack, `${normalized.tokenMint}:preview`, normalized.logoData).catch((error) => {
+      throw this.aiPreviewException(error);
+    });
     if (aiPreviews.length) {
       style.productionAssetStatus = "AI_CONCEPT";
       style.artSource = "AI_ASSISTED";
@@ -641,10 +643,27 @@ export class GeneratorService {
 
   private async persistPreviews(generationRunId: string, styleProfileId: string, version: number, previews: PreviewAssetPlan[]) {
     const storedPreviews = await Promise.all(
-      previews.map(async (preview, index) => ({
-        ...preview,
-        uri: await this.assetStorage.storePreviewAsset(`${generationRunId}/v${version}/${index + 1}-${preview.type.toLowerCase()}${this.previewExtension(preview.uri)}`, preview.uri)
-      }))
+      previews.map(async (preview, index) => {
+        try {
+          return {
+            ...preview,
+            uri: await this.assetStorage.storePreviewAsset(`${generationRunId}/v${version}/${index + 1}-${preview.type.toLowerCase()}${this.previewExtension(preview.uri)}`, preview.uri)
+          };
+        } catch (error) {
+          const aiConcept = preview.productionAssetStatus === "AI_CONCEPT";
+          throw new ServiceUnavailableException({
+            code: aiConcept ? "AI_PREVIEW_STORAGE_FAILED" : "PREVIEW_STORAGE_FAILED",
+            message: aiConcept ? "Storage failed while saving the generated concept preview." : "Storage failed while saving the preview asset.",
+            details: {
+              stage: "preview_asset_storage",
+              assetType: preview.type,
+              provider: preview.provider,
+              errorClass: error instanceof Error ? error.name : typeof error,
+              raw: error instanceof Error ? error.message : String(error)
+            }
+          });
+        }
+      })
     );
 
     await this.prisma.previewAsset.createMany({
@@ -766,6 +785,32 @@ export class GeneratorService {
       style.productionAssetPolicy.defaultAssetStatus = manifest.productionAssetStatus;
       style.artSource = manifest.productionAssetStatus === "ARTIST_APPROVED" || manifest.productionAssetStatus === "FINAL_PRODUCTION" ? "HANDMADE_PACK" : "CURATED_PACK";
     }
+  }
+
+  private aiPreviewException(error: unknown) {
+    if (error instanceof HttpException) return error;
+    if (error instanceof AiConceptGenerationError) {
+      const payload = {
+        code: error.code,
+        message: error.message,
+        details: {
+          stage: "ai_concept_preview",
+          ...error.details
+        }
+      };
+      if (error.code === "OPENAI_PROMPT_REJECTED") return new BadRequestException(payload);
+      if (error.code === "OPENAI_IMAGE_TIMEOUT") return new GatewayTimeoutException(payload);
+      return new ServiceUnavailableException(payload);
+    }
+    return new ServiceUnavailableException({
+      code: "OPENAI_REQUEST_FAILED",
+      message: "OpenAI request failed while creating the AI concept preview.",
+      details: {
+        stage: "ai_concept_preview",
+        errorClass: error instanceof Error ? error.name : typeof error,
+        raw: error instanceof Error ? error.message : String(error)
+      }
+    });
   }
 
   private assertLaunchProviders(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: "BASIC" | "PREMIUM" | "LEGENDARY_READY") {

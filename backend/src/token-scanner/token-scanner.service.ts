@@ -523,6 +523,7 @@ export class TokenScannerService {
     const morphology = this.nameMorphology(input.name, input.symbol);
     const logo = this.logoSemanticAnalysis(input.imageUri);
     const text = `${input.name ?? ""} ${input.symbol ?? ""} ${input.imageUri ?? ""} ${Object.keys(input.socialLinks ?? {}).join(" ")} ${morphology.signals.join(" ")} ${logo.signals.join(" ")}`.toLowerCase();
+    const name = this.publicIdentityName(input.name ?? input.symbol);
     if (/hanta|hantavirus|virus|viral|biohazard|infection|infect|pathogen|lab|quarantine|mutation|toxic/.test(text)) {
       return {
         signalWeights: {
@@ -536,7 +537,7 @@ export class TokenScannerService {
         inferredSignals: ["medical", "contamination", "mutation", "quarantine", "lab", "fever", "meme paranoia"],
         confidence: confidence && confidence.inferredIdentityConfidence >= 70 ? "high" : "medium",
         official: false,
-        description: `${input.name ?? input.symbol ?? "This token"} has sparse official metadata. Internal identity seed inferred from name, symbol, logo URI, socials, and fallback market/profile text: medical contamination, mutation, quarantine, lab, fever, microscopic, and paranoid meme signals.`
+        description: `${name} is forming a containment faction around quarantine energy, mutated silhouettes, and high-voltage meme lore.`
       };
     }
     return {
@@ -550,8 +551,17 @@ export class TokenScannerService {
       inferredSignals: [...morphology.signals, ...logo.signals, "token name morphology", "symbol", "social context"],
       confidence: confidence && confidence.inferredIdentityConfidence >= 55 ? "medium" : "low",
       official: false,
-      description: `${input.name ?? input.symbol ?? "This token"} has sparse official metadata. Internal identity seed inferred from token name morphology, symbol, image/logo URI, social context, and fallback market/profile text; not official token metadata.`
+      description: `${name} is forming a signal-born faction around motion, glow, and market energy.`
     };
+  }
+
+  private publicIdentityName(value?: string) {
+    const clean = (value ?? "This community")
+      .replace(/^\$/, "")
+      .replace(/[^a-zA-Z0-9\s.-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return clean || "This community";
   }
 
   private async persist(scan: TokenScan, asset: HeliusAsset | null, offchain: OffchainMetadata | null, fallback: Record<string, FallbackMetadata | null>) {

@@ -29,6 +29,8 @@ export type ApiErrorDiagnostics = {
   details?: unknown;
 };
 
+type ApiFetchInit = RequestInit & { timeoutMs?: number; maxResponseBytes?: number };
+
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status?: number;
@@ -47,15 +49,16 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const requestId = requestIdFor(init.headers);
+  const { timeoutMs, maxResponseBytes, ...requestInit } = init;
   const headers = new Headers(init.headers);
   headers.set("x-request-id", requestId);
   if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
 
-  const response = await fetchWithTimeout(url, { ...init, headers }, requestId);
-  const parsed = await parseApiResponse<T>(response, url, requestId);
+  const response = await fetchWithTimeout(url, { ...requestInit, headers }, requestId, timeoutMs);
+  const parsed = await parseApiResponse<T>(response, url, requestId, maxResponseBytes);
   if (!response.ok) throw apiErrorFromParsed(response, url, requestId, parsed);
   return parsed.value as T;
 }
@@ -88,9 +91,9 @@ export function isDevMode() {
   return process.env.NODE_ENV !== "production";
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit, requestId: string) {
+async function fetchWithTimeout(url: string, init: RequestInit, requestId: string, timeoutMsOverride?: number) {
   const controller = new AbortController();
-  const timeoutMs = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
+  const timeoutMs = timeoutMsOverride ?? Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: init.signal ?? controller.signal });
@@ -106,10 +109,10 @@ async function fetchWithTimeout(url: string, init: RequestInit, requestId: strin
   }
 }
 
-async function parseApiResponse<T>(response: Response, url: string, requestId: string): Promise<{ value: T | unknown; raw: string; contentType: string }> {
+async function parseApiResponse<T>(response: Response, url: string, requestId: string, maxResponseBytes = MAX_RESPONSE_BYTES): Promise<{ value: T | unknown; raw: string; contentType: string }> {
   const contentType = response.headers.get("content-type") ?? "";
   const contentLength = Number(response.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_RESPONSE_BYTES) {
+  if (contentLength > maxResponseBytes) {
     throw new ApiError({
       kind: "too_large",
       status: response.status,
@@ -185,10 +188,11 @@ function extractErrorRecord(body: unknown) {
   const record = body as Record<string, unknown>;
   const nested = record.error && typeof record.error === "object" ? (record.error as Record<string, unknown>) : record;
   const messageValue = nested.message ?? record.message;
+  const messageObject = messageValue && typeof messageValue === "object" && !Array.isArray(messageValue) ? (messageValue as Record<string, unknown>) : undefined;
   return {
-    code: typeof nested.code === "string" ? nested.code : typeof record.code === "string" ? record.code : undefined,
-    message: Array.isArray(messageValue) ? messageValue.join("; ") : typeof messageValue === "string" ? messageValue : undefined,
-    details: nested.details ?? record.details ?? nested.issues ?? record.issues
+    code: typeof nested.code === "string" ? nested.code : typeof record.code === "string" ? record.code : typeof messageObject?.code === "string" ? messageObject.code : undefined,
+    message: Array.isArray(messageValue) ? messageValue.join("; ") : typeof messageValue === "string" ? messageValue : typeof messageObject?.message === "string" ? messageObject.message : undefined,
+    details: nested.details ?? record.details ?? nested.issues ?? record.issues ?? messageObject?.details
   };
 }
 

@@ -187,9 +187,9 @@ export class StyleProfileGeneratorService {
 
   private lore(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput, context: CommunityContextOutput, theme: string, world: string) {
     if (context.lore) return context.lore;
-    const slogan = context.slogans[0] ? ` Their chant is "${context.slogans[0]}."` : "";
     const symbol = input.tokenSymbol ?? input.hints?.sourceMetadata?.symbol ?? "$TOKEN";
-    return `${symbol} holders formed the ${theme} inside ${world}. The ${analysis.mascot} identity is built from ${analysis.visualKeywords.slice(0, 4).join(", ")} and rewards members who lock, raid, and grow the faction.${slogan}`;
+    const anchor = this.publicAnchorWords(analysis.visualKeywords).slice(0, 3).join(", ") || "motion, glow, and market energy";
+    return `${this.publicIdentityName(symbol)} is forming a ${theme} around ${anchor}. The collection is built for holders who want visible identity, raid energy, and staking progression.`;
   }
 
   private tenKReadiness(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput) {
@@ -309,12 +309,13 @@ export class StyleProfileGeneratorService {
   }
 
   private roleLanguage(motif: string, mascot: string, words: string[], seed: number) {
+    const subject = this.publicIdentityName(mascot).split(/\s+/).slice(0, 2).join(" ") || motif;
     return [
-      `${motif} Holder`,
-      `${titleCase(mascot)} Signal`,
+      `${motif} Founder`,
+      `${subject} Signal`,
       `${titleCase(pick(words.length ? words : [motif], seed + 31))} Scout`,
-      `${motif} Liquidity Guard`,
-      `${titleCase(mascot)} Myth`
+      `${motif} Raid Captain`,
+      `${motif} Mythkeeper`
     ];
   }
 
@@ -347,7 +348,7 @@ export class StyleProfileGeneratorService {
       creativeDna,
       inferredCommunityLanguage: unique([...context.memes, ...context.slogans, ...context.phrases, ...words, ...signalProfile.culturalWords]).slice(0, 32),
       artStyle: creativeDna.artStyle,
-      artStyleReason: `${creativeDna.artStyle} was generated from weighted metadata, logo, social, mood, and fallback-market signals: ${this.topWeightKeys(signalProfile.semanticWeights).join(", ")}.`,
+      artStyleReason: `${creativeDna.artStyle} was shaped from collection identity, visual references, social cues, and creator mood: ${this.topWeightKeys(signalProfile.semanticWeights).join(", ")}.`,
       taxonomy,
       baseSilhouettes,
       moodCulture,
@@ -415,7 +416,7 @@ export class StyleProfileGeneratorService {
     const worldCore = pick(unique([...signals.worldReferences, ...hints.flatMap((hint) => hint.worlds), seedWorld]), seed + 31);
     const worldConcept = `${motif} ${worldCore} ${pick(["micro-world", "signal district", "holder habitat", "myth room", "ritual market", "dream map"], seed + 37)}`.toLowerCase();
     const subjectWord = pick(unique([...signals.entities, analysis.mascot, motif]).filter(Boolean), seed + 41);
-    const mascotOrSubject = `${motif} ${pick([...primary.silhouettes, ...secondary.silhouettes, analysis.mascot], seed + 43)} ${titleCase(subjectWord)}`.toLowerCase();
+    const mascotOrSubject = this.publicSubjectName(motif, signals, analysis, subjectWord, seed);
     const baseSilhouetteRules = unique([
       `${visualSystem.bodySystem}; ${visualSystem.proportionSystem}; ${analysis.shapeLanguage} ${pick(primary.silhouettes, seed + 47)}`,
       `${visualSystem.headShape}; ${visualSystem.eyeSystem}; ${pick(primary.silhouettes, seed + 53)} with ${pick(primaryObjects, seed + 59)} readability`,
@@ -452,6 +453,33 @@ export class StyleProfileGeneratorService {
         `Do not reuse the ${motif} Creative DNA for unrelated communities.`
       ]
     };
+  }
+
+  private publicSubjectName(motif: string, signals: CreativeSignalProfile, analysis: LogoAnalysisOutput, subjectWord: string, seed: number) {
+    const source = `${motif} ${subjectWord} ${analysis.mascot} ${signals.objects.join(" ")} ${signals.worldReferences.join(" ")}`.toLowerCase();
+    if (/hanta|hantavirus|virus|viral|biohazard|infection|pathogen|quarantine|mutation|toxic|lab/.test(source)) return `${motif} containment avatar`.toLowerCase();
+    if (/aura|glow|signal|pulse|motion|energy/.test(source)) return `${motif} aura bearer`.toLowerCase();
+    if (/chart|candle|market|liquidity|degen|pump/.test(source)) return `${motif} market sentinel`.toLowerCase();
+    if (/dream|vapor|liminal|surreal/.test(source)) return `${motif} dream signal`.toLowerCase();
+    return `${motif} ${pick(["signal bearer", "raid avatar", "origin sentinel", "myth keeper"], seed + 47)}`.toLowerCase();
+  }
+
+  private publicAnchorWords(words: string[]) {
+    const forbidden = /^(has|sparse|official|metadata|internal|identity|seed|inferred|token|native|subject|context|fallback|provider|confidence)$/i;
+    return unique(words.flatMap((word) => word.split(/\s+/)))
+      .map((word) => word.replace(/[^a-zA-Z0-9-]/g, "").toLowerCase())
+      .filter((word) => word.length > 2 && !forbidden.test(word))
+      .slice(0, 8);
+  }
+
+  private publicIdentityName(value: string) {
+    const clean = value
+      .replace(/^\$/, "")
+      .replace(/[^a-zA-Z0-9\s.-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!clean) return "This community";
+    return clean.length <= 6 && clean === clean.toUpperCase() ? clean : titleCase(clean);
   }
 
   private generateVisualSystem(signals: CreativeSignalProfile, motif: string, seed: number): VisualDesignSystem {
@@ -869,7 +897,7 @@ export class StyleProfileGeneratorService {
         id: this.categoryId(label),
         label,
         role,
-        description: `${label} generated from Creative DNA signals: ${this.topWeightKeys(signals.semanticWeights).join(", ")}.`,
+        description: `${label} production layer group shaped around ${this.topWeightKeys(signals.semanticWeights).join(", ") || motif}.`,
         targetCount: this.targetCount(role),
         nouns,
         forbiddenConcepts: this.forbiddenForSignals(signals)
@@ -1274,7 +1302,7 @@ export class StyleProfileGeneratorService {
   }
 
   private significantWords(value: string) {
-    const stop = new Set(["with", "from", "that", "this", "into", "token", "coin", "official", "website", "twitter", "discord", "telegram", "https", "metadata", "example", "image", "symbol", "name", "for", "and", "the", "com", "json", "png", "false", "true", "description", "identity", "seed", "inferredidentityseed", "signalweights", "inferredsignals"]);
+    const stop = new Set(["with", "from", "that", "this", "into", "token", "coin", "official", "website", "twitter", "discord", "telegram", "https", "metadata", "example", "image", "symbol", "name", "for", "and", "the", "com", "json", "png", "false", "true", "description", "identity", "seed", "sparse", "internal", "inferred", "fallback", "provider", "confidence", "context", "inferredidentityseed", "signalweights", "inferredsignals"]);
     return unique(value.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2 && !stop.has(word))).slice(0, 80);
   }
 

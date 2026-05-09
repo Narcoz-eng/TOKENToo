@@ -1,4 +1,4 @@
-import { Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, GatewayTimeoutException, Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
 
 export type ImageGenerationInput = {
   prompt: string;
@@ -24,8 +24,8 @@ export interface ImageProvider {
 export class OpenAIImageProvider implements ImageProvider {
   async generate(input: ImageGenerationInput): Promise<ImageGenerationOutput> {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new ServiceUnavailableException("OpenAI Images is not configured.");
-    const model = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-2";
+    if (!apiKey) throw openAiProviderException("OPENAI_KEY_MISSING", "OpenAI key missing. Configure image generation before creating an AI concept preview.");
+    const model = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5";
     const attempts = Math.max(1, Number(process.env.OPENAI_IMAGE_RETRY_ATTEMPTS ?? 2));
     let lastError: unknown;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -38,20 +38,27 @@ export class OpenAIImageProvider implements ImageProvider {
       }
     }
     if (lastError instanceof ServiceUnavailableException) throw lastError;
-    throw new ServiceUnavailableException("OpenAI image generation is temporarily unavailable.");
+    if (lastError instanceof BadRequestException) throw lastError;
+    if (lastError instanceof GatewayTimeoutException) throw lastError;
+    throw openAiProviderException("OPENAI_REQUEST_FAILED", "OpenAI request failed while creating the AI concept preview.", lastError);
   }
 
   private async requestImage(input: ImageGenerationInput & { apiKey: string; model: string }): Promise<ImageGenerationOutput> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), Number(process.env.OPENAI_IMAGE_TIMEOUT_MS ?? 90_000));
+    const timeout = setTimeout(() => controller.abort(), Number(process.env.OPENAI_IMAGE_TIMEOUT_MS ?? 120_000));
     try {
       const response = input.referenceImageBase64 ? await this.editRequest(input, controller.signal) : await this.generationRequest(input, controller.signal);
-      if (!response.ok) throw new ServiceUnavailableException(`OpenAI image generation failed with status ${response.status}.`);
+      if (!response.ok) throw await openAiResponseException(response);
       const result = (await response.json()) as { data?: Array<{ b64_json?: string; url?: string }> };
       const item = result.data?.[0];
       if (item?.b64_json) return { provider: "openai", mimeType: "image/png", bytes: Buffer.from(item.b64_json, "base64"), productionReady: false };
       if (item?.url) return { provider: "openai", mimeType: "image/png", dataUri: item.url, productionReady: false };
-      throw new ServiceUnavailableException("OpenAI image generation did not return an image.");
+      throw openAiProviderException("OPENAI_REQUEST_FAILED", "OpenAI request failed: no image was returned.");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw openAiProviderException("OPENAI_IMAGE_TIMEOUT", "OpenAI image generation timed out before a preview image was returned.", error);
+      }
+      throw error;
     } finally {
       clearTimeout(timeout);
     }
@@ -147,4 +154,54 @@ export class HybridAssetProvider implements ImageProvider {
 
 function escapeXml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char] ?? char);
+}
+
+async function openAiResponseException(response: Response) {
+  const body = await response.text().catch(() => "");
+  const parsed = safeJson(body);
+  const message = openAiErrorText(parsed) || body.slice(0, 240);
+  const moderationIssue = /moderation|content policy|safety|policy|blocked|rejected/i.test(`${response.status} ${message}`);
+  const code = moderationIssue ? "OPENAI_PROMPT_REJECTED" : "OPENAI_REQUEST_FAILED";
+  const publicMessage = moderationIssue
+    ? "OpenAI rejected the image prompt or moderation policy."
+    : `OpenAI request failed while creating the AI concept preview (${response.status}).`;
+  return openAiProviderException(code, publicMessage, { status: response.status, message });
+}
+
+function openAiProviderException(code: string, message: string, cause?: unknown) {
+  const payload = {
+    code,
+    message,
+    details: {
+      provider: "openai",
+      stage: "ai_concept_image_generation",
+      errorClass: cause instanceof Error ? cause.name : cause ? typeof cause : undefined,
+      raw: sanitizeProviderDetail(cause)
+    }
+  };
+  if (code === "OPENAI_PROMPT_REJECTED") return new BadRequestException(payload);
+  if (code === "OPENAI_IMAGE_TIMEOUT") return new GatewayTimeoutException(payload);
+  return new ServiceUnavailableException(payload);
+}
+
+function safeJson(value: string) {
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+function openAiErrorText(value?: Record<string, unknown>) {
+  const error = value?.error;
+  if (!error || typeof error !== "object") return undefined;
+  const message = (error as Record<string, unknown>).message;
+  return typeof message === "string" ? message : undefined;
+}
+
+function sanitizeProviderDetail(value: unknown) {
+  if (!value) return undefined;
+  if (value instanceof Error) return value.message.replace(/sk-[A-Za-z0-9_-]+/g, "sk-...");
+  if (typeof value === "object") return JSON.stringify(value).replace(/sk-[A-Za-z0-9_-]+/g, "sk-...").slice(0, 500);
+  return String(value).replace(/sk-[A-Za-z0-9_-]+/g, "sk-...").slice(0, 500);
 }
