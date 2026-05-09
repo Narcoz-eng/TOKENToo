@@ -21,6 +21,9 @@ export type ApiErrorDiagnostics = {
   contentType?: string;
   bodyPreview?: string;
   code?: string;
+  endpointPath?: string;
+  proxyStage?: string;
+  targetHost?: string;
   details?: unknown;
 };
 
@@ -164,6 +167,9 @@ function apiErrorFromParsed(response: Response, url: string, requestId: string, 
       status: response.status,
       contentType: parsed.contentType,
       code,
+      endpointPath: endpointPathFrom(body, url),
+      proxyStage: proxyStageFrom(body),
+      targetHost: targetHostFrom(body, response.headers.get("x-upstream-target")),
       details: errorRecord.details,
       bodyPreview: isDevMode() ? previewBody(parsed.raw) : undefined
     }
@@ -189,8 +195,42 @@ function looksLikeHtml(contentType: string, raw: string) {
 }
 
 function sanitizeMessage(message: string) {
+  if (/failed before the backend could handle the request/i.test(message)) return "The API proxy returned a structured setup error.";
   if (looksLikeHtml("text/plain", message)) return "The backend returned an HTML error page instead of API data.";
   return message.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim().slice(0, 500) || "The request failed.";
+}
+
+function traceRecord(body: unknown) {
+  if (!body || typeof body !== "object") return {};
+  const trace = (body as Record<string, unknown>).trace;
+  return trace && typeof trace === "object" ? (trace as Record<string, unknown>) : {};
+}
+
+function endpointPathFrom(body: unknown, url: string) {
+  const forwardedPath = traceRecord(body).forwardedPath;
+  if (typeof forwardedPath === "string" && forwardedPath) return forwardedPath;
+  try {
+    const parsed = new URL(url, typeof window === "undefined" ? "http://localhost" : window.location.origin);
+    return parsed.pathname.replace(/^\/api(?=\/|$)/, "") || "/";
+  } catch {
+    return url;
+  }
+}
+
+function proxyStageFrom(body: unknown) {
+  const stage = traceRecord(body).stage;
+  return typeof stage === "string" ? stage : undefined;
+}
+
+function targetHostFrom(body: unknown, upstreamTarget?: string | null) {
+  const target = traceRecord(body).target;
+  const value = typeof target === "string" && target ? target : upstreamTarget ?? undefined;
+  if (!value) return undefined;
+  try {
+    return new URL(value).host;
+  } catch {
+    return undefined;
+  }
 }
 
 function previewBody(raw: string) {

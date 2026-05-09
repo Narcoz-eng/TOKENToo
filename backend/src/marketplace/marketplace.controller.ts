@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Inject, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { WalletAddress } from "../auth/wallet-address.decorator";
 import { WalletAuthGuard } from "../auth/wallet-auth.guard";
@@ -23,7 +23,7 @@ const purchaseSchema = z.object({
 
 @Controller("marketplace")
 export class MarketplaceController {
-  constructor(private readonly marketplace: MarketplaceEngineService) {}
+  constructor(@Inject(MarketplaceEngineService) private readonly marketplace: MarketplaceEngineService) {}
 
   @Post("value-comparison")
   valueComparison(@Body() body: { priceSol: number; backingValueSol: number }) {

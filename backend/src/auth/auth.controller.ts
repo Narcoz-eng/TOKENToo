@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, Inject, Post } from "@nestjs/common";
 import { z } from "zod";
 import { WalletAuthService } from "./wallet-auth.service";
 
@@ -12,7 +12,7 @@ const loginSchema = z.object({
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly auth: WalletAuthService) {}
+  constructor(@Inject(WalletAuthService) private readonly auth: WalletAuthService) {}
 
   @Post("challenge")
   challenge(@Body() body: unknown) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { WalletAddress } from "../auth/wallet-address.decorator";
 import { WalletAuthGuard } from "../auth/wallet-auth.guard";
@@ -32,8 +32,8 @@ const redeemCreateSchema = z.object({
 @UseGuards(WalletAuthGuard)
 export class VaultMintController {
   constructor(
-    private readonly orchestrator: VaultMintOrchestratorService,
-    private readonly redeem: VaultRedeemOrchestratorService
+    @Inject(VaultMintOrchestratorService) private readonly orchestrator: VaultMintOrchestratorService,
+    @Inject(VaultRedeemOrchestratorService) private readonly redeem: VaultRedeemOrchestratorService
   ) {}
 
   @Post("mint/intents")

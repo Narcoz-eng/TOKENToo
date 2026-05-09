@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { PrismaService } from "../db/prisma.service";
@@ -7,8 +7,8 @@ import { SolanaTransactionAdapterService } from "./solana-transaction-adapter.se
 @Injectable()
 export class VaultRedeemOrchestratorService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly solana: SolanaTransactionAdapterService
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
   ) {}
 
   async createRedeem(input: { idempotencyKey: string; vaultNftId: string; walletAddress: string }) {

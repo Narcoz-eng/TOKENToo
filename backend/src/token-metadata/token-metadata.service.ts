@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { requireDbForWrite } from "../db/db-safety";
 import { PrismaService } from "../db/prisma.service";
@@ -19,8 +19,8 @@ export type TokenMetadataInput = {
 @Injectable()
 export class TokenMetadataService {
   constructor(
-    private readonly storage: AssetStorageService,
-    private readonly prisma: PrismaService
+    @Inject(AssetStorageService) private readonly storage: AssetStorageService,
+    @Inject(PrismaService) private readonly prisma: PrismaService
   ) {}
 
   async uploadTokenLogo(input: { mint: string; logoDataUri?: string; logoUrl?: string }) {

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import type { AssetProductionManifest, FinalVaultAsset, FinalVaultAssetInput } from "./asset-production.types";
 import { ProductionLayerPackService } from "./production-layer-pack.service";
@@ -6,7 +6,7 @@ import { pick, seedFrom } from "./generator.util";
 
 @Injectable()
 export class DeterministicRenderService {
-  constructor(private readonly productionLayers: ProductionLayerPackService) {}
+  constructor(@Inject(ProductionLayerPackService) private readonly productionLayers: ProductionLayerPackService) {}
 
   renderFinalVaultAsset(input: FinalVaultAssetInput, manifest: AssetProductionManifest): FinalVaultAsset {
     if (!this.productionLayers.meetsRequiredStatus(manifest.productionAssetStatus, "CURATED_LAYER_READY")) {

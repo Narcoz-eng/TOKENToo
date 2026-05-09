@@ -1,11 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException, NotImplementedException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException, NotImplementedException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import type { RaidScoreInput } from "../types";
 
 @Injectable()
 export class RaidEngineService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   createRaidRoom(collectionId: string, name: string) {
     return {

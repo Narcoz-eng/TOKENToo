@@ -1,4 +1,4 @@
-import { HttpException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { HttpException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { isDatabaseSetupError } from "../db/database-errors";
 import { publicEndpointFallback } from "../db/db-safety";
 import { PrismaService } from "../db/prisma.service";
@@ -17,7 +17,7 @@ class ProductReadTimeoutError extends Error {}
 export class ProductDataService {
   private readonly logger = new Logger(ProductDataService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async publicHome() {
     return this.publicRead(() => this.home(), this.emptyHome());

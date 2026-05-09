@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, NotImplementedException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException, NotImplementedException } from "@nestjs/common";
 import { FeeEngineService } from "../fee-engine/fee-engine.service";
 import { PrismaService } from "../db/prisma.service";
 import { RiskService } from "../risk/risk.service";
@@ -7,9 +7,9 @@ import type { TokenScan } from "../types";
 @Injectable()
 export class MarketplaceEngineService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly fees: FeeEngineService,
-    private readonly risk: RiskService
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(FeeEngineService) private readonly fees: FeeEngineService,
+    @Inject(RiskService) private readonly risk: RiskService
   ) {}
 
   async createListing(input: { vaultNftId: string; sellerUserId: string; priceSol: number; idempotencyKey?: string; walletAddress?: string }) {

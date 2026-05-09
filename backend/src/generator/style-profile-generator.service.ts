@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import type {
   AnimationReadinessPlan,
   BaseSilhouettePlan,
@@ -37,7 +37,7 @@ type SemanticHint = {
 @Injectable()
 export class StyleProfileGeneratorService {
   constructor(
-    private readonly rarity: RarityEngineService,
+    @Inject(RarityEngineService) private readonly rarity: RarityEngineService,
     private readonly creativeDnaService: CreativeDnaService = new CreativeDnaService()
   ) {}
 

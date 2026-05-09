@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { AssetProductionLayerService } from "../generator/asset-production-layer.service";
@@ -11,10 +11,10 @@ import type { CreateMintIntentInput, SubmitMintTransactionInput } from "./vault-
 @Injectable()
 export class VaultMintOrchestratorService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly assetProduction: AssetProductionLayerService,
-    private readonly storage: AssetStorageService,
-    private readonly solana: SolanaTransactionAdapterService
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(AssetProductionLayerService) private readonly assetProduction: AssetProductionLayerService,
+    @Inject(AssetStorageService) private readonly storage: AssetStorageService,
+    @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
   ) {}
 
   async createOrResumeMint(input: CreateMintIntentInput) {

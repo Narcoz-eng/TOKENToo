@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { WalletAuthGuard } from "../auth/wallet-auth.guard";
 import { TokenMetadataService } from "./token-metadata.service";
@@ -16,7 +16,7 @@ const metadataSchema = z.object({
 
 @Controller("token-metadata")
 export class TokenMetadataController {
-  constructor(private readonly metadata: TokenMetadataService) {}
+  constructor(@Inject(TokenMetadataService) private readonly metadata: TokenMetadataService) {}
 
   @Get("status")
   status() {

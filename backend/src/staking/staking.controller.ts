@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Inject, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { WalletAddress } from "../auth/wallet-address.decorator";
 import { WalletAuthGuard } from "../auth/wallet-auth.guard";
@@ -17,7 +17,7 @@ const positionSchema = z.object({
 @Controller("staking")
 @UseGuards(WalletAuthGuard)
 export class StakingController {
-  constructor(private readonly staking: StakingService) {}
+  constructor(@Inject(StakingService) private readonly staking: StakingService) {}
 
   @Post("stake/intents")
   createStakeIntent(@Body() body: unknown, @WalletAddress() walletAddress: string) {

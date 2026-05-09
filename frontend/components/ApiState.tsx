@@ -37,10 +37,18 @@ export function ErrorState({ error, retry }: { error: string | ApiError; retry?:
             <p className="mt-2 break-words text-sm text-slate-300">{message}</p>
             {apiError?.requestId ? <p className="mt-2 text-xs text-slate-500">Request ID: {apiError.requestId}</p> : null}
             {apiError && isDevMode() ? (
-              <details className="mt-3 rounded-md border border-vault-line bg-black/25 p-3 text-xs text-slate-300">
-                <summary className="cursor-pointer font-bold text-slate-200">Developer diagnostics</summary>
-                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(apiError.diagnostics, null, 2)}</pre>
-              </details>
+              <div className="mt-3 rounded-md border border-vault-line bg-black/25 p-3 text-xs text-slate-300">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <DiagnosticLine label="Endpoint" value={apiError.diagnostics.endpointPath ?? apiError.diagnostics.url} />
+                  <DiagnosticLine label="Proxy stage" value={apiError.diagnostics.proxyStage ?? "n/a"} />
+                  <DiagnosticLine label="Error code" value={apiError.code} />
+                  <DiagnosticLine label="Target host" value={apiError.diagnostics.targetHost ?? "n/a"} />
+                </div>
+                <details className="mt-3">
+                  <summary className="cursor-pointer font-bold text-slate-200">Developer diagnostics</summary>
+                  <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(apiError.diagnostics, null, 2)}</pre>
+                </details>
+              </div>
             ) : null}
           </div>
         </div>
@@ -51,6 +59,15 @@ export function ErrorState({ error, retry }: { error: string | ApiError; retry?:
         ) : null}
       </div>
     </SectionCard>
+  );
+}
+
+function DiagnosticLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-white/5 bg-black/20 px-3 py-2">
+      <p className="text-[10px] font-bold uppercase text-slate-500">{label}</p>
+      <p className="mt-1 break-words font-mono text-[11px] text-slate-200">{value}</p>
+    </div>
   );
 }
 

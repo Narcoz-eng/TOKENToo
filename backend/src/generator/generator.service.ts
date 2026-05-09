@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import { requireDbForWrite } from "../db/db-safety";
@@ -40,21 +40,21 @@ type NormalizedGenerationRunInput = CreateGenerationRunInput & {
 @Injectable()
 export class GeneratorService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly logoAnalysis: LogoAnalysisService,
-    private readonly communityContext: CommunityContextService,
-    private readonly styleProfiles: StyleProfileGeneratorService,
-    private readonly traitPacks: TraitPackGeneratorService,
-    private readonly compatibility: CompatibilityEngineService,
-    private readonly previews: ArtPreviewGeneratorService,
-    private readonly aiConcepts: AiConceptPipelineService,
-    private readonly aiQuality: AiOutputQualityValidatorService,
-    private readonly assetProduction: AssetProductionLayerService,
-    private readonly assetStorage: AssetStorageService,
-    private readonly distinctiveness: CollectionDistinctivenessScorerService,
-    private readonly quality: QualityValidatorService,
-    private readonly metadata: MetadataGeneratorService,
-    private readonly solana: SolanaTransactionAdapterService
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(LogoAnalysisService) private readonly logoAnalysis: LogoAnalysisService,
+    @Inject(CommunityContextService) private readonly communityContext: CommunityContextService,
+    @Inject(StyleProfileGeneratorService) private readonly styleProfiles: StyleProfileGeneratorService,
+    @Inject(TraitPackGeneratorService) private readonly traitPacks: TraitPackGeneratorService,
+    @Inject(CompatibilityEngineService) private readonly compatibility: CompatibilityEngineService,
+    @Inject(ArtPreviewGeneratorService) private readonly previews: ArtPreviewGeneratorService,
+    @Inject(AiConceptPipelineService) private readonly aiConcepts: AiConceptPipelineService,
+    @Inject(AiOutputQualityValidatorService) private readonly aiQuality: AiOutputQualityValidatorService,
+    @Inject(AssetProductionLayerService) private readonly assetProduction: AssetProductionLayerService,
+    @Inject(AssetStorageService) private readonly assetStorage: AssetStorageService,
+    @Inject(CollectionDistinctivenessScorerService) private readonly distinctiveness: CollectionDistinctivenessScorerService,
+    @Inject(QualityValidatorService) private readonly quality: QualityValidatorService,
+    @Inject(MetadataGeneratorService) private readonly metadata: MetadataGeneratorService,
+    @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
   ) {}
 
   presets() {

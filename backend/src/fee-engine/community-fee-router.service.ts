@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { FeeAllocationPlan, FeeAllocationPreset, FeeType, Prisma, TreasuryBucketType } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
 
@@ -60,7 +60,7 @@ type RoutePlan = {
 
 @Injectable()
 export class CommunityFeeRouterService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   planForPreset(preset: FeeAllocationPreset): RoutePlan {
     return { preset, ...presetPlans[preset] };

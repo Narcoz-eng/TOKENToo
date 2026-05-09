@@ -61,6 +61,29 @@ const tests: TestCase[] = [
     }
   },
   {
+    name: "proxy diagnostics expose safe route details",
+    run: async () => {
+      mockFetch(() =>
+        Promise.resolve(
+          jsonResponse(500, {
+            ok: false,
+            error: { code: "API_ROUTE_FAILED", message: "The API route failed before the backend could handle the request." },
+            trace: {
+              stage: "resolve_backend_url",
+              forwardedPath: "/product/home",
+              target: "http://127.0.0.1:4000/product/home?secret=hidden"
+            }
+          })
+        )
+      );
+      const error = await expectApiError(() => apiFetch("/product/home"), "backend_unavailable");
+      assert(error.message !== "The API route failed before the backend could handle the request.", "Proxy implementation message leaked into UI");
+      assert(error.diagnostics.endpointPath === "/product/home", "Endpoint path missing from diagnostics");
+      assert(error.diagnostics.proxyStage === "resolve_backend_url", "Proxy stage missing from diagnostics");
+      assert(error.diagnostics.targetHost === "127.0.0.1:4000", "Target host was not sanitized");
+    }
+  },
+  {
     name: "successful json parses",
     run: async () => {
       mockFetch(() => Promise.resolve(jsonResponse(200, { ok: true, data: { user: null, nfts: [] } })));

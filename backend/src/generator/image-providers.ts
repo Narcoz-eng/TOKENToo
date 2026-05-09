@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
 
 export type ImageGenerationInput = {
   prompt: string;
@@ -135,8 +135,8 @@ export class CuratedAssetProvider implements ImageProvider {
 @Injectable()
 export class HybridAssetProvider implements ImageProvider {
   constructor(
-    private readonly openai: OpenAIImageProvider,
-    private readonly curated: CuratedAssetProvider
+    @Inject(OpenAIImageProvider) private readonly openai: OpenAIImageProvider,
+    @Inject(CuratedAssetProvider) private readonly curated: CuratedAssetProvider
   ) {}
 
   async generate(input: ImageGenerationInput): Promise<ImageGenerationOutput> {

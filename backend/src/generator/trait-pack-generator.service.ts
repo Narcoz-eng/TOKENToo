@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import type { CompatibilityRulePlan, GeneratedStyleProfile, TraitDefinitionPlan, TraitPackPlan, TraitCategoryPlan, TraitCategoryRole } from "./generator.types";
 import { pick, seedFrom, titleCase, unique } from "./generator.util";
 import { RarityEngineService } from "./rarity-engine.service";
 
 @Injectable()
 export class TraitPackGeneratorService {
-  constructor(private readonly rarity: RarityEngineService) {}
+  constructor(@Inject(RarityEngineService) private readonly rarity: RarityEngineService) {}
 
   generate(style: GeneratedStyleProfile): TraitPackPlan {
     const seed = seedFrom(`${style.collection}:${style.theme}:${style.backgroundWorld}`);

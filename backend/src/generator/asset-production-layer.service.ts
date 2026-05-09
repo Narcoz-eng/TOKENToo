@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import type { AssetProductionManifest, FinalVaultAsset, FinalVaultAssetInput, ProducedLayerSet } from "./asset-production.types";
 import type { GeneratedStyleProfile, TraitPackPlan } from "./generator.types";
 import { DeterministicRenderService } from "./deterministic-render.service";
@@ -7,8 +7,8 @@ import { ProductionLayerPackService } from "./production-layer-pack.service";
 @Injectable()
 export class AssetProductionLayerService {
   constructor(
-    private readonly productionLayers: ProductionLayerPackService,
-    private readonly deterministicRender: DeterministicRenderService
+    @Inject(ProductionLayerPackService) private readonly productionLayers: ProductionLayerPackService,
+    @Inject(DeterministicRenderService) private readonly deterministicRender: DeterministicRenderService
   ) {}
 
   manifest(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: AssetProductionManifest["qualityTier"]): AssetProductionManifest {

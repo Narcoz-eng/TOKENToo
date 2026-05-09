@@ -221,7 +221,7 @@ function classifyProxyError(error: unknown) {
   if (message.includes("upstream_timeout") || error instanceof DOMException && error.name === "AbortError") return new ProxyFailure("UPSTREAM_TIMEOUT", "The backend request timed out before a controller handled it.", 504, message);
   if (code === "ECONNREFUSED") return new ProxyFailure("BACKEND_CONNECTION_REFUSED", "The backend process is not accepting connections.", 502, message);
   if (code === "ENOTFOUND" || code === "EAI_AGAIN") return new ProxyFailure("BACKEND_DNS_FAILURE", "The backend hostname could not be resolved.", 502, message);
-  return new ProxyFailure("API_ROUTE_FAILED", "The API route failed before the backend could handle the request.", 500, message);
+  return new ProxyFailure("API_ROUTE_FAILED", "The API route failed while preparing the backend request.", 500, message);
 }
 
 function writeProxyError(response: ApiResponse, error: ProxyFailure, trace: ProxyTrace, startedAt: number) {
@@ -277,33 +277,39 @@ function requestIdFrom(request: ApiRequest) {
 function logProxyFailure(scope: string, error: unknown, trace: ProxyTrace, startedAt: number) {
   const elapsedMs = Date.now() - startedAt;
   const detail = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack?.split("\n").slice(0, 4).join("\n") } : { message: String(error) };
-  console.error("[api-proxy] failure", {
-    scope,
-    requestId: trace.requestId,
-    stage: trace.stage,
-    incomingUrl: trace.incomingUrl,
-    forwardedPath: trace.forwardedPath,
-    target: trace.target,
-    status: trace.status,
-    elapsedMs,
-    error: detail
-  });
+  console.error(
+    "[api-proxy] failure",
+    JSON.stringify({
+      scope,
+      requestId: trace.requestId,
+      stage: trace.stage,
+      incomingUrl: trace.incomingUrl,
+      forwardedPath: trace.forwardedPath,
+      target: trace.target,
+      status: trace.status,
+      elapsedMs,
+      error: detail
+    })
+  );
 }
 
 function logStructuredProxyError(error: ProxyFailure, trace: ProxyTrace, elapsedMs: number) {
-  console.error("[api-proxy] response", {
-    requestId: trace.requestId,
-    code: error.code,
-    status: error.status,
-    stage: trace.stage,
-    mode: trace.mode,
-    incomingUrl: trace.incomingUrl,
-    forwardedPath: trace.forwardedPath,
-    target: trace.target,
-    upstreamStatus: trace.status,
-    elapsedMs,
-    detail: process.env.NODE_ENV === "production" ? undefined : error.detail
-  });
+  console.error(
+    "[api-proxy] response",
+    JSON.stringify({
+      requestId: trace.requestId,
+      code: error.code,
+      status: error.status,
+      stage: trace.stage,
+      mode: trace.mode,
+      incomingUrl: trace.incomingUrl,
+      forwardedPath: trace.forwardedPath,
+      target: trace.target,
+      upstreamStatus: trace.status,
+      elapsedMs,
+      detail: process.env.NODE_ENV === "production" ? undefined : error.detail
+    })
+  );
 }
 
 function looksLikeHtml(contentType: string, raw: string) {

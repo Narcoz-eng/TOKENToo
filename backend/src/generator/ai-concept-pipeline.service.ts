@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import type { GeneratedStyleProfile, PreviewAssetPlan, TraitPackPlan } from "./generator.types";
 import { OpenAIImageProvider, type ImageGenerationInput } from "./image-providers";
@@ -15,7 +15,7 @@ type ConceptRequest = {
 
 @Injectable()
 export class AiConceptPipelineService {
-  constructor(private readonly openai: OpenAIImageProvider) {}
+  constructor(@Inject(OpenAIImageProvider) private readonly openai: OpenAIImageProvider) {}
 
   enabled() {
     return (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && Boolean(process.env.OPENAI_API_KEY);

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { Connection, PublicKey } from "@solana/web3.js";
 import type { Prisma } from "@prisma/client";
 import { isDatabaseSetupError } from "../db/database-errors";
@@ -81,7 +81,7 @@ type IdentityConfidence = {
 
 @Injectable()
 export class TokenScannerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async scanToken(mint: string): Promise<TokenScan> {
     const mintAddress = this.assertMint(mint);

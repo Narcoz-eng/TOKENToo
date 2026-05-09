@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Inject, Param } from "@nestjs/common";
 import { ArtGeneratorService } from "./art-generator/art-generator.service";
 import { FeeEngineService } from "./fee-engine/fee-engine.service";
 import { IdentityEngineService } from "./identity-engine/identity-engine.service";
@@ -10,13 +10,13 @@ import { TokenScannerService } from "./token-scanner/token-scanner.service";
 @Controller()
 export class AppController {
   constructor(
-    private readonly scanner: TokenScannerService,
-    private readonly identity: IdentityEngineService,
-    private readonly art: ArtGeneratorService,
-    private readonly raids: RaidEngineService,
-    private readonly fees: FeeEngineService,
-    private readonly marketplace: MarketplaceEngineService,
-    private readonly product: ProductDataService
+    @Inject(TokenScannerService) private readonly scanner: TokenScannerService,
+    @Inject(IdentityEngineService) private readonly identity: IdentityEngineService,
+    @Inject(ArtGeneratorService) private readonly art: ArtGeneratorService,
+    @Inject(RaidEngineService) private readonly raids: RaidEngineService,
+    @Inject(FeeEngineService) private readonly fees: FeeEngineService,
+    @Inject(MarketplaceEngineService) private readonly marketplace: MarketplaceEngineService,
+    @Inject(ProductDataService) private readonly product: ProductDataService
   ) {}
 
   @Get("health")

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { WalletAddress } from "../auth/wallet-address.decorator";
 import { WalletAuthGuard } from "../auth/wallet-auth.guard";
@@ -35,7 +35,7 @@ const submitLaunchSchema = z.object({
 
 @Controller("generator")
 export class GeneratorController {
-  constructor(private readonly generator: GeneratorService) {}
+  constructor(@Inject(GeneratorService) private readonly generator: GeneratorService) {}
 
   @Get("presets")
   presets() {

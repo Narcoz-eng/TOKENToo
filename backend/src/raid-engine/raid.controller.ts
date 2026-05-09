@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Inject, Param, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { WalletAddress } from "../auth/wallet-address.decorator";
 import { WalletAuthGuard } from "../auth/wallet-auth.guard";
@@ -30,7 +30,7 @@ const joinSchema = z.object({
 @Controller("raids")
 @UseGuards(WalletAuthGuard)
 export class RaidController {
-  constructor(private readonly raids: RaidEngineService) {}
+  constructor(@Inject(RaidEngineService) private readonly raids: RaidEngineService) {}
 
   @Post(":raidRoomId/join")
   joinRaid(@Param("raidRoomId") raidRoomId: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {

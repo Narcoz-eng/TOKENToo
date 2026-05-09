@@ -10,7 +10,7 @@ export class DatabaseExceptionFilter extends BaseExceptionFilter {
 
   override catch(exception: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse();
-    const request = host.switchToHttp().getRequest<{ headers?: Record<string, string | string[] | undefined> }>();
+    const request = host.switchToHttp().getRequest<{ headers?: Record<string, string | string[] | undefined>; method?: string; url?: string; route?: { path?: string } }>();
     const requestId = this.requestId(request);
     if (isDatabaseSetupError(exception)) {
       response.status(HttpStatus.UNPROCESSABLE_ENTITY).json(this.errorBody("DB_UNAVAILABLE", databaseSetupMessage(), requestId, { action: "Configure DATABASE_URL and run migrations before retrying this request." }));
@@ -36,6 +36,7 @@ export class DatabaseExceptionFilter extends BaseExceptionFilter {
       return;
     }
 
+    this.logUnhandledException(exception, request, requestId);
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json(this.errorBody("REQUEST_FAILED", "The request could not be completed.", requestId, { action: "Retry or check the backend logs for the underlying exception." }));
   }
 
@@ -63,6 +64,20 @@ export class DatabaseExceptionFilter extends BaseExceptionFilter {
 
   private isZodError(exception: unknown) {
     return Boolean(exception && typeof exception === "object" && (exception as { name?: string }).name === "ZodError");
+  }
+
+  private logUnhandledException(exception: unknown, request: { method?: string; url?: string; route?: { path?: string } } | undefined, requestId: string) {
+    const detail = exception instanceof Error ? { name: exception.name, message: exception.message, stack: exception.stack?.split("\n").slice(0, 6).join("\n") } : { name: "UnknownError", message: String(exception) };
+    console.error(
+      "[backend-exception] unhandled",
+      JSON.stringify({
+        requestId,
+        method: request?.method,
+        url: request?.url,
+        route: request?.route?.path,
+        error: detail
+      })
+    );
   }
 
   private codeForStatus(status: number) {
