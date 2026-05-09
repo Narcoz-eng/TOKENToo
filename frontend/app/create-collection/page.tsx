@@ -878,8 +878,8 @@ function culturePitch(preview: CollectionGeneratorPreview) {
   const name = publicCollectionName(preview);
   const source = `${preview.collection} ${preview.theme} ${preview.mascot} ${preview.artStyle} ${preview.backgroundWorld} ${preview.lore} ${preview.traitLanguage.join(" ")}`.toLowerCase();
   if (/hanta|hantavirus|virus|viral|biohazard|quarantine|mutation|containment|toxic|lab/.test(source)) return `${name} is forming a containment faction around quarantine energy, mutated silhouettes, and high-voltage meme lore.`;
-  if (/aura|glow|pulse|motion|signal|energy/.test(source)) return `${name} is forming a signal-born faction around motion, glow, and market energy.`;
-  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) return `${name} is forming a market-native faction around liquidity pressure, raid momentum, and visible holder status.`;
+  if (/aura|glow|pulse|motion|signal|energy/.test(source)) return `${name} is forming a broadcast-born faction around motion rituals, charged silhouettes, and late-night holder suspense.`;
+  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) return `${name} is forming a trading-floor faction around candlestick shadows, raid momentum, and visible holder status.`;
   const anchors = identityTags(preview).filter((tag) => !/ready|staking|raid/i.test(tag)).slice(0, 3).map((tag) => tag.toLowerCase());
   return `${name} is forming a ${cleanDisplayText(preview.theme).toLowerCase()} around ${joinNatural(anchors.length ? anchors : ["identity", "community energy", "ownership status"])}.`;
 }
@@ -888,8 +888,8 @@ function identityTags(preview: CollectionGeneratorPreview) {
   const source = `${preview.collection} ${preview.theme} ${preview.mascot} ${preview.artStyle} ${preview.backgroundWorld} ${preview.lore} ${preview.traitLanguage.join(" ")}`.toLowerCase();
   const tags: string[] = [];
   if (/hanta|hantavirus|virus|viral|biohazard|quarantine|mutation|containment|toxic|lab/.test(source)) tags.push("Containment Culture", "Mutation Glow", "Raid Energy");
-  if (/aura|glow|pulse|motion|signal|energy/.test(source)) tags.push("Signal Glow", "Motion Aura", "Market Energy");
-  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) tags.push("Liquidity Pressure", "Chart Energy", "Holder Status");
+  if (/aura|glow|pulse|motion|signal|energy/.test(source)) tags.push("Broadcast Aura", "Motion Rituals", "Holder Suspense");
+  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) tags.push("Trading Floor Myth", "Candlestick Shadows", "Holder Status");
   if (/dream|vapor|liminal|surreal/.test(source)) tags.push("Dream Logic", "Surreal World", "Collector Myth");
   if (/cute|toy|soft|sticker|cozy/.test(source)) tags.push("Soft Culture", "Sticker Energy", "Cozy Holders");
   tags.push("Raid-ready", "Staking-ready");

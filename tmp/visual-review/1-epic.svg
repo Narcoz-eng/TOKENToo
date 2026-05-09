@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1100" viewBox="0 0 900 1100" data-engine="comic-panel-engine" data-rarity="Epic" data-pipeline="comic-renderer" data-composition="Epic-panel-volatile">
+  <defs>
+    <filter id="softShadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.42"/></filter>
+    <filter id="roughPaper"><feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" seed="23"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.18"/></feComponentTransfer></filter>
+    <linearGradient id="keyLight" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7cff38"/><stop offset="0.48" stop-color="#3dd6ff"/><stop offset="1" stop-color="#101018"/></linearGradient>
+    <radialGradient id="eventGlow" cx="45%" cy="28%" r="72%"><stop stop-color="#101018" stop-opacity="0.9"/><stop offset="0.48" stop-color="#7cff38" stop-opacity="0.32"/><stop offset="1" stop-color="#f2d34f" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="900" height="1100" fill="#8d7cff"/><path d="M0 0 H900 L522 1100 H0Z" fill="#7cff38" stroke="#f2d34f" stroke-width="10"/><path d="M342 0 H900 V704 L162 924Z" fill="#3dd6ff" stroke="#f2d34f" stroke-width="10"/><g><path d="M610 318 L426 724" stroke="#f2d34f" stroke-width="2" opacity="0.45"/><path d="M39 65 L257 561" stroke="#f2d34f" stroke-width="3" opacity="0.45"/><path d="M548 992 L88 318" stroke="#f2d34f" stroke-width="4" opacity="0.45"/><path d="M877 739 L99 75" stroke="#f2d34f" stroke-width="5" opacity="0.45"/><path d="M306 566 L830 1012" stroke="#f2d34f" stroke-width="2" opacity="0.45"/><path d="M815 313 L661 769" stroke="#f2d34f" stroke-width="3" opacity="0.45"/><path d="M244 140 L492 526" stroke="#f2d34f" stroke-width="4" opacity="0.45"/><path d="M753 987 L323 363" stroke="#f2d34f" stroke-width="5" opacity="0.45"/><path d="M182 814 L154 120" stroke="#f2d34f" stroke-width="2" opacity="0.45"/><path d="M511 561 L885 977" stroke="#f2d34f" stroke-width="3" opacity="0.45"/><path d="M120 308 L896 814" stroke="#f2d34f" stroke-width="4" opacity="0.45"/><path d="M449 135 L727 571" stroke="#f2d34f" stroke-width="5" opacity="0.45"/><path d="M58 982 L558 328" stroke="#f2d34f" stroke-width="2" opacity="0.45"/><path d="M387 809 L389 165" stroke="#f2d34f" stroke-width="3" opacity="0.45"/><path d="M896 556 L220 1022" stroke="#f2d34f" stroke-width="4" opacity="0.45"/><path d="M325 383 L51 779" stroke="#f2d34f" stroke-width="5" opacity="0.45"/><path d="M654 130 L782 616" stroke="#f2d34f" stroke-width="2" opacity="0.45"/><path d="M263 1057 L793 373" stroke="#f2d34f" stroke-width="3" opacity="0.45"/><text x="72" y="150" fill="#f2d34f" font-size="42" font-weight="900" font-family="Inter, Arial, sans-serif">IMPACT</text></g><g transform="rotate(-18 468 572)" filter="url(#softShadow)">
+      <path d="M354.72 359.6 Q482.16 229.8 637.92 418.6 Q616.68 628.64 491.6 715.96 Q309.88 680.56 354.72 359.6Z" fill="#7cff38" stroke="#f2d34f" stroke-width="11"/>
+      <path d="M267.4 701.8 L692.2 673.48 L590.72 937.8 H359.44Z" fill="#3dd6ff" stroke="#f2d34f" stroke-width="11"/>
+      <ellipse cx="409" cy="508.28" rx="40.6" ry="34.8" fill="#101018" stroke="#f2d34f" stroke-width="7"/>
+      <ellipse cx="550.6" cy="488.36" rx="28" ry="34.8" fill="#101018" stroke="#f2d34f" stroke-width="7"/>
+      <path d="M406.64 626.28 q58 68 124 -12" stroke="#f2d34f" stroke-width="12" fill="none"/>
+      <path d="M597.8 645.16 l138 -80" stroke="#f2d34f" stroke-width="18" stroke-linecap="round"/>
+    </g><g font-family="Inter, Arial, sans-serif">
+    <text x="42" y="1036" fill="#f2d34f" font-size="24" font-weight="900">Fever Vault Patient</text>
+    <text x="42" y="1064" fill="#3dd6ff" font-size="13" font-weight="800">Epic / Hantavirus Crypt Calm 4</text>
+  </g>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1100" viewBox="0 0 900 1100" data-engine="cinematic-engine" data-rarity="Legendary" data-pipeline="cinematic-renderer" data-composition="Legendary-film-volatile">
+  <defs>
+    <filter id="softShadow"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity="0.42"/></filter>
+    <filter id="roughPaper"><feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" seed="391"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.18"/></feComponentTransfer></filter>
+    <linearGradient id="keyLight" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6fe7ff"/><stop offset="0.48" stop-color="#5967ff"/><stop offset="1" stop-color="#ff365e"/></linearGradient>
+    <radialGradient id="eventGlow" cx="45%" cy="28%" r="72%"><stop stop-color="#ff365e" stop-opacity="0.9"/><stop offset="0.48" stop-color="#6fe7ff" stop-opacity="0.32"/><stop offset="1" stop-color="#06111a" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="900" height="1100" fill="#06111a"/>
+      <rect y="77.00000000000001" width="900" height="858" fill="url(#keyLight)" opacity="0.54"/>
+      <path d="M0 682 C180 592 612 787 900 634 V1100 H0Z" fill="#5967ff" opacity="0.82"/>
+      <g opacity="0.9"><rect x="209" y="176" width="52" height="264" fill="#5967ff" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="258" y="264" width="68" height="352" fill="#06111a" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="487" y="352" width="84" height="440" fill="#5967ff" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="536" y="440" width="100" height="264" fill="#06111a" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="585" y="176" width="116" height="352" fill="#5967ff" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="634" y="264" width="132" height="440" fill="#06111a" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="683" y="352" width="148" height="264" fill="#5967ff" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="12" y="440" width="164" height="352" fill="#06111a" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="61" y="176" width="180" height="440" fill="#5967ff" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="110" y="264" width="196" height="264" fill="#06111a" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="159" y="352" width="212" height="352" fill="#5967ff" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/><rect x="208" y="440" width="228" height="440" fill="#06111a" stroke="#6fe7ff" stroke-width="2" opacity="0.52"/></g>
+      <rect y="0" width="900" height="82.5" fill="#000"/><rect y="1017.5" width="900" height="82.5" fill="#000"/><g opacity="0.9"><circle cx="252.00000000000003" cy="242" r="150" fill="url(#eventGlow)"/><path d="M45 352 L810 154.00000000000003" stroke="#ff365e" stroke-width="11" opacity="0.42"/><path d="M405 0 V1100" stroke="#6fe7ff" stroke-width="14" opacity="0.18"/></g><g transform="rotate(-7 684 748)" filter="url(#softShadow)">
+      <path d="M656 677 Q686 637 720 680 Q719 728 698 757 L739 883 H621 L664 757 Q640 724 656 677Z" fill="#6fe7ff" opacity="0.92"/>
+      <path d="M666 713 h15 M696 710.25 h19" stroke="#ff365e" stroke-width="7"/>
+      <path d="M668 743 q24 38 48 0" stroke="#06111a" stroke-width="8" fill="none"/>
+      <path d="M611.5 787 q-55 -74 -220 -118" stroke="#ff365e" stroke-width="24" fill="none"/>
+    </g><g font-family="Inter, Arial, sans-serif">
+    <text x="42" y="1036" fill="#fff" font-size="24" font-weight="900">Prompt Harder Tired Ribbit Banner</text>
+    <text x="42" y="1064" fill="#6fe7ff" font-size="13" font-weight="800">Legendary / Agent Kernel Calm 3</text>
+  </g>
+</svg>

@@ -84,8 +84,10 @@ export class GeneratorService {
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
+    let aiUnavailableWarning: string | undefined;
     const aiPreviews = await this.aiConcepts.generateRequired(style, pack, `${normalized.tokenMint}:preview`, normalized.logoData, normalized.logoUri).catch((error) => {
-      throw this.aiPreviewException(error);
+      aiUnavailableWarning = this.aiUnavailableWarning(error);
+      return [] as PreviewAssetPlan[];
     });
     if (aiPreviews.length) {
       style.productionAssetStatus = "AI_CONCEPT";
@@ -147,9 +149,10 @@ export class GeneratorService {
       },
       warnings: [
         "Preview generated without DB persistence.",
-        style.productionAssetStatus === "AI_CONCEPT"
+        aiUnavailableWarning ?? (style.productionAssetStatus === "AI_CONCEPT"
           ? "AI concept preview only; final launch requires curated or artist-approved production assets and permanent storage."
-          : "Wireframe only - enable OpenAI image generation or curated asset provider for professional NFT previews.",
+          : "Wireframe only - enable OpenAI image generation or curated asset provider for professional NFT previews."),
+        ...(aiUnavailableWarning ? ["AI concept generation is unavailable right now; showing the cinematic planning preview so the collection experience is never blank. Retry generation after fixing the OpenAI issue."] : []),
         "OpenAI image generation is art direction only and is never used in mint, final render, redeem, stake, or unstake flows."
       ]
     };
@@ -278,7 +281,12 @@ export class GeneratorService {
     const pack = this.packFromRecord(latest.traitPack);
     const version = Math.max(1, ...latest.previewAssets.map((asset) => asset.version)) + 1;
     const wireframes = this.previews.generate(style, pack, run.seed, version);
-    const aiPreviews = await this.aiConcepts.generate(style, pack, run.seed, run.logoData ?? undefined, run.logoUri ?? undefined).catch(() => []);
+    let aiGenerationFailed = false;
+    const aiPreviews = await this.aiConcepts.generate(style, pack, run.seed, run.logoData ?? undefined, run.logoUri ?? undefined).catch(() => {
+      aiGenerationFailed = true;
+      return [] as PreviewAssetPlan[];
+    });
+    if (aiGenerationFailed && latest.previewAssets.some((asset) => asset.productionAssetStatus === "AI_CONCEPT" || asset.previewClassification === "AI_CONCEPT_PREVIEW")) return this.getRun(id);
     const previews = aiPreviews.length ? aiPreviews : wireframes;
     if (aiPreviews.length) await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
     await this.persistPreviews(id, latest.id, version, previews);
@@ -820,6 +828,35 @@ export class GeneratorService {
         raw: error instanceof Error ? error.message : String(error)
       }
     });
+  }
+
+  private aiUnavailableWarning(error: unknown) {
+    return `AI concept generation unavailable: ${this.publicErrorMessage(error)}`;
+  }
+
+  private publicErrorMessage(error: unknown) {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+      if (typeof response === "string") return this.sanitizePublicError(response);
+      if (response && typeof response === "object") {
+        const record = response as Record<string, unknown>;
+        const message = typeof record.message === "string" ? record.message : undefined;
+        if (message) return this.sanitizePublicError(message);
+      }
+    }
+    if (error instanceof AiConceptGenerationError) return this.sanitizePublicError(error.message);
+    if (error instanceof Error) return this.sanitizePublicError(error.message);
+    return "OpenAI did not return a usable concept preview.";
+  }
+
+  private sanitizePublicError(value: string) {
+    return value
+      .replace(/sk-[A-Za-z0-9_-]+/g, "sk-...")
+      .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer ...")
+      .replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/gi, "data:image/...;base64,...")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 600) || "OpenAI did not return a usable concept preview.";
   }
 
   private assertLaunchProviders(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: "BASIC" | "PREMIUM" | "LEGENDARY_READY") {

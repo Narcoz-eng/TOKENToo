@@ -28,6 +28,7 @@ export function CollectionPreview({
   const visualSamples = professionalPreview ? samples.filter((sample) => Boolean(sample.image)) : [];
   const tags = identityTags(preview);
   const pitch = culturePitch(preview);
+  const generationUnavailable = preview.warnings?.some((warning) => /AI concept generation unavailable/i.test(warning)) ?? false;
 
   return (
     <div className="space-y-5">
@@ -52,12 +53,15 @@ export function CollectionPreview({
                   <StatusPill accent={preview.quality.tier === "Wireframe concept" || preview.quality.tier === "AI concept" || preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
                   <StatusPill accent="cyan">{cleanDisplayText(preview.theme)}</StatusPill>
                   <StatusPill accent={isProductionStatus(preview.productionAssetStatus) ? "green" : "gold"}>{previewStatusLabel(preview)}</StatusPill>
+                  {generationUnavailable ? <StatusPill accent="gold">Generation unavailable</StatusPill> : null}
                 </div>
                 <h2 className="mt-4 text-4xl font-black leading-tight lg:text-5xl">{preview.collection}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{pitch}</p>
                 {!preview.finalProductionReady ? (
                   <p className="mt-3 max-w-3xl rounded-md border border-vault-gold/35 bg-vault-gold/10 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
-                    {preview.productionAssetStatus === "AI_CONCEPT"
+                    {generationUnavailable
+                      ? "AI concept generation is unavailable right now. A cinematic planning preview is shown so the collection experience stays reviewable; retry after the OpenAI issue is fixed."
+                      : preview.productionAssetStatus === "AI_CONCEPT"
                       ? "AI concept preview - creator review only. Final minting requires curated or artist-approved layer packs."
                       : "Professional concept preview required. Generate AI concept imagery before reviewing collection visuals."}
                   </p>
@@ -75,7 +79,7 @@ export function CollectionPreview({
               </div>
             </div>
 
-            {wireframeOnly ? <ProfessionalPreviewGate preview={preview} onGenerateAiConcept={onGenerateAiConcept} canGenerateAiConcept={canGenerateAiConcept} loading={loading} /> : null}
+            {wireframeOnly ? <ProfessionalPreviewGate preview={preview} onGenerateAiConcept={onGenerateAiConcept} canGenerateAiConcept={canGenerateAiConcept} loading={loading} generationUnavailable={generationUnavailable} /> : null}
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <FeatureTile icon={LockKeyhole} title={wireframeOnly ? "Vault visuals pending" : "Vault NFTs"} body={wireframeOnly ? "Vault NFT visuals pending professional concept or curated layer pack." : "Token-backed identity cards with redeem and marketplace hooks."} />
@@ -125,7 +129,7 @@ export function CollectionPreview({
   );
 }
 
-function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiConcept, loading }: { preview: CollectionGeneratorPreview; onGenerateAiConcept?: () => void; canGenerateAiConcept: boolean; loading: boolean }) {
+function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiConcept, loading, generationUnavailable }: { preview: CollectionGeneratorPreview; onGenerateAiConcept?: () => void; canGenerateAiConcept: boolean; loading: boolean; generationUnavailable: boolean }) {
   const culture = identityTags(preview);
   return (
     <div className="mt-7 grid gap-4 rounded-lg border border-vault-cyan/25 bg-black/45 p-4 shadow-[0_0_60px_rgba(22,215,210,0.12)] md:grid-cols-[1.2fr_.8fr]">
@@ -134,11 +138,11 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
           <Wand2 className="size-4" />
           <p className="text-xs font-black uppercase tracking-[0.18em]">Creative DNA Ready</p>
         </div>
-        <p className="mt-3 text-2xl font-black leading-tight text-white">Professional concept preview required</p>
+        <p className="mt-3 text-2xl font-black leading-tight text-white">{generationUnavailable ? "Generation unavailable - planning preview active" : "Professional concept preview required"}</p>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{culturePitch(preview)}</p>
         {onGenerateAiConcept ? (
           <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
-            <Sparkles className="size-4" /> Generate AI Concept Preview
+            <Sparkles className="size-4" /> {generationUnavailable ? "Retry AI Concept Preview" : "Generate AI Concept Preview"}
           </button>
         ) : null}
       </div>
@@ -152,16 +156,17 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
 }
 
 function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGenerateAiConcept, loading }: { preview: CollectionGeneratorPreview; onGenerateAiConcept?: () => void; canGenerateAiConcept: boolean; loading: boolean }) {
+  const generationUnavailable = preview.warnings?.some((warning) => /AI concept generation unavailable/i.test(warning)) ?? false;
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="rounded-lg border border-vault-gold/30 bg-vault-gold/8 p-5">
           <p className="text-sm font-black uppercase text-vault-gold">Creative DNA ready</p>
           <h3 className="mt-2 text-2xl font-black text-white">Professional concept preview required</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-300">A polished identity direction is ready. Generate AI concept imagery to review hero art and sample rarities before any launch decision.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{generationUnavailable ? "AI generation is currently unavailable, but the cinematic planning preview remains available for review. Retry after the OpenAI issue is fixed." : "A polished identity direction is ready. Generate AI concept imagery to review hero art and sample rarities before any launch decision."}</p>
           {onGenerateAiConcept ? (
             <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
-              <Sparkles className="size-4" /> Generate AI Concept Preview
+              <Sparkles className="size-4" /> {generationUnavailable ? "Retry AI Concept Preview" : "Generate AI Concept Preview"}
             </button>
           ) : null}
         </div>
@@ -264,7 +269,7 @@ function AdvancedCreativeDnaPanel({ preview, samples, compact }: { preview: Coll
             ))}
           </div>
         </AdvancedBlock>
-        <AdvancedBlock title="Trait Taxonomy">
+        <AdvancedBlock title="Production Layer Plan">
           <div className="grid gap-2 sm:grid-cols-2">
             {taxonomy.map(([name, count]) => (
               <div key={name} className="rounded-md border border-white/10 bg-black/25 px-3 py-2">
@@ -274,7 +279,7 @@ function AdvancedCreativeDnaPanel({ preview, samples, compact }: { preview: Coll
             ))}
           </div>
         </AdvancedBlock>
-        <AdvancedBlock title="Prompt Specs">
+        <AdvancedBlock title="Visual Direction">
           <div className="space-y-2">
             {promptSpecs.map((spec) => (
               <p key={spec} className="rounded-md border border-white/10 bg-black/25 px-3 py-2 text-xs leading-5 text-slate-300">{spec}</p>
@@ -400,10 +405,10 @@ function culturePitch(preview: CollectionGeneratorPreview) {
     return `${name} is forming a containment faction around quarantine energy, mutated silhouettes, and high-voltage meme lore.`;
   }
   if (/aura|glow|pulse|motion|signal|energy/.test(source)) {
-    return `${name} is forming a signal-born faction around motion, glow, and market energy.`;
+    return `${name} is forming a broadcast-born faction around motion rituals, charged silhouettes, and late-night holder suspense.`;
   }
   if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) {
-    return `${name} is forming a market-native faction around liquidity pressure, raid momentum, and visible holder status.`;
+    return `${name} is forming a trading-floor faction around candlestick shadows, raid momentum, and visible holder status.`;
   }
   const anchors = identityTags(preview)
     .filter((tag) => !/ready|staking|raid/i.test(tag))
@@ -416,8 +421,8 @@ function identityTags(preview: CollectionGeneratorPreview) {
   const source = `${preview.collection} ${preview.theme} ${preview.mascot} ${preview.artStyle} ${preview.backgroundWorld} ${preview.lore} ${preview.traitLanguage.join(" ")}`.toLowerCase();
   const tags: string[] = [];
   if (/hanta|hantavirus|virus|viral|biohazard|quarantine|mutation|containment|toxic|lab/.test(source)) tags.push("Containment Culture", "Mutation Glow", "Raid Energy");
-  if (/aura|glow|pulse|motion|signal|energy/.test(source)) tags.push("Signal Glow", "Motion Aura", "Market Energy");
-  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) tags.push("Liquidity Pressure", "Chart Energy", "Holder Status");
+  if (/aura|glow|pulse|motion|signal|energy/.test(source)) tags.push("Broadcast Aura", "Motion Rituals", "Holder Suspense");
+  if (/market|liquidity|candle|chart|degen|pump|orderbook/.test(source)) tags.push("Trading Floor Myth", "Candlestick Shadows", "Holder Status");
   if (/dream|vapor|liminal|surreal/.test(source)) tags.push("Dream Logic", "Surreal World", "Collector Myth");
   if (/cute|toy|soft|sticker|cozy/.test(source)) tags.push("Soft Culture", "Sticker Energy", "Cozy Holders");
   tags.push("Raid-ready", "Staking-ready");

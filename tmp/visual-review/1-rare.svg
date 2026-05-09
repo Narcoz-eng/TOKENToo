@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1100" viewBox="0 0 900 1100" data-engine="comic-panel-engine" data-rarity="Rare" data-pipeline="comic-renderer" data-composition="Rare-panel-withdrawn">
+  <defs>
+    <filter id="softShadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.42"/></filter>
+    <filter id="roughPaper"><feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" seed="919"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.18"/></feComponentTransfer></filter>
+    <linearGradient id="keyLight" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7cff38"/><stop offset="0.48" stop-color="#3dd6ff"/><stop offset="1" stop-color="#101018"/></linearGradient>
+    <radialGradient id="eventGlow" cx="45%" cy="28%" r="72%"><stop stop-color="#101018" stop-opacity="0.9"/><stop offset="0.48" stop-color="#7cff38" stop-opacity="0.32"/><stop offset="1" stop-color="#f2d34f" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="900" height="1100" fill="#3dd6ff"/><rect x="42" y="42" width="774" height="572" fill="#101018" stroke="#f2d34f" stroke-width="10"/><path d="M0 748 H900 V1100 H0Z" fill="#8d7cff" stroke="#f2d34f" stroke-width="10"/><g><path d="M629 637 L445 1043" stroke="#f2d34f" stroke-width="2" opacity="0.45"/><path d="M58 384 L276 880" stroke="#f2d34f" stroke-width="3" opacity="0.45"/><path d="M567 211 L107 637" stroke="#f2d34f" stroke-width="4" opacity="0.45"/><path d="M896 1058 L118 394" stroke="#f2d34f" stroke-width="5" opacity="0.45"/><path d="M325 885 L849 231" stroke="#f2d34f" stroke-width="2" opacity="0.45"/><path d="M834 632 L680 1088" stroke="#f2d34f" stroke-width="3" opacity="0.45"/><path d="M263 459 L511 845" stroke="#f2d34f" stroke-width="4" opacity="0.45"/><text x="72" y="150" fill="#f2d34f" font-size="42" font-weight="900" font-family="Inter, Arial, sans-serif">BANG</text></g><g transform="rotate(-7 522 418)" filter="url(#softShadow)">
+      <path d="M373.2 139 Q540.6 -31.5 745.2 216.5 Q717.3 492.4 553 607.1 Q314.29999999999995 560.6 373.2 139Z" fill="#7cff38" stroke="#f2d34f" stroke-width="11"/>
+      <path d="M258.5 588.5 L816.5 551.3 L683.2 898.5 H379.4Z" fill="#3dd6ff" stroke="#f2d34f" stroke-width="11"/>
+      <ellipse cx="444.5" cy="334.3" rx="16.24" ry="13.919999999999998" fill="#101018" stroke="#f2d34f" stroke-width="7"/>
+      <ellipse cx="630.5" cy="299.5" rx="28" ry="13.919999999999998" fill="#101018" stroke="#f2d34f" stroke-width="7"/>
+      <path d="M441.4 489.3 q58 24 124 -12" stroke="#f2d34f" stroke-width="12" fill="none"/>
+      <path d="M692.5 514.1 l138 -80" stroke="#f2d34f" stroke-width="18" stroke-linecap="round"/>
+    </g><g font-family="Inter, Arial, sans-serif">
+    <text x="42" y="1036" fill="#f2d34f" font-size="24" font-weight="900">Hanta Signal Mire Scroll</text>
+    <text x="42" y="1064" fill="#3dd6ff" font-size="13" font-weight="800">Rare / Hantavirus Crypt Calm 3</text>
+  </g>
+</svg>

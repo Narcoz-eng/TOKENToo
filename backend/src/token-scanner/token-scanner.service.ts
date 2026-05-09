@@ -551,7 +551,7 @@ export class TokenScannerService {
       inferredSignals: [...morphology.signals, ...logo.signals, "token name morphology", "symbol", "social context"],
       confidence: confidence && confidence.inferredIdentityConfidence >= 55 ? "medium" : "low",
       official: false,
-      description: `${name} is forming a signal-born faction around motion, glow, and market energy.`
+      description: `${name} is forming a broadcast-born faction around motion rituals, charged silhouettes, and late-night holder suspense.`
     };
   }
 

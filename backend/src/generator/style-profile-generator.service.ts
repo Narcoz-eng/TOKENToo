@@ -188,7 +188,7 @@ export class StyleProfileGeneratorService {
   private lore(input: CreateGenerationRunInput, analysis: LogoAnalysisOutput, context: CommunityContextOutput, theme: string, world: string) {
     if (context.lore) return context.lore;
     const symbol = input.tokenSymbol ?? input.hints?.sourceMetadata?.symbol ?? "$TOKEN";
-    const anchor = this.publicAnchorWords(analysis.visualKeywords).slice(0, 3).join(", ") || "motion, glow, and market energy";
+    const anchor = this.publicAnchorWords(analysis.visualKeywords).slice(0, 3).join(", ") || "motion rituals, charged silhouettes, and holder suspense";
     return `${this.publicIdentityName(symbol)} is forming a ${theme} around ${anchor}. The collection is built for holders who want visible identity, raid energy, and staking progression.`;
   }
 
