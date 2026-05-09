@@ -38,7 +38,7 @@ export function startupState() {
 
 export function recordStartupValidation(validation: StartupState["validation"]) {
   state.validation = validation;
-  state.degraded = validation.issues.some((issue) => issue.severity === "warning");
+  state.degraded = validation.issues.some((issue) => issue.severity === "warning" || issue.severity === "fatal");
   state.lastError = validation.issues.find((issue) => issue.severity === "fatal")?.message;
 }
 

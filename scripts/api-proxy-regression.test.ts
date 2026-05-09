@@ -73,6 +73,15 @@ const tests: TestCase[] = [
     }
   },
   {
+    name: "root proxy preserves exact product home endpoint in embedded mode",
+    run: () => {
+      const incoming = normalizeIncomingRequest("/api/product/home");
+      assert(resolveBackendBaseUrl({}) === null, "Missing backend URL should keep root handler in embedded mode");
+      assertEqual(incoming.forwardedPath, "/product/home");
+      assertEqual(incoming.search, "");
+    }
+  },
+  {
     name: "root Vercel proxy path handling removes catch-all route param",
     run: () => {
       const backend = resolveBackendBaseUrl({ BACKEND_URL: "https://backend.example" });
@@ -107,6 +116,15 @@ const tests: TestCase[] = [
       const failure = classifyProxyError(new TypeError("Body is unusable"));
       assertEqual(failure.code, "REQUEST_BODY_UNAVAILABLE");
       assertEqual(failure.errorClass, "TypeError");
+    }
+  },
+  {
+    name: "root proxy classifies embedded startup validation failures",
+    run: () => {
+      const failure = classifyProxyError(new Error("Phew.run startup validation failed: DEMO_CURATED_LAYER_PACK is devnet demo only and must be disabled in production."));
+      assertEqual(failure.code, "BACKEND_STARTUP_VALIDATION_FAILED");
+      assertEqual(failure.status, 503);
+      assertEqual(failure.errorClass, "Error");
     }
   },
   {
@@ -180,6 +198,15 @@ const tests: TestCase[] = [
       const failure = classify(new TypeError("Body is unusable"));
       assertEqual(failure.code, "REQUEST_BODY_UNAVAILABLE");
       assertEqual(failure.errorClass, "TypeError");
+    }
+  },
+  {
+    name: "app proxy classifies embedded startup validation failures",
+    run: () => {
+      const failure = classify(new Error("Phew.run startup validation failed: DEMO_CURATED_LAYER_PACK is devnet demo only and must be disabled in production."));
+      assertEqual(failure.code, "BACKEND_STARTUP_VALIDATION_FAILED");
+      assertEqual(failure.status, 503);
+      assertEqual(failure.errorClass, "Error");
     }
   }
 ];

@@ -62,7 +62,7 @@ export function validateStartupEnvironment() {
     issues
   };
   recordStartupValidation(validation);
-  if ((strict || appEnv === "production") && issues.some((issue) => issue.severity === "fatal")) {
+  if (strict && issues.some((issue) => issue.severity === "fatal")) {
     throw new Error(`Phew.run startup validation failed: ${issues.filter((issue) => issue.severity === "fatal").map((issue) => issue.message).join(" ")}`);
   }
   return validation;

@@ -77,6 +77,7 @@ export function classify(error: unknown) {
   const cause = error instanceof Error ? (error as Error & { cause?: { code?: string } }).cause : undefined;
   const code = cause?.code ?? (error instanceof Error ? (error as Error & { code?: string }).code : undefined);
 
+  if (/startup validation failed/i.test(message)) return new ProxyFailure("BACKEND_STARTUP_VALIDATION_FAILED", "The embedded backend failed startup validation.", 503, message, errorClass);
   if (error instanceof DOMException && error.name === "AbortError") return new ProxyFailure("UPSTREAM_TIMEOUT", "The backend request timed out before a controller handled it.", 504, message, errorClass);
   if (/body is unusable|body stream/i.test(message)) return new ProxyFailure("REQUEST_BODY_UNAVAILABLE", "The request body could not be forwarded because it was already read.", 400, message, errorClass);
   if (/invalid header|invalid character|headers/i.test(message)) return new ProxyFailure("INVALID_PROXY_HEADERS", "The API proxy received headers that cannot be forwarded upstream.", 400, message, errorClass);

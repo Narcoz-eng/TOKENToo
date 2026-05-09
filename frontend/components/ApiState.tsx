@@ -36,7 +36,7 @@ export function ErrorState({ error, retry }: { error: string | ApiError; retry?:
             <p className="font-bold text-vault-red">{title}</p>
             <p className="mt-2 break-words text-sm text-slate-300">{message}</p>
             {apiError?.requestId ? <p className="mt-2 text-xs text-slate-500">Request ID: {apiError.requestId}</p> : null}
-            {apiError && isDevMode() ? (
+            {apiError ? (
               <div className="mt-3 rounded-md border border-vault-line bg-black/25 p-3 text-xs text-slate-300">
                 <div className="grid gap-2 sm:grid-cols-2">
                   <DiagnosticLine label="Endpoint" value={apiError.diagnostics.endpointPath ?? apiError.diagnostics.url} />
@@ -46,10 +46,12 @@ export function ErrorState({ error, retry }: { error: string | ApiError; retry?:
                   <DiagnosticLine label="Backend source" value={apiError.diagnostics.backendUrlSource ?? "n/a"} />
                   <DiagnosticLine label="Error class" value={apiError.diagnostics.preparationErrorClass ?? "n/a"} />
                 </div>
-                <details className="mt-3">
-                  <summary className="cursor-pointer font-bold text-slate-200">Developer diagnostics</summary>
-                  <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(apiError.diagnostics, null, 2)}</pre>
-                </details>
+                {isDevMode() ? (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer font-bold text-slate-200">Developer diagnostics</summary>
+                    <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(apiError.diagnostics, null, 2)}</pre>
+                  </details>
+                ) : null}
               </div>
             ) : null}
           </div>
