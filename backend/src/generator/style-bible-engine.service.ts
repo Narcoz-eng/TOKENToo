@@ -156,15 +156,16 @@ export class StyleBibleEngineService {
       `Show collection DNA, trait catalog, rarity ladder, mood/expression sheet, layer breakdown, palette, line/texture rules, rarity philosophy, and mythology.`,
       "Use human-designed art direction. This is not a loose character poster, mascot placeholder, UI mock, or generic AI concept.",
       `Trait catalog:\n${traitSummary}`,
+      "These outputs are Studio Bible reference visuals only, not final transparent layer files and not mint-ready collection art.",
       `Collection-native archetypes: ${archetypes.join(", ")}.`,
       "Legendary and Mythic must avoid global hood/halo/void/staff/cosmic deity clichés unless explicitly native to the token."
     ].join("\n");
     return {
       styleBibleImage: `${commonRules}\nArrange as a premium studio bible sheet with labeled panels and trait-rich rarity examples.`,
-      traitCatalogSheet: `${commonRules}\nFocus on reusable transparent trait layer families with visible variants per category.`,
+      traitCatalogSheet: `${commonRules}\nFocus on readable trait family visualization with visible variants per category; do not claim these are export-ready transparent PNG/WebP layers.`,
       rarityLadder: `${commonRules}\nFocus on six rarity examples with different base/head/eyes/mouth/outfit/prop/background combinations.`,
       moodSheet: `${commonRules}\nFocus on native mood/expression variations through eyes, mouth, posture, gesture, prop, lighting, and background.`,
-      layerBreakdown: `${commonRules}\nFocus on deterministic layer order, compatibility notes, transparent exports, and manual cleanup checkpoints.`,
+      layerBreakdown: `${commonRules}\nFocus on deterministic layer order, compatibility notes, required transparent PNG/WebP export slots, and manual cleanup checkpoints; mark this as a concept breakdown, not approved final layers.`,
       heroConcept: `${commonRules}\nCreate one hero concept that demonstrates the collection identity without replacing the trait catalog or style bible.`
     };
   }

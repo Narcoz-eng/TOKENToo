@@ -48,6 +48,8 @@ export type AssetProviderReadinessReport = {
   availableTraitLayers: number;
   availableLegendaryOverlays: number;
   canProduce10kPremiumOutputs: boolean;
+  approvedLayerManifestAvailable?: boolean;
+  layerManifestSource?: string;
   reasonIfNo?: string;
 };
 

@@ -18,6 +18,7 @@ import type {
   PreviewAssetPlan,
   PreviewClassification,
   ProductionAssetStatus,
+  StudioGenerationSummary,
   StudioWorkflowInput,
   StudioWorkflowState,
   StyleBiblePlan,
@@ -29,6 +30,7 @@ import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
 import { QualityValidatorService } from "./quality-validator.service";
 import { StyleBibleEngineService } from "./style-bible-engine.service";
+import { StudioImageProviderService } from "./studio-image-provider.service";
 import { StyleProfileGeneratorService } from "./style-profile-generator.service";
 import { TraitPackGeneratorService } from "./trait-pack-generator.service";
 import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
@@ -60,6 +62,7 @@ export class GeneratorService {
     @Inject(CollectionDistinctivenessScorerService) private readonly distinctiveness: CollectionDistinctivenessScorerService,
     @Inject(QualityValidatorService) private readonly quality: QualityValidatorService,
     @Inject(StyleBibleEngineService) private readonly styleBible: StyleBibleEngineService,
+    @Inject(StudioImageProviderService) private readonly studioImages: StudioImageProviderService,
     @Inject(MetadataGeneratorService) private readonly metadata: MetadataGeneratorService,
     @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
   ) {}
@@ -89,33 +92,31 @@ export class GeneratorService {
     const style = this.styleProfiles.generate(normalized, analysis, context, 1);
     const pack = this.traitPacks.generate(style);
     const styleBible = this.buildStyleBible(style, pack);
-    const studioAssets = this.styleBible.studioAssets(styleBible);
+    const wireframes = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
+    const studioResult = await this.studioAssetsWithCache(normalized.tokenMint, style, pack, styleBible, 1, "preview");
+    const studioAssets = studioResult.assets;
     const studioAsset = (type: PreviewAssetPlan["type"]) => studioAssets.find((asset) => asset.type === type);
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
-    const wireframes = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
-    const conceptSeed = `${normalized.tokenMint}:preview`;
-    const conceptResult = await this.conceptPreviewsWithFallback(normalized.tokenMint, style, pack, conceptSeed, normalized.logoData, normalized.logoUri);
-    const aiPreviews = conceptResult.previews;
-    if (aiPreviews.length) {
+    if (studioAssets.length) {
       style.productionAssetStatus = "AI_CONCEPT";
       style.artSource = "AI_ASSISTED";
       style.productionAssetPolicy.defaultAssetStatus = "AI_CONCEPT";
     }
     this.applyConfiguredProductionStatus(style, pack);
-    const previews = aiPreviews.length ? aiPreviews : wireframes;
+    const previews = [...studioAssets, ...wireframes];
     const distinctiveness = this.distinctiveness.score(style, []);
     const quality = this.quality.validate(style, pack, compatibilityRules, previews, distinctiveness);
     if (!compatibilityResult.passed) quality.issues.push(...compatibilityResult.issues);
     quality.issues.push(...this.aiQuality.validate(previews));
     const readiness = this.tenKReadinessReport(pack, style, quality);
-    const providerDiagnostics = conceptResult.conceptRequest as Record<string, unknown>;
+    const providerDiagnostics = studioResult.summary as unknown as Record<string, unknown>;
 
     return {
       ok: true,
       mode: "preview-only",
-      assetProvider: aiPreviews.length ? this.previewProviderLabel(aiPreviews) : "wireframe-concept-preview",
-      previewClassification: aiPreviews.length ? "AI_CONCEPT_PREVIEW" : "WIREFRAME_CONCEPT",
+      assetProvider: this.studioProviderLabel(studioResult.summary),
+      previewClassification: studioAssets.length ? "AI_CONCEPT_PREVIEW" : "WIREFRAME_CONCEPT",
       productionAssetStatus: style.productionAssetStatus,
       finalProductionReady: false,
       brandDna: style.brandDna,
@@ -131,7 +132,7 @@ export class GeneratorService {
       artTeam: styleBible.artTeam,
       traitCoverageScore: styleBible.qaReport.traitCoverageScore,
       rarityDiversityScore: styleBible.qaReport.rarityDiversityScore,
-      providerStatus: String(providerDiagnostics.providerFailureCode ?? providerDiagnostics.providerFailureReason ?? providerDiagnostics.provider ?? this.previewProviderLabel(aiPreviews)),
+      providerStatus: String(providerDiagnostics.provider ?? this.studioProviderLabel(studioResult.summary)),
       collection: {
         name: style.collection,
         palette: style.colors,
@@ -153,7 +154,7 @@ export class GeneratorService {
       animationMetadata: style.creativeUniverse.animationReadiness,
       quality: {
         ...quality,
-        issues: [...quality.issues, `${style.productionAssetStatus === "AI_CONCEPT" ? "AI studio preview only" : "Wireframe concept preview only"}; final collection requires locked creator approval plus curated, layered, or artist-approved production assets.`]
+        issues: [...quality.issues, `${style.productionAssetStatus === "AI_CONCEPT" ? "Studio Bible art direction only" : "Wireframe concept preview only"}; final export requires approved transparent PNG/WebP layers, deterministic composition, metadata, and provenance.`]
       },
       distinctiveness: {
         ...distinctiveness,
@@ -165,20 +166,16 @@ export class GeneratorService {
       capabilities: {
         openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
         pinataAvailable: Boolean(process.env.PINATA_JWT),
+        geminiImagesAvailable: Boolean(process.env.GEMINI_API_KEY),
         aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
         productionStorageAvailable: (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") !== "mock" && Boolean(process.env.PINATA_JWT)
       },
-      conceptRequest: conceptResult.conceptRequest,
+      conceptRequest: this.studioConceptSummary(studioResult.summary),
       warnings: [
         "Preview generated without DB persistence.",
-        ...conceptResult.warnings,
-        !conceptResult.warnings.length && style.productionAssetStatus === "AI_CONCEPT" && this.previewProviderLabel(aiPreviews) === "openai-ai-concept-preview"
-          ? "AI studio preview only; final launch requires locked creator approval, curated/layered or artist-approved production assets, and permanent storage."
-          : "",
-        !aiPreviews.length
-          ? "No AI collection art was generated. Creator-facing output is the style bible, trait plan, rarity ladder, and export manifest until OpenAI or curated assets are available."
-          : "",
-        "OpenAI image generation is art direction only and is never used in mint, final render, redeem, stake, or unstake flows."
+        ...studioResult.warnings,
+        "Fast Studio Preview is art direction only; final launch/export requires an approved transparent layer manifest and deterministic local composition.",
+        "OpenAI is not used for Studio Bible generation. Use Premium Cinematic Render explicitly for optional hero/key art."
       ].filter(Boolean)
     };
   }
@@ -232,8 +229,17 @@ export class GeneratorService {
       }
     });
 
-    await this.createProfileVersion(run.id, normalized, analysis, context, 1, 0);
-    await this.prisma.generationRun.update({ where: { id: run.id }, data: { status: "PREVIEWED" } });
+    const studioSummary = await this.createProfileVersion(run.id, normalized, analysis, context, 1, 0);
+    await this.prisma.generationRun.update({
+      where: { id: run.id },
+      data: {
+        status: "PREVIEWED",
+        studioProvider: studioSummary.provider,
+        cinematicProvider: this.cinematicProvider(),
+        estimatedCostUsd: studioSummary.estimatedCostUsd,
+        generationCostBreakdown: this.json(studioSummary.costBreakdown)
+      }
+    });
     return this.getRun(run.id);
   }
 
@@ -243,7 +249,13 @@ export class GeneratorService {
     const context = this.communityContext.build(normalized.tokenSymbol, normalized.description, normalized.hints, analysis);
     const style = this.styleProfiles.generate(normalized, analysis, context, 1);
     const pack = this.traitPacks.generate(style);
-    return this.aiConcepts.validateRequestPlan(style, pack, `${normalized.tokenMint}:preview`, normalized.logoData, normalized.logoUri);
+    const styleBible = this.buildStyleBible(style, pack);
+    return {
+      ok: true,
+      ...this.studioConceptSummary(this.studioImages.validatePlan(style, styleBible, normalized.tokenMint, 1, "preview")),
+      requests: styleBible.promptPack,
+      issues: []
+    };
   }
 
   async getRun(id: string) {
@@ -290,10 +302,17 @@ export class GeneratorService {
     const input = this.inputFromRun(run);
     const analysis = this.analysisFromRun(run.logoAnalysis);
     const context = this.contextFromRun(run.communityContext);
-    await this.createProfileVersion(id, input, analysis, context, version, run.regenerationCount + 1);
+    const studioSummary = await this.createProfileVersion(id, input, analysis, context, version, run.regenerationCount + 1);
     await this.prisma.generationRun.update({
       where: { id },
-      data: { regenerationCount: { increment: 1 }, status: "PREVIEWED", approvedVersion: null }
+      data: {
+        regenerationCount: { increment: 1 },
+        status: "PREVIEWED",
+        approvedVersion: null,
+        studioProvider: studioSummary.provider,
+        estimatedCostUsd: studioSummary.estimatedCostUsd,
+        generationCostBreakdown: this.json(studioSummary.costBreakdown)
+      }
     });
     return this.getRun(id);
   }
@@ -307,13 +326,61 @@ export class GeneratorService {
     const style = this.styleFromRecord(latest);
     const pack = this.packFromRecord(latest.traitPack);
     const version = Math.max(1, ...latest.previewAssets.map((asset) => asset.version)) + 1;
+    const styleBible = this.buildStyleBible(style, pack);
     const wireframes = this.previews.generate(style, pack, run.seed, version);
-    const conceptResult = await this.conceptPreviewsWithFallback(run.tokenMint, style, pack, run.seed, run.logoData ?? undefined, run.logoUri ?? undefined);
-    const aiPreviews = conceptResult.previews;
-    const previews = aiPreviews.length ? aiPreviews : wireframes;
-    if (aiPreviews.length) await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
+    const studioResult = await this.studioAssetsWithCache(run.tokenMint, style, pack, styleBible, latest.version, `v${version}`);
+    const previews = [...studioResult.assets, ...wireframes];
+    if (studioResult.assets.length) await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
     await this.persistPreviews(id, latest.id, version, previews);
+    await this.prisma.generationRun.update({
+      where: { id },
+      data: {
+        studioProvider: studioResult.summary.provider,
+        estimatedCostUsd: studioResult.summary.estimatedCostUsd,
+        generationCostBreakdown: this.json(studioResult.summary.costBreakdown)
+      }
+    });
     return this.getRun(id);
+  }
+
+  async premiumCinematicRender(id: string, walletAddress?: string) {
+    await requireDbForWrite(this.prisma);
+    const run = await this.getRun(id);
+    this.assertOwner(run, walletAddress);
+    if (run.status === "APPROVED") throw new ConflictException("Approved generator runs are immutable. Create a new run to add premium cinematic art.");
+    if (this.cinematicProvider() !== "openai") throw new BadRequestException("Premium Cinematic Render currently requires CINEMATIC_PROVIDER=openai.");
+    const latest = run.styleProfiles[0];
+    if (!latest?.traitPack) throw new NotFoundException("Generation run has no style profile for premium cinematic render");
+    const style = this.styleFromRecord(latest);
+    const pack = this.packFromRecord(latest.traitPack);
+    const version = this.nextPreviewVersion(latest.previewAssets);
+    try {
+      const previews = await this.withProviderTimeout(this.aiConcepts.generateHeroConcept(style, pack, `${run.seed}:premium-cinematic:${version}`, run.logoData ?? undefined, run.logoUri ?? undefined), 60_000);
+      if (!previews.length) throw new BadRequestException("Premium Cinematic Render did not produce a hero concept.");
+      await this.persistPreviews(id, latest.id, version, previews);
+      const costBreakdown = previews.map((preview) => ({
+        provider: preview.provider,
+        model: String(preview.generationMetadata?.model ?? "unknown"),
+        generationType: "hero_concept",
+        promptHash: String(preview.promptHash ?? ""),
+        estimatedCostUsd: Number(preview.generationMetadata?.estimatedCostUsd ?? 0),
+        cacheStatus: "generated"
+      }));
+      const existingBreakdown = Array.isArray(run.generationCostBreakdown) ? run.generationCostBreakdown : [];
+      const existingCost = Number(run.estimatedCostUsd ?? 0);
+      await this.prisma.generationRun.update({
+        where: { id },
+        data: {
+          cinematicProvider: "openai",
+          estimatedCostUsd: Number((existingCost + costBreakdown.reduce((sum, line) => sum + line.estimatedCostUsd, 0)).toFixed(6)),
+          generationCostBreakdown: this.json([...existingBreakdown, ...costBreakdown])
+        }
+      });
+      return this.getRun(id);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new BadRequestException(this.aiUnavailableWarning(error));
+    }
   }
 
   async studioAction(id: string, input: StudioWorkflowInput) {
@@ -341,10 +408,9 @@ export class GeneratorService {
       const pack = this.packFromRecord(latest.traitPack);
       const version = this.nextPreviewVersion(latest.previewAssets);
       const seedKey = `${run.seed}:${input.action}:${input.target ?? "set"}:${version}`;
-      const wireframes = this.previews.generate(style, pack, seedKey, version);
-      const conceptResult = await this.conceptPreviewsWithFallback(run.tokenMint, style, pack, seedKey, run.logoData ?? undefined, run.logoUri ?? undefined, { bypassCache: true });
-      const generated = conceptResult.previews.length ? conceptResult.previews : wireframes;
-      const previews = this.annotateStudioPreviews(this.selectStudioPreviews(generated, input), input, studioWorkflow);
+      const styleBible = this.buildStyleBible(style, pack);
+      const studioResult = await this.studioAssetsWithCache(run.tokenMint, style, pack, styleBible, latest.version, seedKey, { bypassCache: true });
+      const previews = this.annotateStudioPreviews(this.selectStudioAssets(studioResult.assets, input), input, studioWorkflow);
       if (!previews.length) throw new BadRequestException("Studio refinement did not produce any preview assets.");
       if (previews.some((preview) => preview.productionAssetStatus === "AI_CONCEPT")) {
         await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
@@ -353,6 +419,14 @@ export class GeneratorService {
         style.productionAssetPolicy.defaultAssetStatus = "AI_CONCEPT";
       }
       await this.persistPreviews(id, latest.id, version, previews);
+      await this.prisma.generationRun.update({
+        where: { id },
+        data: {
+          studioProvider: studioResult.summary.provider,
+          estimatedCostUsd: studioResult.summary.estimatedCostUsd,
+          generationCostBreakdown: this.json(studioResult.summary.costBreakdown)
+        }
+      });
       await this.persistPreviewQualityReport(id, latest.id, style, pack, latest, previews);
     }
 
@@ -609,22 +683,22 @@ export class GeneratorService {
     context: ReturnType<CommunityContextService["build"]>,
     version: number,
     reroll: number
-  ) {
+  ): Promise<StudioGenerationSummary> {
     const style = this.styleProfiles.generate(input, analysis, context, version);
     const pack = this.traitPacks.generate(style);
-    this.buildStyleBible(style, pack);
+    const styleBible = this.buildStyleBible(style, pack);
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${input.tokenMint}:${version}`, reroll);
-    const conceptResult = await this.conceptPreviewsWithFallback(input.tokenMint, style, pack, `${input.tokenMint}:${version}`, input.logoData, input.logoUri);
-    const aiPreviews = conceptResult.previews;
-    if (aiPreviews.length) {
+    const studioResult = await this.studioAssetsWithCache(input.tokenMint, style, pack, styleBible, version, `v${version}`);
+    const studioAssets = studioResult.assets;
+    if (studioAssets.length) {
       style.productionAssetStatus = "AI_CONCEPT";
       style.artSource = "AI_ASSISTED";
       style.productionAssetPolicy.defaultAssetStatus = "AI_CONCEPT";
     }
     this.applyConfiguredProductionStatus(style, pack);
-    const previews = aiPreviews.length ? aiPreviews : wireframes;
+    const previews = [...studioAssets, ...wireframes];
     const existing = await this.prisma.styleProfile.findMany({
       where: { generationRunId: { not: runId } },
       orderBy: { createdAt: "desc" },
@@ -727,6 +801,7 @@ export class GeneratorService {
         issues: this.json(quality.issues)
       }
     });
+    return studioResult.summary;
   }
 
   private async persistPreviewQualityReport(
@@ -824,6 +899,13 @@ export class GeneratorService {
     if (input.action === "regenerate-legendary-scene") {
       return previews.filter((preview) => preview.type === "SAMPLE_NFT" && /Legendary|Mythic/.test(String(preview.metadata.rarity)));
     }
+    return [];
+  }
+
+  private selectStudioAssets(previews: PreviewAssetPlan[], input: StudioWorkflowInput) {
+    if (input.action === "regenerate-rarity-tier") return previews.filter((preview) => preview.type === "RARITY_LADDER" || preview.type === "TRAIT_CATALOG");
+    if (input.action === "regenerate-mood-set") return previews.filter((preview) => preview.type === "MOOD_SHEET");
+    if (input.action === "regenerate-legendary-scene") return previews.filter((preview) => preview.type === "RARITY_LADDER" || preview.type === "LAYER_BREAKDOWN");
     return [];
   }
 
@@ -1083,6 +1165,110 @@ export class GeneratorService {
     const plan = this.styleBible.build(style, pack);
     this.styleBible.attach(style, plan);
     return plan;
+  }
+
+  private async studioAssetsWithCache(
+    tokenMint: string,
+    style: GeneratedStyleProfile,
+    pack: TraitPackPlan,
+    plan: StyleBiblePlan,
+    styleVersion: number,
+    rarityVersion: string,
+    options: { bypassCache?: boolean } = {}
+  ) {
+    void pack;
+    const deterministicAssets = this.styleBible.studioAssets(plan);
+    const cachedAssets = options.bypassCache ? [] : await this.persistedStudioAssetCache(tokenMint);
+    return this.studioImages.generateStudioAssets({
+      tokenMint,
+      style,
+      plan,
+      deterministicAssets,
+      styleVersion,
+      rarityVersion,
+      cachedAssets
+    });
+  }
+
+  private async persistedStudioAssetCache(tokenMint: string): Promise<PreviewAssetPlan[]> {
+    try {
+      const runs = await this.prisma.generationRun.findMany({
+        where: { tokenMint },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        include: {
+          styleProfiles: {
+            orderBy: { version: "desc" },
+            take: 3,
+            include: {
+              previewAssets: {
+                where: {
+                  type: { in: ["STYLE_BIBLE", "TRAIT_CATALOG", "RARITY_LADDER", "MOOD_SHEET", "LAYER_BREAKDOWN"] as any }
+                },
+                orderBy: { createdAt: "desc" }
+              }
+            }
+          }
+        }
+      });
+      return runs.flatMap((run) =>
+        run.styleProfiles.flatMap((profile) =>
+          profile.previewAssets.map((asset): PreviewAssetPlan => ({
+            type: asset.type as PreviewAssetPlan["type"],
+            label: asset.label,
+            uri: asset.uri,
+            productionAssetStatus: (asset.productionAssetStatus ?? "AI_CONCEPT") as ProductionAssetStatus,
+            previewClassification: (asset.previewClassification ?? "AI_CONCEPT_PREVIEW") as PreviewClassification,
+            provider: ((asset.provider as PreviewAssetPlan["provider"] | null) ?? "cached") as PreviewAssetPlan["provider"],
+            promptHash: asset.promptHash ?? undefined,
+            generationMetadata: this.record(asset.generationMetadata),
+            metadata: this.record(asset.metadata)
+          }))
+        )
+      );
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: "studio_asset_persistent_cache_lookup_failed",
+          tokenMint: this.shortMint(tokenMint),
+          errorClass: error instanceof Error ? error.name : typeof error,
+          message: error instanceof Error ? error.message : String(error)
+        })
+      );
+      return [];
+    }
+  }
+
+  private studioConceptSummary(summary: StudioGenerationSummary) {
+    return {
+      provider: summary.provider,
+      imageCount: summary.imageCount,
+      estimatedOpenAIRequestCount: 0,
+      usesPaidOpenAIImageGeneration: false,
+      lowCostMode: true,
+      maxImagesPerRun: summary.imageCount,
+      cacheTtlSeconds: 7 * 24 * 60 * 60,
+      cachedResultAvailable: summary.cacheStatus === "hit",
+      confirmationRequired: false,
+      confirmationThreshold: 0,
+      model: summary.model,
+      quality: summary.generationType === "fast_studio_preview" ? "Fast Studio Preview" : "Premium Cinematic Render",
+      estimatedCostUsd: summary.estimatedCostUsd,
+      generationType: summary.generationType,
+      costBreakdown: summary.costBreakdown
+    };
+  }
+
+  private studioProviderLabel(summary: StudioGenerationSummary) {
+    if (summary.provider === "gemini") return "gemini-fast-studio-preview";
+    if (summary.provider === "cached") return "cached-studio-bible-preview";
+    if (summary.provider === "gemini-unavailable") return "deterministic-studio-bible-preview";
+    return "deterministic-studio-bible-preview";
+  }
+
+  private cinematicProvider() {
+    const provider = (process.env.CINEMATIC_PROVIDER ?? "openai").trim().toLowerCase();
+    return provider === "gemini" ? "gemini" : "openai";
   }
 
   private async conceptPreviewsWithFallback(tokenMint: string, style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string, options: { bypassCache?: boolean } = {}) {

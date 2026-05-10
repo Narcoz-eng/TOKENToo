@@ -274,13 +274,18 @@ export type CollectionGeneratorPreview = {
   };
 };
 
-export type StudioPreviewAssetType = "STYLE_BIBLE" | "TRAIT_CATALOG" | "RARITY_LADDER" | "MOOD_SHEET" | "LAYER_BREAKDOWN";
+export type StudioPreviewAssetType = "STYLE_BIBLE" | "TRAIT_CATALOG" | "RARITY_LADDER" | "MOOD_SHEET" | "LAYER_BREAKDOWN" | "HERO_CONCEPT";
 
 export type StudioPreviewAsset = {
   type: StudioPreviewAssetType;
   label: string;
   uri: string;
   provider?: string;
+  model?: string;
+  generationType?: string;
+  promptHash?: string;
+  estimatedCostUsd?: number;
+  cacheStatus?: string;
   metadata?: Record<string, unknown>;
   generationMetadata?: Record<string, unknown>;
 };
@@ -391,6 +396,16 @@ export type ConceptRequestSummary = {
   confirmationThreshold?: number;
   model?: string;
   quality?: string;
+  generationType?: string;
+  estimatedCostUsd?: number;
+  costBreakdown?: Array<{
+    provider?: string;
+    model?: string;
+    generationType?: string;
+    promptHash?: string;
+    estimatedCostUsd?: number;
+    cacheStatus?: string;
+  }>;
   providerFailureReason?: string;
   providerFailureCode?: string;
 };

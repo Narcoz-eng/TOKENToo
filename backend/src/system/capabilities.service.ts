@@ -12,6 +12,9 @@ export type SystemCapabilities = {
   heliusConfigured: boolean;
   heliusReachable: boolean;
   heliusAvailable: boolean;
+  geminiImagesAvailable: boolean;
+  fastStudioPreviewAvailable: boolean;
+  premiumCinematicAvailable: boolean;
   openaiImagesAvailable: boolean;
   pinataAvailable: boolean;
   permanentStorageConfigured: boolean;
@@ -93,6 +96,9 @@ export class CapabilitiesService {
         heliusConfigured,
         heliusReachable,
         heliusAvailable: heliusConfigured && heliusReachable,
+        geminiImagesAvailable: Boolean(process.env.GEMINI_API_KEY),
+        fastStudioPreviewAvailable: this.fastStudioPreviewAvailable(),
+        premiumCinematicAvailable: this.premiumCinematicAvailable(),
         openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
         pinataAvailable: Boolean(process.env.PINATA_JWT),
         permanentStorageConfigured: this.permanentStorageConfigured(),
@@ -127,6 +133,9 @@ export class CapabilitiesService {
       heliusConfigured,
       heliusReachable,
       heliusAvailable: heliusConfigured && heliusReachable,
+      geminiImagesAvailable: Boolean(process.env.GEMINI_API_KEY),
+      fastStudioPreviewAvailable: this.fastStudioPreviewAvailable(),
+      premiumCinematicAvailable: this.premiumCinematicAvailable(),
       openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
       pinataAvailable: Boolean(process.env.PINATA_JWT),
       permanentStorageConfigured: this.permanentStorageConfigured(),
@@ -274,6 +283,31 @@ export class CapabilitiesService {
     return provider === "premium-fallback" || provider === "local-placeholder" || localProvider === "premium-fallback" || localProvider === "branded-placeholder";
   }
 
+  private studioProvider() {
+    const provider = (process.env.STUDIO_PROVIDER ?? "gemini").trim().toLowerCase();
+    if (provider === "openai") return "openai";
+    if (provider === "deterministic" || provider === "deterministic-render") return "deterministic-render";
+    return "gemini";
+  }
+
+  private cinematicProvider() {
+    const provider = (process.env.CINEMATIC_PROVIDER ?? "openai").trim().toLowerCase();
+    return provider === "gemini" ? "gemini" : "openai";
+  }
+
+  private fastStudioPreviewAvailable() {
+    const provider = this.studioProvider();
+    if (provider === "openai") return false;
+    if (provider === "deterministic-render") return true;
+    return Boolean(process.env.GEMINI_API_KEY);
+  }
+
+  private premiumCinematicAvailable() {
+    const provider = this.cinematicProvider();
+    if (provider === "gemini") return Boolean(process.env.GEMINI_API_KEY);
+    return Boolean(process.env.OPENAI_API_KEY) && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true";
+  }
+
   private tokenMetadataAvailable(heliusAvailable: boolean, programExecutable: boolean) {
     return heliusAvailable && this.productionStorageAvailable() && this.solanaAvailable() && this.devnetProgramConfigured() && programExecutable;
   }
@@ -392,6 +426,12 @@ export class CapabilitiesService {
       "APPROVED_LAYER_PACK_ID",
       "DEMO_CURATED_LAYER_PACK",
       "AI_ASSISTED_FINAL_ASSETS_APPROVED",
+      "STUDIO_PROVIDER",
+      "GEMINI_API_KEY",
+      "GEMINI_IMAGE_MODEL",
+      "GEMINI_IMAGE_TIMEOUT_MS",
+      "GEMINI_IMAGE_ESTIMATED_COST_USD",
+      "CINEMATIC_PROVIDER",
       "AI_CONCEPT_PROVIDER",
       "AI_CONCEPT_LOW_COST_MODE",
       "AI_CONCEPT_MAX_IMAGES_PER_RUN",
@@ -423,7 +463,7 @@ export class CapabilitiesService {
       mintingAvailable: launchAvailable && capabilities.productionStorageAvailable,
       creatorSetupRequired: !launchAvailable,
       messages: [
-        creativePreviewReady ? "Creative DNA ready" : "Professional preview not ready yet",
+        creativePreviewReady ? "Fast Studio Preview ready" : "Fast Studio Preview not ready yet",
         launchAvailable ? "Launch path available" : "Launch is not available yet",
         launchAvailable && capabilities.productionStorageAvailable ? "Minting setup ready" : "Minting is temporarily unavailable",
         launchAvailable ? "Ready for creator review" : "Creator setup required"
@@ -433,7 +473,7 @@ export class CapabilitiesService {
 
   private publicWarnings(capabilities: SystemCapabilities, setupModes: SetupMode[]) {
     return this.publicReadiness(capabilities, setupModes).messages.filter((message) =>
-      message === "Professional preview not ready yet" ||
+      message === "Fast Studio Preview not ready yet" ||
       message === "Launch is not available yet" ||
       message === "Minting is temporarily unavailable" ||
       message === "Creator setup required"
@@ -447,8 +487,8 @@ export class CapabilitiesService {
         id: "creative-preview",
         label: "Creative Preview",
         ready: readiness.professionalPreviewReady,
-        output: readiness.professionalPreviewReady ? "Creative DNA ready." : "Professional preview not ready yet.",
-        missing: readiness.professionalPreviewReady ? [] : ["Professional preview not ready yet"],
+        output: readiness.professionalPreviewReady ? "Fast Studio Preview ready." : "Fast Studio Preview not ready yet.",
+        missing: readiness.professionalPreviewReady ? [] : ["Fast Studio Preview not ready yet"],
         blockedBy: readiness.professionalPreviewReady ? [] : ["Creator setup required"]
       },
       {
@@ -480,10 +520,10 @@ export class CapabilitiesService {
       items: [
         {
           key: "PROFESSIONAL_PREVIEW",
-          label: "Professional preview",
+          label: "Fast Studio Preview",
           ok: readiness.professionalPreviewReady,
           requiredFor: ["Creative Preview"],
-          fix: "Professional preview not ready yet."
+          fix: "Fast Studio Preview not ready yet."
         },
         {
           key: "LAUNCH_AVAILABILITY",
@@ -514,6 +554,9 @@ export class CapabilitiesService {
     const readiness = this.publicReadiness(capabilities, setupModes);
     return {
       professionalPreviewReady: readiness.professionalPreviewReady,
+      geminiImagesAvailable: capabilities.geminiImagesAvailable,
+      fastStudioPreviewAvailable: capabilities.fastStudioPreviewAvailable,
+      premiumCinematicAvailable: capabilities.premiumCinematicAvailable,
       launchAvailable: readiness.launchAvailable,
       mintingAvailable: readiness.mintingAvailable,
       creatorSetupRequired: readiness.creatorSetupRequired
@@ -521,9 +564,10 @@ export class CapabilitiesService {
   }
 
   private setupModes(capabilities: SystemCapabilities): SetupMode[] {
-    const creativeMissing = capabilities.localPreviewProviderEnabled ? [] : [
-      ...(capabilities.aiGenerationEnabled ? [] : ["ENABLE_AI_IMAGE_GENERATION=true"]),
-      ...(capabilities.openaiImagesAvailable ? [] : ["OPENAI_API_KEY"])
+    const studioProvider = this.studioProvider();
+    const creativeMissing = [
+      ...(studioProvider === "gemini" && !capabilities.geminiImagesAvailable ? ["GEMINI_API_KEY"] : []),
+      ...(studioProvider === "openai" ? ["STUDIO_PROVIDER must be gemini or deterministic-render"] : [])
     ];
     const devnetLayerPackReady = this.realApprovedLayerPackAvailable() || capabilities.demoCuratedLayerPackAllowed;
     const devnetMissing = [
@@ -547,7 +591,7 @@ export class CapabilitiesService {
         id: "creative-preview",
         label: "Creative Preview Mode",
         ready: creativeMissing.length === 0,
-        output: "Premium AI studio preview for creator refinement and approval, clearly separated from automatic minting.",
+        output: "Fast Studio Preview produces Studio Bible sheets for creator review; final exports still require approved transparent layers.",
         missing: creativeMissing,
         blockedBy: creativeMissing
       },
@@ -587,18 +631,25 @@ export class CapabilitiesService {
       productionLaunchReady: setupModes.find((mode) => mode.id === "production-launch")?.ready ?? false,
       items: [
         {
-          key: "ENABLE_AI_IMAGE_GENERATION",
-          label: "ENABLE_AI_IMAGE_GENERATION",
-          ok: capabilities.aiGenerationEnabled || capabilities.localPreviewProviderEnabled,
+          key: "STUDIO_PROVIDER",
+          label: "STUDIO_PROVIDER",
+          ok: this.studioProvider() !== "openai",
           requiredFor: ["Creative Preview Mode"],
-          fix: "Set ENABLE_AI_IMAGE_GENERATION=true or AI_CONCEPT_PROVIDER=premium-fallback for zero-cost cinematic studio posters."
+          fix: "Set STUDIO_PROVIDER=gemini for Fast Studio Preview sheets. OpenAI is reserved for Premium Cinematic Render."
         },
         {
-          key: "OPENAI_API_KEY",
-          label: "OPENAI_API_KEY",
-          ok: capabilities.openaiImagesAvailable || capabilities.localPreviewProviderEnabled,
+          key: "GEMINI_API_KEY",
+          label: "GEMINI_API_KEY",
+          ok: capabilities.geminiImagesAvailable || this.studioProvider() === "deterministic-render",
           requiredFor: ["Creative Preview Mode"],
-          fix: "Add an OpenAI API key to the backend environment, or use AI_CONCEPT_PROVIDER=premium-fallback for local cinematic studio posters."
+          fix: "Add GEMINI_API_KEY to use Gemini image sheets, or set STUDIO_PROVIDER=deterministic-render for local reference sheets."
+        },
+        {
+          key: "CINEMATIC_PROVIDER",
+          label: "CINEMATIC_PROVIDER",
+          ok: this.cinematicProvider() !== "openai" || capabilities.openaiImagesAvailable,
+          requiredFor: ["Premium Cinematic Render"],
+          fix: "Set CINEMATIC_PROVIDER=openai plus OPENAI_API_KEY only for explicit hero/key-art renders."
         },
         {
           key: "PROGRAM_ID",
@@ -651,7 +702,9 @@ export class CapabilitiesService {
     if (!capabilities.databaseAvailable) warnings.push("Database is unavailable; public reads use empty states and writes are blocked.");
     if (!capabilities.heliusConfigured) warnings.push("HELIUS_API_KEY is missing; CA-first token scanning is blocked.");
     if (capabilities.heliusConfigured && !capabilities.heliusReachable) warnings.push(`Helius is configured but unreachable or unhealthy${getLastHeliusErrorCode() ? ` (${getLastHeliusErrorCode()})` : ""}.`);
-    if (capabilities.aiGenerationEnabled && !capabilities.openaiImagesAvailable) warnings.push("AI image generation is enabled but OPENAI_API_KEY is not configured.");
+    if (this.studioProvider() === "openai") warnings.push("STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; use gemini or deterministic-render.");
+    if (this.studioProvider() === "gemini" && !capabilities.geminiImagesAvailable) warnings.push("GEMINI_API_KEY is missing; Fast Studio Preview falls back to deterministic art-direction sheets.");
+    if (this.cinematicProvider() === "openai" && !capabilities.openaiImagesAvailable) warnings.push("Premium Cinematic Render is configured for OpenAI but OPENAI_API_KEY is missing.");
     if (!capabilities.permanentStorageConfigured) warnings.push("Permanent storage is not configured; launch and final mint assets are blocked.");
     if (!this.realApprovedLayerPackAvailable()) warnings.push(capabilities.demoCuratedLayerPackAllowed ? "Using devnet demo layer pack; production launch remains blocked until a real curated or artist-approved layer pack is configured." : "Approved curated layer pack is missing; production launch is blocked.");
     if (capabilities.demoCuratedLayerPackEnabled && !capabilities.demoCuratedLayerPackAllowed) warnings.push("DEMO_CURATED_LAYER_PACK is enabled but blocked in production.");

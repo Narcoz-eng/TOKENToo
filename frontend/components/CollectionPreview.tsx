@@ -65,12 +65,12 @@ export function CollectionPreview({
                 {!preview.finalProductionReady ? (
                   <p className="mt-3 max-w-3xl rounded-md border border-vault-gold/35 bg-vault-gold/10 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
                     {generationUnavailable
-                      ? exactGenerationReason(preview) ?? "AI studio generation is unavailable right now. No fake collection art is shown; continue editing the style bible and retry after the OpenAI issue is fixed."
+                      ? exactGenerationReason(preview) ?? "Studio Bible generation is unavailable right now. No fake collection art is shown; continue editing the style bible and retry after the provider issue is fixed."
                       : hiddenFallbackArt
                       ? "Fallback art was returned by the provider and is hidden from creator-facing collection output."
                       : preview.productionAssetStatus === "AI_CONCEPT"
-                      ? "AI studio preview - creator refinement only. Final minting requires locked approval plus layered, curated, or artist-approved production assets."
-                      : "AI studio preview required. Generate studio imagery before reviewing collection visuals."}
+                      ? "Studio Bible art direction only. Final minting requires approved transparent layers, deterministic composition, metadata, and provenance."
+                      : "Fast Studio Preview required before reviewing collection visuals."}
                   </p>
                 ) : null}
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -91,7 +91,7 @@ export function CollectionPreview({
             {conceptRequest ? <ConceptRunStatus conceptRequest={conceptRequest} provider={preview.assetProvider} fallbackHidden={hiddenFallbackArt} /> : null}
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <FeatureTile icon={LockKeyhole} title={wireframeOnly ? "Vault visuals pending" : "Vault NFTs"} body={wireframeOnly ? "Vault NFT visuals pending AI studio preview or curated layer pack." : "Token-backed identity cards with redeem and marketplace hooks."} />
+              <FeatureTile icon={LockKeyhole} title={wireframeOnly ? "Vault visuals pending" : "Vault NFTs"} body={wireframeOnly ? "Vault NFT visuals pending Fast Studio Preview or curated layer pack." : "Token-backed identity cards with redeem and marketplace hooks."} />
               <FeatureTile icon={Swords} title="Raid Rooms" body={cleanDisplayText(preview.raidTheme || "Faction raids activate after launch.")} />
               <FeatureTile icon={Sparkles} title="Staking" body="Reward hooks and role progression are ready for collection rules." />
             </div>
@@ -100,8 +100,8 @@ export function CollectionPreview({
       </SectionCard>
 
       {professionalPreview ? (
-        <SectionCard title={aiConcept ? "AI Studio Preview" : "Vault NFT Preview Set"}>
-          {aiConcept ? <p className="mb-4 rounded-md border border-vault-cyan/25 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">AI studio preview - refine, lock, and curate before launch.</p> : null}
+        <SectionCard title={aiConcept ? "Studio Bible Preview" : "Vault NFT Preview Set"}>
+          {aiConcept ? <p className="mb-4 rounded-md border border-vault-cyan/25 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">Studio Bible art direction only. Final layers must be approved before export or launch.</p> : null}
           {visualSamples.length ? (
             <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
               {visualSamples.slice(0, compact ? 3 : 6).map((sample) => (
@@ -150,11 +150,11 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
           <Wand2 className="size-4" />
           <p className="text-xs font-black uppercase tracking-[0.18em]">Creative DNA Ready</p>
         </div>
-        <p className="mt-3 text-2xl font-black leading-tight text-white">{generationUnavailable ? "Generation unavailable - style bible remains editable" : "AI studio preview required"}</p>
+        <p className="mt-3 text-2xl font-black leading-tight text-white">{generationUnavailable ? "Generation unavailable - style bible remains editable" : "Fast Studio Preview required"}</p>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{culturePitch(preview)}</p>
         {onGenerateAiConcept ? (
           <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
-            <Sparkles className="size-4" /> {generationUnavailable ? "Retry AI Studio Preview" : "Generate AI Studio Preview"}
+            <Sparkles className="size-4" /> {generationUnavailable ? "Retry Fast Studio Preview" : "Fast Studio Preview"}
           </button>
         ) : null}
       </div>
@@ -173,7 +173,7 @@ function ConceptRunStatus({ conceptRequest, provider, fallbackHidden }: { concep
     <div className="mt-5 grid gap-3 rounded-lg border border-vault-line bg-black/35 p-4 text-xs font-bold text-slate-300 md:grid-cols-4">
       <p>Provider <span className="mt-1 block text-sm font-black text-white">{providerLabel(provider ?? conceptRequest.provider)}</span></p>
       <p>Images <span className="mt-1 block text-sm font-black text-white">{conceptRequest.imageCount ?? 0}</span></p>
-      <p>OpenAI spend <span className={cn("mt-1 block text-sm font-black", paid ? "text-vault-gold" : "text-vault-green")}>{paid ? `${conceptRequest.estimatedOpenAIRequestCount ?? 0} request(s)` : "None"}</span></p>
+      <p>Estimated cost <span className={cn("mt-1 block text-sm font-black", paid ? "text-vault-gold" : "text-vault-green")}>{formatUsd(conceptRequest.estimatedCostUsd)}</span></p>
       <p>Cache <span className={cn("mt-1 block text-sm font-black", conceptRequest.cachedResultAvailable ? "text-vault-green" : "text-vault-gold")}>{conceptRequest.cachedResultAvailable ? "Available" : fallbackHidden ? "Fallback hidden" : "Not available"}</span></p>
     </div>
   );
@@ -186,18 +186,18 @@ function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGener
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="rounded-lg border border-vault-gold/30 bg-vault-gold/8 p-5">
           <p className="text-sm font-black uppercase text-vault-gold">Creative DNA ready</p>
-          <h3 className="mt-2 text-2xl font-black text-white">AI studio preview required</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-300">{generationUnavailable ? "AI generation is currently unavailable. No fake collection art is shown; use the studio bible and retry after the OpenAI issue is fixed." : "A polished identity direction is ready. Generate studio imagery to review hero art, mood, and rarity storytelling before any launch decision."}</p>
+          <h3 className="mt-2 text-2xl font-black text-white">Fast Studio Preview required</h3>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{generationUnavailable ? "Studio generation is currently unavailable. No fake collection art is shown; use the studio bible and retry after the provider issue is fixed." : "A polished identity direction is ready. Generate Studio Bible sheets to review traits, mood, rarity, and layer direction before any launch decision."}</p>
           {onGenerateAiConcept ? (
             <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
-              <Sparkles className="size-4" /> {generationUnavailable ? "Retry AI Studio Preview" : "Generate AI Studio Preview"}
+              <Sparkles className="size-4" /> {generationUnavailable ? "Retry Fast Studio Preview" : "Fast Studio Preview"}
             </button>
           ) : null}
         </div>
         <div className="rounded-lg border border-vault-line bg-black/35 p-5">
           <p className="text-xs uppercase text-slate-500">Production path</p>
           <div className="mt-3 space-y-2 text-sm font-bold text-slate-200">
-            <p>AI studio preview</p>
+            <p>Fast Studio Preview</p>
             <p>Layered curated or artist-cleaned production assets</p>
             <p>Final production assets</p>
           </div>
@@ -261,7 +261,7 @@ function CreatorReadinessGrid({ preview, wireframeOnly }: { preview: CollectionG
         <ReviewItem icon={BadgeCheck} label="Collection" value={publicCollectionName(preview)} />
         <ReviewItem icon={Palette} label="Visual direction" value={cleanDisplayText(preview.artStyle)} />
         <ReviewItem icon={Swords} label="Raids" value={cleanDisplayText(preview.raidTheme || "Raid rooms ready")} />
-        <ReviewItem icon={ShieldCheck} label="Preview status" value={wireframeOnly ? "AI studio preview required" : `${preview.quality.previewQualityScore}% preview score`} />
+        <ReviewItem icon={ShieldCheck} label="Preview status" value={wireframeOnly ? "Fast Studio Preview required" : `${preview.quality.previewQualityScore}% preview score`} />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {identityTags(preview).map((tag) => (
@@ -434,7 +434,7 @@ function WireframeSpecCard({ sample, index }: { sample: CollectionGeneratorPrevi
 function PendingVaultVisuals() {
   return (
     <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-6 text-center">
-      <p className="font-black text-white">Vault NFT visuals pending AI studio preview or curated layer pack.</p>
+      <p className="font-black text-white">Vault NFT visuals pending Fast Studio Preview or curated layer pack.</p>
       <p className="mx-auto mt-2 max-w-xl text-sm text-slate-400">No wireframe artwork is shown as collection art.</p>
     </div>
   );
@@ -549,18 +549,26 @@ function safeDecode(value: string) {
 }
 
 function exactGenerationReason(preview: CollectionGeneratorPreview) {
-  const warning = preview.warnings?.find((item) => /AI (?:concept|studio) generation unavailable/i.test(item));
+  const warning = preview.warnings?.find((item) => /(?:AI|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
   if (!warning) return undefined;
-  return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "OpenAI generation unavailable: ");
+  return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "Studio generation unavailable: ");
 }
 
 function providerLabel(provider?: string) {
   if (!provider) return "Automatic fallback";
-  if (/openai/i.test(provider)) return "OpenAI studio preview";
+  if (/gemini/i.test(provider)) return "Gemini Studio Bible";
+  if (/openai/i.test(provider)) return "OpenAI premium cinematic";
   if (/cached/i.test(provider)) return "Cached studio preview";
+  if (/deterministic/i.test(provider)) return "Deterministic Studio Bible";
   if (/premium-fallback|fallback-poster/i.test(provider)) return "Fallback art hidden";
   if (/local-placeholder|planning/i.test(provider)) return "Legacy preview hidden";
   return cleanDisplayText(provider);
+}
+
+function formatUsd(value: unknown) {
+  const amount = typeof value === "number" ? value : typeof value === "string" ? Number(value) : 0;
+  if (!Number.isFinite(amount) || amount <= 0) return "$0.00";
+  return amount < 0.01 ? "<$0.01" : `$${amount.toFixed(2)}`;
 }
 
 function shortSpec(value: string) {
@@ -575,7 +583,7 @@ function isWireframePreview(preview: CollectionGeneratorPreview) {
 
 function previewStatusLabel(preview: CollectionGeneratorPreview) {
   if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Studio preview pending";
-  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "AI studio preview";
+  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "Studio Bible ready";
   if (preview.productionAssetStatus === "FINAL_PRODUCTION") return "Final production assets";
   if (preview.productionAssetStatus === "ARTIST_APPROVED") return "Artist approved assets";
   if (preview.productionAssetStatus === "CURATED_LAYER_READY") return "Curated layer ready";
@@ -590,7 +598,7 @@ function assetStatusLabel(status: CollectionGeneratorPreview["productionAssetSta
   if (status === "FINAL_PRODUCTION") return "Final";
   if (status === "ARTIST_APPROVED") return "Artist approved";
   if (status === "CURATED_LAYER_READY") return "Curated layers";
-  if (status === "AI_CONCEPT") return "AI studio";
+  if (status === "AI_CONCEPT") return "Art direction only";
   return "Pending art";
 }
 

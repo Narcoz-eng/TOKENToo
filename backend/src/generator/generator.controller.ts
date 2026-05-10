@@ -96,6 +96,12 @@ export class GeneratorController {
     return this.generator.regeneratePreviews(id, walletAddress);
   }
 
+  @Post("runs/:id/premium-cinematic")
+  @UseGuards(WalletAuthGuard)
+  premiumCinematicRender(@Param("id") id: string, @WalletAddress() walletAddress: string) {
+    return this.generator.premiumCinematicRender(id, walletAddress);
+  }
+
   @Post("runs/:id/studio-action")
   @UseGuards(WalletAuthGuard)
   studioAction(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {

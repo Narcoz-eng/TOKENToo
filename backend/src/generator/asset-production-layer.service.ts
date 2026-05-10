@@ -17,9 +17,11 @@ export class AssetProductionLayerService {
     const legendaryProvider = this.provider(process.env.LEGENDARY_ASSET_PROVIDER ?? process.env.DESIGN_MODEL_PROVIDER);
     const storageIssue = this.storageIssue();
     const providerIssue = this.providerIssue(designProvider, layerProvider, legendaryProvider);
-    const layerPackIssue = this.productionLayers.approvedLayerPackConfigured() ? undefined : "Approved curated layer pack missing: set CURATED_LAYER_PACK_MANIFEST_URI, CURATED_LAYER_PACK_ROOT, or APPROVED_LAYER_PACK_ID.";
+    const layerManifest = this.productionLayers.approvedLayerManifestStatus(pack);
+    const layerPackIssue = layerManifest.approved ? undefined : layerManifest.reasonIfNo ?? "Approved curated layer pack missing: set CURATED_LAYER_PACK_MANIFEST_URI or CURATED_LAYER_PACK_ROOT.";
     const productionAssetStatus = this.productionLayers.status(style, pack, qualityTier);
-    const productionReady = this.productionLayers.meetsRequiredStatus(productionAssetStatus, "CURATED_LAYER_READY");
+    const statusReady = this.productionLayers.meetsRequiredStatus(productionAssetStatus, "CURATED_LAYER_READY");
+    const productionReady = statusReady && layerManifest.approved;
     const availableTraitLayers =
       this.roleValues(pack, "head").length +
       this.roleValues(pack, "eyes").length +
@@ -61,7 +63,11 @@ export class AssetProductionLayerService {
       legendaryAssets: this.layerSet(legendaryProvider, [...this.roleValues(pack, "legendary"), ...this.roleValues(pack, "animation")], "Epic, legendary, and mythic assets require curated composition rules and optional artist review."),
       productionAssetPolicy: { ...style.productionAssetPolicy, defaultAssetStatus: productionAssetStatus },
       royaltyPolicy: this.royaltyPolicy(),
-      readinessReport,
+      readinessReport: {
+        ...readinessReport,
+        layerManifestSource: layerManifest.source,
+        approvedLayerManifestAvailable: layerManifest.approved
+      },
       warnings: productionReady
         ? [this.demoLayerPackWarning(), this.royaltyPolicy().note].filter((value): value is string => Boolean(value))
         : [

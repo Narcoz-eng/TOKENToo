@@ -18,6 +18,7 @@ import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
 import { QualityValidatorService } from "./quality-validator.service";
 import { StyleBibleEngineService } from "./style-bible-engine.service";
+import { StudioImageProviderService } from "./studio-image-provider.service";
 import { RarityEngineService } from "./rarity-engine.service";
 import { StyleProfileGeneratorService } from "./style-profile-generator.service";
 import { TraitCoverageEngineService } from "./trait-coverage-engine.service";
@@ -42,6 +43,7 @@ import { ProductionLayerPackService } from "./production-layer-pack.service";
     CommunityContextService,
     StyleProfileGeneratorService,
     StyleBibleEngineService,
+    StudioImageProviderService,
     TraitCoverageEngineService,
     TraitPackGeneratorService,
     RarityEngineService,
@@ -56,6 +58,6 @@ import { ProductionLayerPackService } from "./production-layer-pack.service";
     CuratedAssetProvider,
     HybridAssetProvider
   ],
-  exports: [GeneratorService, AssetProductionLayerService, AssetStorageService, MetadataGeneratorService, ProductionLayerPackService, DeterministicRenderService]
+  exports: [GeneratorService, AssetProductionLayerService, AssetStorageService, MetadataGeneratorService, ProductionLayerPackService, DeterministicRenderService, StudioImageProviderService]
 })
 export class GeneratorModule {}

@@ -590,15 +590,49 @@ export type PreviewAssetPlan = {
     | "TRAIT_CATALOG"
     | "RARITY_LADDER"
     | "MOOD_SHEET"
-    | "LAYER_BREAKDOWN";
+    | "LAYER_BREAKDOWN"
+    | "HERO_CONCEPT";
   label: string;
   uri: string;
   productionAssetStatus: ProductionAssetStatus;
   previewClassification: PreviewClassification;
-  provider: "wireframe" | "openai" | "premium-fallback" | "local-placeholder" | "cached" | "curated" | "artist" | "deterministic-render";
+  provider:
+    | "wireframe"
+    | "gemini"
+    | "gemini-unavailable"
+    | "openai"
+    | "premium-fallback"
+    | "local-placeholder"
+    | "cached"
+    | "curated"
+    | "artist"
+    | "deterministic-render";
   promptHash?: string;
   generationMetadata?: Record<string, unknown>;
   metadata: Record<string, unknown>;
+};
+
+export type StudioProviderId = "gemini" | "openai" | "deterministic-render" | "cached";
+export type StudioGenerationType = "studio_bible" | "trait_catalog" | "rarity_ladder" | "mood_sheet" | "layer_breakdown" | "hero_concept";
+export type StudioCacheStatus = "hit" | "miss" | "generated" | "disabled";
+
+export type StudioGenerationCostLine = {
+  provider: StudioProviderId | "gemini-unavailable";
+  model: string;
+  generationType: StudioGenerationType;
+  promptHash: string;
+  estimatedCostUsd: number;
+  cacheStatus: StudioCacheStatus;
+};
+
+export type StudioGenerationSummary = {
+  provider: StudioProviderId | "gemini-unavailable";
+  model: string;
+  imageCount: number;
+  estimatedCostUsd: number;
+  cacheStatus: StudioCacheStatus;
+  generationType: "fast_studio_preview" | "premium_cinematic_render";
+  costBreakdown: StudioGenerationCostLine[];
 };
 
 export type DistinctivenessReportPlan = {

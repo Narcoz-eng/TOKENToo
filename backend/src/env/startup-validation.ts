@@ -7,6 +7,9 @@ export function validateStartupEnvironment() {
   const placeholderProgramId = "11111111111111111111111111111111";
   const strict = (process.env.STRICT_STARTUP_VALIDATION ?? "false") === "true";
   const issues: StartupCheck[] = [];
+  process.env.STUDIO_PROVIDER ??= "gemini";
+  process.env.CINEMATIC_PROVIDER ??= "openai";
+  process.env.GEMINI_IMAGE_MODEL ??= "gemini-2.5-flash-image";
   process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-1.5";
   process.env.OPENAI_IMAGE_QUALITY ??= "high";
   process.env.ENABLE_AI_IMAGE_GENERATION ??= "false";
@@ -33,6 +36,9 @@ export function validateStartupEnvironment() {
   }
   if ((process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && !process.env.OPENAI_API_KEY) {
     issues.push({ code: "OPENAI_MISSING", severity: appEnv === "production" ? "warning" : "info", message: "OPENAI_API_KEY is required when ENABLE_AI_IMAGE_GENERATION=true." });
+  }
+  if ((process.env.STUDIO_PROVIDER ?? "gemini").toLowerCase() === "openai") {
+    issues.push({ code: "STUDIO_PROVIDER_OPENAI", severity: appEnv === "production" ? "warning" : "info", message: "STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; use gemini or deterministic-render." });
   }
   if ((process.env.DEMO_CURATED_LAYER_PACK ?? "false") === "true" && appEnv === "production") {
     issues.push({ code: "DEMO_LAYER_PACK_IN_PRODUCTION", severity: "fatal", message: "DEMO_CURATED_LAYER_PACK is devnet demo only and must be disabled in production." });

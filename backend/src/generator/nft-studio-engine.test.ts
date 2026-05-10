@@ -1,4 +1,7 @@
 import { selectArtTeam } from "./art-team-engine";
+import { AiOutputQualityValidatorService } from "./ai-output-quality-validator.service";
+import { ProductionLayerPackService } from "./production-layer-pack.service";
+import { StudioImageProviderService } from "./studio-image-provider.service";
 import { StyleBibleEngineService } from "./style-bible-engine.service";
 import { TraitCoverageEngineService } from "./trait-coverage-engine.service";
 import type { GeneratedStyleProfile, TraitPackPlan } from "./generator.types";
@@ -177,9 +180,61 @@ async function main() {
   const bible = engine.build(baseStyle, pack);
   assert(bible.artTeam.id === "DEGENLAB", "style bible should preserve selected art team");
   assert(bible.exportPlan.provenanceHash.length === 64, "export provenance hash should be sha256");
+  assert(bible.exportPlan.layerManifest.endsWith("layer-manifest.json"), "style bible export should include a layer manifest path");
+  assert(bible.exportPlan.metaplexCandyMachineConfig.endsWith("metaplex-candy-machine.json"), "style bible export should include Candy Machine compatible config path");
+  assert(bible.exportPlan.genericZip.endsWith("-studio-export.zip"), "style bible export should include generic ZIP export path");
   assert(bible.exportPlan.styleBibleImage.startsWith("data:image/svg+xml"), "style bible image should be an inline studio sheet");
   assert(/style bible|data-studio-bible/i.test(decodeURIComponent(bible.exportPlan.styleBibleImage)), "style bible image should identify itself as a bible, not fake NFT art");
   assert(bible.qaReport.passed, `style bible QA should pass: ${bible.qaReport.issues.join(", ")}`);
+
+  const studioAssets = engine.studioAssets(bible);
+  const requiredTypes = ["STYLE_BIBLE", "TRAIT_CATALOG", "RARITY_LADDER", "MOOD_SHEET", "LAYER_BREAKDOWN"];
+  for (const type of requiredTypes) {
+    assert(studioAssets.some((asset) => asset.type === type && asset.uri.startsWith("data:image/svg+xml")), `${type} should render as a first-class Studio Bible asset`);
+  }
+
+  const previousStudioProvider = process.env.STUDIO_PROVIDER;
+  const previousGeminiKey = process.env.GEMINI_API_KEY;
+  delete process.env.STUDIO_PROVIDER;
+  delete process.env.GEMINI_API_KEY;
+  const provider = new StudioImageProviderService();
+  const summary = provider.validatePlan(baseStyle, bible, "test-mint");
+  assert(summary.provider === "gemini-unavailable", "Gemini should be the default Studio Bible provider, with deterministic fallback when the key is missing");
+  assert(summary.imageCount === 5, "Fast Studio Preview should plan the five Studio Bible sheets");
+  assert(summary.estimatedCostUsd === 0, "Missing Gemini key should not estimate paid preview cost");
+  const generated = await provider.generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(generated.assets.length === 5, "Studio provider should return all five Studio Bible assets");
+  assert(generated.assets.every((asset) => asset.provider !== "openai"), "OpenAI must not generate default Studio Bible assets");
+  assert(generated.assets.every((asset) => asset.generationMetadata?.artDirectionOnly === true && asset.generationMetadata?.finalLayerAsset === false), "Studio Bible assets must be marked as art direction, not final layers");
+  assert(generated.summary.costBreakdown.every((line) => line.generationType && typeof line.estimatedCostUsd === "number"), "Studio provider should return per-asset cost metadata");
+  const cached = await provider.generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview",
+    cachedAssets: generated.assets
+  });
+  assert(cached.assets.every((asset) => asset.provider === "cached"), "Identical Studio Bible requests should reuse cached assets");
+  assert(cached.summary.estimatedCostUsd === 0, "Cached Studio Bible reuse should not estimate new provider cost");
+  const aiIssues = new AiOutputQualityValidatorService().validate(generated.assets);
+  assert(!aiIssues.some((issue) => /missing banner|rarity character/i.test(issue)), `Studio Bible validation should not require cinematic OpenAI assets: ${aiIssues.join(", ")}`);
+  if (previousStudioProvider === undefined) delete process.env.STUDIO_PROVIDER;
+  else process.env.STUDIO_PROVIDER = previousStudioProvider;
+  if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+  else process.env.GEMINI_API_KEY = previousGeminiKey;
+
+  const layerStatus = new ProductionLayerPackService().approvedLayerManifestStatus(pack);
+  assert(!layerStatus.approved, "Final export should be blocked without an approved transparent PNG/WebP layer manifest");
+  assert(/Final export|Layer manifest|CURATED_LAYER_PACK/i.test(layerStatus.reasonIfNo ?? ""), "Missing layer manifest should explain that export is art direction only");
 }
 
 main().catch((error) => {

@@ -126,6 +126,62 @@ export class AiConceptPipelineService {
     return this.generateRequired(style, pack, seedKey, logoData, logoUri);
   }
 
+  async generateHeroConcept(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string): Promise<PreviewAssetPlan[]> {
+    if (this.provider() === "premium-fallback") return this.generatePremiumFallback(style, pack, seedKey, logoData, logoUri, "explicit-premium-cinematic").slice(0, 1).map((asset) => this.asHeroConcept(asset));
+    const availability = this.availability();
+    if (!availability.ready) throw new AiConceptGenerationError(availability.code, availability.message, { stage: "premium_cinematic_configuration" });
+    const reference = this.parseReference(logoData, logoUri);
+    const request = this.requests(style, pack, seedKey).find((item) => item.kind === "collection-hero");
+    if (!request) throw new AiConceptGenerationError("PREMIUM_HERO_REQUEST_MISSING", "Premium Cinematic Render could not build a hero concept request.", { stage: "premium_cinematic_request" });
+    const quality = resolveOpenAIImageQuality() as ImageGenerationInput["quality"];
+    const dnaHash = this.dnaHash(style);
+    const output = await this.openai.generate({
+      prompt: request.prompt,
+      size: request.size,
+      quality,
+      referenceImageBase64: reference?.base64,
+      referenceImageMimeType: reference?.mimeType,
+      referenceImageUrl: reference?.url
+    });
+    const uri = output.dataUri ?? `data:${output.mimeType};base64,${output.bytes?.toString("base64") ?? ""}`;
+    const promptHash = this.hash(request.prompt);
+    return [{
+      type: "HERO_CONCEPT",
+      label: `${style.collection} Premium Cinematic Render`,
+      uri,
+      productionAssetStatus: "AI_CONCEPT",
+      previewClassification: "AI_CONCEPT_PREVIEW",
+      provider: "openai",
+      promptHash,
+      generationMetadata: {
+        kind: "premium-cinematic-hero",
+        provider: "openai",
+        model: resolveOpenAIImageModel(),
+        quality,
+        size: request.size,
+        generationType: "hero_concept",
+        estimatedCostUsd: this.estimatedOpenAICostUsd(),
+        explicitPremiumAction: true,
+        seedKey,
+        dnaHash,
+        promptHash,
+        prompt: request.prompt
+      },
+      metadata: {
+        dnaHash,
+        generationType: "hero_concept",
+        estimatedCostUsd: this.estimatedOpenAICostUsd(),
+        artProductionStatus: "AI_CONCEPT",
+        productionAssetStatus: "AI_CONCEPT",
+        previewClassification: "AI_CONCEPT_PREVIEW",
+        conceptOnly: true,
+        notMintable: true,
+        promptHash,
+        visualSystem: style.creativeUniverse.creativeDna.visualSystem
+      }
+    }];
+  }
+
   async generateRequired(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string): Promise<PreviewAssetPlan[]> {
     if (this.provider() === "premium-fallback") return this.generatePremiumFallback(style, pack, seedKey, logoData, logoUri, "local-preview-provider");
     const availability = this.availability();
@@ -378,6 +434,30 @@ export class AiConceptPipelineService {
       })
     );
     return assets;
+  }
+
+  private asHeroConcept(asset: PreviewAssetPlan): PreviewAssetPlan {
+    return {
+      ...asset,
+      type: "HERO_CONCEPT",
+      label: asset.label.replace(/premium studio poster|AI studio hero preview/i, "Premium Cinematic Render"),
+      generationMetadata: {
+        ...(asset.generationMetadata ?? {}),
+        generationType: "hero_concept",
+        explicitPremiumAction: true
+      },
+      metadata: {
+        ...asset.metadata,
+        generationType: "hero_concept",
+        conceptOnly: true,
+        notMintable: true
+      }
+    };
+  }
+
+  private estimatedOpenAICostUsd() {
+    const configured = Number(process.env.OPENAI_IMAGE_ESTIMATED_COST_USD);
+    return Number.isFinite(configured) && configured >= 0 ? configured : 0.08;
   }
 
   private requests(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string): ConceptRequest[] {
