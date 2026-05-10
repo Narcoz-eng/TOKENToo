@@ -12,6 +12,8 @@ export class AiOutputQualityValidatorService {
     const requiredRarities = lowCostMode ? ["Common", "Epic", "Legendary"] : ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"];
     const issues: string[] = [];
     if (!ai.length) return issues;
+    if (ai.some((asset) => asset.provider === "local-placeholder")) issues.push("Creator-facing AI previews include legacy placeholder provider output.");
+    if (ai.some((asset) => /PLANNING VISUAL|local-branded-placeholder|branded placeholder/i.test(`${asset.label} ${asset.uri} ${JSON.stringify(asset.generationMetadata ?? {})}`))) issues.push("Creator-facing AI previews include legacy placeholder labels or metadata.");
     if (generatedAi.some((asset) => asset.uri.startsWith("data:image/svg+xml"))) issues.push("AI studio pipeline returned SVG or placeholder output.");
     if (generatedAi.some((asset) => famousIpPattern.test(JSON.stringify(asset.generationMetadata ?? {})))) issues.push("AI studio prompt references famous NFT IP.");
     for (const type of ["BANNER"]) {

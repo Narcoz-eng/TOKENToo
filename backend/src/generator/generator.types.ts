@@ -52,6 +52,12 @@ export type CommunityHints = {
   themePreference?: string;
   colorPreference?: string;
   mood?: GeneratorMood;
+  artTeamOverride?: ArtTeamId;
+  styleSubtype?: string;
+  traitIntensity?: number;
+  legendaryDirection?: string;
+  mythicDirection?: string;
+  rarityPercentages?: Partial<Record<"Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Mythic", number>>;
   sourceMetadata?: TokenSourceMetadata;
   overrides?: {
     tokenName?: string;
@@ -59,6 +65,27 @@ export type CommunityHints = {
     description?: string;
     logoUri?: string;
   };
+};
+
+export type ArtTeamId = "DEGENLAB" | "SOFTROOM_STUDIO" | "PAPERGHOST" | "MOSSWORKS" | "PIXEL_REBEL" | "VOID_SKETCH";
+
+export type ArtTeamProfile = {
+  id: ArtTeamId;
+  name: string;
+  lineLanguage: string;
+  anatomyRules: string;
+  shapeLanguage: string;
+  palettePhilosophy: string;
+  textureDensity: string;
+  detailBudget: string;
+  moodVocabulary: string[];
+  expressionSystem: string;
+  traitPhilosophy: string;
+  rarityEscalationPhilosophy: string;
+  mythicLegendaryRules: string[];
+  thumbnailReadabilityRules: string[];
+  nativeArchetypes: string[];
+  nativeTraitCatalog: Partial<Record<TraitCategoryRole, string[]>>;
 };
 
 export type TokenSourceMetadata = {
@@ -386,7 +413,106 @@ export type BrandDNA = {
   traitTaxonomy: TraitCategoryPlan[];
   rarityVisualRules: Record<string, RarityComplexityRule>;
   forbiddenSimilarities: string[];
+  artTeam?: ArtTeamProfile;
+  styleBible?: StyleBiblePlan;
+  traitCoverage?: TraitCoverageReport;
+  exportPlan?: StudioExportPlan;
   sourceMetadataSummary: Record<string, unknown>;
+};
+
+export type RarityExamplePlan = {
+  rarity: "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Mythic";
+  supplyTarget: string;
+  base: string;
+  head: string;
+  eyes: string;
+  mouth: string;
+  body: string;
+  prop: string;
+  background: string;
+  aura: string;
+  mood: string;
+  posture: string;
+  roleFantasy: string;
+  archetype: string;
+};
+
+export type TraitCoverageReport = {
+  traitCoverageScore: number;
+  traitDiversityScore: number;
+  rarityVisualDistance: number;
+  accessoryRotationScore: number;
+  outfitRotationScore: number;
+  mouthRotationScore: number;
+  eyeRotationScore: number;
+  backgroundRotationScore: number;
+  silhouetteVariationScore: number;
+  repeatedTraitWarnings: string[];
+  globalClicheWarnings: string[];
+  examples: RarityExamplePlan[];
+};
+
+export type StudioExportPlan = {
+  styleBibleJson: string;
+  styleBibleImage: string;
+  styleBiblePdf: string;
+  traitCatalogJson: string;
+  rarityTableJson: string;
+  metadataTemplate: string;
+  metadataFiles: string;
+  imageManifest: string;
+  layerManifest: string;
+  collectionConfig: string;
+  provenanceHash: string;
+  metaplexCandyMachineConfig: string;
+  genericZip: string;
+};
+
+export type StyleBiblePlan = {
+  collectionName: string;
+  ticker: string;
+  artTeam: ArtTeamProfile;
+  collectionDNA: string[];
+  tone: string[];
+  visualPrinciples: string[];
+  palette: string[];
+  lineTextureRules: string[];
+  traitCategories: Array<{ id: string; label: string; role: TraitCategoryRole; count: number; examples: string[] }>;
+  traitCounts: Record<string, number>;
+  moodVocabulary: string[];
+  rarityLadder: RarityExamplePlan[];
+  rarityPhilosophy: string;
+  archetypes: Array<{
+    name: string;
+    socialFantasy: string;
+    collectibleFantasy: string;
+    powerFantasy: string;
+    emotionalFantasy: string;
+    statusSymbol: string;
+    environmentalPrestige: string;
+    mythicIdentity: string;
+  }>;
+  layerBreakdown: Array<{ role: TraitCategoryRole; category: string; exportName: string; rules: string[]; approvalRequired: boolean }>;
+  thumbnailReadabilityRules: string[];
+  promptPack: {
+    styleBibleImage: string;
+    traitCatalogSheet: string;
+    rarityLadder: string;
+    moodSheet: string;
+    layerBreakdown: string;
+    heroConcept: string;
+  };
+  exportPlan: StudioExportPlan;
+  qaReport: {
+    traitCoverageScore: number;
+    rarityDiversityScore: number;
+    artTeamConsistencyScore: number;
+    collectionNativeArchetypeScore: number;
+    thumbnailReadabilityScore: number;
+    aiGenericRiskScore: number;
+    passed: boolean;
+    issues: string[];
+  };
 };
 
 export type RarityComplexityRule = {
@@ -454,12 +580,22 @@ export type CompatibilityRulePlan = {
 };
 
 export type PreviewAssetPlan = {
-  type: "AVATAR" | "BANNER" | "SAMPLE_NFT" | "TRAIT_SHEET" | "ANIMATION_KEYFRAME";
+  type:
+    | "AVATAR"
+    | "BANNER"
+    | "SAMPLE_NFT"
+    | "TRAIT_SHEET"
+    | "ANIMATION_KEYFRAME"
+    | "STYLE_BIBLE"
+    | "TRAIT_CATALOG"
+    | "RARITY_LADDER"
+    | "MOOD_SHEET"
+    | "LAYER_BREAKDOWN";
   label: string;
   uri: string;
   productionAssetStatus: ProductionAssetStatus;
   previewClassification: PreviewClassification;
-  provider: "wireframe" | "openai" | "local-placeholder" | "cached" | "curated" | "artist" | "deterministic-render";
+  provider: "wireframe" | "openai" | "premium-fallback" | "local-placeholder" | "cached" | "curated" | "artist" | "deterministic-render";
   promptHash?: string;
   generationMetadata?: Record<string, unknown>;
   metadata: Record<string, unknown>;

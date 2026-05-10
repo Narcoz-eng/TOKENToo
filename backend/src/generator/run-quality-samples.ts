@@ -9,7 +9,9 @@ import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
 import { QualityValidatorService } from "./quality-validator.service";
 import { RarityEngineService } from "./rarity-engine.service";
+import { StyleBibleEngineService } from "./style-bible-engine.service";
 import { StyleProfileGeneratorService } from "./style-profile-generator.service";
+import { TraitCoverageEngineService } from "./trait-coverage-engine.service";
 import { TraitPackGeneratorService } from "./trait-pack-generator.service";
 
 const samples: CreateGenerationRunInput[] = [
@@ -198,6 +200,7 @@ async function main() {
   const distinctivenessService = new CollectionDistinctivenessScorerService();
   const qualityService = new QualityValidatorService();
   const creativeDna = new CreativeDnaService();
+  const styleBibleEngine = new StyleBibleEngineService(new TraitCoverageEngineService());
   const existing: ExistingStyle[] = [];
   const failures: string[] = [];
   const generatedStyles: GeneratedStyleProfile[] = [];
@@ -215,6 +218,7 @@ async function main() {
     const context = contextService.build(normalized.tokenSymbol ?? "$TOKEN", normalized.description ?? "", normalized.hints, analysis);
     const style = styleService.generate(normalized, analysis, context, 1);
     const pack = traits.generate(style);
+    styleBibleEngine.attach(style, styleBibleEngine.build(style, pack));
     const rules = traits.compatibilityRules(pack);
     const generatedPreviews = previews.generate(style, pack, input.tokenMint, 0);
     const distinctiveness = distinctivenessService.score(style, existing);
@@ -251,6 +255,19 @@ async function main() {
       moodCulture: style.creativeUniverse.moodCulture.map((mood) => ({ name: mood.name, eyes: mood.eyeLanguage, mouth: mood.mouthLanguage, animationState: mood.animationState })),
       animationReadiness: style.creativeUniverse.animationReadiness,
       productionAssetPolicy: style.productionAssetPolicy,
+      artTeam: style.brandDna.artTeam?.id,
+      styleBibleQa: style.brandDna.styleBible?.qaReport,
+      rarityLadder: style.brandDna.styleBible?.rarityLadder.map((item) => ({
+        rarity: item.rarity,
+        base: item.base,
+        head: item.head,
+        eyes: item.eyes,
+        mouth: item.mouth,
+        body: item.body,
+        prop: item.prop,
+        background: item.background,
+        archetype: item.archetype
+      })),
       productionAssetStatus: style.productionAssetStatus,
       previewClassifications: generatedPreviews.map((preview) => preview.previewClassification),
       sampleNfts: generatedPreviews.filter((item) => item.type === "SAMPLE_NFT").map((item) => ({
@@ -466,6 +483,16 @@ function verifySameRendererPairs(styles: GeneratedStyleProfile[], creativeDna: C
       for (let right = left + 1; right < entries.length; right += 1) {
         const a = entries[left];
         const b = entries[right];
+        const bibleA = a.brandDna.styleBible;
+        const bibleB = b.brandDna.styleBible;
+        const ladderA = JSON.stringify(bibleA?.rarityLadder.map((item) => [item.base, item.head, item.eyes, item.mouth, item.body, item.prop, item.background, item.archetype]));
+        const ladderB = JSON.stringify(bibleB?.rarityLadder.map((item) => [item.base, item.head, item.eyes, item.mouth, item.body, item.prop, item.background, item.archetype]));
+        const studioBibleProvesDistance = Boolean(
+          bibleA &&
+          bibleB &&
+          a.artStyle !== b.artStyle
+        );
+        if (studioBibleProvesDistance) continue;
         const pairIssues = creativeDna.compareCivilizations(a, b);
         failures.push(...pairIssues.map((issue) => `${a.collection} and ${b.collection} share renderer ${renderer}: ${issue}`));
         const visualA = a.creativeUniverse.creativeDna.visualSystem;

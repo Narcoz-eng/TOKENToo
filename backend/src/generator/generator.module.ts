@@ -17,8 +17,10 @@ import { GeneratorService } from "./generator.service";
 import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
 import { QualityValidatorService } from "./quality-validator.service";
+import { StyleBibleEngineService } from "./style-bible-engine.service";
 import { RarityEngineService } from "./rarity-engine.service";
 import { StyleProfileGeneratorService } from "./style-profile-generator.service";
+import { TraitCoverageEngineService } from "./trait-coverage-engine.service";
 import { TraitPackGeneratorService } from "./trait-pack-generator.service";
 import { CuratedAssetProvider, HybridAssetProvider, MockImageProvider, OpenAIImageProvider } from "./image-providers";
 import { ProductionLayerPackService } from "./production-layer-pack.service";
@@ -39,6 +41,8 @@ import { ProductionLayerPackService } from "./production-layer-pack.service";
     LogoAnalysisService,
     CommunityContextService,
     StyleProfileGeneratorService,
+    StyleBibleEngineService,
+    TraitCoverageEngineService,
     TraitPackGeneratorService,
     RarityEngineService,
     CompatibilityEngineService,

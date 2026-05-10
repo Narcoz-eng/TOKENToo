@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { CompatibilityRulePlan, GeneratedStyleProfile, TraitDefinitionPlan, TraitPackPlan, TraitCategoryPlan, TraitCategoryRole } from "./generator.types";
 import { pick, seedFrom, titleCase, unique } from "./generator.util";
 import { RarityEngineService } from "./rarity-engine.service";
+import { artTeamForStyle } from "./art-team-engine";
 
 @Injectable()
 export class TraitPackGeneratorService {
@@ -10,10 +11,12 @@ export class TraitPackGeneratorService {
   generate(style: GeneratedStyleProfile): TraitPackPlan {
     const seed = seedFrom(`${style.collection}:${style.theme}:${style.backgroundWorld}`);
     const taxonomy = style.creativeUniverse?.taxonomy ?? this.fallbackTaxonomy(style);
+    const artTeam = artTeamForStyle(style);
     const categories = Object.fromEntries(
       taxonomy.map((category, index) => {
         const base = category.role === "base" ? style.brandDna.baseArchetypes : [];
-        return [category.id, unique([...base, ...this.names(style, category, seed + index * 113)]).slice(0, category.targetCount)];
+        const native = artTeam.nativeTraitCatalog[category.role] ?? [];
+        return [category.id, unique([...native, ...base, ...this.names(style, category, seed + index * 113)]).slice(0, Math.max(category.targetCount, native.length))];
       })
     );
     const categoryRoles = Object.fromEntries(taxonomy.map((category) => [category.role, category.id])) as Record<TraitCategoryRole, string>;

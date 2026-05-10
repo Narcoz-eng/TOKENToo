@@ -20,6 +20,7 @@ import type {
   ProductionAssetStatus,
   StudioWorkflowInput,
   StudioWorkflowState,
+  StyleBiblePlan,
   SubmitCollectionLaunchInput,
   TraitPackPlan
 } from "./generator.types";
@@ -27,6 +28,7 @@ import { seedFrom } from "./generator.util";
 import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
 import { QualityValidatorService } from "./quality-validator.service";
+import { StyleBibleEngineService } from "./style-bible-engine.service";
 import { StyleProfileGeneratorService } from "./style-profile-generator.service";
 import { TraitPackGeneratorService } from "./trait-pack-generator.service";
 import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
@@ -57,6 +59,7 @@ export class GeneratorService {
     @Inject(AssetStorageService) private readonly assetStorage: AssetStorageService,
     @Inject(CollectionDistinctivenessScorerService) private readonly distinctiveness: CollectionDistinctivenessScorerService,
     @Inject(QualityValidatorService) private readonly quality: QualityValidatorService,
+    @Inject(StyleBibleEngineService) private readonly styleBible: StyleBibleEngineService,
     @Inject(MetadataGeneratorService) private readonly metadata: MetadataGeneratorService,
     @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
   ) {}
@@ -85,6 +88,9 @@ export class GeneratorService {
     const context = this.communityContext.build(normalized.tokenSymbol, normalized.description, normalized.hints, analysis);
     const style = this.styleProfiles.generate(normalized, analysis, context, 1);
     const pack = this.traitPacks.generate(style);
+    const styleBible = this.buildStyleBible(style, pack);
+    const studioAssets = this.styleBible.studioAssets(styleBible);
+    const studioAsset = (type: PreviewAssetPlan["type"]) => studioAssets.find((asset) => asset.type === type);
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
@@ -103,6 +109,7 @@ export class GeneratorService {
     if (!compatibilityResult.passed) quality.issues.push(...compatibilityResult.issues);
     quality.issues.push(...this.aiQuality.validate(previews));
     const readiness = this.tenKReadinessReport(pack, style, quality);
+    const providerDiagnostics = conceptResult.conceptRequest as Record<string, unknown>;
 
     return {
       ok: true,
@@ -114,6 +121,17 @@ export class GeneratorService {
       brandDna: style.brandDna,
       creativeUniverse: style.creativeUniverse,
       productionAssetPolicy: style.productionAssetPolicy,
+      styleBible,
+      studioAssets,
+      styleBibleAsset: studioAsset("STYLE_BIBLE"),
+      traitCatalogAsset: studioAsset("TRAIT_CATALOG"),
+      rarityLadderAsset: studioAsset("RARITY_LADDER"),
+      moodSheetAsset: studioAsset("MOOD_SHEET"),
+      layerBreakdownAsset: studioAsset("LAYER_BREAKDOWN"),
+      artTeam: styleBible.artTeam,
+      traitCoverageScore: styleBible.qaReport.traitCoverageScore,
+      rarityDiversityScore: styleBible.qaReport.rarityDiversityScore,
+      providerStatus: String(providerDiagnostics.providerFailureCode ?? providerDiagnostics.providerFailureReason ?? providerDiagnostics.provider ?? this.previewProviderLabel(aiPreviews)),
       collection: {
         name: style.collection,
         palette: style.colors,
@@ -143,6 +161,7 @@ export class GeneratorService {
         estimate: distinctiveness.score >= 86 ? "highly distinct" : distinctiveness.score >= 72 ? "distinct with review" : "too close"
       },
       tenKReadiness: readiness,
+      exportPlan: styleBible.exportPlan,
       capabilities: {
         openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
         pinataAvailable: Boolean(process.env.PINATA_JWT),
@@ -153,17 +172,11 @@ export class GeneratorService {
       warnings: [
         "Preview generated without DB persistence.",
         ...conceptResult.warnings,
-        conceptResult.warnings.length ? "Studio planning visual fallback active; this keeps the preview reviewable while final assets are curated." : "",
         !conceptResult.warnings.length && style.productionAssetStatus === "AI_CONCEPT" && this.previewProviderLabel(aiPreviews) === "openai-ai-concept-preview"
           ? "AI studio preview only; final launch requires locked creator approval, curated/layered or artist-approved production assets, and permanent storage."
           : "",
-        !conceptResult.warnings.length && this.previewProviderLabel(aiPreviews) === "local-placeholder-planning-visual"
-          ? "Local branded studio planning visual provider active; no paid OpenAI image generation was used."
-          : "",
         !aiPreviews.length
-          ? (style.productionAssetStatus === "AI_CONCEPT"
-          ? "AI studio preview only; final launch requires curated/layered or artist-approved production assets and permanent storage."
-          : "Wireframe only - enable OpenAI image generation or curated asset provider for professional NFT previews.")
+          ? "No AI collection art was generated. Creator-facing output is the style bible, trait plan, rarity ladder, and export manifest until OpenAI or curated assets are available."
           : "",
         "OpenAI image generation is art direction only and is never used in mint, final render, redeem, stake, or unstake flows."
       ].filter(Boolean)
@@ -599,6 +612,7 @@ export class GeneratorService {
   ) {
     const style = this.styleProfiles.generate(input, analysis, context, version);
     const pack = this.traitPacks.generate(style);
+    this.buildStyleBible(style, pack);
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${input.tokenMint}:${version}`, reroll);
@@ -948,7 +962,7 @@ export class GeneratorService {
       data: storedPreviews.map((preview) => ({
         generationRunId,
         styleProfileId,
-        type: preview.type,
+        type: preview.type as Prisma.PreviewAssetCreateManyInput["type"],
         label: preview.label,
         uri: preview.uri,
         productionAssetStatus: preview.productionAssetStatus,
@@ -1065,6 +1079,12 @@ export class GeneratorService {
     }
   }
 
+  private buildStyleBible(style: GeneratedStyleProfile, pack: TraitPackPlan): StyleBiblePlan {
+    const plan = this.styleBible.build(style, pack);
+    this.styleBible.attach(style, plan);
+    return plan;
+  }
+
   private async conceptPreviewsWithFallback(tokenMint: string, style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string, options: { bypassCache?: boolean } = {}) {
     const conceptRequest = this.aiConcepts.conceptRunSummary(style, pack, seedKey, logoData, logoUri);
     const cacheKey = String(conceptRequest.cacheKey);
@@ -1093,22 +1113,22 @@ export class GeneratorService {
     }
 
     if (conceptRequest.provider === "cached-only") {
-      const previews = this.aiConcepts.generateLocalPlaceholder(style, pack, seedKey, logoData, logoUri, "cached-only-no-cache");
       const result = {
-        previews,
-        warnings: ["AI_CONCEPT_PROVIDER=cached-only is configured, but no cached studio preview exists. Showing branded studio planning visuals without calling OpenAI."],
-        conceptRequest: { ...conceptRequest, provider: "local-placeholder", cachedResultAvailable: false, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0 }
+        previews: [] as PreviewAssetPlan[],
+        warnings: ["AI_CONCEPT_PROVIDER=cached-only is configured, but no cached studio art exists. No fake collection art is shown; use the style bible and controls until cached or OpenAI assets are available."],
+        conceptRequest: { ...conceptRequest, provider: "cached-only", cachedResultAvailable: false, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0 }
       };
-      this.logPreviewTrace("cached-only-placeholder", tokenMint, result.previews, result.conceptRequest);
+      this.logPreviewTrace("cached-only-no-art", tokenMint, result.previews, result.conceptRequest);
       return result;
     }
 
     try {
-      const previews = await this.aiConcepts.generateRequired(style, pack, seedKey, logoData, logoUri);
+      const previews = await this.withProviderTimeout(this.aiConcepts.generateRequired(style, pack, seedKey, logoData, logoUri), 20_000);
       const provider = this.previewProviderLabel(previews);
-      const warnings = provider === "local-placeholder-planning-visual" ? ["Local branded studio planning visual provider active; no paid OpenAI image generation was used."] : [];
+      const visiblePreviews = provider === "premium-fallback-poster" || provider === "legacy-placeholder-hidden" ? [] : previews;
+      const warnings = visiblePreviews.length ? [] : ["Configured image provider returned fallback or placeholder art. It is hidden from creator-facing collection output."];
       const result = {
-        previews,
+        previews: visiblePreviews,
         warnings,
         conceptRequest: { ...conceptRequest, provider, cachedResultAvailable: false, usesPaidOpenAIImageGeneration: provider === "openai-ai-concept-preview", estimatedOpenAIRequestCount: provider === "openai-ai-concept-preview" ? conceptRequest.imageCount : 0 }
       };
@@ -1116,17 +1136,30 @@ export class GeneratorService {
       return result;
     } catch (error) {
       const unavailable = this.aiUnavailableWarning(error);
-      const previews = this.aiConcepts.generateLocalPlaceholder(style, pack, seedKey, logoData, logoUri, "openai-unavailable");
       const result = {
-        previews,
+        previews: [] as PreviewAssetPlan[],
         warnings: [
           unavailable,
-          "OpenAI generation is unavailable right now; showing branded cinematic studio planning visuals so the collection experience is never blank."
+          "OpenAI generation is unavailable. No fake NFT art is shown; creators can keep editing the style bible, traits, moods, rarity plan, and exports, then rerender after billing/provider repair."
         ],
-        conceptRequest: { ...conceptRequest, provider: "local-placeholder", cachedResultAvailable: false, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0, providerFailureReason: unavailable }
+        conceptRequest: { ...conceptRequest, provider: "openai-unavailable", cachedResultAvailable: false, usesPaidOpenAIImageGeneration: false, estimatedOpenAIRequestCount: 0, providerFailureReason: unavailable, providerFailureCode: this.providerFailureCode(error) }
       };
-      this.logPreviewTrace("openai-fallback-placeholder", tokenMint, result.previews, result.conceptRequest);
+      this.logPreviewTrace("openai-unavailable-no-art", tokenMint, result.previews, result.conceptRequest);
       return result;
+    }
+  }
+
+  private async withProviderTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        operation,
+        new Promise<T>((_, reject) => {
+          timer = setTimeout(() => reject(new GatewayTimeoutException(`OpenAI image provider timed out after ${timeoutMs}ms`)), timeoutMs);
+        })
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
@@ -1188,7 +1221,8 @@ export class GeneratorService {
   private previewProviderLabel(previews: PreviewAssetPlan[]) {
     if (previews.some((preview) => preview.provider === "openai")) return "openai-ai-concept-preview";
     if (previews.some((preview) => preview.provider === "cached")) return "cached-ai-concept-preview";
-    if (previews.some((preview) => preview.provider === "local-placeholder")) return "local-placeholder-planning-visual";
+    if (previews.some((preview) => preview.provider === "premium-fallback")) return "premium-fallback-poster";
+    if (previews.some((preview) => preview.provider === "local-placeholder")) return "legacy-placeholder-hidden";
     if (previews.some((preview) => preview.provider === "curated")) return "curated-layer-preview";
     return "wireframe-concept-preview";
   }
@@ -1254,13 +1288,26 @@ export class GeneratorService {
       if (typeof response === "string") return this.sanitizePublicError(response);
       if (response && typeof response === "object") {
         const record = response as Record<string, unknown>;
+        const code = typeof record.code === "string" ? record.code : undefined;
         const message = typeof record.message === "string" ? record.message : undefined;
-        if (message) return this.sanitizePublicError(message);
+        if (message) return this.sanitizePublicError(code ? `${code}: ${message}` : message);
       }
     }
     if (error instanceof AiConceptGenerationError) return this.sanitizePublicError(error.message);
     if (error instanceof Error) return this.sanitizePublicError(error.message);
     return "OpenAI did not return a usable studio preview.";
+  }
+
+  private providerFailureCode(error: unknown) {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+      if (response && typeof response === "object") {
+        const code = (response as Record<string, unknown>).code;
+        if (typeof code === "string") return code;
+      }
+    }
+    if (error instanceof AiConceptGenerationError) return error.code;
+    return "OPENAI_REQUEST_FAILED";
   }
 
   private sanitizePublicError(value: string) {

@@ -20,6 +20,7 @@ import type {
 import { CreativeDnaService } from "./creative-dna.service";
 import { pick, seedFrom, titleCase, unique } from "./generator.util";
 import { RarityEngineService } from "./rarity-engine.service";
+import { selectArtTeam } from "./art-team-engine";
 
 type SemanticHint = {
   key: string;
@@ -48,8 +49,21 @@ export class StyleProfileGeneratorService {
     const tokenSymbol = input.tokenSymbol ?? source?.symbol ?? "$TOKEN";
     const sourceWords = unique([...context.extractedVocabulary, ...this.sourceWords(input), ...analysis.visualKeywords]).filter((word) => !this.genericWord(word));
     const motif = this.primaryMotif(tokenName, tokenSymbol, sourceWords, context.extractedVocabulary, seed);
+    const artTeam = selectArtTeam(input, sourceWords.join(" "));
     const seedWorld = input.hints?.themePreference?.trim() || this.visualWorld(sourceWords, seed + 2);
     const universe = this.creativeUniverse(input, analysis, context, sourceWords, motif, seedWorld, seed);
+    universe.artStyle = `${artTeam.name} / ${this.cleanTokenCode(input.tokenSymbol ?? input.tokenName ?? motif)}: ${artTeam.lineLanguage}; ${artTeam.shapeLanguage}; ${motif} ${universe.archetype} subtype`;
+    Object.assign(universe.creativeDna.visualSystem, this.artTeamVisualSystem(artTeam.id));
+    universe.artStyleReason = `Selected from token metadata and creator hints; ${artTeam.traitPhilosophy}`;
+    universe.creativeDna.artStyle = universe.artStyle;
+    universe.creativeDna.textureLanguage = artTeam.lineLanguage;
+    universe.creativeDna.moodCulture = artTeam.moodVocabulary;
+    universe.creativeDna.expressionLanguage = artTeam.moodVocabulary.map((mood) => `${mood} expressed through ${artTeam.expressionSystem}`);
+    universe.creativeDna.rarityPhilosophy = artTeam.rarityEscalationPhilosophy;
+    universe.creativeDna.legendaryMythology =
+      input.hints?.legendaryDirection?.trim() ||
+      `${this.cleanTokenCode(input.tokenSymbol ?? input.tokenName ?? motif)} ${pick(artTeam.nativeArchetypes, seed + 19)} becomes the collection-native legendary identity inside ${universe.creativeDna.worldConcept}; ${artTeam.mythicLegendaryRules.join("; ")}`;
+    universe.antiGenericRules = unique([...universe.antiGenericRules, ...artTeam.mythicLegendaryRules, "Reject hood + halo + void + staff as a universal mythic formula.", "Reject global gold god forms unless the token-native status fantasy demands it."]);
     const world = universe.creativeDna.worldConcept;
     const silhouette = universe.creativeDna.baseSilhouetteRules[0] ?? this.silhouette(analysis, sourceWords, seed);
     const mascot = universe.creativeDna.mascotOrSubject;
@@ -107,6 +121,7 @@ export class StyleProfileGeneratorService {
         ...universe.creativeDna.forbiddenSimilarities,
         ...universe.antiGenericRules
       ],
+      artTeam,
       creativeDna: universe.creativeDna,
       signalProfile: universe.signalProfile,
       sourceMetadataSummary: {
@@ -1336,6 +1351,20 @@ export class StyleProfileGeneratorService {
 
   private categoryId(label: string) {
     return label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 48);
+  }
+
+  private cleanTokenCode(value: string) {
+    return value.replace(/[^a-z0-9]+/gi, "").toUpperCase().slice(0, 12) || "TOKEN";
+  }
+
+  private artTeamVisualSystem(artTeamId: string): Partial<VisualDesignSystem> {
+    if (artTeamId === "DEGENLAB") return { rendererFamily: "comic-panel", renderingEngine: "comic-panel-engine", cardStructure: "rough ink NFT bible card, paper panel, visible trait labels" };
+    if (artTeamId === "SOFTROOM_STUDIO") return { rendererFamily: "sticker-pack", renderingEngine: "sticker-engine", cardStructure: "clean sticker collectible card with simple readable shapes" };
+    if (artTeamId === "PAPERGHOST") return { rendererFamily: "painterly-portrait", renderingEngine: "portrait-engine", cardStructure: "quiet paper portrait with sparse pencil rules" };
+    if (artTeamId === "MOSSWORKS") return { rendererFamily: "children-cartoon", renderingEngine: "poster-engine", cardStructure: "storybook specimen card with organic layer notes" };
+    if (artTeamId === "PIXEL_REBEL") return { rendererFamily: "pixel-topdown", renderingEngine: "pixel-engine", cardStructure: "pixel identity card with screen emotion panels" };
+    if (artTeamId === "VOID_SKETCH") return { rendererFamily: "propaganda-poster", renderingEngine: "poster-engine", cardStructure: "street poster card with marker/spray trait tags" };
+    return {};
   }
 
   private rarityVisualRules(motif: string, world: string, silhouette: string, visual: VisualDesignSystem): Record<string, RarityComplexityRule> {

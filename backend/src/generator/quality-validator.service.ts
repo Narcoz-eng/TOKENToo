@@ -40,6 +40,7 @@ export class QualityValidatorService {
     if (this.usesFixedArchetypeTemplate(style)) issues.push("Generator still exposes a fixed archetype template instead of dynamic Creative DNA.");
     if (!style.productionAssetPolicy || style.productionAssetPolicy.launchClassification !== "CONCEPT_PREVIEW") issues.push("Production asset policy must distinguish concept previews from final approved assets.");
     if (style.productionAssetPolicy?.aiFinalImageAllowed !== false) issues.push("Production policy must not allow fully AI-generated final NFT images.");
+    issues.push(...this.styleBibleIssues(style));
     issues.push(...this.creativeDna.validate(style, pack));
     if (this.poseReuse(previews) > 0.55) issues.push("Too many sample NFTs reuse the same pose; rarity ladder needs visible composition changes.");
     if (this.sameBaseAcrossRarities(previews)) issues.push("All rarity previews share the same base/face language.");
@@ -88,6 +89,28 @@ export class QualityValidatorService {
     };
     const scores = Object.entries(minimums).map(([role, minimum]) => (this.roleValues(pack, role as TraitCategoryRole).length >= minimum ? 100 : 0));
     return average(scores);
+  }
+
+  private styleBibleIssues(style: GeneratedStyleProfile) {
+    const issues: string[] = [];
+    const bible = style.brandDna.styleBible;
+    const coverage = style.brandDna.traitCoverage;
+    if (!bible) return ["Creator-facing style bible is required before a collection preview can be accepted."];
+    if (!coverage) return ["Trait coverage report is required before a collection preview can be accepted."];
+    if (coverage.traitCoverageScore < 82) issues.push("Trait catalog and rarity ladder are not connected strongly enough.");
+    if (coverage.traitDiversityScore < 82) issues.push("Rarity examples repeat too many visible traits.");
+    if (coverage.rarityVisualDistance < 78) issues.push("Rarity ladder examples look too similar across tiers.");
+    if (coverage.accessoryRotationScore < 80) issues.push("Accessory/prop rotation is too weak across rarity examples.");
+    if (coverage.outfitRotationScore < 80) issues.push("Outfit/body rotation is too weak across rarity examples.");
+    if (coverage.mouthRotationScore < 80) issues.push("Mouth/expression rotation is too weak across rarity examples.");
+    if (coverage.eyeRotationScore < 80) issues.push("Eye rotation is too weak across rarity examples.");
+    if (coverage.backgroundRotationScore < 80) issues.push("Background rotation is too weak across rarity examples.");
+    if (coverage.silhouetteVariationScore < 80) issues.push("Silhouette variation is too weak across rarity examples.");
+    if (coverage.globalClicheWarnings.length) issues.push(...coverage.globalClicheWarnings);
+    if (coverage.repeatedTraitWarnings.length) issues.push(...coverage.repeatedTraitWarnings.slice(0, 4));
+    if (bible.qaReport.aiGenericRiskScore > 35) issues.push("Style bible still has high generic AI-art risk.");
+    if (!bible.qaReport.passed) issues.push("Style bible QA did not pass creator-facing visual quality gates.");
+    return issues;
   }
 
   private previewQuality(style: GeneratedStyleProfile, previews: PreviewAssetPlan[]) {

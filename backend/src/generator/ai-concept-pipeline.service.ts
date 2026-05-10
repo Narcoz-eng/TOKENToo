@@ -6,7 +6,7 @@ import { buildOpenAIImageRequest, resolveOpenAIImageModel, resolveOpenAIImageQua
 import { escapeXml, svgUri } from "./renderers/svg";
 import type { Rarity } from "./renderers/render-types";
 
-type AiConceptProviderConfig = "openai" | "local-placeholder" | "cached-only";
+type AiConceptProviderConfig = "openai" | "premium-fallback" | "cached-only";
 
 type ConceptRequest = {
   type: PreviewAssetPlan["type"];
@@ -83,18 +83,18 @@ export class AiConceptPipelineService {
 
   enabled() {
     const provider = this.provider();
-    if (provider === "local-placeholder") return true;
+    if (provider === "premium-fallback") return true;
     if (provider === "cached-only") return false;
     return (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && Boolean(process.env.OPENAI_API_KEY);
   }
 
   availability() {
     const provider = this.provider();
-    if (provider === "local-placeholder") {
+    if (provider === "premium-fallback") {
       return {
         ready: true,
-        code: "LOCAL_PLACEHOLDER_READY",
-        message: "Local branded studio planning visual provider is ready."
+        code: "PREMIUM_FALLBACK_READY",
+        message: "Premium cinematic fallback poster provider is ready."
       };
     }
     if (provider === "cached-only") {
@@ -127,7 +127,7 @@ export class AiConceptPipelineService {
   }
 
   async generateRequired(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string): Promise<PreviewAssetPlan[]> {
-    if (this.provider() === "local-placeholder") return this.generateLocalPlaceholder(style, pack, seedKey, logoData, logoUri, "local-preview-provider");
+    if (this.provider() === "premium-fallback") return this.generatePremiumFallback(style, pack, seedKey, logoData, logoUri, "local-preview-provider");
     const availability = this.availability();
     if (!availability.ready) throw new AiConceptGenerationError(availability.code, availability.message, { stage: "ai_concept_configuration" });
     const reference = this.parseReference(logoData, logoUri);
@@ -298,7 +298,7 @@ export class AiConceptPipelineService {
   }
 
   usableConceptSet(assets: PreviewAssetPlan[]) {
-    return this.hasRequiredConceptSet(assets);
+    return this.hasRequiredConceptSet(assets) && assets.every((asset) => !this.isFallbackPoster(asset) && asset.provider !== "local-placeholder");
   }
 
   cacheKey(style: GeneratedStyleProfile, seedKey: string) {
@@ -320,7 +320,7 @@ export class AiConceptPipelineService {
       .slice(0, 32);
   }
 
-  generateLocalPlaceholder(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string, reason = "openai-unavailable"): PreviewAssetPlan[] {
+  generatePremiumFallback(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string, logoData?: string, logoUri?: string, reason = "openai-unavailable"): PreviewAssetPlan[] {
     const requests = this.requests(style, pack, seedKey);
     const identity = this.authoredIdentityBrief(style);
     const dnaHash = this.dnaHash(style);
@@ -330,18 +330,18 @@ export class AiConceptPipelineService {
       const rarity = request.rarity;
       return {
         type: request.type,
-        label: request.label.replace("AI concept", "studio planning visual"),
-        uri: svgUri(this.placeholderSvg(style, identity, request, index, logoData, logoUri)),
+        label: request.label.replace("AI concept", "premium studio poster"),
+        uri: svgUri(this.premiumPosterSvg(style, identity, request, index, logoData, logoUri)),
         productionAssetStatus: "AI_CONCEPT",
         previewClassification: "AI_CONCEPT_PREVIEW",
-        provider: "local-placeholder",
+        provider: "premium-fallback",
         promptHash,
         generationMetadata: {
           kind: request.kind,
-          provider: "local-placeholder",
-          planningVisual: true,
+          provider: "premium-fallback",
+          premiumFallbackPoster: true,
           reason,
-          model: "local-branded-placeholder",
+          model: "local-premium-poster-renderer",
           size: request.size,
           lowCostMode: this.lowCostMode(),
           seedKey,
@@ -352,7 +352,7 @@ export class AiConceptPipelineService {
         metadata: {
           rarity,
           dnaHash,
-          planningVisual: true,
+          premiumFallbackPoster: true,
           artProductionStatus: "AI_CONCEPT",
           productionAssetStatus: "AI_CONCEPT",
           previewClassification: "AI_CONCEPT_PREVIEW",
@@ -366,11 +366,10 @@ export class AiConceptPipelineService {
         }
       };
     });
-    this.rememberConcepts(cacheKey, assets);
     this.logger.log(
       JSON.stringify({
-        event: "ai_concept_local_placeholder_ready",
-        providerSelected: "local-placeholder",
+        event: "ai_concept_premium_fallback_ready",
+        providerSelected: "premium-fallback",
         reason,
         imageCount: assets.length,
         promptHashes: assets.map((asset) => asset.promptHash),
@@ -614,13 +613,20 @@ Do not mention or reference any famous NFT collection names in the image.`;
 
   private provider(): AiConceptProviderConfig {
     const explicit = (process.env.AI_CONCEPT_PROVIDER ?? "").trim().toLowerCase();
-    if (explicit === "openai" || explicit === "local-placeholder" || explicit === "cached-only") return explicit;
-    if ((process.env.LOCAL_PREVIEW_PROVIDER ?? "").trim().toLowerCase() === "branded-placeholder") return "local-placeholder";
+    if (explicit === "openai" || explicit === "premium-fallback" || explicit === "cached-only") return explicit;
+    if (explicit === "local-placeholder") return "premium-fallback";
+    const localPreviewProvider = (process.env.LOCAL_PREVIEW_PROVIDER ?? "").trim().toLowerCase();
+    if (localPreviewProvider === "branded-placeholder" || localPreviewProvider === "premium-fallback") return "premium-fallback";
     return "openai";
   }
 
   private lowCostMode() {
+    if (this.visualQualityMode()) return false;
     return (process.env.AI_CONCEPT_LOW_COST_MODE ?? process.env.LOW_COST_CONCEPT_MODE ?? "false").toLowerCase() === "true";
+  }
+
+  private visualQualityMode() {
+    return (process.env.AI_CONCEPT_VISUAL_QUALITY_MODE ?? "true").toLowerCase() !== "false";
   }
 
   private maxImagesPerRun() {
@@ -655,88 +661,105 @@ Do not mention or reference any famous NFT collection names in the image.`;
     };
   }
 
-  private placeholderSvg(style: GeneratedStyleProfile, identity: AuthoredIdentityBrief, request: ConceptRequest, index: number, logoData?: string, logoUri?: string) {
+  private isFallbackPoster(asset: PreviewAssetPlan) {
+    return asset.provider === "premium-fallback" || asset.generationMetadata?.premiumFallbackPoster === true || asset.metadata?.premiumFallbackPoster === true;
+  }
+
+  private premiumPosterSvg(style: GeneratedStyleProfile, identity: AuthoredIdentityBrief, request: ConceptRequest, index: number, logoData?: string, logoUri?: string) {
     const isHero = request.type === "BANNER";
     const width = isHero ? 1600 : 1024;
     const height = isHero ? 900 : 1360;
     const rarity = request.rarity ?? "Legendary";
     const intensity = this.rarityIntensity(rarity);
-    const palette = this.placeholderPalette(style);
+    const palette = this.posterPalette(style);
     const mood = request.rarity ? this.moodFor(style, request.rarity, index) : this.moodFor(style, "Legendary", index);
     const logo = this.safeImageReference(logoData) ?? this.safeImageReference(logoUri);
-    const title = escapeXml(style.collection.replace(/^\$/, "").slice(0, 36));
-    const subtitle = escapeXml((request.rarity ? `${request.rarity} studio preview` : "Hero studio preview").slice(0, 40));
-    const culture = escapeXml(identity.culture.slice(0, 72));
-    const moodLabel = escapeXml(`${mood.name}: ${mood.expression}`.slice(0, 82));
-    const shake = intensity >= 5 ? 24 : intensity >= 4 ? 14 : intensity >= 3 ? 8 : 3;
-    const fxOpacity = 0.14 + intensity * 0.045;
-    const subjectX = isHero ? 1020 : 512;
-    const subjectY = isHero ? 520 : 680;
-    const headY = subjectY - (isHero ? 165 : 205);
-    const bodyHeight = isHero ? 430 : 560;
-    const shoulderWidth = isHero ? 500 : 610;
-    const capeWidth = shoulderWidth + intensity * 26;
-    const eyeTilt = intensity >= 4 ? 9 : 4;
-    const mouthPath = intensity >= 5 ? "M -72 82 Q 0 132 74 78" : intensity >= 4 ? "M -68 86 Q 0 116 68 86" : "M -56 82 Q 0 98 58 82";
-    const posterLabelY = isHero ? 782 : 1224;
-    const gridLines = Array.from({ length: isHero ? 9 : 11 }, (_, line) => {
-      const x = Math.round((width / (isHero ? 8 : 10)) * line);
-      return `<path d="M${x + (line % 2 ? shake : -shake)} 0 L${x - shake} ${height}" stroke="${palette.secondary}" stroke-opacity=".06" stroke-width="2"/>`;
-    }).join("");
+    const title = escapeXml(style.collection.replace(/^\$/, "").slice(0, 38));
+    const subtitle = escapeXml((request.rarity ? `${request.rarity} faction splash` : "Cinematic faction launch").slice(0, 44));
+    const culture = escapeXml(identity.culture.slice(0, 76));
+    const moodLabel = escapeXml(`${mood.name}: ${mood.expression}`.slice(0, 86));
+    const posterLabelY = isHero ? 748 : 1188;
+    const scene = this.posterScene(rarity, isHero, width, height, intensity, palette, index);
+    const grainSeed = Number.parseInt(this.hash(`${style.collection}:${rarity}:${index}`).slice(0, 6), 16) % 997;
     const rarityBars = Array.from({ length: Math.min(6, intensity + 1) }, (_, bar) => {
-      const barHeight = 22 + bar * 13;
-      const x = isHero ? 90 + bar * 28 : 72 + bar * 28;
-      return `<rect x="${x}" y="${posterLabelY + 62 - barHeight}" width="14" height="${barHeight}" rx="7" fill="${bar % 2 ? palette.secondary : palette.primary}" opacity="${0.48 + bar * 0.06}"/>`;
+      const barHeight = 26 + bar * (isHero ? 15 : 20);
+      const x = isHero ? 90 + bar * 30 : 70 + bar * 31;
+      return `<rect x="${x}" y="${posterLabelY + 76 - barHeight}" width="15" height="${barHeight}" rx="2" fill="${bar % 2 ? palette.secondary : palette.primary}" opacity="${0.46 + bar * 0.07}"/>`;
     }).join("");
     const logoLayer = logo
-      ? `<clipPath id="logoClip"><circle cx="${isHero ? 142 : 134}" cy="${isHero ? 132 : 126}" r="${isHero ? 70 : 62}"/></clipPath>
-  <image href="${escapeXml(logo)}" x="${isHero ? 72 : 72}" y="${isHero ? 62 : 64}" width="${isHero ? 140 : 124}" height="${isHero ? 140 : 124}" preserveAspectRatio="xMidYMid slice" clip-path="url(#logoClip)"/>
-  <circle cx="${isHero ? 142 : 134}" cy="${isHero ? 132 : 126}" r="${isHero ? 73 : 65}" fill="none" stroke="${palette.primary}" stroke-width="5" opacity=".9"/>`
-      : `<circle cx="${isHero ? 142 : 134}" cy="${isHero ? 132 : 126}" r="${isHero ? 72 : 64}" fill="${palette.primary}" opacity=".16"/>
-  <text x="${isHero ? 142 : 134}" y="${isHero ? 146 : 139}" text-anchor="middle" font-size="${isHero ? 42 : 34}" font-weight="950" fill="${palette.primary}">${escapeXml(style.brandDna.tokenSymbol.replace(/^\$/, "").slice(0, 4))}</text>`;
+      ? `<clipPath id="logoClip"><circle cx="${isHero ? 132 : 120}" cy="${isHero ? 120 : 116}" r="${isHero ? 58 : 54}"/></clipPath>
+  <image href="${escapeXml(logo)}" x="${isHero ? 74 : 66}" y="${isHero ? 62 : 62}" width="${isHero ? 116 : 108}" height="${isHero ? 116 : 108}" preserveAspectRatio="xMidYMid slice" clip-path="url(#logoClip)"/>
+  <circle cx="${isHero ? 132 : 120}" cy="${isHero ? 120 : 116}" r="${isHero ? 62 : 58}" fill="none" stroke="url(#rim)" stroke-width="4" opacity=".92"/>`
+      : `<circle cx="${isHero ? 132 : 120}" cy="${isHero ? 120 : 116}" r="${isHero ? 62 : 58}" fill="${palette.primary}" opacity=".11" stroke="url(#rim)" stroke-width="4"/>
+  <text x="${isHero ? 132 : 120}" y="${isHero ? 136 : 130}" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="${isHero ? 36 : 31}" font-weight="950" fill="${palette.primary}">${escapeXml(style.brandDna.tokenSymbol.replace(/^\$/, "").slice(0, 4))}</text>`;
 
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${title} ${subtitle}">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#020806"/><stop offset=".42" stop-color="${palette.ink}"/><stop offset="1" stop-color="#07110d"/></linearGradient>
-    <radialGradient id="halo" cx="${isHero ? "68%" : "50%"}" cy="36%" r="58%"><stop stop-color="${palette.primary}" stop-opacity="${fxOpacity}"/><stop offset=".5" stop-color="${palette.secondary}" stop-opacity=".16"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
-    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${palette.primary}"/><stop offset=".5" stop-color="${palette.secondary}"/><stop offset="1" stop-color="${palette.accent}"/></linearGradient>
-    <filter id="glow"><feGaussianBlur stdDeviation="${10 + intensity * 4}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#010403"/><stop offset=".36" stop-color="${palette.ink}"/><stop offset="1" stop-color="#05090f"/></linearGradient>
+    <radialGradient id="eventGlow" cx="${isHero ? "67%" : "50%"}" cy="${intensity >= 5 ? "29%" : "38%"}" r="62%"><stop stop-color="${palette.primary}" stop-opacity="${0.22 + intensity * 0.055}"/><stop offset=".48" stop-color="${palette.secondary}" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${palette.primary}"/><stop offset=".46" stop-color="${palette.secondary}"/><stop offset="1" stop-color="${palette.accent}"/></linearGradient>
+    <linearGradient id="monolith" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${palette.accent}" stop-opacity=".92"/><stop offset=".38" stop-color="${palette.primary}" stop-opacity=".26"/><stop offset="1" stop-color="#020806" stop-opacity=".94"/></linearGradient>
+    <filter id="softGlow"><feGaussianBlur stdDeviation="${12 + intensity * 5}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".75" numOctaves="3" seed="${grainSeed}"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .13"/></feComponentTransfer></filter>
   </defs>
   <rect width="${width}" height="${height}" fill="url(#bg)"/>
-  <rect width="${width}" height="${height}" fill="url(#halo)"/>
-  ${gridLines}
-  <path d="M0 ${height * 0.74} C ${width * 0.2} ${height * 0.62}, ${width * 0.36} ${height * 0.88}, ${width * 0.56} ${height * 0.7} S ${width * 0.84} ${height * 0.58}, ${width} ${height * 0.72} L ${width} ${height} L 0 ${height}Z" fill="#000" opacity=".42"/>
-  <g opacity=".75">${Array.from({ length: intensity + 2 }, (_, spark) => `<path d="M${120 + spark * (isHero ? 190 : 118)} ${310 + (spark % 3) * 75} l${30 + spark * 5} ${-34 - spark * 6}" stroke="${spark % 2 ? palette.secondary : palette.primary}" stroke-width="${2 + (spark % 3)}" stroke-linecap="round" opacity=".42"/>`).join("")}</g>
-  <g transform="translate(${subjectX} ${subjectY})" filter="url(#glow)">
-    <path d="M ${-capeWidth / 2} ${bodyHeight * 0.46} Q ${-shoulderWidth / 2} ${-bodyHeight * 0.25} -90 -${bodyHeight * 0.32} Q 0 -${bodyHeight * 0.44} 92 -${bodyHeight * 0.32} Q ${shoulderWidth / 2} -${bodyHeight * 0.18} ${capeWidth / 2} ${bodyHeight * 0.46} Z" fill="#040806" stroke="url(#rim)" stroke-width="${8 + intensity}" opacity=".96"/>
-    <path d="M -${shoulderWidth / 2.8} ${bodyHeight * 0.34} Q 0 ${bodyHeight * 0.13} ${shoulderWidth / 2.8} ${bodyHeight * 0.34}" fill="none" stroke="${palette.secondary}" stroke-width="${8 + intensity}" opacity=".62"/>
-    <circle cx="0" cy="-${bodyHeight * 0.54}" r="${isHero ? 136 : 164}" fill="#050d0b" stroke="${palette.primary}" stroke-width="${10 + intensity}" />
-    <path d="M -${isHero ? 122 : 146} -${bodyHeight * 0.62} Q 0 -${bodyHeight * 0.84} ${isHero ? 122 : 146} -${bodyHeight * 0.62}" fill="none" stroke="${palette.accent}" stroke-width="${7 + intensity}" opacity=".85"/>
-    <g transform="translate(0 -${bodyHeight * 0.56})">
-      <path d="M -92 ${-eyeTilt} Q -52 -38 -12 -${eyeTilt}" stroke="${palette.primary}" stroke-width="${13 + intensity}" stroke-linecap="round"/>
-      <path d="M 12 -${eyeTilt} Q 52 -38 92 ${-eyeTilt}" stroke="${palette.primary}" stroke-width="${13 + intensity}" stroke-linecap="round"/>
-      <path d="${mouthPath}" fill="none" stroke="${palette.secondary}" stroke-width="${8 + intensity}" stroke-linecap="round"/>
-    </g>
-    <path d="M -${65 + intensity * 9} ${bodyHeight * 0.02} L ${65 + intensity * 9} ${bodyHeight * 0.02} L ${45 + intensity * 7} ${bodyHeight * 0.21} L -${45 + intensity * 7} ${bodyHeight * 0.21}Z" fill="${palette.primary}" opacity=".12" stroke="${palette.primary}" stroke-width="4"/>
-  </g>
-  <g>
-    ${logoLayer}
-    <text x="${isHero ? 232 : 72}" y="${isHero ? 104 : 1030}" font-family="Inter, Arial, sans-serif" font-size="${isHero ? 22 : 24}" font-weight="950" fill="${palette.primary}" letter-spacing="0">PHEW.RUN</text>
-    <text x="${isHero ? 232 : 72}" y="${isHero ? 137 : 1064}" font-family="Inter, Arial, sans-serif" font-size="${isHero ? 18 : 18}" font-weight="850" fill="#d8ffe1" opacity=".82" letter-spacing="0">PLANNING VISUAL</text>
-  </g>
+  <rect width="${width}" height="${height}" fill="url(#eventGlow)"/>
+  ${scene}
+  <g>${logoLayer}</g>
   <g font-family="Inter, Arial, sans-serif">
-    <text x="${isHero ? 90 : 72}" y="${posterLabelY}" font-size="${isHero ? 58 : 48}" font-weight="950" fill="#ffffff" letter-spacing="0">${title}</text>
-    <text x="${isHero ? 92 : 74}" y="${posterLabelY + 40}" font-size="${isHero ? 24 : 24}" font-weight="900" fill="${palette.primary}" letter-spacing="0">${subtitle}</text>
-    <text x="${isHero ? 92 : 74}" y="${posterLabelY + 92}" font-size="${isHero ? 18 : 18}" font-weight="800" fill="#cbd5e1" opacity=".9" letter-spacing="0">${moodLabel}</text>
-    <text x="${isHero ? 92 : 74}" y="${posterLabelY + 122}" font-size="${isHero ? 15 : 15}" font-weight="700" fill="#94a3b8" opacity=".82" letter-spacing="0">${culture}</text>
+    <text x="${isHero ? 218 : 66}" y="${isHero ? 94 : 1008}" font-size="${isHero ? 18 : 18}" font-weight="900" fill="${palette.primary}" opacity=".86" letter-spacing="0">PREMIUM STUDIO</text>
+    <text x="${isHero ? 218 : 66}" y="${isHero ? 124 : 1040}" font-size="${isHero ? 15 : 15}" font-weight="800" fill="#e2e8f0" opacity=".66" letter-spacing="0">CONCEPT POSTER</text>
+    <text x="${isHero ? 88 : 66}" y="${posterLabelY}" font-size="${isHero ? 58 : 48}" font-weight="950" fill="#ffffff" letter-spacing="0">${title}</text>
+    <text x="${isHero ? 90 : 68}" y="${posterLabelY + 40}" font-size="${isHero ? 24 : 24}" font-weight="900" fill="${palette.primary}" letter-spacing="0">${subtitle}</text>
+    <text x="${isHero ? 90 : 68}" y="${posterLabelY + 94}" font-size="${isHero ? 18 : 18}" font-weight="800" fill="#cbd5e1" opacity=".9" letter-spacing="0">${moodLabel}</text>
+    <text x="${isHero ? 90 : 68}" y="${posterLabelY + 124}" font-size="${isHero ? 15 : 15}" font-weight="700" fill="#94a3b8" opacity=".82" letter-spacing="0">${culture}</text>
     ${rarityBars}
   </g>
-  <rect x="28" y="28" width="${width - 56}" height="${height - 56}" rx="22" fill="none" stroke="url(#rim)" stroke-width="4" opacity=".72"/>
-  <rect x="44" y="44" width="${width - 88}" height="${height - 88}" rx="14" fill="none" stroke="#ffffff" stroke-width="1" opacity=".08"/>
+  <rect x="28" y="28" width="${width - 56}" height="${height - 56}" rx="18" fill="none" stroke="url(#rim)" stroke-width="${intensity >= 5 ? 5 : 3}" opacity=".72"/>
+  <rect x="46" y="46" width="${width - 92}" height="${height - 92}" rx="10" fill="none" stroke="#ffffff" stroke-width="1" opacity=".08"/>
+  <rect width="${width}" height="${height}" filter="url(#grain)" opacity=".55"/>
 </svg>`;
   }
 
-  private placeholderPalette(style: GeneratedStyleProfile) {
+  private posterScene(rarity: string, isHero: boolean, width: number, height: number, intensity: number, palette: { primary: string; secondary: string; ink: string; accent: string }, index: number) {
+    const cx = isHero ? Math.round(width * 0.68) : Math.round(width * 0.5);
+    const horizon = isHero ? Math.round(height * 0.63) : Math.round(height * 0.68);
+    const monolithTop = isHero ? 186 - intensity * 10 : 230 - intensity * 15;
+    const monolithBottom = isHero ? 720 : 1090;
+    const monolithWidth = isHero ? 290 + intensity * 35 : 320 + intensity * 44;
+    const ringCount = intensity + 2;
+    const beamCount = intensity + 3;
+    const terrain = `<path d="M0 ${horizon} C ${width * 0.18} ${horizon - 55}, ${width * 0.32} ${horizon + 80}, ${width * 0.48} ${horizon + 10} S ${width * 0.82} ${horizon - 74}, ${width} ${horizon + 12} L ${width} ${height} L 0 ${height}Z" fill="#000" opacity=".46"/>`;
+    const rings = Array.from({ length: ringCount }, (_, ring) => {
+      const radiusX = (isHero ? 190 : 170) + ring * (isHero ? 58 : 46);
+      const radiusY = (isHero ? 68 : 86) + ring * (isHero ? 18 : 26);
+      return `<ellipse cx="${cx}" cy="${horizon - intensity * 20}" rx="${radiusX}" ry="${radiusY}" fill="none" stroke="${ring % 2 ? palette.secondary : palette.primary}" stroke-width="${ring % 3 === 0 ? 4 : 2}" opacity="${Math.max(0.08, 0.34 - ring * 0.035)}"/>`;
+    }).join("");
+    const beams = Array.from({ length: beamCount }, (_, beam) => {
+      const angle = (beam - Math.floor(beamCount / 2)) * (isHero ? 42 : 30);
+      const x1 = cx + angle;
+      const x2 = cx + angle * (intensity >= 5 ? 3.8 : 2.7);
+      return `<path d="M${x1} ${horizon - 40} L${x2} ${Math.max(40, monolithTop - 90)}" stroke="${beam % 2 ? palette.secondary : palette.accent}" stroke-width="${2 + (beam % 3)}" stroke-linecap="round" opacity="${0.17 + intensity * 0.025}"/>`;
+    }).join("");
+    const monolith = `<g filter="url(#softGlow)">
+    <path d="M${cx - monolithWidth / 2} ${monolithBottom} L${cx - monolithWidth * 0.32} ${monolithTop + 110} L${cx - monolithWidth * 0.09} ${monolithTop} L${cx + monolithWidth * 0.18} ${monolithTop + 48} L${cx + monolithWidth / 2} ${monolithBottom} Z" fill="url(#monolith)" stroke="url(#rim)" stroke-width="${5 + intensity}" opacity=".95"/>
+    <path d="M${cx - monolithWidth * 0.18} ${monolithBottom - 78} L${cx - monolithWidth * 0.05} ${monolithTop + 130} L${cx + monolithWidth * 0.18} ${monolithBottom - 40}" fill="none" stroke="${palette.primary}" stroke-width="${5 + intensity}" opacity=".38"/>
+    <path d="M${cx + monolithWidth * 0.04} ${monolithTop + 94} L${cx + monolithWidth * 0.3} ${monolithBottom - 140}" fill="none" stroke="${palette.secondary}" stroke-width="${3 + intensity}" opacity=".32"/>
+  </g>`;
+    const foreground = Array.from({ length: Math.min(9, intensity + 4) }, (_, shard) => {
+      const x = Math.round((width / (intensity + 5)) * (shard + 1));
+      const h = 80 + shard * 18 + intensity * 12;
+      const lean = shard % 2 ? 22 : -18;
+      return `<path d="M${x} ${height} L${x + lean} ${height - h} L${x + lean + 28} ${height}" fill="${shard % 2 ? palette.secondary : palette.primary}" opacity="${0.08 + intensity * 0.012}"/>`;
+    }).join("");
+    const eventScale = rarity === "Mythic" || rarity === "Legendary"
+      ? `<path d="M${cx - monolithWidth} ${monolithTop + 40} C${cx - monolithWidth * 0.42} ${monolithTop - 90}, ${cx + monolithWidth * 0.5} ${monolithTop - 80}, ${cx + monolithWidth} ${monolithTop + 62}" fill="none" stroke="${palette.accent}" stroke-width="${rarity === "Mythic" ? 12 : 8}" opacity="${rarity === "Mythic" ? ".42" : ".3"}"/>`
+      : "";
+    const moodPulse = `<path d="M${cx - monolithWidth * 0.58} ${horizon + 36} C${cx - monolithWidth * 0.2} ${horizon + 4}, ${cx + monolithWidth * 0.2} ${horizon + 4}, ${cx + monolithWidth * 0.58} ${horizon + 36}" fill="none" stroke="${palette.primary}" stroke-width="${3 + intensity}" opacity=".32"/>`;
+    return `${terrain}${rings}${beams}${eventScale}${monolith}${moodPulse}${foreground}`;
+  }
+
+  private posterPalette(style: GeneratedStyleProfile) {
     const colors = [...style.colors, ...style.brandDna.logoPalette, "#baff00", "#16d7d2", "#f4c542"].filter(Boolean);
     const normalized = colors.map((color) => this.validHex(color)).filter(Boolean) as string[];
     return {

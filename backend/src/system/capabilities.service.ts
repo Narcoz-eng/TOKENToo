@@ -269,7 +269,9 @@ export class CapabilitiesService {
   }
 
   private localPreviewProviderEnabled() {
-    return (process.env.AI_CONCEPT_PROVIDER ?? "").trim().toLowerCase() === "local-placeholder" || (process.env.LOCAL_PREVIEW_PROVIDER ?? "").trim().toLowerCase() === "branded-placeholder";
+    const provider = (process.env.AI_CONCEPT_PROVIDER ?? "").trim().toLowerCase();
+    const localProvider = (process.env.LOCAL_PREVIEW_PROVIDER ?? "").trim().toLowerCase();
+    return provider === "premium-fallback" || provider === "local-placeholder" || localProvider === "premium-fallback" || localProvider === "branded-placeholder";
   }
 
   private tokenMetadataAvailable(heliusAvailable: boolean, programExecutable: boolean) {
@@ -589,14 +591,14 @@ export class CapabilitiesService {
           label: "ENABLE_AI_IMAGE_GENERATION",
           ok: capabilities.aiGenerationEnabled || capabilities.localPreviewProviderEnabled,
           requiredFor: ["Creative Preview Mode"],
-          fix: "Set ENABLE_AI_IMAGE_GENERATION=true or AI_CONCEPT_PROVIDER=local-placeholder for zero-cost studio planning visuals."
+          fix: "Set ENABLE_AI_IMAGE_GENERATION=true or AI_CONCEPT_PROVIDER=premium-fallback for zero-cost cinematic studio posters."
         },
         {
           key: "OPENAI_API_KEY",
           label: "OPENAI_API_KEY",
           ok: capabilities.openaiImagesAvailable || capabilities.localPreviewProviderEnabled,
           requiredFor: ["Creative Preview Mode"],
-          fix: "Add an OpenAI API key to the backend environment, or use AI_CONCEPT_PROVIDER=local-placeholder for local studio planning visuals."
+          fix: "Add an OpenAI API key to the backend environment, or use AI_CONCEPT_PROVIDER=premium-fallback for local cinematic studio posters."
         },
         {
           key: "PROGRAM_ID",

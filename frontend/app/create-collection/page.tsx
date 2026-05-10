@@ -5,13 +5,12 @@ import type { ReactNode } from "react";
 import { Check, ChevronDown, Loader2, LockKeyhole, Palette, RadioTower, RefreshCcw, Search, ShieldCheck, Sparkles, Swords, Upload, Wand2, Zap } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { CollectionPreview } from "@/components/CollectionPreview";
-import { SetupWarning } from "@/components/ApiState";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { apiFetch } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
-import type { CollectionGeneratorPreview, ConceptRequestSummary, StudioWorkflowState } from "@/lib/types";
+import type { ArtTeamProfile, CollectionGeneratorPreview, ConceptRequestSummary, StudioPreviewAsset, StudioWorkflowState, StyleBiblePlan, StudioExportPlan } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { cn } from "@/lib/utils";
@@ -113,6 +112,8 @@ type GeneratorRun = {
     raidTheme: string;
     lore: string;
     roleNames: unknown;
+    brandDna?: unknown;
+    visualFingerprint?: unknown;
     productionAssetStatus?: ProductionAssetStatus;
     isApproved: boolean;
     traitPack?: {
@@ -199,6 +200,18 @@ type PreviewOnlyResponse = {
     visualDiversityScore: number;
     blockers: string[];
   };
+  styleBible?: StyleBiblePlan;
+  studioAssets?: StudioPreviewAsset[];
+  styleBibleAsset?: StudioPreviewAsset;
+  traitCatalogAsset?: StudioPreviewAsset;
+  rarityLadderAsset?: StudioPreviewAsset;
+  moodSheetAsset?: StudioPreviewAsset;
+  layerBreakdownAsset?: StudioPreviewAsset;
+  artTeam?: ArtTeamProfile;
+  traitCoverageScore?: number;
+  rarityDiversityScore?: number;
+  providerStatus?: string;
+  exportPlan?: StudioExportPlan;
   conceptRequest?: ConceptRequestSummary;
   warnings: string[];
 };
@@ -520,10 +533,6 @@ export default function CreateCollectionPage() {
 
         {error ? <ProductNotice tone="red" message={error} /> : null}
         {walletAuth.error ? <ProductNotice tone="red" message={walletAuth.error} /> : null}
-        {privateDiagnostics ? <div className="opacity-80">
-          <SetupWarning warnings={previewOnly?.warnings?.slice(0, 1)} />
-        </div> : null}
-
         <div className="grid gap-6 xl:grid-cols-[430px_minmax(0,1fr)]">
           <aside className="space-y-5">
             <SectionCard title="Launch Brief" className="p-5">
@@ -609,8 +618,10 @@ export default function CreateCollectionPage() {
 
           <main className="space-y-6">
             <LiveLaunchPreview preview={studioPreview} launchResult={launchResult} />
+            <StyleBibleStudioPanel preview={studioPreview} />
 
-            {privateDiagnostics ? (
+            <CreatorStudioStatusPanel preview={studioPreview} setup={setup} loading={loading || capabilityState.loading} />
+            {privateDiagnostics && advancedOpen ? (
               <SetupChecklistPanel
                 setup={setup}
                 modes={capabilityState.data?.setupModes ?? []}
@@ -624,14 +635,7 @@ export default function CreateCollectionPage() {
                 onValidateStorage={() => validateSetup("storage")}
                 canGenerateAiConcept={canGenerateAiConcept}
               />
-            ) : (
-              <PublicReadinessPanel
-                setup={setup}
-                loading={loading || capabilityState.loading}
-                canGenerateAiConcept={canGenerateAiConcept}
-                onGenerateAiConcept={generatePreview}
-              />
-            )}
+            ) : null}
 
             <StudioWorkflowPanel
               workflow={studioPreview.studioWorkflow}
@@ -773,6 +777,36 @@ function PublicReadinessItem({ label, value, ready }: { label: string; value: st
   );
 }
 
+function CreatorStudioStatusPanel({ preview, setup, loading }: { preview: CollectionGeneratorPreview; setup?: SetupChecklist; loading: boolean }) {
+  const previewReady = Boolean(preview.styleBibleAsset?.uri || preview.styleBible?.exportPlan?.styleBibleImage);
+  const devLaunchReady = Boolean(setup?.devnetLaunchReady || setup?.productionLaunchReady);
+  const productionReady = preview.productionAssetStatus === "FINAL_PRODUCTION" || preview.productionAssetStatus === "ARTIST_APPROVED" || preview.productionAssetStatus === "CURATED_LAYER_READY";
+  const providerReason = exactGenerationReason(preview) ?? preview.providerStatus;
+  return (
+    <SectionCard title="Studio Status" className="p-5">
+      <div className="grid gap-3 md:grid-cols-3">
+        <SimpleCreatorStatus label="Preview" value={loading ? "Working" : previewReady ? "Preview ready" : "Not ready"} ok={previewReady} />
+        <SimpleCreatorStatus label="Dev launch" value={devLaunchReady ? "Available" : "Dev launch unavailable"} ok={devLaunchReady} />
+        <SimpleCreatorStatus label="Production" value={productionReady ? "Production assets ready" : "Production assets required"} ok={productionReady} />
+      </div>
+      {!previewReady && providerReason ? (
+        <p className="mt-4 rounded-md border border-vault-gold/30 bg-vault-gold/8 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
+          Studio Bible generation unavailable - provider reason: {providerReason}
+        </p>
+      ) : null}
+    </SectionCard>
+  );
+}
+
+function SimpleCreatorStatus({ label, value, ok }: { label: string; value: string; ok: boolean }) {
+  return (
+    <div className={cn("rounded-md border p-4", ok ? "border-vault-green/40 bg-vault-green/8" : "border-vault-line bg-black/30")}>
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className={cn("mt-2 text-sm font-black", ok ? "text-vault-green" : "text-slate-300")}>{value}</p>
+    </div>
+  );
+}
+
 function StudioWorkflowPanel({ workflow, disabled, hasRun, onAction }: { workflow?: StudioWorkflowState; disabled: boolean; hasRun: boolean; onAction: (action: StudioWorkflowActionName, target?: string) => void }) {
   const state = workflow ?? defaultStudioWorkflow();
   const lockItems = [
@@ -874,8 +908,15 @@ function providerDisplay(provider?: string) {
   if (!provider) return "Automatic fallback";
   if (/openai/i.test(provider)) return "OpenAI studio art";
   if (/cached/i.test(provider)) return "Cached studio preview";
-  if (/local-placeholder|planning/i.test(provider)) return "Branded studio planning visual";
+  if (/premium-fallback|fallback-poster/i.test(provider)) return "Fallback art hidden";
+  if (/local-placeholder|planning/i.test(provider)) return "Legacy preview hidden";
   return cleanDisplayText(provider);
+}
+
+function exactGenerationReason(preview: CollectionGeneratorPreview) {
+  const warning = preview.warnings?.find((item) => /AI (?:concept|studio) generation unavailable/i.test(item));
+  if (!warning) return undefined;
+  return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "OpenAI generation unavailable: ");
 }
 
 function SetupChecklistItem({ item }: { item: SetupChecklist["items"][number] }) {
@@ -920,24 +961,140 @@ function defaultSetupItems(): SetupChecklist["items"] {
   }));
 }
 
+function StyleBibleStudioPanel({ preview }: { preview: CollectionGeneratorPreview }) {
+  const bible = preview.styleBible;
+  const styleBibleAsset = preview.styleBibleAsset ?? (bible?.exportPlan.styleBibleImage ? { type: "STYLE_BIBLE" as const, label: "Full NFT Studio Bible", uri: bible.exportPlan.styleBibleImage } : undefined);
+  const modules = [
+    preview.traitCatalogAsset,
+    preview.rarityLadderAsset,
+    preview.moodSheetAsset,
+    preview.layerBreakdownAsset
+  ].filter(Boolean) as StudioPreviewAsset[];
+  const providerReason = exactGenerationReason(preview) ?? preview.providerStatus;
+  if (!styleBibleAsset?.uri && !modules.length) {
+    return (
+      <SectionCard title="NFT Studio Bible" className="p-5">
+        <div className="rounded-md border border-dashed border-vault-line bg-black/30 p-6 text-sm text-slate-300">
+          {providerReason
+            ? `Studio Bible generation unavailable - provider reason: ${providerReason}`
+            : "Generate AI Studio Preview to build collection DNA, art team selection, trait catalog, rarity ladder, mood sheet, layer plan, and export manifest."}
+        </div>
+      </SectionCard>
+    );
+  }
+  const qa = bible?.qaReport;
+  const exportItems = bible ? [bible.exportPlan.styleBibleJson, bible.exportPlan.traitCatalogJson, bible.exportPlan.metaplexCandyMachineConfig, bible.exportPlan.genericZip] : [];
+  return (
+    <SectionCard title="NFT Studio Bible" className="overflow-hidden p-0">
+      <div className="border-b border-vault-line bg-black/65 p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill accent="green">{preview.artTeam?.id ?? bible?.artTeam.id ?? "STUDIO BIBLE"}</StatusPill>
+          {qa ? <StatusPill accent={qa.passed ? "green" : "gold"}>{qa.passed ? "Studio QA pass" : "Needs studio pass"}</StatusPill> : null}
+          {preview.providerStatus ? <StatusPill accent="cyan">{providerDisplay(preview.providerStatus)}</StatusPill> : null}
+        </div>
+        <h3 className="mt-3 text-3xl font-black text-white">{bible?.collectionName ?? preview.collection}</h3>
+        <p className="mt-2 max-w-4xl text-sm leading-relaxed text-slate-300">{bible?.artTeam.traitPhilosophy ?? "Studio sheets render collection DNA, traits, rarity, mood, layers, and export readiness as first-class creator review assets."}</p>
+      </div>
+      <div className="grid gap-0 xl:grid-cols-[minmax(0,1.45fr)_420px]">
+        <div className="space-y-4 bg-[#1a1710] p-4">
+          {styleBibleAsset?.uri ? <StudioAssetFrame asset={styleBibleAsset} large /> : null}
+          {modules.length ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {modules.map((asset) => <StudioAssetFrame key={asset.type} asset={asset} />)}
+            </div>
+          ) : null}
+        </div>
+        <div className="space-y-5 bg-black/45 p-5">
+          {qa ? (
+            <div className="grid grid-cols-2 gap-2">
+              <StudioMetric label="Trait coverage" value={preview.traitCoverageScore ?? qa.traitCoverageScore} />
+              <StudioMetric label="Rarity diversity" value={preview.rarityDiversityScore ?? qa.rarityDiversityScore} />
+              <StudioMetric label="Art-team consistency" value={qa.artTeamConsistencyScore} />
+              <StudioMetric label="Native mythology" value={qa.collectionNativeArchetypeScore} />
+            </div>
+          ) : null}
+
+          {bible ? (
+            <>
+              <StudioList title="Collection DNA" items={bible.collectionDNA.slice(0, 5)} />
+              <StudioList title="Mood System" items={bible.moodVocabulary.slice(0, 9)} compact />
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-vault-green">Rarity Ladder</p>
+                <div className="mt-3 grid gap-2">
+                  {bible.rarityLadder.map((item) => (
+                    <div key={item.rarity} className="rounded-md border border-vault-line bg-black/35 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-black text-white">{item.rarity}</p>
+                        <span className="text-[11px] font-black text-vault-green">{item.supplyTarget}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-400">{[item.base, item.head, item.eyes, item.mouth, item.body, item.prop, item.background].filter(Boolean).join(" / ")}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <StudioList title="Export Manifest" items={exportItems} />
+            </>
+          ) : null}
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+function StudioAssetFrame({ asset, large = false }: { asset: StudioPreviewAsset; large?: boolean }) {
+  return (
+    <figure className="rounded-md border border-[#15110a] bg-[#ede5d4] p-3 shadow-[0_18px_45px_rgba(0,0,0,0.35)]">
+      <div className="mb-2 flex items-center justify-between gap-3 border-b border-black/20 pb-2">
+        <figcaption className="text-xs font-black uppercase tracking-[0.16em] text-black">{asset.label}</figcaption>
+        <span className="rounded-sm bg-black px-2 py-1 text-[10px] font-black uppercase text-[#baff00]">{asset.type.replaceAll("_", " ")}</span>
+      </div>
+      <img src={asset.uri} alt={asset.label} className={cn("w-full rounded-sm border border-black/20 bg-[#f4efdf] object-cover", large ? "max-h-[780px]" : "h-72")} />
+    </figure>
+  );
+}
+
+function StudioMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-vault-line bg-black/30 p-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1 text-2xl font-black text-white">{value}</p>
+    </div>
+  );
+}
+
+function StudioList({ title, items, compact = false }: { title: string; items: string[]; compact?: boolean }) {
+  return (
+    <div>
+      <p className="text-xs font-black uppercase tracking-[0.2em] text-vault-green">{title}</p>
+      <div className={cn("mt-2 flex flex-wrap gap-2", !compact && "flex-col")}>
+        {items.map((item) => (
+          <span key={item} className={cn("rounded-md border border-vault-line bg-black/30 px-3 py-2 text-xs font-bold text-slate-300", compact && "py-1")}>{item}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGeneratorPreview; launchResult: string | null }) {
   const wireframeOnly = isWireframePreview(preview);
   const tags = identityTags(preview);
+  const heroImage = preview.styleBibleAsset?.uri ?? preview.styleBible?.exportPlan.styleBibleImage ?? preview.exportPlan?.styleBibleImage ?? "";
   return (
     <section className="phew-panel relative overflow-hidden rounded-lg">
-      <img src={wireframeOnly ? brandAssets.emptyVaultPremium : safeImage(preview.banner, brandAssets.launchHero)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
+      {heroImage ? <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" /> : null}
       <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/88 to-[#020806]/30" />
       <div className="absolute inset-0 grid-mask opacity-25" />
       <div className="relative grid gap-6 p-6 lg:grid-cols-[150px_minmax(0,1fr)_260px] lg:p-7">
-        {wireframeOnly ? (
-          <div className="grid aspect-square place-items-center rounded-lg border border-vault-cyan/35 bg-black/55 shadow-[0_0_40px_rgba(22,215,210,0.18)]">
-            <div className="text-center">
-              <Wand2 className="mx-auto size-7 text-vault-cyan" />
-              <p className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-slate-400">Art Direction</p>
-            </div>
+        {heroImage ? (
+          <div className="aspect-square overflow-hidden rounded-md border border-[#15110a] bg-[#ede5d4] p-2 shadow-green">
+            <img src={heroImage} alt={`${preview.collection} studio bible`} className="h-full w-full rounded-sm border border-black/20 object-cover" />
           </div>
         ) : (
-          <img src={safeImage(preview.avatar, brandAssets.factionMark)} alt="" className="aspect-square rounded-lg border border-vault-green/40 object-cover shadow-green" />
+          <div className="aspect-square rounded-md border border-dashed border-vault-line bg-black/35 p-4 text-xs font-bold leading-5 text-slate-400">
+            Studio Bible generation unavailable{preview.providerStatus ? ` - provider reason: ${preview.providerStatus}` : ""}
+          </div>
         )}
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
@@ -949,8 +1106,8 @@ function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGener
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{culturePitch(preview)}</p>
           {wireframeOnly ? (
             <div className="mt-3 max-w-2xl rounded-md border border-vault-gold/30 bg-vault-gold/8 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
-              <p>AI studio preview required. Generate premium preview imagery before reviewing collection visuals.</p>
-              <p className="mt-1">Vault NFT visuals pending studio preview or curated layer pack.</p>
+              <p>{preview.providerStatus ? `Studio Bible generation unavailable - provider reason: ${preview.providerStatus}` : "Generate AI Studio Preview before reviewing collection visuals."}</p>
+              <p className="mt-1">No placeholder NFT art is shown.</p>
             </div>
           ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
@@ -1014,10 +1171,15 @@ function ProductNotice({ tone, message }: { tone: "red" | "gold"; message: strin
 }
 
 function ResolvedTokenCard({ scan, showDiagnostics }: { scan: TokenScan; showDiagnostics: boolean }) {
+  const tokenImage = nonLegacyArt(scan.imageUri || scan.logoUri);
   return (
     <div className="rounded-md border border-vault-green/35 bg-vault-green/8 p-4">
       <div className="flex gap-3">
-        <img src={safeImage(scan.imageUri || scan.logoUri, brandAssets.factionMark)} alt="" className="size-16 rounded-md border border-white/10 object-cover" />
+        {tokenImage ? (
+          <img src={tokenImage} alt="" className="size-16 rounded-md border border-white/10 object-cover" />
+        ) : (
+          <div className="grid size-16 place-items-center rounded-md border border-dashed border-white/10 bg-black/30 text-[10px] font-black uppercase text-slate-500">No logo</div>
+        )}
         <div className="min-w-0">
           <p className="truncate text-lg font-black text-white">{scan.name}</p>
           <p className="mt-1 text-sm font-bold text-vault-green">{scan.symbol}</p>
@@ -1100,16 +1262,16 @@ function joinNatural(items: string[]) {
 }
 
 function fallbackPreview(tokenName: string, tokenSymbol: string, description: string, preset: string): CollectionGeneratorPreview {
-  return {
+  const preview: CollectionGeneratorPreview = {
     id: "studio-preview",
     collection: tokenName.trim() || "PHEW Vault Faction",
     preset: preset || "PHEW Vault Faction",
     theme: "Token-backed vault faction",
     mascot: tokenSymbol.trim() || "PHEW",
-    artStyle: "Dark premium sci-fi vault",
+    artStyle: "Dark studio vault system",
     palette: ["#baff00", "#16d7d2", "#071017", "#f4c542"],
     backgroundWorld: "Cinematic vault command chamber",
-    lore: description.trim() || "A premium faction identity will form here as you define the token, brand kit, vault collection, and launch readiness.",
+    lore: description.trim() || "A studio faction identity will form here as you define the token, brand kit, vault collection, and launch readiness.",
     raidTheme: "Vault breach raids",
     roleNames: ["Founder", "Vault Raider", "Stake Commander", "Relic Guardian"],
     traitLanguage: ["Obsidian frame", "Lime energy core", "Cyan circuit edge", "Founder seal", "Raid charge", "Vault key"],
@@ -1120,8 +1282,8 @@ function fallbackPreview(tokenName: string, tokenSymbol: string, description: st
     previewClassification: "WIREFRAME_CONCEPT",
     productionAssetStatus: "WIREFRAME",
     finalProductionReady: false,
-    avatar: brandAssets.factionMark,
-    banner: brandAssets.launchHero,
+    avatar: "",
+    banner: "",
     samples: [],
     quality: {
       previewQualityScore: 84,
@@ -1149,6 +1311,7 @@ function fallbackPreview(tokenName: string, tokenSymbol: string, description: st
       blockers: []
     }
   };
+  return preview;
 }
 
 function activePreviewAssets(assets: GeneratorRun["styleProfiles"][number]["previewAssets"]) {
@@ -1203,6 +1366,20 @@ function studioWorkflowFromHints(value: unknown): StudioWorkflowState | undefine
   };
 }
 
+function studioAssetsFromBible(styleBible: StyleBiblePlan | undefined): StudioPreviewAsset[] {
+  if (!styleBible?.exportPlan?.styleBibleImage) return [];
+  return [{
+    type: "STYLE_BIBLE",
+    label: "Full NFT Studio Bible",
+    uri: styleBible.exportPlan.styleBibleImage,
+    provider: "deterministic-render",
+    metadata: {
+      artTeam: styleBible.artTeam.id,
+      collectionName: styleBible.collectionName
+    }
+  }];
+}
+
 function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGeneratorPreview {
   const profile = run.styleProfiles[0];
   const categories = asRecord<string[]>(profile.traitPack?.categories);
@@ -1212,6 +1389,11 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
   const quality = profile.qualityReports[0];
   const distinctiveness = profile.distinctivenessReports[0];
   const roles = asArray(profile.roleNames);
+  const brandDna = asRecord<unknown>(profile.brandDna);
+  const styleBible = brandDna.styleBible as StyleBiblePlan | undefined;
+  const exportPlan = brandDna.exportPlan as StudioExportPlan | undefined;
+  const studioAssets = studioAssetsFromBible(styleBible);
+  const styleBibleAsset = studioAssets.find((asset) => asset.type === "STYLE_BIBLE");
 
   return {
     id: run.id,
@@ -1231,7 +1413,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
     assetProvider: "persisted-generator-run",
     conceptRequest: {
-      provider: previews.some((asset) => asset.provider === "openai") ? "openai" : previews.some((asset) => asset.provider === "local-placeholder") ? "local-placeholder" : previews.some((asset) => asset.provider === "cached") ? "cached" : "persisted",
+      provider: previews.some((asset) => asset.provider === "openai") ? "openai" : previews.some((asset) => asset.provider === "premium-fallback") ? "premium-fallback" : previews.some((asset) => asset.provider === "local-placeholder") ? "legacy-placeholder" : previews.some((asset) => asset.provider === "cached") ? "cached" : "persisted",
       imageCount: previews.filter((asset) => asset.type === "BANNER" || asset.type === "SAMPLE_NFT").length,
       estimatedOpenAIRequestCount: 0,
       usesPaidOpenAIImageGeneration: false,
@@ -1241,8 +1423,20 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     productionAssetStatus: profile.productionAssetStatus ?? "WIREFRAME",
     finalProductionReady: isProductionStatus(profile.productionAssetStatus),
     studioWorkflow: studioWorkflowFromHints(run.communityHints),
-    avatar: safeImage(avatarUri, brandAssets.factionMark),
-    banner: safeImage(previews.find((asset) => asset.type === "BANNER")?.uri, brandAssets.launchHero),
+    styleBible,
+    studioAssets,
+    styleBibleAsset,
+    traitCatalogAsset: studioAssets.find((asset) => asset.type === "TRAIT_CATALOG"),
+    rarityLadderAsset: studioAssets.find((asset) => asset.type === "RARITY_LADDER"),
+    moodSheetAsset: studioAssets.find((asset) => asset.type === "MOOD_SHEET"),
+    layerBreakdownAsset: studioAssets.find((asset) => asset.type === "LAYER_BREAKDOWN"),
+    artTeam: styleBible?.artTeam,
+    traitCoverageScore: styleBible?.qaReport.traitCoverageScore,
+    rarityDiversityScore: styleBible?.qaReport.rarityDiversityScore,
+    providerStatus: previews[0]?.provider ?? "persisted-generator-run",
+    exportPlan,
+    avatar: nonLegacyArt(avatarUri),
+    banner: nonLegacyArt(previews.find((asset) => asset.type === "BANNER")?.uri),
     samples: normalizedSamples(profile.productionAssetStatus ?? "WIREFRAME", samples.map((asset, index) => {
       const metadata = asRecord<string>(asset.metadata);
       return {
@@ -1287,6 +1481,10 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
 function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGeneratorPreview {
   const roles = asArray(data.brandDna.roleLanguage);
   const avatarUri = data.avatarPreviewSpec?.uri ?? data.samples[0]?.uri;
+  const styleBible = data.styleBible ?? (data.brandDna.styleBible as StyleBiblePlan | undefined);
+  const exportPlan = data.exportPlan ?? styleBible?.exportPlan;
+  const studioAssets = data.studioAssets?.length ? data.studioAssets : studioAssetsFromBible(styleBible);
+  const styleBibleAsset = data.styleBibleAsset ?? studioAssets.find((asset) => asset.type === "STYLE_BIBLE");
   return {
     id: "preview-only",
     collection: data.collection.name,
@@ -1308,9 +1506,21 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     previewClassification: data.previewClassification ?? previewClassForStatus(data.productionAssetStatus, undefined),
     productionAssetStatus: data.productionAssetStatus,
     finalProductionReady: isProductionStatus(data.productionAssetStatus),
+    styleBible,
+    studioAssets,
+    styleBibleAsset,
+    traitCatalogAsset: data.traitCatalogAsset ?? studioAssets.find((asset) => asset.type === "TRAIT_CATALOG"),
+    rarityLadderAsset: data.rarityLadderAsset ?? studioAssets.find((asset) => asset.type === "RARITY_LADDER"),
+    moodSheetAsset: data.moodSheetAsset ?? studioAssets.find((asset) => asset.type === "MOOD_SHEET"),
+    layerBreakdownAsset: data.layerBreakdownAsset ?? studioAssets.find((asset) => asset.type === "LAYER_BREAKDOWN"),
+    artTeam: data.artTeam ?? styleBible?.artTeam,
+    traitCoverageScore: data.traitCoverageScore ?? styleBible?.qaReport.traitCoverageScore,
+    rarityDiversityScore: data.rarityDiversityScore ?? styleBible?.qaReport.rarityDiversityScore,
+    providerStatus: data.providerStatus ?? data.conceptRequest?.providerFailureReason ?? data.conceptRequest?.provider,
+    exportPlan,
     warnings: data.warnings,
-    avatar: safeImage(avatarUri, brandAssets.factionMark),
-    banner: safeImage(data.bannerPreviewSpec?.uri, brandAssets.launchHero),
+    avatar: nonLegacyArt(avatarUri),
+    banner: nonLegacyArt(data.bannerPreviewSpec?.uri),
     samples: normalizedSamples(data.productionAssetStatus, data.samples.slice(0, 6).map((sample, index) => ({
       id: `preview-${index}`,
       name: sample.label,
@@ -1357,14 +1567,32 @@ function normalizedSamples(status: ProductionAssetStatus, samples: CollectionGen
       ...sample,
       image: visualsAllowed ? safeImage(sample.image, "") : sample.image
     }))
-    .filter((sample) => !visualsAllowed || Boolean(sample.image));
+    .filter((sample) => !visualsAllowed || (Boolean(sample.image) && !isLegacyPlaceholderVisual(sample.image, sample.provider)));
+}
+
+function nonLegacyArt(src: string | undefined | null, provider?: string) {
+  if (!src || isLegacyPlaceholderVisual(src, provider)) return "";
+  return src;
 }
 
 function safeImage(src: string | undefined | null, fallback: string) {
   if (!src) return fallback;
-  const value = src.toLowerCase();
-  if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink")) return fallback;
+  if (isLegacyPlaceholderVisual(src)) return fallback;
   return src;
+}
+
+function isLegacyPlaceholderVisual(src: string | undefined | null, provider?: string) {
+  const value = String(src ?? "");
+  const decoded = safeDecode(value.slice(0, 4000)).toLowerCase();
+  return /local-placeholder|planning visual|branded placeholder|local-branded-placeholder|premium-fallback|fallback-poster|smiley|pink/.test(`${provider ?? ""} ${value.toLowerCase()} ${decoded}`);
+}
+
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function previewStatusLabel(preview: CollectionGeneratorPreview) {
@@ -1377,8 +1605,8 @@ function previewStatusLabel(preview: CollectionGeneratorPreview) {
 }
 
 function previewTierLabel(tier: "BASIC" | "PREMIUM" | "LEGENDARY_READY", finalProductionReady: boolean, assetProvider?: string, previewClassification?: string, productionAssetStatus?: ProductionAssetStatus): CollectionGeneratorPreview["quality"]["tier"] {
-  if (productionAssetStatus === "WIREFRAME" || (!finalProductionReady && (previewClassification === "WIREFRAME_CONCEPT" || /wireframe|fallback|preview|persisted-generator-run/i.test(assetProvider ?? "")))) return "Wireframe concept";
   if (productionAssetStatus === "AI_CONCEPT" || previewClassification === "AI_CONCEPT_PREVIEW") return "AI studio";
+  if (productionAssetStatus === "WIREFRAME" || (!finalProductionReady && (previewClassification === "WIREFRAME_CONCEPT" || /wireframe|persisted-generator-run/i.test(assetProvider ?? "")))) return "Wireframe concept";
   return tier === "LEGENDARY_READY" ? "Legendary-ready" : tier === "PREMIUM" ? "Premium" : "Basic";
 }
 

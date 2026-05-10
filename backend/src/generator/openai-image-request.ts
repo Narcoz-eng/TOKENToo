@@ -29,6 +29,10 @@ export type OpenAIImageRequestInput = {
 export type OpenAIImageRequest = {
   endpoint: typeof OPENAI_IMAGE_GENERATION_ENDPOINT | typeof OPENAI_IMAGE_EDIT_ENDPOINT;
   payload: Record<string, unknown>;
+  referenceImage?: {
+    imageUrl: string;
+    mimeType?: string;
+  };
   model: string;
   size: string;
   quality: string;
@@ -72,8 +76,7 @@ export function buildOpenAIImageRequest(input: OpenAIImageRequestInput): OpenAII
         prompt,
         size,
         quality,
-        n: 1,
-        images: [{ image_url: reference.imageUrl }]
+        n: 1
       }
     : {
         model,
@@ -86,12 +89,13 @@ export function buildOpenAIImageRequest(input: OpenAIImageRequestInput): OpenAII
   return {
     endpoint: reference ? OPENAI_IMAGE_EDIT_ENDPOINT : OPENAI_IMAGE_GENERATION_ENDPOINT,
     payload,
+    referenceImage: reference,
     model,
     size,
     quality,
     promptLength: prompt.length,
-    requestFields: Object.keys(payload),
-    imageReferenceFields: reference ? ["image_url"] : [],
+    requestFields: reference ? [...Object.keys(payload), "image[]"] : Object.keys(payload),
+    imageReferenceFields: reference ? ["image[]"] : [],
     referenceImageBase64Present: Boolean(input.referenceImageBase64),
     referenceImageUrlPresent: Boolean(input.referenceImageUrl?.trim()),
     referenceImageMimeType: reference?.mimeType ?? input.referenceImageMimeType
@@ -148,28 +152,26 @@ export function validateOpenAIImageRequest(request: OpenAIImageRequest): OpenAII
     }
   }
   if (request.endpoint === OPENAI_IMAGE_EDIT_ENDPOINT) {
-    const images = request.payload.images;
-    if (!Array.isArray(images) || !images.length) {
+    const imageUrl = request.referenceImage?.imageUrl;
+    if (!imageUrl) {
       issues.push({
         code: "OPENAI_IMAGE_REFERENCE_REQUIRED",
-        field: "images",
-        message: "Image edit requests require an images array."
+        field: "image",
+        message: "Image edit requests require a reference image upload."
       });
     } else {
-      const first = images[0] as Record<string, unknown>;
-      const imageUrl = first.image_url;
-      if (typeof imageUrl !== "string" || !isValidReferenceImageUrl(imageUrl)) {
+      if (!isValidReferenceImageUrl(imageUrl)) {
         issues.push({
           code: "OPENAI_IMAGE_REFERENCE_URL_INVALID",
-          field: "images[0].image_url",
+          field: "referenceImage",
           message: "Reference image must be an absolute http(s) URL or a base64 data:image URL.",
           fix: "Use a publicly reachable https logo URL, upload a data:image reference, or omit the reference image."
         });
       }
-      if (typeof imageUrl === "string" && imageUrl.length > OPENAI_REFERENCE_IMAGE_URL_MAX_LENGTH) {
+      if (imageUrl.length > OPENAI_REFERENCE_IMAGE_URL_MAX_LENGTH) {
         issues.push({
           code: "OPENAI_IMAGE_REFERENCE_URL_TOO_LONG",
-          field: "images[0].image_url",
+          field: "referenceImage",
           message: "Reference image URL/data URL is too large for the OpenAI Images API.",
           fix: "Use a smaller reference image."
         });
@@ -206,8 +208,22 @@ export function sanitizedOpenAIImagePayload(request: OpenAIImageRequest) {
   return {
     ...summarizeOpenAIImageRequest(request),
     n: request.payload.n,
-    imagesCount: Array.isArray(request.payload.images) ? request.payload.images.length : 0
+    imagesCount: request.referenceImage ? 1 : 0
   };
+}
+
+export function referenceImageFileName(mimeType = "image/png") {
+  if (mimeType === "image/jpeg") return "reference.jpg";
+  if (mimeType === "image/webp") return "reference.webp";
+  return "reference.png";
+}
+
+export function referenceImageMimeTypeFromDataUrl(value: string) {
+  return /^data:(image\/(?:png|jpeg|webp));base64,/i.exec(value)?.[1]?.toLowerCase();
+}
+
+export function referenceImageBase64FromDataUrl(value: string) {
+  return /^data:image\/(?:png|jpeg|webp);base64,([a-z0-9+/=\s]+)$/i.exec(value)?.[1]?.replace(/\s+/g, "");
 }
 
 export function openAIImageConfigFix(model = resolveOpenAIImageModel()) {

@@ -1,4 +1,4 @@
-import { BadRequestException, type Logger } from "@nestjs/common";
+import { BadRequestException, ServiceUnavailableException, type Logger } from "@nestjs/common";
 import { openAiResponseException } from "./image-providers";
 import {
   buildOpenAIImageRequest,
@@ -64,6 +64,15 @@ const tests: TestCase[] = [
     }
   },
   {
+    name: "reference images are prepared as Image API multipart uploads",
+    run: () => {
+      const request = buildOpenAIImageRequest({ ...baseInput, referenceImageBase64: "aGVsbG8=", referenceImageMimeType: "image/png" });
+      assert(request.endpoint.endsWith("/images/edits"), "Reference image should use the edits endpoint.");
+      assert(request.requestFields.includes("image[]"), "Reference image should be represented as a multipart image[] field.");
+      assert(!("images" in request.payload), "Reference image should not be sent as a JSON images payload.");
+    }
+  },
+  {
     name: "OpenAI 400 body is parsed into an actionable UI message",
     run: async () => {
       const request = buildOpenAIImageRequest({ ...baseInput, model: "gpt-image-2" });
@@ -102,7 +111,8 @@ const tests: TestCase[] = [
         silentLogger
       );
       const response = exception.getResponse() as { code?: string; message?: string; details?: { raw?: unknown } };
-      assert(response.code === "OPENAI_REQUEST_REJECTED", "Billing hard limit should be classified as an OpenAI request rejection.");
+      assert(exception instanceof ServiceUnavailableException, "Billing hard limit should be treated as provider unavailable.");
+      assert(response.code === "OPENAI_BILLING_UNAVAILABLE", "Billing hard limit should be classified as billing unavailable.");
       assert(response.message?.includes("Billing hard limit has been reached."), "Billing hard limit reason should be visible to the UI.");
       assert(!JSON.stringify(response).includes("sk-"), "Billing error response leaked an API key pattern.");
     }

@@ -1,8 +1,12 @@
-import { BadRequestException, GatewayTimeoutException, Inject, Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, GatewayTimeoutException, HttpException, Inject, Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import {
   buildOpenAIImageRequest,
   openAIImageConfigFix,
+  OPENAI_IMAGE_EDIT_ENDPOINT,
+  referenceImageBase64FromDataUrl,
+  referenceImageFileName,
+  referenceImageMimeTypeFromDataUrl,
   sanitizedOpenAIImagePayload,
   summarizeOpenAIImageRequest,
   validateOpenAIImageRequest,
@@ -61,7 +65,7 @@ export class OpenAIImageProvider implements ImageProvider {
       try {
         return await this.requestImage(request, apiKey);
       } catch (error) {
-        if (error instanceof BadRequestException) throw error;
+        if (error instanceof BadRequestException || isOpenAINonRetryable(error)) throw error;
         lastError = error;
         if (attempt === attempts) break;
         await new Promise((resolve) => setTimeout(resolve, attempt * 750));
@@ -102,7 +106,25 @@ export class OpenAIImageProvider implements ImageProvider {
     }
   }
 
-  private imageRequest(request: OpenAIImageRequest, apiKey: string, signal: AbortSignal) {
+  private async imageRequest(request: OpenAIImageRequest, apiKey: string, signal: AbortSignal) {
+    if (request.endpoint === OPENAI_IMAGE_EDIT_ENDPOINT) {
+      const form = new FormData();
+      form.append("model", request.model);
+      form.append("prompt", String(request.payload.prompt ?? ""));
+      form.append("size", request.size);
+      form.append("quality", request.quality);
+      form.append("n", String(request.payload.n ?? 1));
+      const reference = await this.referenceImageBlob(request, signal);
+      form.append("image[]", reference.blob, reference.fileName);
+      return fetch(request.endpoint, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKey}`
+        },
+        body: form,
+        signal
+      });
+    }
     return fetch(request.endpoint, {
       method: "POST",
       headers: {
@@ -113,29 +135,60 @@ export class OpenAIImageProvider implements ImageProvider {
       signal
     });
   }
+
+  private async referenceImageBlob(request: OpenAIImageRequest, signal: AbortSignal) {
+    const referenceImage = request.referenceImage;
+    const imageUrl = referenceImage?.imageUrl;
+    if (!referenceImage || !imageUrl) throw openAiProviderException("OPENAI_IMAGE_REFERENCE_REQUIRED", "OpenAI image edit request is missing the reference image upload.", { request: summarizeOpenAIImageRequest(request) }, "bad_request");
+    if (imageUrl.startsWith("data:")) {
+      const mimeType = referenceImageMimeTypeFromDataUrl(imageUrl) ?? referenceImage.mimeType ?? "image/png";
+      const base64 = referenceImageBase64FromDataUrl(imageUrl);
+      if (!base64) throw openAiProviderException("OPENAI_IMAGE_REFERENCE_INVALID", "OpenAI image edit reference is not a valid base64 data image.", { request: summarizeOpenAIImageRequest(request) }, "bad_request");
+      return {
+        blob: new Blob([Buffer.from(base64, "base64")], { type: mimeType }),
+        fileName: referenceImageFileName(mimeType)
+      };
+    }
+    const response = await fetch(imageUrl, { signal });
+    if (!response.ok) {
+      throw openAiProviderException("OPENAI_IMAGE_REFERENCE_FETCH_FAILED", `OpenAI image edit reference could not be fetched: HTTP ${response.status}.`, { request: summarizeOpenAIImageRequest(request) }, "bad_request");
+    }
+    const mimeType = response.headers.get("content-type")?.split(";")[0]?.toLowerCase() || referenceImage.mimeType || "image/png";
+    if (!["image/png", "image/jpeg", "image/webp"].includes(mimeType)) {
+      throw openAiProviderException("OPENAI_IMAGE_REFERENCE_MIME_UNSUPPORTED", `OpenAI image edit reference returned unsupported MIME type "${mimeType}".`, { request: summarizeOpenAIImageRequest(request) }, "bad_request");
+    }
+    return {
+      blob: new Blob([await response.arrayBuffer()], { type: mimeType }),
+      fileName: referenceImageFileName(mimeType)
+    };
+  }
 }
 
 @Injectable()
 export class MockImageProvider implements ImageProvider {
   async generate(input: ImageGenerationInput): Promise<ImageGenerationOutput> {
-    const title = escapeXml(input.prompt.split(/[.,\n]/)[0]?.slice(0, 42) || "Phew.run preview");
+    const title = escapeXml(input.prompt.split(/[.,\n]/)[0]?.slice(0, 44) || "Premium concept poster");
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="42%" r="72%"><stop offset="0" stop-color="#16d7d2" stop-opacity=".75"/><stop offset=".42" stop-color="#baff00" stop-opacity=".22"/><stop offset="1" stop-color="#05070f"/></radialGradient>
-    <filter id="glow"><feGaussianBlur stdDeviation="18" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <linearGradient id="frame" x1="0" x2="1"><stop stop-color="#baff00"/><stop offset=".6" stop-color="#16d7d2"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#010403"/><stop offset=".48" stop-color="#071017"/><stop offset="1" stop-color="#101019"/></linearGradient>
+    <radialGradient id="glow" cx="52%" cy="34%" r="62%"><stop stop-color="#baff00" stop-opacity=".45"/><stop offset=".5" stop-color="#16d7d2" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="16" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="frame" x1="0" x2="1"><stop stop-color="#baff00"/><stop offset=".58" stop-color="#16d7d2"/><stop offset="1" stop-color="#f4c542"/></linearGradient>
   </defs>
   <rect width="1024" height="1024" fill="url(#bg)"/>
-  <path d="M140 760 260 360 420 700 570 240 720 710 860 430 930 760Z" fill="#06131a" opacity=".72"/>
-  <circle cx="512" cy="470" r="245" fill="#baff00" opacity=".14" filter="url(#glow)"/>
-  <path d="M322 400 Q350 218 512 246 Q674 218 702 400 Q734 640 512 780 Q290 640 322 400Z" fill="#0a1620" stroke="#baff00" stroke-width="14" filter="url(#glow)"/>
-  <circle cx="430" cy="445" r="54" fill="#d8ffd8" stroke="#05070f" stroke-width="10"/>
-  <circle cx="594" cy="445" r="54" fill="#d8ffd8" stroke="#05070f" stroke-width="10"/>
-  <circle cx="430" cy="445" r="20" fill="#05070f"/>
-  <circle cx="594" cy="445" r="20" fill="#05070f"/>
-  <path d="M392 592 Q512 660 632 592" fill="none" stroke="#16d7d2" stroke-width="18" stroke-linecap="round"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <path d="M0 690 C170 608 325 766 498 678 S820 594 1024 700 L1024 1024 L0 1024Z" fill="#000" opacity=".48"/>
+  <g filter="url(#soft)">
+    <ellipse cx="512" cy="456" rx="310" ry="108" fill="none" stroke="#16d7d2" stroke-width="5" opacity=".2"/>
+    <ellipse cx="512" cy="456" rx="220" ry="74" fill="none" stroke="#baff00" stroke-width="7" opacity=".26"/>
+    <path d="M322 824 L404 312 L492 180 L618 288 L736 824 Z" fill="#050b0f" stroke="url(#frame)" stroke-width="12" opacity=".96"/>
+    <path d="M452 760 L502 332 L620 764" fill="none" stroke="#baff00" stroke-width="10" opacity=".36"/>
+    <path d="M350 262 L206 130 M676 248 L840 116 M512 250 L512 64" stroke="#f4c542" stroke-width="6" stroke-linecap="round" opacity=".28"/>
+  </g>
   <rect x="36" y="36" width="952" height="952" rx="42" fill="none" stroke="url(#frame)" stroke-width="6" opacity=".88"/>
-  <text x="80" y="900" fill="#ffffff" font-size="42" font-family="Arial, sans-serif" font-weight="900">${title}</text>
+  <text x="72" y="838" fill="#baff00" font-size="18" font-family="Arial, sans-serif" font-weight="900">PREMIUM STUDIO</text>
+  <text x="72" y="900" fill="#ffffff" font-size="42" font-family="Arial, sans-serif" font-weight="900">${title}</text>
+  <text x="72" y="936" fill="#16d7d2" font-size="18" font-family="Arial, sans-serif" font-weight="800">Cinematic faction splash</text>
 </svg>`;
     return {
       provider: "mock",
@@ -181,20 +234,21 @@ export async function openAiResponseException(response: Response, request: OpenA
       request: sanitizedOpenAIImagePayload(request),
       promptHash: hashForLog(String(request.payload.prompt ?? "")),
       openaiError,
-      accountBillingError: /billing|hard limit|quota|credit/i.test(`${openaiError.code ?? ""} ${openaiError.type ?? ""} ${openaiError.message ?? ""}`)
+      accountBillingError: isOpenAIBillingIssue(openaiError)
     })
   );
   const reason = openaiError.message || `OpenAI returned HTTP ${response.status}`;
+  const billingIssue = isOpenAIBillingIssue(openaiError);
   const moderationIssue = /moderation|content policy|safety|policy|blocked|rejected/i.test(`${response.status} ${reason} ${openaiError.code ?? ""} ${openaiError.type ?? ""}`);
   const unsupportedModel = /unsupported_model|model_not_found|does not exist|unsupported model|invalid model/i.test(`${openaiError.code ?? ""} ${openaiError.type ?? ""} ${reason}`);
-  const code = unsupportedModel ? "OPENAI_UNSUPPORTED_MODEL" : moderationIssue ? "OPENAI_PROMPT_REJECTED" : response.status >= 400 && response.status < 500 ? "OPENAI_REQUEST_REJECTED" : "OPENAI_REQUEST_FAILED";
-  const publicReason = unsupportedModel ? `${reason} ${openAIImageConfigFix(request.model)}` : reason;
+  const code = billingIssue ? "OPENAI_BILLING_UNAVAILABLE" : unsupportedModel ? "OPENAI_UNSUPPORTED_MODEL" : moderationIssue ? "OPENAI_PROMPT_REJECTED" : response.status >= 400 && response.status < 500 ? "OPENAI_REQUEST_REJECTED" : "OPENAI_REQUEST_FAILED";
+  const publicReason = billingIssue ? `${reason} Add credits, raise the OpenAI billing limit, or use AI_CONCEPT_PROVIDER=premium-fallback until billing is restored.` : unsupportedModel ? `${reason} ${openAIImageConfigFix(request.model)}` : reason;
   const publicMessage = `OpenAI image request rejected: ${publicReason}`;
   return openAiProviderException(code, publicMessage, {
     status: response.status,
     request: summarizeOpenAIImageRequest(request),
     openaiError
-  }, response.status >= 400 && response.status < 500 && response.status !== 429 ? "bad_request" : "service_unavailable");
+  }, billingIssue || response.status === 429 ? "service_unavailable" : response.status >= 400 && response.status < 500 ? "bad_request" : "service_unavailable");
 }
 
 function openAiProviderException(code: string, message: string, cause?: unknown, kind?: "bad_request" | "gateway_timeout" | "service_unavailable") {
@@ -211,6 +265,17 @@ function openAiProviderException(code: string, message: string, cause?: unknown,
   if (kind === "bad_request" || code === "OPENAI_PROMPT_REJECTED" || code === "OPENAI_REQUEST_REJECTED" || code === "OPENAI_UNSUPPORTED_MODEL") return new BadRequestException(payload);
   if (kind === "gateway_timeout" || code === "OPENAI_IMAGE_TIMEOUT") return new GatewayTimeoutException(payload);
   return new ServiceUnavailableException(payload);
+}
+
+function isOpenAINonRetryable(error: unknown) {
+  if (!(error instanceof HttpException)) return false;
+  const response = error.getResponse();
+  const code = typeof response === "object" && response ? (response as Record<string, unknown>).code : undefined;
+  return code === "OPENAI_BILLING_UNAVAILABLE";
+}
+
+function isOpenAIBillingIssue(openaiError: { code?: string; type?: string; message?: string }) {
+  return /billing|hard limit|quota|credit|insufficient_quota|usage limit|payment required/i.test(`${openaiError.code ?? ""} ${openaiError.type ?? ""} ${openaiError.message ?? ""}`);
 }
 
 function safeJson(value: string) {

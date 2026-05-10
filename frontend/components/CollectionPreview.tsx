@@ -5,7 +5,6 @@ import { ProgressBar } from "./ProgressBar";
 import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
 import { ChestOpenAnimation, MintRevealAnimation, RewardBurstAnimation } from "./animations";
-import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
 export function CollectionPreview({
@@ -25,30 +24,33 @@ export function CollectionPreview({
   const wireframeOnly = isWireframePreview(preview);
   const aiConcept = preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW";
   const professionalPreview = !wireframeOnly;
-  const visualSamples = professionalPreview ? samples.filter((sample) => Boolean(sample.image)) : [];
+  const styleBibleImage = preview.styleBibleAsset?.uri ?? preview.styleBible?.exportPlan.styleBibleImage ?? preview.exportPlan?.styleBibleImage ?? "";
+  const bannerImage = nonLegacyArt(preview.banner) || styleBibleImage;
+  const avatarImage = nonLegacyArt(preview.avatar) || styleBibleImage;
+  const visualSamples = professionalPreview ? samples.filter((sample) => Boolean(sample.image) && !isLegacyPlaceholderVisual(sample.image, sample.provider)) : [];
   const tags = identityTags(preview);
   const pitch = culturePitch(preview);
   const generationUnavailable = preview.warnings?.some((warning) => /AI (?:concept|studio) generation unavailable/i.test(warning)) ?? false;
-  const planningVisual = /local-placeholder|planning-visual/i.test(preview.assetProvider ?? "") || preview.samples.some((sample) => /local-placeholder/i.test(sample.provider ?? ""));
+  const hiddenFallbackArt = /premium-fallback|fallback-poster/i.test(preview.assetProvider ?? "") || preview.samples.some((sample) => /premium-fallback/i.test(sample.provider ?? ""));
   const conceptRequest = preview.conceptRequest;
 
   return (
     <div className="space-y-5">
       <SectionCard title={compact ? "Art Direction Review" : "Collection Art Direction"} className="overflow-hidden p-0">
         <div className="relative min-h-[420px]">
-          {professionalPreview ? (
-            <img src={safeImage(preview.banner, brandAssets.launchHero)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-60" />
-          ) : (
-            <img src={brandAssets.emptyVaultPremium} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />
-          )}
+          {bannerImage ? <img src={bannerImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" /> : null}
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/90 to-[#020806]/35" />
           <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#020806] to-transparent" />
           <div className="relative p-6 lg:p-7">
             <div className="grid gap-6 lg:grid-cols-[128px_minmax(0,1fr)_300px]">
-              {professionalPreview ? (
-                <img src={safeImage(preview.avatar, brandAssets.factionMark)} alt={preview.collection} className="aspect-square rounded-lg border border-vault-green/40 object-cover shadow-green" />
+              {avatarImage ? (
+                <div className="aspect-square overflow-hidden rounded-md border border-[#15110a] bg-[#ede5d4] p-2 shadow-green">
+                  <img src={avatarImage} alt={`${preview.collection} studio bible`} className="h-full w-full rounded-sm border border-black/20 object-cover" />
+                </div>
               ) : (
-                <DnaMark preview={preview} />
+                <div className="aspect-square rounded-md border border-dashed border-vault-line bg-black/35 p-4 text-xs font-bold leading-5 text-slate-400">
+                  Studio Bible generation unavailable{preview.providerStatus ? ` - provider reason: ${preview.providerStatus}` : ""}
+                </div>
               )}
               <div className="min-w-0">
                 <div className="flex flex-wrap gap-2">
@@ -56,19 +58,19 @@ export function CollectionPreview({
                   <StatusPill accent="cyan">{cleanDisplayText(preview.theme)}</StatusPill>
                   <StatusPill accent={isProductionStatus(preview.productionAssetStatus) ? "green" : "gold"}>{previewStatusLabel(preview)}</StatusPill>
                   {generationUnavailable ? <StatusPill accent="gold">Generation unavailable</StatusPill> : null}
-                  {planningVisual ? <StatusPill accent="cyan">Planning visual</StatusPill> : null}
+                  {hiddenFallbackArt ? <StatusPill accent="gold">Fallback hidden</StatusPill> : null}
                 </div>
                 <h2 className="mt-4 text-4xl font-black leading-tight lg:text-5xl">{preview.collection}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{pitch}</p>
                 {!preview.finalProductionReady ? (
                   <p className="mt-3 max-w-3xl rounded-md border border-vault-gold/35 bg-vault-gold/10 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">
                     {generationUnavailable
-                      ? exactGenerationReason(preview) ?? "AI studio generation is unavailable right now. A cinematic planning preview is shown so the collection experience stays reviewable; retry after the OpenAI issue is fixed."
-                      : planningVisual
-                      ? "Branded studio planning visuals are shown instead of paid AI preview art. They keep the collection reviewable while final assets are curated."
+                      ? exactGenerationReason(preview) ?? "AI studio generation is unavailable right now. No fake collection art is shown; continue editing the style bible and retry after the OpenAI issue is fixed."
+                      : hiddenFallbackArt
+                      ? "Fallback art was returned by the provider and is hidden from creator-facing collection output."
                       : preview.productionAssetStatus === "AI_CONCEPT"
                       ? "AI studio preview - creator refinement only. Final minting requires locked approval plus layered, curated, or artist-approved production assets."
-                      : "AI studio preview required. Generate premium preview imagery before reviewing collection visuals."}
+                      : "AI studio preview required. Generate studio imagery before reviewing collection visuals."}
                   </p>
                 ) : null}
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -86,7 +88,7 @@ export function CollectionPreview({
 
             {wireframeOnly ? <ProfessionalPreviewGate preview={preview} onGenerateAiConcept={onGenerateAiConcept} canGenerateAiConcept={canGenerateAiConcept} loading={loading} generationUnavailable={generationUnavailable} /> : null}
 
-            {conceptRequest ? <ConceptRunStatus conceptRequest={conceptRequest} provider={preview.assetProvider} planningVisual={planningVisual} /> : null}
+            {conceptRequest ? <ConceptRunStatus conceptRequest={conceptRequest} provider={preview.assetProvider} fallbackHidden={hiddenFallbackArt} /> : null}
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <FeatureTile icon={LockKeyhole} title={wireframeOnly ? "Vault visuals pending" : "Vault NFTs"} body={wireframeOnly ? "Vault NFT visuals pending AI studio preview or curated layer pack." : "Token-backed identity cards with redeem and marketplace hooks."} />
@@ -98,8 +100,8 @@ export function CollectionPreview({
       </SectionCard>
 
       {professionalPreview ? (
-        <SectionCard title={planningVisual ? "Studio Planning Preview" : aiConcept ? "AI Studio Preview" : "Vault NFT Preview Set"}>
-          {aiConcept ? <p className="mb-4 rounded-md border border-vault-cyan/25 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">{planningVisual ? "Studio planning visual - branded placeholder for review." : "AI studio preview - refine, lock, and curate before launch."}</p> : null}
+        <SectionCard title={aiConcept ? "AI Studio Preview" : "Vault NFT Preview Set"}>
+          {aiConcept ? <p className="mb-4 rounded-md border border-vault-cyan/25 bg-vault-cyan/8 px-3 py-2 text-xs font-bold text-vault-cyan">AI studio preview - refine, lock, and curate before launch.</p> : null}
           {visualSamples.length ? (
             <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
               {visualSamples.slice(0, compact ? 3 : 6).map((sample) => (
@@ -115,6 +117,8 @@ export function CollectionPreview({
           <ProfessionalPreviewRequirement preview={preview} onGenerateAiConcept={onGenerateAiConcept} canGenerateAiConcept={canGenerateAiConcept} loading={loading} />
         </SectionCard>
       )}
+
+      <StudioBibleAssetStrip preview={preview} />
 
       <CreatorReadinessGrid preview={preview} wireframeOnly={wireframeOnly} />
       <StudioApprovalStatus preview={preview} />
@@ -146,7 +150,7 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
           <Wand2 className="size-4" />
           <p className="text-xs font-black uppercase tracking-[0.18em]">Creative DNA Ready</p>
         </div>
-        <p className="mt-3 text-2xl font-black leading-tight text-white">{generationUnavailable ? "Generation unavailable - studio planning preview active" : "AI studio preview required"}</p>
+        <p className="mt-3 text-2xl font-black leading-tight text-white">{generationUnavailable ? "Generation unavailable - style bible remains editable" : "AI studio preview required"}</p>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{culturePitch(preview)}</p>
         {onGenerateAiConcept ? (
           <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
@@ -163,14 +167,14 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
   );
 }
 
-function ConceptRunStatus({ conceptRequest, provider, planningVisual }: { conceptRequest: NonNullable<CollectionGeneratorPreview["conceptRequest"]>; provider?: string; planningVisual: boolean }) {
+function ConceptRunStatus({ conceptRequest, provider, fallbackHidden }: { conceptRequest: NonNullable<CollectionGeneratorPreview["conceptRequest"]>; provider?: string; fallbackHidden: boolean }) {
   const paid = Boolean(conceptRequest.usesPaidOpenAIImageGeneration);
   return (
     <div className="mt-5 grid gap-3 rounded-lg border border-vault-line bg-black/35 p-4 text-xs font-bold text-slate-300 md:grid-cols-4">
       <p>Provider <span className="mt-1 block text-sm font-black text-white">{providerLabel(provider ?? conceptRequest.provider)}</span></p>
       <p>Images <span className="mt-1 block text-sm font-black text-white">{conceptRequest.imageCount ?? 0}</span></p>
       <p>OpenAI spend <span className={cn("mt-1 block text-sm font-black", paid ? "text-vault-gold" : "text-vault-green")}>{paid ? `${conceptRequest.estimatedOpenAIRequestCount ?? 0} request(s)` : "None"}</span></p>
-      <p>Cache <span className={cn("mt-1 block text-sm font-black", conceptRequest.cachedResultAvailable ? "text-vault-green" : "text-vault-gold")}>{conceptRequest.cachedResultAvailable ? "Available" : planningVisual ? "Placeholder active" : "Not available"}</span></p>
+      <p>Cache <span className={cn("mt-1 block text-sm font-black", conceptRequest.cachedResultAvailable ? "text-vault-green" : "text-vault-gold")}>{conceptRequest.cachedResultAvailable ? "Available" : fallbackHidden ? "Fallback hidden" : "Not available"}</span></p>
     </div>
   );
 }
@@ -183,7 +187,7 @@ function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGener
         <div className="rounded-lg border border-vault-gold/30 bg-vault-gold/8 p-5">
           <p className="text-sm font-black uppercase text-vault-gold">Creative DNA ready</p>
           <h3 className="mt-2 text-2xl font-black text-white">AI studio preview required</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-300">{generationUnavailable ? "AI generation is currently unavailable, but the cinematic studio planning preview remains available for review. Retry after the OpenAI issue is fixed." : "A polished identity direction is ready. Generate premium studio imagery to review hero art, mood, and rarity storytelling before any launch decision."}</p>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{generationUnavailable ? "AI generation is currently unavailable. No fake collection art is shown; use the studio bible and retry after the OpenAI issue is fixed." : "A polished identity direction is ready. Generate studio imagery to review hero art, mood, and rarity storytelling before any launch decision."}</p>
           {onGenerateAiConcept ? (
             <button type="button" onClick={onGenerateAiConcept} disabled={!canGenerateAiConcept || loading} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black disabled:opacity-55">
               <Sparkles className="size-4" /> {generationUnavailable ? "Retry AI Studio Preview" : "Generate AI Studio Preview"}
@@ -204,6 +208,32 @@ function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGener
   );
 }
 
+function StudioBibleAssetStrip({ preview }: { preview: CollectionGeneratorPreview }) {
+  const assets = [
+    preview.styleBibleAsset,
+    preview.traitCatalogAsset,
+    preview.rarityLadderAsset,
+    preview.moodSheetAsset,
+    preview.layerBreakdownAsset
+  ].filter((asset) => Boolean(asset?.uri));
+  if (!assets.length) return null;
+  return (
+    <SectionCard title="NFT Studio Bible Assets">
+      <div className="grid gap-4 lg:grid-cols-2">
+        {assets.map((asset) => (
+          <figure key={asset!.type} className="rounded-md border border-[#15110a] bg-[#ede5d4] p-3">
+            <div className="mb-2 flex items-center justify-between gap-3 border-b border-black/20 pb-2">
+              <figcaption className="text-xs font-black uppercase tracking-[0.16em] text-black">{asset!.label}</figcaption>
+              <span className="rounded-sm bg-black px-2 py-1 text-[10px] font-black uppercase text-[#baff00]">{asset!.type.replaceAll("_", " ")}</span>
+            </div>
+            <img src={asset!.uri} alt={asset!.label} className="h-80 w-full rounded-sm border border-black/20 bg-[#f4efdf] object-cover" />
+          </figure>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 function CreatorSignalGrid({ preview }: { preview: CollectionGeneratorPreview }) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -220,18 +250,6 @@ function SummaryCard({ title, body }: { title: string; body: string }) {
     <div className="rounded-md border border-vault-line bg-black/25 p-4">
       <p className="text-xs font-black uppercase text-slate-500">{title}</p>
       <p className="mt-2 text-sm font-bold leading-5 text-slate-200">{body}</p>
-    </div>
-  );
-}
-
-function DnaMark({ preview }: { preview: CollectionGeneratorPreview }) {
-  const initials = (preview.collection.replace(/^\$/, "").match(/\b[A-Za-z0-9]/g) ?? ["D", "N", "A"]).slice(0, 3).join("");
-  return (
-    <div className="grid aspect-square place-items-center rounded-lg border border-vault-cyan/35 bg-black/55 shadow-[0_0_40px_rgba(22,215,210,0.18)]">
-      <div className="text-center">
-        <p className="text-3xl font-black text-vault-cyan">{initials}</p>
-        <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">DNA</p>
-      </div>
     </div>
   );
 }
@@ -373,7 +391,6 @@ function AdvancedBlock({ title, children }: { title: string; children: ReactNode
 
 function PreviewNftCard({ sample }: { sample: CollectionGeneratorPreview["samples"][number] }) {
   const rarityAccent = sample.rarity === "Legendary" || sample.rarity === "Mythic" ? "gold" : sample.rarity === "Epic" ? "cyan" : "green";
-  const planning = /local-placeholder/i.test(sample.provider ?? "");
   return (
     <article className="phew-card-hover overflow-hidden rounded-lg border border-vault-line bg-black/35">
       <div className="relative aspect-[4/5] overflow-hidden">
@@ -382,7 +399,6 @@ function PreviewNftCard({ sample }: { sample: CollectionGeneratorPreview["sample
         <div className="absolute left-3 top-3">
           <StatusPill accent={rarityAccent}>{sample.rarity}</StatusPill>
         </div>
-        {planning ? <div className="absolute right-3 top-3"><StatusPill accent="cyan">Planning visual</StatusPill></div> : null}
         <div className="absolute bottom-3 left-3 right-3">
           <p className="text-sm font-black text-white">{sample.name}</p>
           <p className="mt-1 text-xs font-bold text-vault-green">{sample.role}</p>
@@ -419,7 +435,7 @@ function PendingVaultVisuals() {
   return (
     <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-6 text-center">
       <p className="font-black text-white">Vault NFT visuals pending AI studio preview or curated layer pack.</p>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-slate-400">No placeholder or wireframe artwork is shown as collection art.</p>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-slate-400">No wireframe artwork is shown as collection art.</p>
     </div>
   );
 }
@@ -513,11 +529,23 @@ function joinNatural(items: string[]) {
   return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
-function safeImage(src: string | undefined | null, fallback: string) {
-  if (!src) return fallback;
-  const value = src.toLowerCase();
-  if (value.includes("placeholder") || value.includes("smiley") || value.includes("pink")) return fallback;
+function nonLegacyArt(src: string | undefined | null, provider?: string) {
+  if (!src || isLegacyPlaceholderVisual(src, provider)) return "";
   return src;
+}
+
+function isLegacyPlaceholderVisual(src: string | undefined | null, provider?: string) {
+  const value = String(src ?? "");
+  const decoded = safeDecode(value.slice(0, 4000)).toLowerCase();
+  return /local-placeholder|planning visual|branded placeholder|local-branded-placeholder|premium-fallback|fallback-poster|smiley|pink/.test(`${provider ?? ""} ${value.toLowerCase()} ${decoded}`);
+}
+
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function exactGenerationReason(preview: CollectionGeneratorPreview) {
@@ -530,13 +558,14 @@ function providerLabel(provider?: string) {
   if (!provider) return "Automatic fallback";
   if (/openai/i.test(provider)) return "OpenAI studio preview";
   if (/cached/i.test(provider)) return "Cached studio preview";
-  if (/local-placeholder|planning/i.test(provider)) return "Branded studio planning visual";
+  if (/premium-fallback|fallback-poster/i.test(provider)) return "Fallback art hidden";
+  if (/local-placeholder|planning/i.test(provider)) return "Legacy preview hidden";
   return cleanDisplayText(provider);
 }
 
 function shortSpec(value: string) {
   if (!value) return "No render URI";
-  if (value.startsWith("data:")) return "Inline SVG planning specification";
+  if (value.startsWith("data:")) return "Inline studio visual";
   return value.length > 96 ? `${value.slice(0, 72)}...${value.slice(-16)}` : value;
 }
 
