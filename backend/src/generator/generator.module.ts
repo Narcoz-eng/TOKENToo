@@ -11,6 +11,7 @@ import { CollectionDistinctivenessScorerService } from "./collection-distinctive
 import { CommunityContextService } from "./community-context.service";
 import { CompatibilityEngineService } from "./compatibility-engine.service";
 import { CreativeDnaService } from "./creative-dna.service";
+import { CuratedLayerPackService } from "./curated-layer-pack.service";
 import { DeterministicRenderService } from "./deterministic-render.service";
 import { GeneratorController } from "./generator.controller";
 import { GeneratorService } from "./generator.service";
@@ -37,6 +38,7 @@ import { ProductionLayerPackService } from "./production-layer-pack.service";
     AssetProductionLayerService,
     AssetStorageService,
     CreativeDnaService,
+    CuratedLayerPackService,
     DeterministicRenderService,
     ProductionLayerPackService,
     LogoAnalysisService,
@@ -58,6 +60,6 @@ import { ProductionLayerPackService } from "./production-layer-pack.service";
     CuratedAssetProvider,
     HybridAssetProvider
   ],
-  exports: [GeneratorService, AssetProductionLayerService, AssetStorageService, MetadataGeneratorService, ProductionLayerPackService, DeterministicRenderService, StudioImageProviderService]
+  exports: [GeneratorService, AssetProductionLayerService, AssetStorageService, MetadataGeneratorService, ProductionLayerPackService, DeterministicRenderService, StudioImageProviderService, CuratedLayerPackService]
 })
 export class GeneratorModule {}

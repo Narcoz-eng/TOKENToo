@@ -22,6 +22,11 @@ type GenerateStudioAssetsInput = {
   tokenMint: string;
   style: GeneratedStyleProfile;
   plan: StyleBiblePlan;
+  /**
+   * Kept for compatibility with older callers. The provider must not use these
+   * as visual Studio Bible replacements; local rendering is only a diagnostic
+   * fallback outside the creator-facing Gemini sheet path.
+   */
   deterministicAssets: PreviewAssetPlan[];
   styleVersion: number;
   rarityVersion?: string;
@@ -96,12 +101,23 @@ export class StudioImageProviderService {
       warnings.push("STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; OpenAI is reserved for explicit Premium Cinematic Render.");
     }
     if (styleProvider === "gemini" && !this.canUseGemini()) {
-      warnings.push("GEMINI_API_KEY is missing; generated deterministic Studio Bible sheets are shown as art direction only.");
+      warnings.push("GEMINI_API_KEY is missing; no creator-facing Studio Bible sheet artwork was generated. Local SVG sheets are not used as Gemini substitutes.");
+      return {
+        assets,
+        summary: {
+          provider: "gemini-unavailable" as const,
+          model: model,
+          imageCount: 0,
+          estimatedCostUsd: 0,
+          cacheStatus: "disabled" as const,
+          generationType: "fast_studio_preview" as const,
+          costBreakdown
+        },
+        warnings
+      };
     }
 
     for (const request of studioAssetRequests) {
-      const deterministic = deterministicByType.get(request.type);
-      if (!deterministic) continue;
       const prompt = this.promptFor(input.plan, request);
       const promptHash = this.hash(prompt);
       const studioCacheKey = this.cacheKey(input.tokenMint, input.style, input.plan, input.styleVersion, input.rarityVersion ?? "rarity-v1", request.generationType, promptHash);
@@ -122,26 +138,28 @@ export class StudioImageProviderService {
       }
 
       const generated = this.canUseGemini() ? await this.tryGemini(prompt, request, studioCacheKey) : undefined;
-      const asset = generated
-        ? this.withStudioMetadata(deterministic, request, {
-            provider: "gemini",
-            model,
-            prompt,
-            promptHash,
-            studioCacheKey,
-            estimatedCostUsd: this.estimatedGeminiCostUsd(),
-            cacheStatus: "generated",
-            uri: generated.uri
-          })
-        : this.withStudioMetadata(deterministic, request, {
-            provider: this.configuredStudioProvider() === "gemini" ? "gemini-unavailable" : "deterministic-render",
-            model: "style-bible-engine",
-            prompt,
-            promptHash,
-            studioCacheKey,
-            estimatedCostUsd: 0,
-            cacheStatus: "generated"
-          });
+      if (!generated) {
+        warnings.push(`Gemini did not return usable ${request.type} sheet artwork; no deterministic template substitute was emitted.`);
+        costBreakdown.push({
+          provider: "gemini-unavailable",
+          model,
+          generationType: request.generationType,
+          promptHash,
+          estimatedCostUsd: 0,
+          cacheStatus: "disabled"
+        });
+        continue;
+      }
+      const asset = this.withStudioMetadata(this.emptyStudioAsset(request, input.plan), request, {
+        provider: "gemini",
+        model,
+        prompt,
+        promptHash,
+        studioCacheKey,
+        estimatedCostUsd: this.estimatedGeminiCostUsd(),
+        cacheStatus: "generated",
+        uri: generated.uri
+      });
       assets.push(asset);
       costBreakdown.push(this.costLine(asset, request));
     }
@@ -262,6 +280,30 @@ export class StudioImageProviderService {
     };
   }
 
+  private emptyStudioAsset(request: StudioAssetRequest, plan: StyleBiblePlan): PreviewAssetPlan {
+    return {
+      type: request.type,
+      label: this.labelFor(request.type),
+      uri: "",
+      productionAssetStatus: "AI_CONCEPT",
+      previewClassification: "AI_CONCEPT_PREVIEW",
+      provider: "gemini",
+      metadata: {
+        artTeam: plan.artTeam.id,
+        collectionName: plan.collectionName
+      },
+      generationMetadata: {}
+    };
+  }
+
+  private labelFor(type: StudioAssetType) {
+    if (type === "STYLE_BIBLE") return "Full NFT Studio Bible";
+    if (type === "TRAIT_CATALOG") return "Trait Catalog Sheet";
+    if (type === "RARITY_LADDER") return "Rarity Ladder Sheet";
+    if (type === "MOOD_SHEET") return "Mood / Expression Sheet";
+    return "Layer Breakdown Sheet";
+  }
+
   private costLine(asset: PreviewAssetPlan, request: StudioAssetRequest): StudioGenerationCostLine {
     return {
       provider: (asset.provider === "cached" || asset.provider === "gemini" || asset.provider === "gemini-unavailable" ? asset.provider : "deterministic-render") as StudioGenerationCostLine["provider"],
@@ -278,8 +320,9 @@ export class StudioImageProviderService {
     return [
       raw,
       "",
-      "Render one complete NFT Studio Bible sheet, not a cinematic poster and not final NFT art.",
-      "Use a paper-and-ink studio layout with clear labeled sections, readable trait drawings, rarity separation, and consistent art-team style.",
+      "Generate one complete cohesive raster NFT Studio Bible sheet directly. Do not output an SVG, UI dashboard, vector template, placeholder grid, or icon system.",
+      "Use hand-directed art-team sheet artwork with natural imperfections: sketch marks, brushwork, texture, uneven spacing, annotated thumbnails, paper grain, ink variance, and composition asymmetry.",
+      "Different sections should feel intentionally composed by an artist, not auto-laid out by admin software. Use readable labels but avoid sterile boxes and repeated vector symbols.",
       "Every trait example must be visually distinct and collection-native. Legendary and Mythic examples must avoid generic hood, halo, void, staff, cosmic deity, and repeated archetype shortcuts.",
       "The output is art direction only. Do not imply transparent layers, mint-ready assets, metadata export, or final production approval."
     ].join("\n");

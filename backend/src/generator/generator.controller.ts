@@ -39,6 +39,19 @@ const studioActionSchema = z.object({
   note: z.string().optional()
 });
 
+const layerPackImportSchema = z.object({
+  name: z.string().min(1).optional(),
+  version: z.string().min(1).optional(),
+  rootPath: z.string().min(1).optional(),
+  manifestPath: z.string().min(1).optional(),
+  manifest: z.record(z.string(), z.unknown()).optional(),
+  assets: z.array(z.record(z.string(), z.unknown())).optional()
+});
+
+const layerPackExportSchema = z.object({
+  count: z.number().int().positive().max(10_000).optional()
+});
+
 const launchSchema = z.object({
   slug: z.string().optional(),
   collectionAssetAddress: z.string().optional(),
@@ -100,6 +113,18 @@ export class GeneratorController {
   @UseGuards(WalletAuthGuard)
   premiumCinematicRender(@Param("id") id: string, @WalletAddress() walletAddress: string) {
     return this.generator.premiumCinematicRender(id, walletAddress);
+  }
+
+  @Post("runs/:id/layer-pack/import")
+  @UseGuards(WalletAuthGuard)
+  importCuratedLayerPack(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.generator.importCuratedLayerPack(id, layerPackImportSchema.parse(body) as never, walletAddress);
+  }
+
+  @Post("runs/:id/layer-pack/export")
+  @UseGuards(WalletAuthGuard)
+  exportCuratedLayerPack(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.generator.exportCuratedLayerPack(id, layerPackExportSchema.parse(body ?? {}), walletAddress);
   }
 
   @Post("runs/:id/studio-action")

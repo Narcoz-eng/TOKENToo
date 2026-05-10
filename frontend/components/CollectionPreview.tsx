@@ -24,7 +24,7 @@ export function CollectionPreview({
   const wireframeOnly = isWireframePreview(preview);
   const aiConcept = preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW";
   const professionalPreview = !wireframeOnly;
-  const styleBibleImage = preview.styleBibleAsset?.uri ?? preview.styleBible?.exportPlan.styleBibleImage ?? preview.exportPlan?.styleBibleImage ?? "";
+  const styleBibleImage = preview.styleBibleAsset?.uri ?? "";
   const bannerImage = nonLegacyArt(preview.banner) || styleBibleImage;
   const avatarImage = nonLegacyArt(preview.avatar) || styleBibleImage;
   const visualSamples = professionalPreview ? samples.filter((sample) => Boolean(sample.image) && !isLegacyPlaceholderVisual(sample.image, sample.provider)) : [];
@@ -556,6 +556,7 @@ function exactGenerationReason(preview: CollectionGeneratorPreview) {
 
 function providerLabel(provider?: string) {
   if (!provider) return "Automatic fallback";
+  if (/unavailable|no-studio-sheets/i.test(provider)) return "Gemini unavailable";
   if (/gemini/i.test(provider)) return "Gemini Studio Bible";
   if (/openai/i.test(provider)) return "OpenAI premium cinematic";
   if (/cached/i.test(provider)) return "Cached studio preview";

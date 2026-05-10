@@ -271,6 +271,7 @@ model GenerationRun {
   communityContext    CommunityContext?
   styleProfiles       StyleProfile[]
   previewAssets       PreviewAsset[]
+  curatedLayerPacks   CuratedLayerPack[]
   qualityReports      QualityReport[]
   distinctivenessReports DistinctivenessReport[]
 
@@ -337,6 +338,7 @@ model StyleProfile {
   generationRun      GenerationRun          @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
   traitPack          GeneratorTraitPack?
   previewAssets      PreviewAsset[]
+  curatedLayerPacks  CuratedLayerPack[]
   qualityReports     QualityReport[]
   distinctivenessReports DistinctivenessReport[]
 
@@ -406,6 +408,57 @@ model PreviewAsset {
   styleProfile    StyleProfile     @relation(fields: [styleProfileId], references: [id], onDelete: Cascade)
 
   @@index([generationRunId, type])
+}
+
+model CuratedLayerPack {
+  id              String        @id @default(uuid()) @db.Uuid
+  generationRunId String        @db.Uuid
+  styleProfileId  String        @db.Uuid
+  name            String
+  version         String        @default("v1")
+  rootUri         String?
+  manifest        Json
+  validation      Json          @default("{}")
+  status          String        @default("IMPORTED")
+  width           Int?
+  height          Int?
+  provenanceHash  String?
+  previewUri      String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  generationRun   GenerationRun @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+  styleProfile    StyleProfile  @relation(fields: [styleProfileId], references: [id], onDelete: Cascade)
+  assets          CuratedLayerAsset[]
+
+  @@index([generationRunId])
+  @@index([styleProfileId, status])
+}
+
+model CuratedLayerAsset {
+  id                  String           @id @default(uuid()) @db.Uuid
+  layerPackId         String           @db.Uuid
+  category            String
+  traitName           String
+  rarity              String?
+  weightBps           Int              @default(100)
+  zIndex              Int              @default(0)
+  offsetX             Int              @default(0)
+  offsetY             Int              @default(0)
+  blendMode           String           @default("over")
+  aliases             Json             @default("[]")
+  incompatibleWith    Json             @default("[]")
+  uri                 String
+  mimeType            String?
+  width               Int?
+  height              Int?
+  hasAlpha            Boolean          @default(false)
+  contentHash         String?
+  metadata            Json             @default("{}")
+  createdAt           DateTime         @default(now())
+  layerPack           CuratedLayerPack @relation(fields: [layerPackId], references: [id], onDelete: Cascade)
+
+  @@unique([layerPackId, category, traitName])
+  @@index([layerPackId, category])
 }
 
 model QualityReport {

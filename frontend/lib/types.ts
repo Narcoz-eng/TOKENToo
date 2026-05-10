@@ -235,6 +235,7 @@ export type CollectionGeneratorPreview = {
   rarityDiversityScore?: number;
   providerStatus?: string;
   exportPlan?: StudioExportPlan;
+  curatedLayerPack?: CuratedLayerPackSummary;
   warnings?: string[];
   avatar: string;
   banner: string;
@@ -272,6 +273,27 @@ export type CollectionGeneratorPreview = {
     visualDiversityScore: number;
     blockers: string[];
   };
+};
+
+export type CuratedLayerPackSummary = {
+  id: string;
+  name: string;
+  version?: string;
+  status: string;
+  previewUri?: string | null;
+  provenanceHash?: string | null;
+  validation?: Record<string, unknown>;
+  assets?: Array<{
+    category: string;
+    traitName: string;
+    rarity?: string | null;
+    weightBps: number;
+    zIndex: number;
+    width?: number | null;
+    height?: number | null;
+    hasAlpha: boolean;
+    incompatibleWith?: unknown;
+  }>;
 };
 
 export type StudioPreviewAssetType = "STYLE_BIBLE" | "TRAIT_CATALOG" | "RARITY_LADDER" | "MOOD_SHEET" | "LAYER_BREAKDOWN" | "HERO_CONCEPT";

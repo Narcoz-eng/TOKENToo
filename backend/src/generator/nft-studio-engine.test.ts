@@ -1,5 +1,6 @@
 import { selectArtTeam } from "./art-team-engine";
 import { AiOutputQualityValidatorService } from "./ai-output-quality-validator.service";
+import { CuratedLayerPackService } from "./curated-layer-pack.service";
 import { ProductionLayerPackService } from "./production-layer-pack.service";
 import { StudioImageProviderService } from "./studio-image-provider.service";
 import { StyleBibleEngineService } from "./style-bible-engine.service";
@@ -199,7 +200,7 @@ async function main() {
   delete process.env.GEMINI_API_KEY;
   const provider = new StudioImageProviderService();
   const summary = provider.validatePlan(baseStyle, bible, "test-mint");
-  assert(summary.provider === "gemini-unavailable", "Gemini should be the default Studio Bible provider, with deterministic fallback when the key is missing");
+  assert(summary.provider === "gemini-unavailable", "Gemini should be the default Studio Bible provider, with no fake sheet fallback when the key is missing");
   assert(summary.imageCount === 5, "Fast Studio Preview should plan the five Studio Bible sheets");
   assert(summary.estimatedCostUsd === 0, "Missing Gemini key should not estimate paid preview cost");
   const generated = await provider.generateStudioAssets({
@@ -210,10 +211,10 @@ async function main() {
     styleVersion: 1,
     rarityVersion: "preview"
   });
-  assert(generated.assets.length === 5, "Studio provider should return all five Studio Bible assets");
+  assert(generated.assets.length === 0, "Studio provider must not return deterministic template sheets when Gemini is unavailable");
   assert(generated.assets.every((asset) => asset.provider !== "openai"), "OpenAI must not generate default Studio Bible assets");
-  assert(generated.assets.every((asset) => asset.generationMetadata?.artDirectionOnly === true && asset.generationMetadata?.finalLayerAsset === false), "Studio Bible assets must be marked as art direction, not final layers");
-  assert(generated.summary.costBreakdown.every((line) => line.generationType && typeof line.estimatedCostUsd === "number"), "Studio provider should return per-asset cost metadata");
+  assert(generated.warnings.some((warning) => /Local SVG sheets are not used as Gemini substitutes/i.test(warning)), "Missing Gemini should be an honest no-sheet state");
+  assert(generated.summary.costBreakdown.every((line) => line.generationType && typeof line.estimatedCostUsd === "number"), "Studio provider should return per-asset cost metadata when provider calls are attempted");
   const cached = await provider.generateStudioAssets({
     tokenMint: "test-mint",
     style: baseStyle,
@@ -223,7 +224,7 @@ async function main() {
     rarityVersion: "preview",
     cachedAssets: generated.assets
   });
-  assert(cached.assets.every((asset) => asset.provider === "cached"), "Identical Studio Bible requests should reuse cached assets");
+  assert(cached.assets.length === 0, "No fake cached Studio Bible assets should exist when Gemini never generated sheets");
   assert(cached.summary.estimatedCostUsd === 0, "Cached Studio Bible reuse should not estimate new provider cost");
   const aiIssues = new AiOutputQualityValidatorService().validate(generated.assets);
   assert(!aiIssues.some((issue) => /missing banner|rarity character/i.test(issue)), `Studio Bible validation should not require cinematic OpenAI assets: ${aiIssues.join(", ")}`);
@@ -235,6 +236,63 @@ async function main() {
   const layerStatus = new ProductionLayerPackService().approvedLayerManifestStatus(pack);
   assert(!layerStatus.approved, "Final export should be blocked without an approved transparent PNG/WebP layer manifest");
   assert(/Final export|Layer manifest|CURATED_LAYER_PACK/i.test(layerStatus.reasonIfNo ?? ""), "Missing layer manifest should explain that export is art direction only");
+
+  const sharpModule = await import("sharp");
+  const sharp = sharpModule.default;
+  const transparentPng = `data:image/png;base64,${(await sharp({ create: { width: 8, height: 8, channels: 4, background: "#4a5d2380" } }).png().toBuffer()).toString("base64")}`;
+  const requiredCategories = ["base", "background", "head", "eyes", "mouth", "body", "prop", "aura"];
+  const fakeDb = fakeCuratedLayerDb();
+  const curated = new CuratedLayerPackService(fakeDb as any);
+  const imported = await curated.importForStyle({
+    generationRunId: "00000000-0000-0000-0000-000000000001",
+    styleProfileId: "00000000-0000-0000-0000-000000000002",
+    style: baseStyle,
+    pack,
+    layerPack: {
+      name: "Test transparent layers",
+      assets: requiredCategories.map((category, index) => ({
+        category,
+        name: `${category} test layer`,
+        dataUri: transparentPng,
+        weightBps: 1000,
+        zIndex: index
+      }))
+    }
+  });
+  assert(imported?.status === "VALID", `transparent curated layer import should validate: ${JSON.stringify(imported?.validation)}`);
+  const exportResult = await curated.exportForStyle({ styleProfileId: "00000000-0000-0000-0000-000000000002", style: baseStyle, pack, count: 3 });
+  assert(exportResult.zipBytes > 0, "deterministic export should produce a ZIP payload");
+  assert(exportResult.provenanceHash.length === 64, "deterministic export should produce a provenance hash");
+}
+
+function fakeCuratedLayerDb() {
+  const state: { pack?: any; assets: any[] } = { assets: [] };
+  const tx = {
+    curatedLayerPack: {
+      create: async ({ data }: any) => {
+        state.pack = { id: "00000000-0000-0000-0000-000000000003", ...data, createdAt: new Date(), updatedAt: new Date() };
+        return state.pack;
+      },
+      findUnique: async () => ({ ...state.pack, assets: state.assets })
+    },
+    curatedLayerAsset: {
+      createMany: async ({ data }: any) => {
+        state.assets = data.map((asset: any, index: number) => ({ id: `asset-${index}`, ...asset, createdAt: new Date() }));
+        return { count: state.assets.length };
+      }
+    }
+  };
+  return {
+    $transaction: async (fn: any) => fn(tx),
+    styleProfile: { update: async () => ({}) },
+    curatedLayerPack: {
+      findFirst: async () => ({ ...state.pack, assets: state.assets }),
+      update: async ({ data }: any) => {
+        state.pack = { ...state.pack, ...data };
+        return state.pack;
+      }
+    }
+  };
 }
 
 main().catch((error) => {

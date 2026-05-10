@@ -10,6 +10,7 @@ import { AssetStorageService } from "./asset-storage.service";
 import { CollectionDistinctivenessScorerService } from "./collection-distinctiveness-scorer.service";
 import { CommunityContextService } from "./community-context.service";
 import { CompatibilityEngineService } from "./compatibility-engine.service";
+import { CuratedLayerPackService, type CuratedLayerPackImportInput } from "./curated-layer-pack.service";
 import type {
   ApproveGenerationRunInput,
   CreateGenerationRunInput,
@@ -63,6 +64,7 @@ export class GeneratorService {
     @Inject(QualityValidatorService) private readonly quality: QualityValidatorService,
     @Inject(StyleBibleEngineService) private readonly styleBible: StyleBibleEngineService,
     @Inject(StudioImageProviderService) private readonly studioImages: StudioImageProviderService,
+    @Inject(CuratedLayerPackService) private readonly curatedLayers: CuratedLayerPackService,
     @Inject(MetadataGeneratorService) private readonly metadata: MetadataGeneratorService,
     @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
   ) {}
@@ -277,6 +279,11 @@ export class GeneratorService {
             qualityReports: { orderBy: { createdAt: "desc" }, take: 1 },
             distinctivenessReports: { orderBy: { createdAt: "desc" }, take: 1 }
           }
+        },
+        curatedLayerPacks: {
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          include: { assets: { orderBy: [{ zIndex: "asc" }, { category: "asc" }, { traitName: "asc" }] } }
         }
       }
     });
@@ -383,6 +390,50 @@ export class GeneratorService {
     }
   }
 
+  async importCuratedLayerPack(id: string, input: CuratedLayerPackImportInput, walletAddress?: string) {
+    await requireDbForWrite(this.prisma);
+    const run = await this.getRun(id);
+    this.assertOwner(run, walletAddress);
+    if (run.status === "APPROVED") throw new ConflictException("Approved generator runs are immutable. Import curated layers on a draft run before approval.");
+    const latest = run.styleProfiles[0];
+    if (!latest?.traitPack) throw new NotFoundException("Generation run has no style profile for curated layer import");
+    const style = this.styleFromRecord(latest);
+    const pack = this.packFromRecord(latest.traitPack);
+    const imported = await this.curatedLayers.importForStyle({
+      generationRunId: run.id,
+      styleProfileId: latest.id,
+      style,
+      pack,
+      layerPack: input
+    });
+    if (imported?.status === "VALID") {
+      style.assetPackId = imported.id;
+      style.artSource = "CURATED_PACK";
+      style.productionAssetStatus = "CURATED_LAYER_READY";
+      style.productionAssetPolicy.defaultAssetStatus = "CURATED_LAYER_READY";
+      await this.persistPreviewQualityReport(run.id, latest.id, style, pack, latest, []);
+    }
+    return this.getRun(id);
+  }
+
+  async exportCuratedLayerPack(id: string, input: { count?: number } = {}, walletAddress?: string) {
+    await requireDbForWrite(this.prisma);
+    const run = await this.getRun(id);
+    this.assertOwner(run, walletAddress);
+    const latest = run.styleProfiles[0];
+    if (!latest?.traitPack) throw new NotFoundException("Generation run has no style profile for deterministic export");
+    const style = this.styleFromRecord(latest);
+    style.productionAssetStatus = "CURATED_LAYER_READY";
+    style.artSource = "CURATED_PACK";
+    const result = await this.curatedLayers.exportForStyle({
+      styleProfileId: latest.id,
+      style,
+      pack: this.packFromRecord(latest.traitPack),
+      count: input.count
+    });
+    return { run: await this.getRun(id), export: result };
+  }
+
   async studioAction(id: string, input: StudioWorkflowInput) {
     await requireDbForWrite(this.prisma);
     const run = await this.getRun(id);
@@ -443,6 +494,7 @@ export class GeneratorService {
     if (!latest || !report) throw new NotFoundException("Generation run has no preview to approve");
     const pack = latest.traitPack ? this.packFromRecord(latest.traitPack) : null;
     const readiness = pack ? this.assetProduction.manifest(this.styleFromRecord(latest), pack, report.tier).readinessReport : null;
+    const curatedReadiness = await this.curatedLayers.readinessForStyle(latest.id);
     if (input.acceptedVersion && input.acceptedVersion !== latest.version) throw new ConflictException("The accepted version is no longer the latest generated version.");
     if (!input.explicitConfirmation) throw new BadRequestException("Explicit creator confirmation is required before approval.");
     const studioIssues = this.studioApprovalIssues(this.studioWorkflowState(this.record(run.communityHints).studioWorkflow));
@@ -451,8 +503,9 @@ export class GeneratorService {
     if (!distinctiveness?.passed || distinctiveness.score < 72) throw new BadRequestException("Collection distinctiveness score is below the approval threshold.");
     const manifest = pack ? this.assetProduction.manifest(this.styleFromRecord(latest), pack, report.tier) : null;
     if (latest.productionAssetStatus === "WIREFRAME" || latest.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Wireframe previews are planning/debug assets and cannot be approved for launch.");
-    if (latest.productionAssetStatus === "AI_CONCEPT") throw new BadRequestException("AI studio previews can be reviewed and refined as art direction, but cannot be approved for launch until layered, curated, or artist-approved production assets are configured.");
-    if (!manifest?.productionReady || !readiness?.canProduce10kPremiumOutputs) throw new BadRequestException("Asset provider readiness report does not allow scalable deterministic output approval.");
+    if (latest.productionAssetStatus === "AI_CONCEPT" && !curatedReadiness.approvalReady) throw new BadRequestException("AI Studio Bible assets can be reviewed as art direction, but cannot be approved until a real curated transparent layer pack is imported and validated.");
+    if (!curatedReadiness.approvalReady && (!manifest?.productionReady || !readiness?.canProduce10kPremiumOutputs)) throw new BadRequestException("Asset provider readiness report does not allow scalable deterministic output approval.");
+    if (!curatedReadiness.approvalReady) throw new BadRequestException(`Curated layer pack approval gate failed: ${curatedReadiness.errors.join(" ") || "manifest valid, transparency validation, preview render, and metadata generation are required."}`);
 
     await this.prisma.styleProfile.updateMany({ where: { generationRunId: id }, data: { isApproved: false } });
     await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { isApproved: true } });
@@ -496,7 +549,9 @@ export class GeneratorService {
     }
     if (profile.productionAssetStatus === "WIREFRAME" || profile.artSource === "PROCEDURAL_FALLBACK") throw new BadRequestException("Collection launch requires curated, artist-approved, or final production assets; wireframes cannot launch.");
     if (profile.productionAssetStatus === "AI_CONCEPT") throw new BadRequestException("AI studio previews are art direction only. Configure locked creator approval plus layered, curated, or artist-approved production assets before launch.");
-    this.assertLaunchProviders(this.styleFromRecord(profile), this.packFromRecord(profile.traitPack), report.tier);
+    const curatedReadiness = await this.curatedLayers.readinessForStyle(profile.id);
+    if (!curatedReadiness.exportReady) throw new BadRequestException("Collection launch blocked: run deterministic curated-layer export successfully before launch. AI Studio Bible assets are not mint-ready assets.");
+    this.assertLaunchProviders(this.styleFromRecord(profile), this.packFromRecord(profile.traitPack), report.tier, curatedReadiness.exportReady);
 
     const slug = this.slug(input.slug ?? profile.collection);
     return this.prisma.$transaction(async (tx) => {
@@ -1262,7 +1317,7 @@ export class GeneratorService {
   private studioProviderLabel(summary: StudioGenerationSummary) {
     if (summary.provider === "gemini") return "gemini-fast-studio-preview";
     if (summary.provider === "cached") return "cached-studio-bible-preview";
-    if (summary.provider === "gemini-unavailable") return "deterministic-studio-bible-preview";
+    if (summary.provider === "gemini-unavailable") return "gemini-unavailable-no-studio-sheets";
     return "deterministic-studio-bible-preview";
   }
 
@@ -1506,11 +1561,11 @@ export class GeneratorService {
       .slice(0, 600) || "OpenAI did not return a usable studio preview.";
   }
 
-  private assertLaunchProviders(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: "BASIC" | "PREMIUM" | "LEGENDARY_READY") {
+  private assertLaunchProviders(style: GeneratedStyleProfile, pack: TraitPackPlan, qualityTier: "BASIC" | "PREMIUM" | "LEGENDARY_READY", deterministicExportReady = false) {
     const manifest = this.assetProduction.manifest(style, pack, qualityTier);
     const issues = manifest.readinessReport.reasonIfNo ? [manifest.readinessReport.reasonIfNo] : [];
     const storageProvider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
-    if (!manifest.productionReady) issues.push(`Launch requires ${process.env.REQUIRED_LAUNCH_ASSET_STATUS ?? "CURATED_LAYER_READY/ARTIST_APPROVED"} assets; current status is ${manifest.productionAssetStatus}.`);
+    if (!deterministicExportReady && !manifest.productionReady) issues.push(`Launch requires ${process.env.REQUIRED_LAUNCH_ASSET_STATUS ?? "CURATED_LAYER_READY/ARTIST_APPROVED"} assets; current status is ${manifest.productionAssetStatus}.`);
     if (storageProvider === "mock") issues.push("Permanent storage is missing. Set FINAL_ASSET_STORAGE_PROVIDER to pinata, arweave, irys, or a supported permanent adapter.");
     if (!process.env.FINAL_RENDER_STORAGE_ROOT && !this.demoLayerPackAllowed()) issues.push("FINAL_RENDER_STORAGE_ROOT is required for cached/pre-generated deterministic render outputs.");
     if (storageProvider === "pinata" && !process.env.PINATA_JWT) issues.push("PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata.");

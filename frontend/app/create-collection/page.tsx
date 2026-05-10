@@ -10,7 +10,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { apiFetch } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
-import type { ArtTeamProfile, CollectionGeneratorPreview, ConceptRequestSummary, StudioPreviewAsset, StudioWorkflowState, StyleBiblePlan, StudioExportPlan } from "@/lib/types";
+import type { ArtTeamProfile, CollectionGeneratorPreview, ConceptRequestSummary, CuratedLayerPackSummary, StudioPreviewAsset, StudioWorkflowState, StyleBiblePlan, StudioExportPlan } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { cn } from "@/lib/utils";
@@ -101,6 +101,7 @@ type GeneratorRun = {
   cinematicProvider?: string | null;
   estimatedCostUsd?: string | number | null;
   generationCostBreakdown?: unknown;
+  curatedLayerPacks?: CuratedLayerPackSummary[];
   communityHints?: unknown;
   approvedVersion?: number | null;
   styleProfiles: Array<{
@@ -278,13 +279,16 @@ export default function CreateCollectionPage() {
   const [launchResult, setLaunchResult] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [setupActionMessage, setSetupActionMessage] = useState<string | null>(null);
+  const [layerPackRoot, setLayerPackRoot] = useState("");
+  const [exportCount, setExportCount] = useState(100);
   const presetName = selectedPresetName(presets, selectedPreset);
   const preview = useMemo(() => (run ? mapRunToPreview(run, presetName) : previewOnly ? mapPreviewOnly(previewOnly, presetName) : null), [run, previewOnly, presetName]);
   const latestProfile = run?.styleProfiles[0];
   const latestQuality = latestProfile?.qualityReports[0];
   const latestDistinctiveness = latestProfile?.distinctivenessReports[0];
   const studioApprovalsComplete = Boolean(preview?.studioWorkflow?.locks.artDirection && preview.studioWorkflow.approvals.silhouetteSystem && preview.studioWorkflow.approvals.factionCulture && preview.studioWorkflow.approvals.traitFamily && preview.studioWorkflow.approvals.cinematicDirection);
-  const canApprove = Boolean(run && approvalConfirmed && studioApprovalsComplete && latestQuality?.passed && latestQuality.tier !== "BASIC" && latestDistinctiveness?.passed && capabilityState.data?.capabilities?.databaseAvailable);
+  const curatedApprovalReady = preview?.curatedLayerPack?.status === "VALID" || preview?.curatedLayerPack?.status === "EXPORT_READY";
+  const canApprove = Boolean(run && approvalConfirmed && studioApprovalsComplete && curatedApprovalReady && latestQuality?.passed && latestQuality.tier !== "BASIC" && latestDistinctiveness?.passed && capabilityState.data?.capabilities?.databaseAvailable);
   const effectiveTokenName = tokenName.trim() || scan?.name || "";
   const effectiveTokenSymbol = tokenSymbol.trim() || scan?.symbol || "";
   const effectiveDescription = description.trim() || scan?.description || (effectiveTokenName ? `${effectiveTokenName} holder community built from verified Solana token metadata.` : "");
@@ -413,6 +417,29 @@ export default function CreateCollectionPage() {
         body: JSON.stringify({ action: actionName, target })
       });
       setRun(data);
+    });
+  }
+
+  async function importLayerPack() {
+    if (!run) return;
+    await action(async () => {
+      const data = await walletAuth.authFetch<GeneratorRun>(`/generator/runs/${run.id}/layer-pack/import`, {
+        method: "POST",
+        body: JSON.stringify({ rootPath: layerPackRoot.trim(), name: `${run.tokenSymbol} curated layer pack` })
+      });
+      setRun(data);
+    });
+  }
+
+  async function exportLayerPack() {
+    if (!run) return;
+    await action(async () => {
+      const data = await walletAuth.authFetch<{ run: GeneratorRun; export: { count: number; zipPath?: string; zipBytes: number; provenanceHash: string } }>(`/generator/runs/${run.id}/layer-pack/export`, {
+        method: "POST",
+        body: JSON.stringify({ count: exportCount })
+      });
+      setRun(data.run);
+      setSetupActionMessage(`Deterministic export ready: ${data.export.count} NFTs, ${Math.round(data.export.zipBytes / 1024)} KB ZIP${data.export.zipPath ? ` at ${data.export.zipPath}` : ""}.`);
     });
   }
 
@@ -636,6 +663,17 @@ export default function CreateCollectionPage() {
             <PremiumCinematicPanel preview={studioPreview} />
 
             <CreatorStudioStatusPanel preview={studioPreview} setup={setup} loading={loading || capabilityState.loading} />
+            <CuratedLayerPackManager
+              preview={studioPreview}
+              rootPath={layerPackRoot}
+              exportCount={exportCount}
+              loading={loading}
+              disabled={!run || loading}
+              onRootPathChange={setLayerPackRoot}
+              onExportCountChange={setExportCount}
+              onImport={importLayerPack}
+              onExport={exportLayerPack}
+            />
             {privateDiagnostics && advancedOpen ? (
               <SetupChecklistPanel
                 setup={setup}
@@ -688,7 +726,7 @@ export default function CreateCollectionPage() {
                   <button type="button" onClick={approveRun} disabled={!canApprove || loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-vault-green/50 bg-vault-green/10 text-sm font-bold text-vault-green disabled:opacity-45">
                     <ShieldCheck className="size-4" /> Approve Production Assets
                   </button>
-                  <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !launchEnvironmentReady} className="phew-button phew-button-primary flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black disabled:opacity-45">
+                  <button type="button" onClick={launchCollection} disabled={!run || run.status !== "APPROVED" || loading || !launchEnvironmentReady || preview?.curatedLayerPack?.status !== "EXPORT_READY"} className="phew-button phew-button-primary flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black disabled:opacity-45">
                     <Check className="size-4" /> Launch Collection
                   </button>
                 </div>
@@ -798,7 +836,7 @@ function PublicReadinessItem({ label, value, ready }: { label: string; value: st
 function CreatorStudioStatusPanel({ preview, setup, loading }: { preview: CollectionGeneratorPreview; setup?: SetupChecklist; loading: boolean }) {
   const previewReady = hasAllStudioBibleAssets(preview);
   const devLaunchReady = Boolean(setup?.devnetLaunchReady || setup?.productionLaunchReady);
-  const productionReady = preview.productionAssetStatus === "FINAL_PRODUCTION" || preview.productionAssetStatus === "ARTIST_APPROVED" || preview.productionAssetStatus === "CURATED_LAYER_READY";
+  const productionReady = preview.curatedLayerPack?.status === "VALID" || preview.curatedLayerPack?.status === "EXPORT_READY" || preview.productionAssetStatus === "FINAL_PRODUCTION" || preview.productionAssetStatus === "ARTIST_APPROVED" || preview.productionAssetStatus === "CURATED_LAYER_READY";
   const providerReason = exactGenerationReason(preview) ?? preview.providerStatus;
   return (
     <SectionCard title="Studio Status" className="p-5">
@@ -879,6 +917,88 @@ function StudioGroup({ title, children }: { title: string; children: ReactNode }
   );
 }
 
+function CuratedLayerPackManager({
+  preview,
+  rootPath,
+  exportCount,
+  loading,
+  disabled,
+  onRootPathChange,
+  onExportCountChange,
+  onImport,
+  onExport
+}: {
+  preview: CollectionGeneratorPreview;
+  rootPath: string;
+  exportCount: number;
+  loading: boolean;
+  disabled: boolean;
+  onRootPathChange: (value: string) => void;
+  onExportCountChange: (value: number) => void;
+  onImport: () => void;
+  onExport: () => void;
+}) {
+  const pack = preview.curatedLayerPack;
+  const validation = asRecord<unknown>(pack?.validation);
+  const errors = asArray(validation.errors);
+  const warnings = asArray(validation.warnings);
+  const exportInfo = asRecord<unknown>(validation.deterministicExport);
+  const categoryCounts = pack?.assets?.reduce<Record<string, number>>((acc, asset) => {
+    acc[asset.category] = (acc[asset.category] ?? 0) + 1;
+    return acc;
+  }, {}) ?? {};
+  const valid = pack?.status === "VALID" || pack?.status === "EXPORT_READY";
+  const exportReady = pack?.status === "EXPORT_READY";
+  return (
+    <SectionCard title="Curated Layer Pack Manager" className="p-5">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill accent={valid ? "green" : "gold"}>{pack ? pack.status : "No layer pack"}</StatusPill>
+            <StatusPill accent={exportReady ? "green" : "gold"}>{exportReady ? "Deterministic export ready" : "Art direction only"}</StatusPill>
+            {pack?.provenanceHash ? <StatusPill accent="cyan">Provenance {short(pack.provenanceHash)}</StatusPill> : null}
+          </div>
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
+            <Field label="Layer pack root path" value={rootPath} onChange={onRootPathChange} placeholder="C:\\art\\my-pack or /packs/my-pack" />
+            <label className="block text-sm">
+              <span className="mb-2 block text-xs font-black uppercase text-slate-500">Export count</span>
+              <input type="number" min={1} max={10000} value={exportCount} onChange={(event) => onExportCountChange(Math.max(1, Math.min(10000, Number(event.target.value) || 1)))} className="w-full rounded-md border border-vault-line bg-black/35 px-3 py-3 text-sm font-bold text-white outline-none focus:border-vault-green" />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={onImport} disabled={disabled || !rootPath.trim()} className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-black text-black disabled:opacity-45">
+              <Upload className="size-4" /> Import Curated Layers
+            </button>
+            <button type="button" onClick={onExport} disabled={disabled || !valid} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green disabled:opacity-45">
+              <ShieldCheck className="size-4" /> Build Deterministic Export
+            </button>
+          </div>
+          {errors.length ? <p className="rounded-md border border-red-500/35 bg-red-500/10 px-3 py-2 text-xs font-bold leading-5 text-red-200">Validation errors: {errors.join(" ")}</p> : null}
+          {warnings.length ? <p className="rounded-md border border-vault-gold/35 bg-vault-gold/8 px-3 py-2 text-xs font-bold leading-5 text-vault-gold">Warnings: {warnings.join(" ")}</p> : null}
+          {exportInfo.provenanceHash ? <p className="rounded-md border border-vault-green/35 bg-vault-green/8 px-3 py-2 text-xs font-bold text-vault-green">Last export: {exportInfo.count ? `${exportInfo.count} assets` : "ready"} / {String(exportInfo.provenanceHash)}</p> : null}
+        </div>
+        <div className="space-y-3">
+          {pack?.previewUri ? (
+            <div className="overflow-hidden rounded-md border border-[#15110a] bg-[#ede5d4] p-2">
+              <img src={pack.previewUri} alt={`${pack.name} compositor preview`} className="aspect-square w-full rounded-sm border border-black/20 object-cover" />
+            </div>
+          ) : (
+            <div className="grid aspect-square place-items-center rounded-md border border-dashed border-vault-line bg-black/25 p-4 text-center text-xs font-bold text-slate-400">Import transparent PNG/WebP layers to preview deterministic composition.</div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(categoryCounts).slice(0, 8).map(([category, count]) => (
+              <div key={category} className="rounded-md border border-vault-line bg-black/25 p-2">
+                <p className="text-[10px] font-black uppercase text-slate-500">{category}</p>
+                <p className="text-lg font-black text-white">{count}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
 function StudioActionButton({ icon: Icon, label, active, disabled, onClick }: { icon: typeof LockKeyhole; label: string; active: boolean; disabled: boolean; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-black disabled:opacity-45", active ? "border-vault-green/50 bg-vault-green/12 text-vault-green" : "border-vault-line bg-black/30 text-slate-200 hover:border-vault-cyan/45")}>
@@ -925,6 +1045,7 @@ function ConceptPlanNotice({ plan }: { plan: ConceptRequestSummary | null }) {
 
 function providerDisplay(provider?: string) {
   if (!provider) return "Automatic fallback";
+  if (/unavailable|no-studio-sheets/i.test(provider)) return "Gemini unavailable";
   if (/gemini/i.test(provider)) return "Gemini Studio Bible";
   if (/openai/i.test(provider)) return "OpenAI premium cinematic";
   if (/cached/i.test(provider)) return "Cached studio preview";
@@ -1016,7 +1137,7 @@ function defaultSetupItems(): SetupChecklist["items"] {
 
 function StyleBibleStudioPanel({ preview }: { preview: CollectionGeneratorPreview }) {
   const bible = preview.styleBible;
-  const styleBibleAsset = preview.styleBibleAsset ?? (bible?.exportPlan.styleBibleImage ? { type: "STYLE_BIBLE" as const, label: "Full NFT Studio Bible", uri: bible.exportPlan.styleBibleImage } : undefined);
+  const styleBibleAsset = preview.styleBibleAsset;
   const assetsByType = new Map(
     [
       styleBibleAsset,
@@ -1176,7 +1297,7 @@ function StudioList({ title, items, compact = false }: { title: string; items: s
 function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGeneratorPreview; launchResult: string | null }) {
   const wireframeOnly = isWireframePreview(preview);
   const tags = identityTags(preview);
-  const heroImage = preview.styleBibleAsset?.uri ?? preview.styleBible?.exportPlan.styleBibleImage ?? preview.exportPlan?.styleBibleImage ?? "";
+  const heroImage = preview.styleBibleAsset?.uri ?? "";
   return (
     <section className="phew-panel relative overflow-hidden rounded-lg">
       {heroImage ? <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" /> : null}
@@ -1463,17 +1584,8 @@ function studioWorkflowFromHints(value: unknown): StudioWorkflowState | undefine
 }
 
 function studioAssetsFromBible(styleBible: StyleBiblePlan | undefined): StudioPreviewAsset[] {
-  if (!styleBible?.exportPlan?.styleBibleImage) return [];
-  return [{
-    type: "STYLE_BIBLE",
-    label: "Full NFT Studio Bible",
-    uri: styleBible.exportPlan.styleBibleImage,
-    provider: "deterministic-render",
-    metadata: {
-      artTeam: styleBible.artTeam.id,
-      collectionName: styleBible.collectionName
-    }
-  }];
+  void styleBible;
+  return [];
 }
 
 function studioAssetsFromPreviewAssets(assets: GeneratorRun["styleProfiles"][number]["previewAssets"]): StudioPreviewAsset[] {
@@ -1558,6 +1670,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     rarityDiversityScore: styleBible?.qaReport.rarityDiversityScore,
     providerStatus: run.studioProvider ?? studioAssets[0]?.provider ?? previews[0]?.provider ?? "persisted-generator-run",
     exportPlan,
+    curatedLayerPack: run.curatedLayerPacks?.[0],
     avatar: nonLegacyArt(avatarUri),
     banner: nonLegacyArt(previews.find((asset) => asset.type === "BANNER")?.uri),
     samples: normalizedSamples(profile.productionAssetStatus ?? "WIREFRAME", samples.map((asset, index) => {
@@ -1641,6 +1754,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     rarityDiversityScore: data.rarityDiversityScore ?? styleBible?.qaReport.rarityDiversityScore,
     providerStatus: data.providerStatus ?? data.conceptRequest?.providerFailureReason ?? data.conceptRequest?.provider,
     exportPlan,
+    curatedLayerPack: undefined,
     warnings: data.warnings,
     avatar: nonLegacyArt(avatarUri),
     banner: nonLegacyArt(data.bannerPreviewSpec?.uri),

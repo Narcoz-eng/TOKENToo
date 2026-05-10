@@ -642,7 +642,7 @@ export class CapabilitiesService {
           label: "GEMINI_API_KEY",
           ok: capabilities.geminiImagesAvailable || this.studioProvider() === "deterministic-render",
           requiredFor: ["Creative Preview Mode"],
-          fix: "Add GEMINI_API_KEY to use Gemini image sheets, or set STUDIO_PROVIDER=deterministic-render for local reference sheets."
+          fix: "Add GEMINI_API_KEY to use Gemini image sheets. Deterministic local sheets are not used as creator-facing Gemini substitutes."
         },
         {
           key: "CINEMATIC_PROVIDER",
@@ -703,7 +703,7 @@ export class CapabilitiesService {
     if (!capabilities.heliusConfigured) warnings.push("HELIUS_API_KEY is missing; CA-first token scanning is blocked.");
     if (capabilities.heliusConfigured && !capabilities.heliusReachable) warnings.push(`Helius is configured but unreachable or unhealthy${getLastHeliusErrorCode() ? ` (${getLastHeliusErrorCode()})` : ""}.`);
     if (this.studioProvider() === "openai") warnings.push("STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; use gemini or deterministic-render.");
-    if (this.studioProvider() === "gemini" && !capabilities.geminiImagesAvailable) warnings.push("GEMINI_API_KEY is missing; Fast Studio Preview falls back to deterministic art-direction sheets.");
+    if (this.studioProvider() === "gemini" && !capabilities.geminiImagesAvailable) warnings.push("GEMINI_API_KEY is missing; Fast Studio Preview will not emit creator-facing Studio Bible sheets until Gemini image generation is configured.");
     if (this.cinematicProvider() === "openai" && !capabilities.openaiImagesAvailable) warnings.push("Premium Cinematic Render is configured for OpenAI but OPENAI_API_KEY is missing.");
     if (!capabilities.permanentStorageConfigured) warnings.push("Permanent storage is not configured; launch and final mint assets are blocked.");
     if (!this.realApprovedLayerPackAvailable()) warnings.push(capabilities.demoCuratedLayerPackAllowed ? "Using devnet demo layer pack; production launch remains blocked until a real curated or artist-approved layer pack is configured." : "Approved curated layer pack is missing; production launch is blocked.");
