@@ -1,5 +1,6 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { createHash } from "node:crypto";
+import { GeminiStudioImageError, GeminiStudioImageProviderService, type GeminiStudioErrorCode } from "./gemini-studio-image-provider.service";
 import type {
   GeneratedStyleProfile,
   PreviewAssetPlan,
@@ -7,10 +8,11 @@ import type {
   StudioGenerationCostLine,
   StudioGenerationSummary,
   StudioGenerationType,
+  StudioProviderDiagnostics,
   StyleBiblePlan
 } from "./generator.types";
 
-type StudioAssetType = Extract<PreviewAssetPlan["type"], "STYLE_BIBLE" | "TRAIT_CATALOG" | "RARITY_LADDER" | "MOOD_SHEET" | "LAYER_BREAKDOWN">;
+export type StudioAssetType = Extract<PreviewAssetPlan["type"], "STYLE_BIBLE" | "TRAIT_CATALOG" | "RARITY_LADDER" | "MOOD_SHEET" | "LAYER_BREAKDOWN">;
 
 type StudioAssetRequest = {
   type: StudioAssetType;
@@ -23,31 +25,26 @@ type GenerateStudioAssetsInput = {
   style: GeneratedStyleProfile;
   plan: StyleBiblePlan;
   /**
-   * Kept for compatibility with older callers. The provider must not use these
-   * as visual Studio Bible replacements; local rendering is only a diagnostic
-   * fallback outside the creator-facing Gemini sheet path.
+   * Kept for explicit local/dev deterministic fallback only. These assets must
+   * never be counted as creator-facing Gemini Studio Bible sheets.
    */
   deterministicAssets: PreviewAssetPlan[];
   styleVersion: number;
   rarityVersion?: string;
   cachedAssets?: PreviewAssetPlan[];
+  routeCalled?: string;
 };
 
-type GeminiResponse = {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-        inlineData?: {
-          mimeType?: string;
-          data?: string;
-        };
-      }>;
-    };
-  }>;
+type ProviderDecision = {
+  provider: "gemini" | "openai" | "deterministic-render";
+  canCallGemini: boolean;
+  useDeterministic: boolean;
+  branch: string;
+  failureCode?: GeminiStudioErrorCode;
+  fallbackReason?: string;
 };
 
-const studioAssetRequests: StudioAssetRequest[] = [
+export const studioAssetRequests: StudioAssetRequest[] = [
   { type: "STYLE_BIBLE", generationType: "studio_bible", promptKey: "styleBibleImage" },
   { type: "TRAIT_CATALOG", generationType: "trait_catalog", promptKey: "traitCatalogSheet" },
   { type: "RARITY_LADDER", generationType: "rarity_ladder", promptKey: "rarityLadder" },
@@ -55,67 +52,99 @@ const studioAssetRequests: StudioAssetRequest[] = [
   { type: "LAYER_BREAKDOWN", generationType: "layer_breakdown", promptKey: "layerBreakdown" }
 ];
 
+const studioAssetTypeSet = new Set<StudioAssetType>(studioAssetRequests.map((request) => request.type));
+
 @Injectable()
 export class StudioImageProviderService {
   private readonly logger = new Logger(StudioImageProviderService.name);
 
+  constructor(
+    @Optional()
+    @Inject(GeminiStudioImageProviderService)
+    private readonly geminiProvider: GeminiStudioImageProviderService = new GeminiStudioImageProviderService()
+  ) {}
+
   validatePlan(style: GeneratedStyleProfile, plan: StyleBiblePlan, tokenMint: string, styleVersion = 1, rarityVersion = "rarity-v1"): StudioGenerationSummary {
     const model = this.model();
-    const provider: StudioGenerationCostLine["provider"] = this.canUseGemini() ? "gemini" : this.configuredStudioProvider() === "gemini" ? "gemini-unavailable" : "deterministic-render";
+    const decision = this.providerDecision("POST /generator/ai-concept/validate-request", "miss");
     const costBreakdown = studioAssetRequests.map((request) => {
       const prompt = this.promptFor(plan, request);
       return {
-        provider,
-        model: provider === "gemini" ? model : "style-bible-engine",
+        provider: this.costProviderForDecision(decision),
+        model: decision.canCallGemini ? model : decision.provider === "deterministic-render" ? "style-bible-engine" : model,
         generationType: request.generationType,
         promptHash: this.hash(prompt),
-        estimatedCostUsd: this.canUseGemini() ? this.estimatedGeminiCostUsd() : 0,
-        cacheStatus: "miss" as StudioCacheStatus
+        estimatedCostUsd: decision.canCallGemini ? this.estimatedGeminiCostUsd() : 0,
+        cacheStatus: decision.canCallGemini ? "miss" as StudioCacheStatus : "disabled" as StudioCacheStatus
       };
     });
-    return {
-      provider,
-      model: provider === "gemini" ? model : "style-bible-engine",
-      imageCount: studioAssetRequests.length,
+    void style;
+    void tokenMint;
+    void styleVersion;
+    void rarityVersion;
+    return this.summary({
+      provider: decision.canCallGemini ? "gemini" : decision.provider === "deterministic-render" ? "deterministic-render" : "gemini-unavailable",
+      model: decision.canCallGemini ? model : decision.provider === "deterministic-render" ? "style-bible-engine" : model,
+      assets: [],
+      costBreakdown,
+      cacheStatus: decision.canCallGemini ? "miss" : "disabled",
+      imagesThisRun: decision.canCallGemini ? studioAssetRequests.length : 0,
       estimatedCostUsd: this.sumCost(costBreakdown),
-      cacheStatus: "miss",
-      generationType: "fast_studio_preview",
-      costBreakdown
-    };
+      diagnostics: this.diagnostics(decision, "POST /generator/ai-concept/validate-request", decision.canCallGemini ? "miss" : "disabled"),
+      failureCode: decision.failureCode,
+      failureReason: decision.failureCode
+    });
   }
 
   async generateStudioAssets(input: GenerateStudioAssetsInput) {
+    const routeCalled = input.routeCalled ?? "POST /generator/preview";
     const warnings: string[] = [];
     const assets: PreviewAssetPlan[] = [];
     const costBreakdown: StudioGenerationCostLine[] = [];
-    const deterministicByType = new Map(input.deterministicAssets.map((asset) => [asset.type, asset]));
-    const cachedByKey = new Map(
-      (input.cachedAssets ?? []).map((asset) => [
-        String(asset.metadata.studioCacheKey ?? asset.generationMetadata?.studioCacheKey ?? ""),
-        asset
-      ])
-    );
     const model = this.model();
-    const styleProvider = this.configuredStudioProvider();
-    if (styleProvider === "openai") {
-      warnings.push("STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; OpenAI is reserved for explicit Premium Cinematic Render.");
+    const decision = this.providerDecision(routeCalled, "miss");
+
+    if (decision.provider === "openai") {
+      warnings.push("GEMINI_DISABLED: STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; OpenAI is reserved for explicit Premium Cinematic Render.");
     }
-    if (styleProvider === "gemini" && !this.canUseGemini()) {
-      warnings.push("GEMINI_API_KEY is missing; no creator-facing Studio Bible sheet artwork was generated. Local SVG sheets are not used as Gemini substitutes.");
+
+    if (!decision.canCallGemini) {
+      if (decision.failureCode) warnings.push(`${decision.failureCode}: ${this.failureMessage(decision.failureCode)}`);
+      const deterministicAssets = decision.useDeterministic ? this.deterministicFallbackAssets(input.deterministicAssets, input.plan) : [];
+      const deterministicCost = deterministicAssets.map((asset) => this.costLine(asset, this.requestForAsset(asset.type), "disabled"));
       return {
-        assets,
-        summary: {
-          provider: "gemini-unavailable" as const,
-          model: model,
-          imageCount: 0,
+        assets: deterministicAssets,
+        summary: this.summary({
+          provider: decision.provider === "deterministic-render" ? "deterministic-render" : "gemini-unavailable",
+          model: decision.provider === "deterministic-render" ? "style-bible-engine" : model,
+          assets: deterministicAssets,
+          costBreakdown: deterministicCost,
+          cacheStatus: "disabled",
+          imagesThisRun: 0,
           estimatedCostUsd: 0,
-          cacheStatus: "disabled" as const,
-          generationType: "fast_studio_preview" as const,
-          costBreakdown
-        },
+          diagnostics: this.diagnostics(decision, routeCalled, "disabled"),
+          failureCode: decision.failureCode,
+          failureReason: decision.failureCode
+        }),
         warnings
       };
     }
+
+    const cachedEntries: Array<[string, PreviewAssetPlan]> = (input.cachedAssets ?? [])
+      .filter((asset) => isRealStudioBibleAsset(asset))
+      .map((asset) => [
+        String(asset.metadata.studioCacheKey ?? asset.generationMetadata?.studioCacheKey ?? ""),
+        asset
+      ])
+      .filter((entry): entry is [string, PreviewAssetPlan] => Boolean(entry[0]));
+    const cachedByKey = new Map<string, PreviewAssetPlan>(cachedEntries);
+
+    const generationRequests: Array<{
+      request: StudioAssetRequest;
+      prompt: string;
+      promptHash: string;
+      studioCacheKey: string;
+    }> = [];
 
     for (const request of studioAssetRequests) {
       const prompt = this.promptFor(input.plan, request);
@@ -124,8 +153,9 @@ export class StudioImageProviderService {
       const cached = cachedByKey.get(studioCacheKey);
       if (cached) {
         const asset = this.withStudioMetadata(cached, request, {
-          provider: "cached",
-          model: String(cached.generationMetadata?.model ?? cached.metadata.model ?? "cached"),
+          provider: "cached-gemini",
+          sourceProvider: "gemini",
+          model: String(cached.generationMetadata?.model ?? cached.metadata.model ?? model),
           prompt,
           promptHash,
           studioCacheKey,
@@ -133,25 +163,27 @@ export class StudioImageProviderService {
           cacheStatus: "hit"
         });
         assets.push(asset);
-        costBreakdown.push(this.costLine(asset, request));
+        costBreakdown.push(this.costLine(asset, request, "hit"));
         continue;
       }
 
-      const generated = this.canUseGemini() ? await this.tryGemini(prompt, request, studioCacheKey) : undefined;
-      if (!generated) {
-        warnings.push(`Gemini did not return usable ${request.type} sheet artwork; no deterministic template substitute was emitted.`);
-        costBreakdown.push({
-          provider: "gemini-unavailable",
-          model,
-          generationType: request.generationType,
-          promptHash,
-          estimatedCostUsd: 0,
-          cacheStatus: "disabled"
-        });
-        continue;
-      }
+      generationRequests.push({ request, prompt, promptHash, studioCacheKey });
+    }
+
+    const batchController = new AbortController();
+    const generatedPromises = generationRequests.map(async ({ request, prompt, promptHash, studioCacheKey }) => {
+      const generated = await this.geminiProvider.generateStudioBible({
+        prompt,
+        generationType: request.generationType,
+        studioCacheKey,
+        model,
+        apiKey: process.env.GEMINI_API_KEY,
+        timeoutMs: Number(process.env.GEMINI_IMAGE_TIMEOUT_MS ?? 90_000),
+        signal: batchController.signal
+      });
       const asset = this.withStudioMetadata(this.emptyStudioAsset(request, input.plan), request, {
         provider: "gemini",
+        sourceProvider: "gemini",
         model,
         prompt,
         promptHash,
@@ -160,75 +192,67 @@ export class StudioImageProviderService {
         cacheStatus: "generated",
         uri: generated.uri
       });
-      assets.push(asset);
-      costBreakdown.push(this.costLine(asset, request));
-    }
+      return { asset, request, studioCacheKey };
+    });
 
-    const provider = assets.some((asset) => asset.provider === "gemini")
-      ? "gemini"
-      : assets.some((asset) => asset.provider === "cached")
-        ? "cached"
-        : assets.some((asset) => asset.provider === "gemini-unavailable")
-          ? "gemini-unavailable"
-          : "deterministic-render";
-    const summary: StudioGenerationSummary = {
-      provider,
-      model: provider === "gemini" ? model : provider === "cached" ? "cached" : "style-bible-engine",
-      imageCount: assets.length,
-      estimatedCostUsd: this.sumCost(costBreakdown),
-      cacheStatus: assets.every((asset) => asset.generationMetadata?.cacheStatus === "hit") ? "hit" : assets.some((asset) => asset.generationMetadata?.cacheStatus === "hit") ? "generated" : "miss",
-      generationType: "fast_studio_preview",
-      costBreakdown
-    };
-    return { assets, summary, warnings };
-  }
-
-  private async tryGemini(prompt: string, request: StudioAssetRequest, studioCacheKey: string) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return undefined;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), Number(process.env.GEMINI_IMAGE_TIMEOUT_MS ?? 90_000));
+    let generatedResults: Awaited<(typeof generatedPromises)[number]>[];
     try {
-      const model = this.model();
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
-        }),
-        signal: controller.signal
-      });
-      if (!response.ok) {
-        this.logger.warn(
-          JSON.stringify({
-            event: "gemini_studio_image_request_failed",
-            status: response.status,
-            generationType: request.generationType,
-            studioCacheKey,
-            body: (await response.text().catch(() => "")).slice(0, 600)
-          })
-        );
-        return undefined;
-      }
-      const payload = (await response.json()) as GeminiResponse;
-      const image = payload.candidates?.flatMap((candidate) => candidate.content?.parts ?? []).find((part) => part.inlineData?.data)?.inlineData;
-      if (!image?.data) return undefined;
-      return { uri: `data:${image.mimeType ?? "image/png"};base64,${image.data}` };
+      generatedResults = await Promise.all(generatedPromises);
     } catch (error) {
+      batchController.abort(error);
+      const failureCode = this.providerFailureCode(error);
+      const failureReason = this.failureMessage(failureCode);
+      warnings.push(`${failureCode}: ${failureReason}`);
       this.logger.warn(
         JSON.stringify({
-          event: "gemini_studio_image_request_error",
-          generationType: request.generationType,
-          studioCacheKey,
+          event: "gemini_studio_generation_aborted",
+          code: failureCode,
+          generationType: "studio_bible_batch",
+          model,
+          routeCalled,
           errorClass: error instanceof Error ? error.name : typeof error,
           message: error instanceof Error ? error.message : String(error)
         })
       );
-      return undefined;
-    } finally {
-      clearTimeout(timeout);
+      return {
+        assets: [],
+        summary: this.summary({
+          provider: "gemini",
+          model,
+          assets: [],
+          costBreakdown,
+          cacheStatus: "miss",
+          imagesThisRun: 0,
+          estimatedCostUsd: 0,
+          diagnostics: this.diagnostics({ ...decision, branch: "gemini-request-failed", fallbackReason: failureCode }, routeCalled, "miss", failureCode),
+          failureCode,
+          failureReason: failureCode
+        }),
+        warnings
+      };
     }
+
+    for (const result of generatedResults) {
+      assets.push(result.asset);
+      costBreakdown.push(this.costLine(result.asset, result.request, "generated"));
+    }
+
+    const cacheStatus: StudioCacheStatus = assets.length === studioAssetRequests.length && assets.every((asset) => asset.generationMetadata?.cacheStatus === "hit") ? "hit" : "miss";
+    const provider = cacheStatus === "hit" ? "cached-gemini" : "gemini";
+    return {
+      assets,
+      summary: this.summary({
+        provider,
+        model,
+        assets,
+        costBreakdown,
+        cacheStatus,
+        imagesThisRun: assets.length,
+        estimatedCostUsd: this.sumCost(costBreakdown),
+        diagnostics: this.diagnostics({ ...decision, branch: cacheStatus === "hit" ? "cache-hit-gemini" : "gemini-generated" }, routeCalled, cacheStatus)
+      }),
+      warnings
+    };
   }
 
   private withStudioMetadata(
@@ -236,6 +260,7 @@ export class StudioImageProviderService {
     request: StudioAssetRequest,
     values: {
       provider: PreviewAssetPlan["provider"];
+      sourceProvider: "gemini" | "deterministic-render";
       model: string;
       prompt: string;
       promptHash: string;
@@ -255,6 +280,7 @@ export class StudioImageProviderService {
       generationMetadata: {
         ...(base.generationMetadata ?? {}),
         provider: values.provider,
+        sourceProvider: values.sourceProvider,
         model: values.model,
         generationType: request.generationType,
         promptHash: values.promptHash,
@@ -268,6 +294,7 @@ export class StudioImageProviderService {
       metadata: {
         ...base.metadata,
         provider: values.provider,
+        sourceProvider: values.sourceProvider,
         model: values.model,
         generationType: request.generationType,
         promptHash: values.promptHash,
@@ -296,6 +323,40 @@ export class StudioImageProviderService {
     };
   }
 
+  private deterministicFallbackAssets(deterministicAssets: PreviewAssetPlan[], plan: StyleBiblePlan) {
+    if ((process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") === "production") return [];
+    return deterministicAssets
+      .filter((asset) => studioAssetTypeSet.has(asset.type as StudioAssetType) && Boolean(asset.uri))
+      .map((asset) => ({
+        ...asset,
+        provider: "deterministic-render" as const,
+        productionAssetStatus: "WIREFRAME" as const,
+        previewClassification: "WIREFRAME_CONCEPT" as const,
+        generationMetadata: {
+          ...(asset.generationMetadata ?? {}),
+          provider: "deterministic-render",
+          sourceProvider: "deterministic-render",
+          model: "style-bible-engine",
+          cacheStatus: "disabled",
+          artDirectionOnly: true,
+          finalLayerAsset: false,
+          devFallbackOnly: true
+        },
+        metadata: {
+          ...asset.metadata,
+          provider: "deterministic-render",
+          sourceProvider: "deterministic-render",
+          model: "style-bible-engine",
+          cacheStatus: "disabled",
+          artTeam: plan.artTeam.id,
+          collectionName: plan.collectionName,
+          artDirectionOnly: true,
+          finalLayerAsset: false,
+          devFallbackOnly: true
+        }
+      }));
+  }
+
   private labelFor(type: StudioAssetType) {
     if (type === "STYLE_BIBLE") return "Full NFT Studio Bible";
     if (type === "TRAIT_CATALOG") return "Trait Catalog Sheet";
@@ -304,15 +365,31 @@ export class StudioImageProviderService {
     return "Layer Breakdown Sheet";
   }
 
-  private costLine(asset: PreviewAssetPlan, request: StudioAssetRequest): StudioGenerationCostLine {
+  private costLine(asset: PreviewAssetPlan, request: StudioAssetRequest, cacheStatus?: StudioCacheStatus): StudioGenerationCostLine {
+    const sourceProvider = String(asset.generationMetadata?.sourceProvider ?? asset.metadata.sourceProvider ?? asset.provider);
     return {
-      provider: (asset.provider === "cached" || asset.provider === "gemini" || asset.provider === "gemini-unavailable" ? asset.provider : "deterministic-render") as StudioGenerationCostLine["provider"],
+      provider: asset.provider === "cached-gemini" || (asset.provider === "cached" && sourceProvider === "gemini") ? "cached-gemini" : this.costProvider(asset.provider),
       model: String(asset.generationMetadata?.model ?? asset.metadata.model ?? "unknown"),
       generationType: request.generationType,
       promptHash: String(asset.promptHash ?? asset.generationMetadata?.promptHash ?? ""),
       estimatedCostUsd: Number(asset.generationMetadata?.estimatedCostUsd ?? asset.metadata.estimatedCostUsd ?? 0),
-      cacheStatus: (asset.generationMetadata?.cacheStatus ?? asset.metadata.cacheStatus ?? "generated") as StudioCacheStatus
+      cacheStatus: cacheStatus ?? (asset.generationMetadata?.cacheStatus ?? asset.metadata.cacheStatus ?? "generated") as StudioCacheStatus
     };
+  }
+
+  private costProvider(provider: PreviewAssetPlan["provider"]): StudioGenerationCostLine["provider"] {
+    if (provider === "gemini" || provider === "gemini-unavailable" || provider === "cached-gemini" || provider === "cached" || provider === "deterministic-render" || provider === "openai") return provider;
+    return "deterministic-render";
+  }
+
+  private costProviderForDecision(decision: ProviderDecision): StudioGenerationCostLine["provider"] {
+    if (decision.canCallGemini) return "gemini";
+    if (decision.provider === "deterministic-render") return "deterministic-render";
+    return "gemini-unavailable";
+  }
+
+  private requestForAsset(type: PreviewAssetPlan["type"]) {
+    return studioAssetRequests.find((request) => request.type === type) ?? studioAssetRequests[0];
   }
 
   private promptFor(plan: StyleBiblePlan, request: StudioAssetRequest) {
@@ -320,7 +397,7 @@ export class StudioImageProviderService {
     return [
       raw,
       "",
-      "Generate one complete cohesive raster NFT Studio Bible sheet directly. Do not output an SVG, UI dashboard, vector template, placeholder grid, or icon system.",
+      "Generate one complete cohesive raster NFT Studio Bible sheet directly. Do not output an SVG, UI dashboard, vector template, placeholder grid, wireframe concept, or icon system.",
       "Use hand-directed art-team sheet artwork with natural imperfections: sketch marks, brushwork, texture, uneven spacing, annotated thumbnails, paper grain, ink variance, and composition asymmetry.",
       "Different sections should feel intentionally composed by an artist, not auto-laid out by admin software. Use readable labels but avoid sterile boxes and repeated vector symbols.",
       "Every trait example must be visually distinct and collection-native. Legendary and Mythic examples must avoid generic hood, halo, void, staff, cosmic deity, and repeated archetype shortcuts.",
@@ -352,15 +429,113 @@ export class StudioImageProviderService {
     }));
   }
 
-  private canUseGemini() {
-    return this.configuredStudioProvider() === "gemini" && Boolean(process.env.GEMINI_API_KEY);
+  private providerDecision(routeCalled: string, cacheStatus: StudioCacheStatus, fallbackReason?: string): ProviderDecision {
+    void routeCalled;
+    void cacheStatus;
+    const provider = this.configuredStudioProvider();
+    if (provider === "openai") {
+      return {
+        provider,
+        canCallGemini: false,
+        useDeterministic: false,
+        branch: "studio-provider-openai-disabled",
+        failureCode: "GEMINI_DISABLED",
+        fallbackReason: fallbackReason ?? "STUDIO_PROVIDER_OPENAI"
+      };
+    }
+    if (provider === "deterministic-render") {
+      const production = (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") === "production";
+      return {
+        provider,
+        canCallGemini: false,
+        useDeterministic: !production,
+        branch: production ? "deterministic-blocked-production" : "explicit-deterministic-dev-fallback",
+        fallbackReason: production ? "DETERMINISTIC_BLOCKED_PRODUCTION" : "EXPLICIT_DETERMINISTIC_PROVIDER"
+      };
+    }
+    if (!process.env.GEMINI_API_KEY) {
+      return {
+        provider,
+        canCallGemini: false,
+        useDeterministic: false,
+        branch: "gemini-key-missing",
+        failureCode: "GEMINI_KEY_MISSING",
+        fallbackReason: fallbackReason ?? "GEMINI_API_KEY_MISSING"
+      };
+    }
+    if (!this.studioImageGenerationEnabled()) {
+      return {
+        provider,
+        canCallGemini: false,
+        useDeterministic: false,
+        branch: "gemini-disabled-by-env",
+        failureCode: "GEMINI_DISABLED",
+        fallbackReason: fallbackReason ?? "STUDIO_IMAGE_GENERATION_DISABLED"
+      };
+    }
+    return { provider, canCallGemini: true, useDeterministic: false, branch: "gemini-configured" };
   }
 
-  private configuredStudioProvider(): "gemini" | "openai" | "deterministic-render" {
+  private diagnostics(decision: ProviderDecision, routeCalled: string, cacheStatus: StudioCacheStatus, fallbackReason?: string): StudioProviderDiagnostics {
+    return {
+      envStudioProvider: process.env.STUDIO_PROVIDER?.trim() || "gemini",
+      geminiApiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
+      studioImageGenerationEnabled: this.studioImageGenerationEnabled(),
+      modelSelected: this.model(),
+      routeCalled,
+      providerDecisionBranch: decision.branch,
+      cacheStatus,
+      fallbackReason: fallbackReason ?? decision.fallbackReason
+    };
+  }
+
+  private summary(input: {
+    provider: StudioGenerationSummary["provider"];
+    model: string;
+    assets: PreviewAssetPlan[];
+    costBreakdown: StudioGenerationCostLine[];
+    cacheStatus: StudioCacheStatus;
+    imagesThisRun: number;
+    estimatedCostUsd: number;
+    diagnostics: StudioProviderDiagnostics;
+    failureCode?: GeminiStudioErrorCode;
+    failureReason?: string;
+  }): StudioGenerationSummary {
+    return {
+      provider: input.provider,
+      model: input.model,
+      imageCount: input.imagesThisRun,
+      imagesThisRun: input.imagesThisRun,
+      estimatedCostUsd: Number(input.estimatedCostUsd.toFixed(4)),
+      cacheStatus: input.cacheStatus,
+      generationType: "fast_studio_preview",
+      costBreakdown: input.costBreakdown,
+      assets: input.assets.map((asset) => asset.type),
+      providerFailureCode: input.failureCode,
+      providerFailureReason: input.failureReason,
+      diagnostics: input.diagnostics
+    };
+  }
+
+  private providerFailureCode(error: unknown): GeminiStudioErrorCode {
+    if (error instanceof GeminiStudioImageError) return error.code;
+    if (error instanceof DOMException && error.name === "AbortError") return "GEMINI_TIMEOUT";
+    return "GEMINI_REQUEST_FAILED";
+  }
+
+  private failureMessage(code: GeminiStudioErrorCode) {
+    return code;
+  }
+
+  private configuredStudioProvider(): ProviderDecision["provider"] {
     const provider = (process.env.STUDIO_PROVIDER ?? "gemini").trim().toLowerCase();
     if (provider === "openai") return "openai";
     if (provider === "deterministic-render" || provider === "deterministic") return "deterministic-render";
     return "gemini";
+  }
+
+  private studioImageGenerationEnabled() {
+    return (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") === "true" || (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true";
   }
 
   private model() {
@@ -379,4 +554,19 @@ export class StudioImageProviderService {
   private hash(value: string) {
     return createHash("sha256").update(value).digest("hex").slice(0, 32);
   }
+}
+
+export function isRealStudioBibleAsset(asset: PreviewAssetPlan | undefined | null): asset is PreviewAssetPlan {
+  if (!asset || !studioAssetTypeSet.has(asset.type as StudioAssetType) || !asset.uri) return false;
+  const provider = String(asset.provider ?? asset.metadata.provider ?? asset.generationMetadata?.provider ?? "").toLowerCase();
+  const sourceProvider = String(asset.metadata.sourceProvider ?? asset.generationMetadata?.sourceProvider ?? "").toLowerCase();
+  const model = String(asset.metadata.model ?? asset.generationMetadata?.model ?? "").toLowerCase();
+  const uri = String(asset.uri).toLowerCase();
+  if (/deterministic|wireframe|placeholder|openai|premium-fallback/.test(`${provider} ${sourceProvider}`)) return false;
+  if (uri.startsWith("data:image/svg+xml")) return false;
+  return provider === "gemini" || provider === "cached-gemini" || sourceProvider === "gemini" || model.includes("gemini");
+}
+
+export function hasAllRealStudioBibleAssets(assets: PreviewAssetPlan[]) {
+  return studioAssetRequests.every((request) => assets.some((asset) => asset.type === request.type && isRealStudioBibleAsset(asset)));
 }

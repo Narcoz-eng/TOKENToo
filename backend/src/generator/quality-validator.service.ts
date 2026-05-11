@@ -27,7 +27,7 @@ export class QualityValidatorService {
     if (!style.brandDna) issues.push("Brand DNA is required before approval.");
     if (!style.tenKReadiness?.pass) issues.push("10k collection readiness validation failed.");
     if (style.artSource === "PROCEDURAL_FALLBACK") {
-      issues.push("Wireframe concept preview only; final collection requires locked creator approval plus curated, layered, or artist-approved asset pack.");
+      issues.push("Fast Studio Preview required; final collection requires locked creator approval plus curated, layered, or artist-approved asset pack.");
       issues.push("Procedural SVG fallback art cannot be approved for production launch.");
     }
     if (this.hasGenericTraitNames(style, pack)) issues.push("Trait names are too generic for premium collection identity.");

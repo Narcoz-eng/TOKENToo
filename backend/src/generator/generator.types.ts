@@ -604,6 +604,7 @@ export type PreviewAssetPlan = {
     | "premium-fallback"
     | "local-placeholder"
     | "cached"
+    | "cached-gemini"
     | "curated"
     | "artist"
     | "deterministic-render";
@@ -612,9 +613,28 @@ export type PreviewAssetPlan = {
   metadata: Record<string, unknown>;
 };
 
-export type StudioProviderId = "gemini" | "openai" | "deterministic-render" | "cached";
+export type StudioProviderId = "gemini" | "openai" | "deterministic-render" | "cached" | "cached-gemini";
 export type StudioGenerationType = "studio_bible" | "trait_catalog" | "rarity_ladder" | "mood_sheet" | "layer_breakdown" | "hero_concept";
 export type StudioCacheStatus = "hit" | "miss" | "generated" | "disabled";
+
+export type StudioProviderFailureCode =
+  | "GEMINI_KEY_MISSING"
+  | "GEMINI_DISABLED"
+  | "GEMINI_REQUEST_FAILED"
+  | "GEMINI_QUOTA_EXCEEDED"
+  | "GEMINI_MODEL_UNSUPPORTED"
+  | "GEMINI_TIMEOUT";
+
+export type StudioProviderDiagnostics = {
+  envStudioProvider: string;
+  geminiApiKeyPresent: boolean;
+  studioImageGenerationEnabled: boolean;
+  modelSelected: string;
+  routeCalled: string;
+  providerDecisionBranch: string;
+  cacheStatus: StudioCacheStatus;
+  fallbackReason?: string;
+};
 
 export type StudioGenerationCostLine = {
   provider: StudioProviderId | "gemini-unavailable";
@@ -629,10 +649,15 @@ export type StudioGenerationSummary = {
   provider: StudioProviderId | "gemini-unavailable";
   model: string;
   imageCount: number;
+  imagesThisRun: number;
   estimatedCostUsd: number;
   cacheStatus: StudioCacheStatus;
   generationType: "fast_studio_preview" | "premium_cinematic_render";
   costBreakdown: StudioGenerationCostLine[];
+  assets: PreviewAssetPlan["type"][];
+  providerFailureCode?: StudioProviderFailureCode;
+  providerFailureReason?: string;
+  diagnostics?: StudioProviderDiagnostics;
 };
 
 export type DistinctivenessReportPlan = {

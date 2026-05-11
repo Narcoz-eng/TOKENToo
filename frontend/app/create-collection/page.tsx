@@ -13,6 +13,7 @@ import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { ArtTeamProfile, CollectionGeneratorPreview, ConceptRequestSummary, CuratedLayerPackSummary, StudioPreviewAsset, StudioWorkflowState, StyleBiblePlan, StudioExportPlan } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
+import { hasRealStudioBibleAssets, isRealStudioBibleAsset, isStudioPreviewRequired, realStudioBibleAssetsFromPreview, studioAssetProvider, studioBibleAssetTypes, studioDisplayAssetTypeSet, studioPreviewStatusLabel } from "@/lib/studio-readiness";
 import { cn } from "@/lib/utils";
 
 type Preset = { id: string; name: string; artStyle: string; mood: string };
@@ -251,10 +252,6 @@ const rarityRows = [
   ["Epic", "Overclocked vault core", "10%"],
   ["Legendary", "Gold founder seal", "4%"]
 ];
-const studioBibleAssetTypes = ["STYLE_BIBLE", "TRAIT_CATALOG", "RARITY_LADDER", "MOOD_SHEET", "LAYER_BREAKDOWN"] as const;
-const studioBibleAssetTypeSet = new Set<string>(studioBibleAssetTypes);
-const studioDisplayAssetTypeSet = new Set<string>([...studioBibleAssetTypes, "HERO_CONCEPT"]);
-
 export default function CreateCollectionPage() {
   const walletAuth = useWalletAuth();
   const capabilityState = useApiResource<SystemCapabilitiesResponse>("/system/capabilities");
@@ -662,7 +659,7 @@ export default function CreateCollectionPage() {
             <StyleBibleStudioPanel preview={studioPreview} />
             <PremiumCinematicPanel preview={studioPreview} />
 
-            <CreatorStudioStatusPanel preview={studioPreview} setup={setup} loading={loading || capabilityState.loading} />
+            <CreatorStudioStatusPanel preview={studioPreview} setup={setup} loading={loading || capabilityState.loading} showDiagnostics={privateDiagnostics} />
             <CuratedLayerPackManager
               preview={studioPreview}
               rootPath={layerPackRoot}
@@ -833,7 +830,7 @@ function PublicReadinessItem({ label, value, ready }: { label: string; value: st
   );
 }
 
-function CreatorStudioStatusPanel({ preview, setup, loading }: { preview: CollectionGeneratorPreview; setup?: SetupChecklist; loading: boolean }) {
+function CreatorStudioStatusPanel({ preview, setup, loading, showDiagnostics }: { preview: CollectionGeneratorPreview; setup?: SetupChecklist; loading: boolean; showDiagnostics: boolean }) {
   const previewReady = hasAllStudioBibleAssets(preview);
   const devLaunchReady = Boolean(setup?.devnetLaunchReady || setup?.productionLaunchReady);
   const productionReady = preview.curatedLayerPack?.status === "VALID" || preview.curatedLayerPack?.status === "EXPORT_READY" || preview.productionAssetStatus === "FINAL_PRODUCTION" || preview.productionAssetStatus === "ARTIST_APPROVED" || preview.productionAssetStatus === "CURATED_LAYER_READY";
@@ -850,7 +847,31 @@ function CreatorStudioStatusPanel({ preview, setup, loading }: { preview: Collec
           Studio Bible generation unavailable - provider reason: {providerReason}
         </p>
       ) : null}
+      {showDiagnostics && preview.conceptRequest?.diagnostics ? <StudioProviderDiagnosticsPanel diagnostics={preview.conceptRequest.diagnostics} /> : null}
     </SectionCard>
+  );
+}
+
+function StudioProviderDiagnosticsPanel({ diagnostics }: { diagnostics: NonNullable<ConceptRequestSummary["diagnostics"]> }) {
+  const rows = [
+    ["STUDIO_PROVIDER", diagnostics.envStudioProvider],
+    ["GEMINI_API_KEY present", diagnostics.geminiApiKeyPresent === undefined ? undefined : String(diagnostics.geminiApiKeyPresent)],
+    ["Model selected", diagnostics.modelSelected],
+    ["Route called", diagnostics.routeCalled],
+    ["Provider branch", diagnostics.providerDecisionBranch],
+    ["Cache", diagnostics.cacheStatus],
+    ["Fallback reason", diagnostics.fallbackReason],
+    ["Studio generation enabled", diagnostics.studioImageGenerationEnabled === undefined ? undefined : String(diagnostics.studioImageGenerationEnabled)]
+  ].filter(([, value]) => value !== undefined && value !== "");
+  return (
+    <details className="mt-4 rounded-md border border-vault-line bg-black/30 p-4">
+      <summary className="cursor-pointer text-xs font-black uppercase text-slate-400">Provider diagnostics</summary>
+      <div className="mt-3 grid gap-2 text-xs font-bold text-slate-300 md:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <p key={label}>{label}: <span className="text-white">{value}</span></p>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -1025,18 +1046,22 @@ function ConceptPlanNotice({ plan }: { plan: ConceptRequestSummary | null }) {
     );
   }
   const paid = Boolean(plan.usesPaidOpenAIImageGeneration);
+  const imagesThisRun = plan.imagesThisRun ?? plan.imageCount ?? 0;
   return (
     <div className="rounded-md border border-vault-cyan/25 bg-black/30 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <StatusPill accent={paid ? "gold" : "green"}>{paid ? "Premium Cinematic" : "Fast Studio Preview"}</StatusPill>
         {plan.lowCostMode ? <StatusPill accent="cyan">Low preview cost</StatusPill> : null}
-        {plan.cachedResultAvailable ? <StatusPill accent="green">Cached available</StatusPill> : <StatusPill accent="gold">No cache yet</StatusPill>}
+        {plan.cachedResultAvailable || plan.cacheStatus === "hit" ? <StatusPill accent="green">Cached available</StatusPill> : <StatusPill accent="gold">No cache yet</StatusPill>}
+        {plan.providerFailureCode ? <StatusPill accent="gold">{plan.providerFailureCode}</StatusPill> : null}
       </div>
       <div className="mt-3 grid gap-2 text-xs font-bold text-slate-300">
         <p>Provider: <span className="text-white">{providerDisplay(plan.provider)}</span></p>
-        <p>Images this run: <span className="text-white">{plan.imageCount ?? 0}</span></p>
+        <p>Images this run: <span className="text-white">{imagesThisRun}</span></p>
         <p>Estimated cost: <span className={paid ? "text-vault-gold" : "text-vault-green"}>{formatUsd(plan.estimatedCostUsd)}</span></p>
         {plan.model ? <p>Model: <span className="text-white">{plan.model}</span></p> : null}
+        {plan.cacheStatus ? <p>Cache status: <span className="text-white">{plan.cacheStatus}</span></p> : null}
+        {plan.providerFailureCode ? <p>Provider reason: <span className="text-vault-gold">{plan.providerFailureCode}</span></p> : null}
         {plan.generationType ? <p>Generation type: <span className="text-white">{generationTypeLabel(plan.generationType)}</span></p> : null}
       </div>
     </div>
@@ -1045,11 +1070,12 @@ function ConceptPlanNotice({ plan }: { plan: ConceptRequestSummary | null }) {
 
 function providerDisplay(provider?: string) {
   if (!provider) return "Automatic fallback";
+  if (/cached-gemini/i.test(provider)) return "Cached Gemini";
   if (/unavailable|no-studio-sheets/i.test(provider)) return "Gemini unavailable";
-  if (/gemini/i.test(provider)) return "Gemini Studio Bible";
+  if (/gemini/i.test(provider)) return "Gemini Studio";
   if (/openai/i.test(provider)) return "OpenAI premium cinematic";
   if (/cached/i.test(provider)) return "Cached studio preview";
-  if (/deterministic/i.test(provider)) return "Deterministic Studio Bible";
+  if (/deterministic/i.test(provider)) return "Deterministic dev fallback";
   if (/premium-fallback|fallback-poster/i.test(provider)) return "Fallback art hidden";
   if (/local-placeholder|planning/i.test(provider)) return "Legacy preview hidden";
   return cleanDisplayText(provider);
@@ -1070,25 +1096,16 @@ function formatUsd(value: unknown) {
 }
 
 function hasAllStudioBibleAssets(preview: CollectionGeneratorPreview | null | undefined) {
-  if (!preview) return false;
-  const fallbackAssets = [
-    preview.styleBibleAsset,
-    preview.traitCatalogAsset,
-    preview.rarityLadderAsset,
-    preview.moodSheetAsset,
-    preview.layerBreakdownAsset
-  ].filter(Boolean) as StudioPreviewAsset[];
-  const assets = preview.studioAssets ?? fallbackAssets;
-  return studioBibleAssetTypes.every((type) => assets.some((asset) => asset.type === type && Boolean(asset.uri)));
+  return hasRealStudioBibleAssets(preview);
 }
 
 function assetProvider(asset: StudioPreviewAsset) {
-  return asset.provider ?? stringFrom(asset.metadata?.provider) ?? stringFrom(asset.generationMetadata?.provider) ?? "studio-provider";
+  return studioAssetProvider(asset);
 }
 
 function exactGenerationReason(preview: CollectionGeneratorPreview) {
-  const warning = preview.warnings?.find((item) => /(?:AI|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
-  if (!warning) return undefined;
+  const warning = preview.warnings?.find((item) => /GEMINI_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|(?:AI|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
+  if (!warning) return preview.conceptRequest?.providerFailureCode ?? preview.conceptRequest?.providerFailureReason;
   return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "Studio generation unavailable: ");
 }
 
@@ -1120,6 +1137,7 @@ function defaultSetupItems(): SetupChecklist["items"] {
   return [
     "STUDIO_PROVIDER",
     "GEMINI_API_KEY",
+    "ENABLE_STUDIO_IMAGE_GENERATION",
     "CINEMATIC_PROVIDER",
     "PROGRAM_ID",
     "SOLANA_RPC_URL",
@@ -1137,17 +1155,8 @@ function defaultSetupItems(): SetupChecklist["items"] {
 
 function StyleBibleStudioPanel({ preview }: { preview: CollectionGeneratorPreview }) {
   const bible = preview.styleBible;
-  const styleBibleAsset = preview.styleBibleAsset;
   const assetsByType = new Map(
-    [
-      styleBibleAsset,
-      preview.traitCatalogAsset,
-      preview.rarityLadderAsset,
-      preview.moodSheetAsset,
-      preview.layerBreakdownAsset,
-      ...(preview.studioAssets ?? [])
-    ]
-      .filter(Boolean)
+    realStudioBibleAssetsFromPreview(preview)
       .map((asset) => [asset!.type, asset!])
   );
   const orderedAssets = studioBibleAssetTypes.map((type) => assetsByType.get(type)).filter(Boolean) as StudioPreviewAsset[];
@@ -1297,7 +1306,7 @@ function StudioList({ title, items, compact = false }: { title: string; items: s
 function LiveLaunchPreview({ preview, launchResult }: { preview: CollectionGeneratorPreview; launchResult: string | null }) {
   const wireframeOnly = isWireframePreview(preview);
   const tags = identityTags(preview);
-  const heroImage = preview.styleBibleAsset?.uri ?? "";
+  const heroImage = realStudioBibleAssetsFromPreview(preview).find((asset) => asset.type === "STYLE_BIBLE")?.uri ?? "";
   return (
     <section className="phew-panel relative overflow-hidden rounded-lg">
       {heroImage ? <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" /> : null}
@@ -1508,7 +1517,7 @@ function fallbackPreview(tokenName: string, tokenSymbol: string, description: st
       colorHarmonyScore: 92,
       duplicateRiskScore: 18,
       compatibilityScore: 88,
-      tier: "Wireframe concept",
+      tier: "Preview required",
       passed: false
     },
     distinctiveness: {
@@ -1622,10 +1631,12 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
   const brandDna = asRecord<unknown>(profile.brandDna);
   const styleBible = brandDna.styleBible as StyleBiblePlan | undefined;
   const exportPlan = brandDna.exportPlan as StudioExportPlan | undefined;
-  const persistedStudioAssets = studioAssetsFromPreviewAssets(previews);
+  const persistedStudioAssets = studioAssetsFromPreviewAssets(previews).filter(isRealStudioBibleAsset);
   const studioAssets = persistedStudioAssets.length ? persistedStudioAssets : studioAssetsFromBible(styleBible);
   const styleBibleAsset = studioAssets.find((asset) => asset.type === "STYLE_BIBLE");
+  const studioBibleReady = hasRealStudioBibleAssets({ studioAssets } as CollectionGeneratorPreview);
   const generationCost = costSummaryFromRun(run);
+  const previewClassification = studioBibleReady ? "AI_CONCEPT_PREVIEW" : previewClassForStatus(profile.productionAssetStatus === "AI_CONCEPT" ? "WIREFRAME" : profile.productionAssetStatus, previews[0]?.previewClassification);
 
   return {
     id: run.id,
@@ -1643,19 +1654,20 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     traitCounts: Object.fromEntries(Object.entries(categories).map(([key, value]) => [key, value.length])),
     rarityWeights: asRecord<number>(profile.traitPack?.rarityWeights ?? profile.rarityStructure),
     unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
-    assetProvider: "persisted-generator-run",
+    assetProvider: run.studioProvider ?? "persisted-generator-run",
     conceptRequest: {
-      provider: run.studioProvider ?? (studioAssets.some((asset) => asset.provider === "gemini") ? "gemini" : studioAssets.some((asset) => asset.provider === "cached") ? "cached" : previews.some((asset) => asset.provider === "openai") ? "openai" : previews.some((asset) => asset.provider === "premium-fallback") ? "premium-fallback" : previews.some((asset) => asset.provider === "local-placeholder") ? "legacy-placeholder" : "persisted"),
+      provider: run.studioProvider ?? (studioAssets.some((asset) => asset.provider === "gemini") ? "gemini" : studioAssets.some((asset) => /cached-gemini|cached/i.test(asset.provider ?? "")) ? "cached-gemini" : previews.some((asset) => asset.provider === "openai") ? "openai" : previews.some((asset) => asset.provider === "premium-fallback") ? "premium-fallback" : previews.some((asset) => asset.provider === "local-placeholder") ? "legacy-placeholder" : "persisted"),
       imageCount: studioAssets.length || previews.filter((asset) => asset.type === "BANNER" || asset.type === "SAMPLE_NFT").length,
+      imagesThisRun: studioAssets.length,
       estimatedOpenAIRequestCount: 0,
       usesPaidOpenAIImageGeneration: false,
-      cachedResultAvailable: studioAssets.some((asset) => asset.cacheStatus === "hit" || asset.provider === "cached"),
+      cachedResultAvailable: studioAssets.some((asset) => asset.cacheStatus === "hit" || /cached/i.test(asset.provider ?? "")),
       estimatedCostUsd: generationCost.total,
       generationType: "fast_studio_preview",
       costBreakdown: generationCost.breakdown
     },
-    previewClassification: previewClassForStatus(profile.productionAssetStatus ?? "WIREFRAME", previews[0]?.previewClassification),
-    productionAssetStatus: profile.productionAssetStatus ?? "WIREFRAME",
+    previewClassification,
+    productionAssetStatus: studioBibleReady ? profile.productionAssetStatus ?? "AI_CONCEPT" : profile.productionAssetStatus === "AI_CONCEPT" ? "WIREFRAME" : profile.productionAssetStatus ?? "WIREFRAME",
     finalProductionReady: isProductionStatus(profile.productionAssetStatus),
     studioWorkflow: studioWorkflowFromHints(run.communityHints),
     styleBible,
@@ -1699,7 +1711,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
       colorHarmonyScore: quality.colorHarmonyScore,
       duplicateRiskScore: quality.duplicateRiskScore,
       compatibilityScore: quality.compatibilityScore,
-      tier: previewTierLabel(quality.tier, isProductionStatus(profile.productionAssetStatus), "persisted-generator-run", previewClassForStatus(profile.productionAssetStatus, previews[0]?.previewClassification), profile.productionAssetStatus ?? "WIREFRAME"),
+      tier: previewTierLabel(quality.tier, isProductionStatus(profile.productionAssetStatus), run.studioProvider ?? "persisted-generator-run", previewClassification, studioBibleReady ? profile.productionAssetStatus ?? "AI_CONCEPT" : "WIREFRAME"),
       passed: quality.passed
     },
     distinctiveness: {
@@ -1719,8 +1731,11 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
   const avatarUri = data.avatarPreviewSpec?.uri ?? data.samples[0]?.uri;
   const styleBible = data.styleBible ?? (data.brandDna.styleBible as StyleBiblePlan | undefined);
   const exportPlan = data.exportPlan ?? styleBible?.exportPlan;
-  const studioAssets = data.studioAssets?.length ? data.studioAssets : studioAssetsFromBible(styleBible);
-  const styleBibleAsset = data.styleBibleAsset ?? studioAssets.find((asset) => asset.type === "STYLE_BIBLE");
+  const studioAssets = (data.studioAssets?.length ? data.studioAssets : studioAssetsFromBible(styleBible)).filter(isRealStudioBibleAsset);
+  const styleBibleAsset = isRealStudioBibleAsset(data.styleBibleAsset) ? data.styleBibleAsset : studioAssets.find((asset) => asset.type === "STYLE_BIBLE");
+  const studioBibleReady = hasRealStudioBibleAssets({ studioAssets } as CollectionGeneratorPreview);
+  const productionAssetStatus = studioBibleReady ? data.productionAssetStatus : data.productionAssetStatus === "AI_CONCEPT" ? "WIREFRAME" : data.productionAssetStatus;
+  const previewClassification = studioBibleReady ? data.previewClassification ?? "AI_CONCEPT_PREVIEW" : "WIREFRAME_CONCEPT";
   return {
     id: "preview-only",
     collection: data.collection.name,
@@ -1739,16 +1754,16 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     unlocks: {},
     assetProvider: data.assetProvider,
     conceptRequest: data.conceptRequest,
-    previewClassification: data.previewClassification ?? previewClassForStatus(data.productionAssetStatus, undefined),
-    productionAssetStatus: data.productionAssetStatus,
+    previewClassification,
+    productionAssetStatus,
     finalProductionReady: isProductionStatus(data.productionAssetStatus),
     styleBible,
     studioAssets,
     styleBibleAsset,
-    traitCatalogAsset: data.traitCatalogAsset ?? studioAssets.find((asset) => asset.type === "TRAIT_CATALOG"),
-    rarityLadderAsset: data.rarityLadderAsset ?? studioAssets.find((asset) => asset.type === "RARITY_LADDER"),
-    moodSheetAsset: data.moodSheetAsset ?? studioAssets.find((asset) => asset.type === "MOOD_SHEET"),
-    layerBreakdownAsset: data.layerBreakdownAsset ?? studioAssets.find((asset) => asset.type === "LAYER_BREAKDOWN"),
+    traitCatalogAsset: isRealStudioBibleAsset(data.traitCatalogAsset) ? data.traitCatalogAsset : studioAssets.find((asset) => asset.type === "TRAIT_CATALOG"),
+    rarityLadderAsset: isRealStudioBibleAsset(data.rarityLadderAsset) ? data.rarityLadderAsset : studioAssets.find((asset) => asset.type === "RARITY_LADDER"),
+    moodSheetAsset: isRealStudioBibleAsset(data.moodSheetAsset) ? data.moodSheetAsset : studioAssets.find((asset) => asset.type === "MOOD_SHEET"),
+    layerBreakdownAsset: isRealStudioBibleAsset(data.layerBreakdownAsset) ? data.layerBreakdownAsset : studioAssets.find((asset) => asset.type === "LAYER_BREAKDOWN"),
     artTeam: data.artTeam ?? styleBible?.artTeam,
     traitCoverageScore: data.traitCoverageScore ?? styleBible?.qaReport.traitCoverageScore,
     rarityDiversityScore: data.rarityDiversityScore ?? styleBible?.qaReport.rarityDiversityScore,
@@ -1758,7 +1773,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
     warnings: data.warnings,
     avatar: nonLegacyArt(avatarUri),
     banner: nonLegacyArt(data.bannerPreviewSpec?.uri),
-    samples: normalizedSamples(data.productionAssetStatus, data.samples.slice(0, 6).map((sample, index) => ({
+    samples: normalizedSamples(productionAssetStatus, data.samples.slice(0, 6).map((sample, index) => ({
       id: `preview-${index}`,
       name: sample.label,
       image: sample.uri,
@@ -1781,7 +1796,7 @@ function mapPreviewOnly(data: PreviewOnlyResponse, preset: string): CollectionGe
       colorHarmonyScore: data.quality.colorHarmonyScore,
       duplicateRiskScore: data.quality.duplicateRiskScore,
       compatibilityScore: data.quality.compatibilityScore,
-      tier: previewTierLabel(data.quality.tier, isProductionStatus(data.productionAssetStatus), data.assetProvider, data.previewClassification, data.productionAssetStatus),
+      tier: previewTierLabel(data.quality.tier, isProductionStatus(productionAssetStatus), data.assetProvider, previewClassification, productionAssetStatus),
       passed: false
     },
     distinctiveness: {
@@ -1833,17 +1848,13 @@ function safeDecode(value: string) {
 }
 
 function previewStatusLabel(preview: CollectionGeneratorPreview) {
-  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Studio preview pending";
-  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "Studio Bible ready";
-  if (preview.productionAssetStatus === "FINAL_PRODUCTION") return "Final production assets";
-  if (preview.productionAssetStatus === "ARTIST_APPROVED") return "Artist approved assets";
-  if (preview.productionAssetStatus === "CURATED_LAYER_READY") return "Curated layer ready";
-  return "Concept preview";
+  return studioPreviewStatusLabel(preview);
 }
 
 function previewTierLabel(tier: "BASIC" | "PREMIUM" | "LEGENDARY_READY", finalProductionReady: boolean, assetProvider?: string, previewClassification?: string, productionAssetStatus?: ProductionAssetStatus): CollectionGeneratorPreview["quality"]["tier"] {
+  if (!finalProductionReady && (productionAssetStatus === "WIREFRAME" || previewClassification === "WIREFRAME_CONCEPT")) return "Preview required";
   if (productionAssetStatus === "AI_CONCEPT" || previewClassification === "AI_CONCEPT_PREVIEW") return "AI studio";
-  if (productionAssetStatus === "WIREFRAME" || (!finalProductionReady && (previewClassification === "WIREFRAME_CONCEPT" || /wireframe|persisted-generator-run/i.test(assetProvider ?? "")))) return "Wireframe concept";
+  if (!finalProductionReady && /wireframe|persisted-generator-run/i.test(assetProvider ?? "")) return "Preview required";
   return tier === "LEGENDARY_READY" ? "Legendary-ready" : tier === "PREMIUM" ? "Premium" : "Basic";
 }
 
@@ -1859,7 +1870,7 @@ function isProductionStatus(status: ProductionAssetStatus | undefined) {
 }
 
 function isWireframePreview(preview: Pick<CollectionGeneratorPreview, "productionAssetStatus" | "previewClassification">) {
-  return preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT";
+  return isStudioPreviewRequired(preview);
 }
 
 function assetStatusLabel(status: ProductionAssetStatus | undefined) {

@@ -6,6 +6,7 @@ import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
 import { ChestOpenAnimation, MintRevealAnimation, RewardBurstAnimation } from "./animations";
 import { cn } from "@/lib/utils";
+import { hasRealStudioBibleAssets, isStudioPreviewRequired, realStudioBibleAssetsFromPreview, studioPreviewStatusLabel } from "@/lib/studio-readiness";
 
 export function CollectionPreview({
   preview,
@@ -21,16 +22,17 @@ export function CollectionPreview({
   loading?: boolean;
 }) {
   const samples = preview.samples;
+  const studioBibleReady = hasRealStudioBibleAssets(preview);
   const wireframeOnly = isWireframePreview(preview);
-  const aiConcept = preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW";
+  const aiConcept = studioBibleReady;
   const professionalPreview = !wireframeOnly;
-  const styleBibleImage = preview.styleBibleAsset?.uri ?? "";
+  const styleBibleImage = realStudioBibleAssetsFromPreview(preview).find((asset) => asset.type === "STYLE_BIBLE")?.uri ?? "";
   const bannerImage = nonLegacyArt(preview.banner) || styleBibleImage;
   const avatarImage = nonLegacyArt(preview.avatar) || styleBibleImage;
   const visualSamples = professionalPreview ? samples.filter((sample) => Boolean(sample.image) && !isLegacyPlaceholderVisual(sample.image, sample.provider)) : [];
   const tags = identityTags(preview);
   const pitch = culturePitch(preview);
-  const generationUnavailable = preview.warnings?.some((warning) => /AI (?:concept|studio) generation unavailable/i.test(warning)) ?? false;
+  const generationUnavailable = Boolean(preview.conceptRequest?.providerFailureCode || preview.warnings?.some((warning) => /GEMINI_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|AI (?:concept|studio) generation unavailable/i.test(warning)));
   const hiddenFallbackArt = /premium-fallback|fallback-poster/i.test(preview.assetProvider ?? "") || preview.samples.some((sample) => /premium-fallback/i.test(sample.provider ?? ""));
   const conceptRequest = preview.conceptRequest;
 
@@ -54,7 +56,7 @@ export function CollectionPreview({
               )}
               <div className="min-w-0">
                 <div className="flex flex-wrap gap-2">
-                  <StatusPill accent={preview.quality.tier === "Wireframe concept" || preview.quality.tier === "AI concept" || preview.quality.tier === "AI studio" || preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
+                  <StatusPill accent={preview.quality.tier === "Preview required" || preview.quality.tier === "Wireframe concept" || preview.quality.tier === "AI concept" || preview.quality.tier === "AI studio" || preview.quality.tier === "Basic" ? "gold" : "green"}>{preview.quality.tier}</StatusPill>
                   <StatusPill accent="cyan">{cleanDisplayText(preview.theme)}</StatusPill>
                   <StatusPill accent={isProductionStatus(preview.productionAssetStatus) ? "green" : "gold"}>{previewStatusLabel(preview)}</StatusPill>
                   {generationUnavailable ? <StatusPill accent="gold">Generation unavailable</StatusPill> : null}
@@ -169,18 +171,19 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
 
 function ConceptRunStatus({ conceptRequest, provider, fallbackHidden }: { conceptRequest: NonNullable<CollectionGeneratorPreview["conceptRequest"]>; provider?: string; fallbackHidden: boolean }) {
   const paid = Boolean(conceptRequest.usesPaidOpenAIImageGeneration);
+  const imagesThisRun = conceptRequest.imagesThisRun ?? conceptRequest.imageCount ?? 0;
   return (
     <div className="mt-5 grid gap-3 rounded-lg border border-vault-line bg-black/35 p-4 text-xs font-bold text-slate-300 md:grid-cols-4">
       <p>Provider <span className="mt-1 block text-sm font-black text-white">{providerLabel(provider ?? conceptRequest.provider)}</span></p>
-      <p>Images <span className="mt-1 block text-sm font-black text-white">{conceptRequest.imageCount ?? 0}</span></p>
+      <p>Images <span className="mt-1 block text-sm font-black text-white">{imagesThisRun}</span></p>
       <p>Estimated cost <span className={cn("mt-1 block text-sm font-black", paid ? "text-vault-gold" : "text-vault-green")}>{formatUsd(conceptRequest.estimatedCostUsd)}</span></p>
-      <p>Cache <span className={cn("mt-1 block text-sm font-black", conceptRequest.cachedResultAvailable ? "text-vault-green" : "text-vault-gold")}>{conceptRequest.cachedResultAvailable ? "Available" : fallbackHidden ? "Fallback hidden" : "Not available"}</span></p>
+      <p>Cache <span className={cn("mt-1 block text-sm font-black", conceptRequest.cachedResultAvailable || conceptRequest.cacheStatus === "hit" ? "text-vault-green" : "text-vault-gold")}>{conceptRequest.cachedResultAvailable || conceptRequest.cacheStatus === "hit" ? "Available" : fallbackHidden ? "Fallback hidden" : "Not available"}</span></p>
     </div>
   );
 }
 
 function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGenerateAiConcept, loading }: { preview: CollectionGeneratorPreview; onGenerateAiConcept?: () => void; canGenerateAiConcept: boolean; loading: boolean }) {
-  const generationUnavailable = preview.warnings?.some((warning) => /AI (?:concept|studio) generation unavailable/i.test(warning)) ?? false;
+  const generationUnavailable = Boolean(preview.conceptRequest?.providerFailureCode || preview.warnings?.some((warning) => /GEMINI_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|AI (?:concept|studio) generation unavailable/i.test(warning)));
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -209,13 +212,7 @@ function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGener
 }
 
 function StudioBibleAssetStrip({ preview }: { preview: CollectionGeneratorPreview }) {
-  const assets = [
-    preview.styleBibleAsset,
-    preview.traitCatalogAsset,
-    preview.rarityLadderAsset,
-    preview.moodSheetAsset,
-    preview.layerBreakdownAsset
-  ].filter((asset) => Boolean(asset?.uri));
+  const assets = realStudioBibleAssetsFromPreview(preview);
   if (!assets.length) return null;
   return (
     <SectionCard title="NFT Studio Bible Assets">
@@ -549,18 +546,19 @@ function safeDecode(value: string) {
 }
 
 function exactGenerationReason(preview: CollectionGeneratorPreview) {
-  const warning = preview.warnings?.find((item) => /(?:AI|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
-  if (!warning) return undefined;
+  const warning = preview.warnings?.find((item) => /GEMINI_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|(?:AI|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
+  if (!warning) return preview.conceptRequest?.providerFailureCode ?? preview.conceptRequest?.providerFailureReason;
   return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "Studio generation unavailable: ");
 }
 
 function providerLabel(provider?: string) {
   if (!provider) return "Automatic fallback";
+  if (/cached-gemini/i.test(provider)) return "Cached Gemini";
   if (/unavailable|no-studio-sheets/i.test(provider)) return "Gemini unavailable";
-  if (/gemini/i.test(provider)) return "Gemini Studio Bible";
+  if (/gemini/i.test(provider)) return "Gemini Studio";
   if (/openai/i.test(provider)) return "OpenAI premium cinematic";
   if (/cached/i.test(provider)) return "Cached studio preview";
-  if (/deterministic/i.test(provider)) return "Deterministic Studio Bible";
+  if (/deterministic/i.test(provider)) return "Deterministic dev fallback";
   if (/premium-fallback|fallback-poster/i.test(provider)) return "Fallback art hidden";
   if (/local-placeholder|planning/i.test(provider)) return "Legacy preview hidden";
   return cleanDisplayText(provider);
@@ -579,16 +577,11 @@ function shortSpec(value: string) {
 }
 
 function isWireframePreview(preview: CollectionGeneratorPreview) {
-  return preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT";
+  return isStudioPreviewRequired(preview);
 }
 
 function previewStatusLabel(preview: CollectionGeneratorPreview) {
-  if (preview.productionAssetStatus === "WIREFRAME" || preview.previewClassification === "WIREFRAME_CONCEPT") return "Studio preview pending";
-  if (preview.productionAssetStatus === "AI_CONCEPT" || preview.previewClassification === "AI_CONCEPT_PREVIEW") return "Studio Bible ready";
-  if (preview.productionAssetStatus === "FINAL_PRODUCTION") return "Final production assets";
-  if (preview.productionAssetStatus === "ARTIST_APPROVED") return "Artist approved assets";
-  if (preview.productionAssetStatus === "CURATED_LAYER_READY") return "Curated layer ready";
-  return "Concept preview";
+  return studioPreviewStatusLabel(preview);
 }
 
 function isProductionStatus(status: CollectionGeneratorPreview["productionAssetStatus"]) {

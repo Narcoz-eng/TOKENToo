@@ -31,7 +31,7 @@ import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
 import { QualityValidatorService } from "./quality-validator.service";
 import { StyleBibleEngineService } from "./style-bible-engine.service";
-import { StudioImageProviderService } from "./studio-image-provider.service";
+import { hasAllRealStudioBibleAssets, isRealStudioBibleAsset, StudioImageProviderService } from "./studio-image-provider.service";
 import { StyleProfileGeneratorService } from "./style-profile-generator.service";
 import { TraitPackGeneratorService } from "./trait-pack-generator.service";
 import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
@@ -96,11 +96,12 @@ export class GeneratorService {
     const styleBible = this.buildStyleBible(style, pack);
     const wireframes = this.previews.generate(style, pack, `${normalized.tokenMint}:preview`, 0);
     const studioResult = await this.studioAssetsWithCache(normalized.tokenMint, style, pack, styleBible, 1, "preview");
-    const studioAssets = studioResult.assets;
+    const studioAssets = studioResult.assets.filter(isRealStudioBibleAsset);
+    const studioBibleReady = hasAllRealStudioBibleAssets(studioAssets);
     const studioAsset = (type: PreviewAssetPlan["type"]) => studioAssets.find((asset) => asset.type === type);
     const compatibilityRules = this.traitPacks.compatibilityRules(pack);
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
-    if (studioAssets.length) {
+    if (studioBibleReady) {
       style.productionAssetStatus = "AI_CONCEPT";
       style.artSource = "AI_ASSISTED";
       style.productionAssetPolicy.defaultAssetStatus = "AI_CONCEPT";
@@ -118,7 +119,7 @@ export class GeneratorService {
       ok: true,
       mode: "preview-only",
       assetProvider: this.studioProviderLabel(studioResult.summary),
-      previewClassification: studioAssets.length ? "AI_CONCEPT_PREVIEW" : "WIREFRAME_CONCEPT",
+      previewClassification: studioBibleReady ? "AI_CONCEPT_PREVIEW" : "WIREFRAME_CONCEPT",
       productionAssetStatus: style.productionAssetStatus,
       finalProductionReady: false,
       brandDna: style.brandDna,
@@ -134,7 +135,7 @@ export class GeneratorService {
       artTeam: styleBible.artTeam,
       traitCoverageScore: styleBible.qaReport.traitCoverageScore,
       rarityDiversityScore: styleBible.qaReport.rarityDiversityScore,
-      providerStatus: String(providerDiagnostics.provider ?? this.studioProviderLabel(studioResult.summary)),
+      providerStatus: String(providerDiagnostics.providerFailureCode ?? providerDiagnostics.provider ?? this.studioProviderLabel(studioResult.summary)),
       collection: {
         name: style.collection,
         palette: style.colors,
@@ -156,7 +157,7 @@ export class GeneratorService {
       animationMetadata: style.creativeUniverse.animationReadiness,
       quality: {
         ...quality,
-        issues: [...quality.issues, `${style.productionAssetStatus === "AI_CONCEPT" ? "Studio Bible art direction only" : "Wireframe concept preview only"}; final export requires approved transparent PNG/WebP layers, deterministic composition, metadata, and provenance.`]
+        issues: [...quality.issues, `${style.productionAssetStatus === "AI_CONCEPT" ? "Studio Bible art direction only" : "Fast Studio Preview required"}; final export requires approved transparent PNG/WebP layers, deterministic composition, metadata, and provenance.`]
       },
       distinctiveness: {
         ...distinctiveness,
@@ -176,7 +177,7 @@ export class GeneratorService {
       warnings: [
         "Preview generated without DB persistence.",
         ...studioResult.warnings,
-        "Fast Studio Preview is art direction only; final launch/export requires an approved transparent layer manifest and deterministic local composition.",
+        studioBibleReady ? "Fast Studio Preview is art direction only; final launch/export requires an approved transparent layer manifest and deterministic local composition." : "Fast Studio Preview required before reviewing collection visuals.",
         "OpenAI is not used for Studio Bible generation. Use Premium Cinematic Render explicitly for optional hero/key art."
       ].filter(Boolean)
     };
@@ -336,8 +337,9 @@ export class GeneratorService {
     const styleBible = this.buildStyleBible(style, pack);
     const wireframes = this.previews.generate(style, pack, run.seed, version);
     const studioResult = await this.studioAssetsWithCache(run.tokenMint, style, pack, styleBible, latest.version, `v${version}`);
-    const previews = [...studioResult.assets, ...wireframes];
-    if (studioResult.assets.length) await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
+    const studioAssets = studioResult.assets.filter(isRealStudioBibleAsset);
+    const previews = [...studioAssets, ...wireframes];
+    if (hasAllRealStudioBibleAssets(studioAssets)) await this.prisma.styleProfile.update({ where: { id: latest.id }, data: { artSource: "AI_ASSISTED", productionAssetStatus: "AI_CONCEPT" } });
     await this.persistPreviews(id, latest.id, version, previews);
     await this.prisma.generationRun.update({
       where: { id },
@@ -746,8 +748,8 @@ export class GeneratorService {
     const compatibilityResult = this.compatibility.validateRules(pack, compatibilityRules);
     const wireframes = this.previews.generate(style, pack, `${input.tokenMint}:${version}`, reroll);
     const studioResult = await this.studioAssetsWithCache(input.tokenMint, style, pack, styleBible, version, `v${version}`);
-    const studioAssets = studioResult.assets;
-    if (studioAssets.length) {
+    const studioAssets = studioResult.assets.filter(isRealStudioBibleAsset);
+    if (hasAllRealStudioBibleAssets(studioAssets)) {
       style.productionAssetStatus = "AI_CONCEPT";
       style.artSource = "AI_ASSISTED";
       style.productionAssetPolicy.defaultAssetStatus = "AI_CONCEPT";
@@ -1298,6 +1300,7 @@ export class GeneratorService {
     return {
       provider: summary.provider,
       imageCount: summary.imageCount,
+      imagesThisRun: summary.imagesThisRun,
       estimatedOpenAIRequestCount: 0,
       usesPaidOpenAIImageGeneration: false,
       lowCostMode: true,
@@ -1310,15 +1313,20 @@ export class GeneratorService {
       quality: summary.generationType === "fast_studio_preview" ? "Fast Studio Preview" : "Premium Cinematic Render",
       estimatedCostUsd: summary.estimatedCostUsd,
       generationType: summary.generationType,
-      costBreakdown: summary.costBreakdown
+      cacheStatus: summary.cacheStatus,
+      assets: summary.assets,
+      costBreakdown: summary.costBreakdown,
+      providerFailureReason: summary.providerFailureReason,
+      providerFailureCode: summary.providerFailureCode,
+      diagnostics: summary.diagnostics
     };
   }
 
   private studioProviderLabel(summary: StudioGenerationSummary) {
     if (summary.provider === "gemini") return "gemini-fast-studio-preview";
-    if (summary.provider === "cached") return "cached-studio-bible-preview";
+    if (summary.provider === "cached" || summary.provider === "cached-gemini") return "cached-gemini-studio-bible-preview";
     if (summary.provider === "gemini-unavailable") return "gemini-unavailable-no-studio-sheets";
-    return "deterministic-studio-bible-preview";
+    return "deterministic-dev-fallback-preview";
   }
 
   private cinematicProvider() {

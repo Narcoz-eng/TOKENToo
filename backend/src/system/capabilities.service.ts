@@ -299,13 +299,17 @@ export class CapabilitiesService {
     const provider = this.studioProvider();
     if (provider === "openai") return false;
     if (provider === "deterministic-render") return true;
-    return Boolean(process.env.GEMINI_API_KEY);
+    return Boolean(process.env.GEMINI_API_KEY) && this.studioImageGenerationEnabled();
   }
 
   private premiumCinematicAvailable() {
     const provider = this.cinematicProvider();
     if (provider === "gemini") return Boolean(process.env.GEMINI_API_KEY);
     return Boolean(process.env.OPENAI_API_KEY) && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true";
+  }
+
+  private studioImageGenerationEnabled() {
+    return (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") === "true" || (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true";
   }
 
   private tokenMetadataAvailable(heliusAvailable: boolean, programExecutable: boolean) {
@@ -567,6 +571,7 @@ export class CapabilitiesService {
     const studioProvider = this.studioProvider();
     const creativeMissing = [
       ...(studioProvider === "gemini" && !capabilities.geminiImagesAvailable ? ["GEMINI_API_KEY"] : []),
+      ...(studioProvider === "gemini" && capabilities.geminiImagesAvailable && !this.studioImageGenerationEnabled() ? ["ENABLE_STUDIO_IMAGE_GENERATION=true"] : []),
       ...(studioProvider === "openai" ? ["STUDIO_PROVIDER must be gemini or deterministic-render"] : [])
     ];
     const devnetLayerPackReady = this.realApprovedLayerPackAvailable() || capabilities.demoCuratedLayerPackAllowed;
@@ -645,6 +650,13 @@ export class CapabilitiesService {
           fix: "Add GEMINI_API_KEY to use Gemini image sheets. Deterministic local sheets are not used as creator-facing Gemini substitutes."
         },
         {
+          key: "ENABLE_STUDIO_IMAGE_GENERATION",
+          label: "ENABLE_STUDIO_IMAGE_GENERATION",
+          ok: this.studioProvider() !== "gemini" || this.studioImageGenerationEnabled(),
+          requiredFor: ["Creative Preview Mode"],
+          fix: "Set ENABLE_STUDIO_IMAGE_GENERATION=true or ENABLE_AI_IMAGE_GENERATION=true so Fast Studio Preview can call Gemini."
+        },
+        {
           key: "CINEMATIC_PROVIDER",
           label: "CINEMATIC_PROVIDER",
           ok: this.cinematicProvider() !== "openai" || capabilities.openaiImagesAvailable,
@@ -704,6 +716,7 @@ export class CapabilitiesService {
     if (capabilities.heliusConfigured && !capabilities.heliusReachable) warnings.push(`Helius is configured but unreachable or unhealthy${getLastHeliusErrorCode() ? ` (${getLastHeliusErrorCode()})` : ""}.`);
     if (this.studioProvider() === "openai") warnings.push("STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; use gemini or deterministic-render.");
     if (this.studioProvider() === "gemini" && !capabilities.geminiImagesAvailable) warnings.push("GEMINI_API_KEY is missing; Fast Studio Preview will not emit creator-facing Studio Bible sheets until Gemini image generation is configured.");
+    if (this.studioProvider() === "gemini" && capabilities.geminiImagesAvailable && !this.studioImageGenerationEnabled()) warnings.push("Gemini Studio Bible generation is disabled; set ENABLE_STUDIO_IMAGE_GENERATION=true or ENABLE_AI_IMAGE_GENERATION=true.");
     if (this.cinematicProvider() === "openai" && !capabilities.openaiImagesAvailable) warnings.push("Premium Cinematic Render is configured for OpenAI but OPENAI_API_KEY is missing.");
     if (!capabilities.permanentStorageConfigured) warnings.push("Permanent storage is not configured; launch and final mint assets are blocked.");
     if (!this.realApprovedLayerPackAvailable()) warnings.push(capabilities.demoCuratedLayerPackAllowed ? "Using devnet demo layer pack; production launch remains blocked until a real curated or artist-approved layer pack is configured." : "Approved curated layer pack is missing; production launch is blocked.");

@@ -13,6 +13,7 @@ import { CompatibilityEngineService } from "./compatibility-engine.service";
 import { CreativeDnaService } from "./creative-dna.service";
 import { CuratedLayerPackService } from "./curated-layer-pack.service";
 import { DeterministicRenderService } from "./deterministic-render.service";
+import { GeminiStudioImageProviderService } from "./gemini-studio-image-provider.service";
 import { GeneratorController } from "./generator.controller";
 import { GeneratorService } from "./generator.service";
 import { LogoAnalysisService } from "./logo-analysis.service";
@@ -40,6 +41,7 @@ import { ProductionLayerPackService } from "./production-layer-pack.service";
     CreativeDnaService,
     CuratedLayerPackService,
     DeterministicRenderService,
+    GeminiStudioImageProviderService,
     ProductionLayerPackService,
     LogoAnalysisService,
     CommunityContextService,
@@ -60,6 +62,6 @@ import { ProductionLayerPackService } from "./production-layer-pack.service";
     CuratedAssetProvider,
     HybridAssetProvider
   ],
-  exports: [GeneratorService, AssetProductionLayerService, AssetStorageService, MetadataGeneratorService, ProductionLayerPackService, DeterministicRenderService, StudioImageProviderService, CuratedLayerPackService]
+  exports: [GeneratorService, AssetProductionLayerService, AssetStorageService, MetadataGeneratorService, ProductionLayerPackService, DeterministicRenderService, GeminiStudioImageProviderService, StudioImageProviderService, CuratedLayerPackService]
 })
 export class GeneratorModule {}

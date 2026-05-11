@@ -172,7 +172,7 @@ export type CollectionCompetition = {
 
 export type ProductionAssetStatus = "WIREFRAME" | "AI_CONCEPT" | "CURATED_LAYER_READY" | "ARTIST_APPROVED" | "FINAL_PRODUCTION";
 
-export type GeneratorQualityTier = "Wireframe concept" | "AI concept" | "AI studio" | "Basic" | "Premium" | "Legendary-ready";
+export type GeneratorQualityTier = "Preview required" | "Wireframe concept" | "AI concept" | "AI studio" | "Basic" | "Premium" | "Legendary-ready";
 
 export type StudioWorkflowState = {
   locks: {
@@ -408,6 +408,7 @@ export type StyleBiblePlan = {
 export type ConceptRequestSummary = {
   provider?: string;
   imageCount?: number;
+  imagesThisRun?: number;
   estimatedOpenAIRequestCount?: number;
   usesPaidOpenAIImageGeneration?: boolean;
   lowCostMode?: boolean;
@@ -419,6 +420,8 @@ export type ConceptRequestSummary = {
   model?: string;
   quality?: string;
   generationType?: string;
+  cacheStatus?: string;
+  assets?: StudioPreviewAssetType[];
   estimatedCostUsd?: number;
   costBreakdown?: Array<{
     provider?: string;
@@ -430,4 +433,14 @@ export type ConceptRequestSummary = {
   }>;
   providerFailureReason?: string;
   providerFailureCode?: string;
+  diagnostics?: {
+    envStudioProvider?: string;
+    geminiApiKeyPresent?: boolean;
+    studioImageGenerationEnabled?: boolean;
+    modelSelected?: string;
+    routeCalled?: string;
+    providerDecisionBranch?: string;
+    cacheStatus?: string;
+    fallbackReason?: string;
+  };
 };

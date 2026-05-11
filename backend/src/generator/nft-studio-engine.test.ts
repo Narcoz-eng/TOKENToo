@@ -1,8 +1,9 @@
 import { selectArtTeam } from "./art-team-engine";
 import { AiOutputQualityValidatorService } from "./ai-output-quality-validator.service";
 import { CuratedLayerPackService } from "./curated-layer-pack.service";
+import { GeminiStudioImageError } from "./gemini-studio-image-provider.service";
 import { ProductionLayerPackService } from "./production-layer-pack.service";
-import { StudioImageProviderService } from "./studio-image-provider.service";
+import { hasAllRealStudioBibleAssets, StudioImageProviderService } from "./studio-image-provider.service";
 import { StyleBibleEngineService } from "./style-bible-engine.service";
 import { TraitCoverageEngineService } from "./trait-coverage-engine.service";
 import type { GeneratedStyleProfile, TraitPackPlan } from "./generator.types";
@@ -196,12 +197,19 @@ async function main() {
 
   const previousStudioProvider = process.env.STUDIO_PROVIDER;
   const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const previousStudioGeneration = process.env.ENABLE_STUDIO_IMAGE_GENERATION;
+  const previousAiGeneration = process.env.ENABLE_AI_IMAGE_GENERATION;
+  const previousAppEnv = process.env.APP_ENV;
+  const previousGeminiModel = process.env.GEMINI_IMAGE_MODEL;
   delete process.env.STUDIO_PROVIDER;
   delete process.env.GEMINI_API_KEY;
+  delete process.env.ENABLE_STUDIO_IMAGE_GENERATION;
+  delete process.env.ENABLE_AI_IMAGE_GENERATION;
   const provider = new StudioImageProviderService();
   const summary = provider.validatePlan(baseStyle, bible, "test-mint");
   assert(summary.provider === "gemini-unavailable", "Gemini should be the default Studio Bible provider, with no fake sheet fallback when the key is missing");
-  assert(summary.imageCount === 5, "Fast Studio Preview should plan the five Studio Bible sheets");
+  assert(summary.providerFailureCode === "GEMINI_KEY_MISSING", "Missing Gemini key should return the exact GEMINI_KEY_MISSING code");
+  assert(summary.imageCount === 0, "Missing Gemini key should not claim images were generated this run");
   assert(summary.estimatedCostUsd === 0, "Missing Gemini key should not estimate paid preview cost");
   const generated = await provider.generateStudioAssets({
     tokenMint: "test-mint",
@@ -213,7 +221,7 @@ async function main() {
   });
   assert(generated.assets.length === 0, "Studio provider must not return deterministic template sheets when Gemini is unavailable");
   assert(generated.assets.every((asset) => asset.provider !== "openai"), "OpenAI must not generate default Studio Bible assets");
-  assert(generated.warnings.some((warning) => /Local SVG sheets are not used as Gemini substitutes/i.test(warning)), "Missing Gemini should be an honest no-sheet state");
+  assert(generated.summary.providerFailureCode === "GEMINI_KEY_MISSING", "Missing Gemini should be an honest no-sheet state with an exact code");
   assert(generated.summary.costBreakdown.every((line) => line.generationType && typeof line.estimatedCostUsd === "number"), "Studio provider should return per-asset cost metadata when provider calls are attempted");
   const cached = await provider.generateStudioAssets({
     tokenMint: "test-mint",
@@ -226,12 +234,114 @@ async function main() {
   });
   assert(cached.assets.length === 0, "No fake cached Studio Bible assets should exist when Gemini never generated sheets");
   assert(cached.summary.estimatedCostUsd === 0, "Cached Studio Bible reuse should not estimate new provider cost");
+
+  process.env.STUDIO_PROVIDER = "gemini";
+  process.env.GEMINI_API_KEY = "test-gemini-key";
+  process.env.ENABLE_STUDIO_IMAGE_GENERATION = "true";
+  process.env.GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
+  const geminiFake = fakeGeminiProvider();
+  const configured = await new StudioImageProviderService(geminiFake as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(geminiFake.calls.length === 5, "Gemini configured -> GeminiProvider.generateStudioBible should be called for all five Studio Bible sheets");
+  assert(configured.summary.provider === "gemini", "Gemini generation should report provider=gemini");
+  assert(configured.summary.model === "gemini-2.5-flash-image", "Gemini generation should report the configured image model");
+  assert(configured.summary.imagesThisRun === 5, "Gemini generation should report five images this run");
+  assert(configured.summary.estimatedCostUsd > 0, "Gemini generation should include a positive cost estimate");
+  assert(hasAllRealStudioBibleAssets(configured.assets), "Gemini output should count as a real Studio Bible only when all five assets exist");
+
+  const failingGemini = fakeGeminiProvider(new GeminiStudioImageError("GEMINI_REQUEST_FAILED", "GEMINI_REQUEST_FAILED"));
+  const failed = await new StudioImageProviderService(failingGemini as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(failingGemini.calls.length === 5, "Gemini failure should still attempt the five Studio Bible sheets in the parallel batch");
+  assert(failed.assets.length === 0, "Gemini configured but failed -> deterministic fallback must not be silently marked ready");
+  assert(failed.summary.provider !== "deterministic-render", "Gemini failure must not report deterministic-render");
+  assert(failed.summary.providerFailureCode === "GEMINI_REQUEST_FAILED", "Gemini failure should surface GEMINI_REQUEST_FAILED");
+
+  const quotaGemini = fakeGeminiProvider(new GeminiStudioImageError("GEMINI_QUOTA_EXCEEDED", "GEMINI_QUOTA_EXCEEDED"));
+  const quotaFailed = await new StudioImageProviderService(quotaGemini as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(quotaFailed.assets.length === 0, "Gemini quota failure must not produce deterministic Studio Bible assets");
+  assert(quotaFailed.summary.providerFailureCode === "GEMINI_QUOTA_EXCEEDED", "Gemini quota failure should surface GEMINI_QUOTA_EXCEEDED");
+
+  const cacheProbe = fakeGeminiProvider();
+  const cachedGemini = await new StudioImageProviderService(cacheProbe as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview",
+    cachedAssets: configured.assets
+  });
+  assert(cacheProbe.calls.length === 0, "Gemini cache hit should not call the provider");
+  assert(cachedGemini.summary.provider === "cached-gemini", "Gemini cache hit should report Cached Gemini");
+  assert(hasAllRealStudioBibleAssets(cachedGemini.assets), "Cached Gemini assets should count as real Studio Bible assets");
+
+  const deterministicCacheProbe = fakeGeminiProvider();
+  const deterministicCache = configured.assets.map((asset) => ({
+    ...asset,
+    uri: "data:image/svg+xml,%3Csvg%3E%3C/svg%3E",
+    provider: "deterministic-render" as const,
+    generationMetadata: { ...(asset.generationMetadata ?? {}), provider: "deterministic-render", sourceProvider: "deterministic-render", model: "style-bible-engine" },
+    metadata: { ...asset.metadata, provider: "deterministic-render", sourceProvider: "deterministic-render", model: "style-bible-engine" }
+  }));
+  const ignoredDeterministicCache = await new StudioImageProviderService(deterministicCacheProbe as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview",
+    cachedAssets: deterministicCache
+  });
+  assert(deterministicCacheProbe.calls.length === 5, "Deterministic cached sheets should be ignored and should not block real Gemini generation");
+  assert(hasAllRealStudioBibleAssets(ignoredDeterministicCache.assets), "Ignored deterministic cache should be replaced by real Gemini assets");
+
+  process.env.STUDIO_PROVIDER = "deterministic";
+  process.env.APP_ENV = "production";
+  const deterministicProduction = await new StudioImageProviderService(fakeGeminiProvider() as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(deterministicProduction.assets.length === 0, "Deterministic provider cannot emit Studio Bible ready assets in production");
+  assert(!hasAllRealStudioBibleAssets(deterministicProduction.assets), "Deterministic provider cannot set Studio Bible ready in production");
+  if (previousAppEnv === undefined) delete process.env.APP_ENV;
+  else process.env.APP_ENV = previousAppEnv;
+
   const aiIssues = new AiOutputQualityValidatorService().validate(generated.assets);
   assert(!aiIssues.some((issue) => /missing banner|rarity character/i.test(issue)), `Studio Bible validation should not require cinematic OpenAI assets: ${aiIssues.join(", ")}`);
   if (previousStudioProvider === undefined) delete process.env.STUDIO_PROVIDER;
   else process.env.STUDIO_PROVIDER = previousStudioProvider;
   if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
   else process.env.GEMINI_API_KEY = previousGeminiKey;
+  if (previousStudioGeneration === undefined) delete process.env.ENABLE_STUDIO_IMAGE_GENERATION;
+  else process.env.ENABLE_STUDIO_IMAGE_GENERATION = previousStudioGeneration;
+  if (previousAiGeneration === undefined) delete process.env.ENABLE_AI_IMAGE_GENERATION;
+  else process.env.ENABLE_AI_IMAGE_GENERATION = previousAiGeneration;
+  if (previousGeminiModel === undefined) delete process.env.GEMINI_IMAGE_MODEL;
+  else process.env.GEMINI_IMAGE_MODEL = previousGeminiModel;
 
   const layerStatus = new ProductionLayerPackService().approvedLayerManifestStatus(pack);
   assert(!layerStatus.approved, "Final export should be blocked without an approved transparent PNG/WebP layer manifest");
@@ -291,6 +401,18 @@ function fakeCuratedLayerDb() {
         state.pack = { ...state.pack, ...data };
         return state.pack;
       }
+    }
+  };
+}
+
+function fakeGeminiProvider(error?: Error) {
+  const calls: any[] = [];
+  return {
+    calls,
+    generateStudioBible: async (input: any) => {
+      calls.push(input);
+      if (error) throw error;
+      return { uri: `data:image/png;base64,${Buffer.from(input.generationType).toString("base64")}` };
     }
   };
 }
