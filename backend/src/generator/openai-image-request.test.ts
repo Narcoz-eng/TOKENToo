@@ -36,10 +36,10 @@ const tests: TestCase[] = [
     }
   },
   {
-    name: "gpt-image-2 accepts documented flexible sizes",
+    name: "gpt-image-1-mini is accepted as explicit fallback model",
     run: () => {
-      const validation = validationFor({ ...baseInput, model: "gpt-image-2", size: "1536x864" });
-      assert(validation.valid, `Flexible gpt-image-2 size should pass: ${validation.issues.map((issue) => issue.message).join("; ")}`);
+      const validation = validationFor({ ...baseInput, model: "gpt-image-1-mini", size: "1024x1024" });
+      assert(validation.valid, `gpt-image-1-mini should pass: ${validation.issues.map((issue) => issue.message).join("; ")}`);
     }
   },
   {
@@ -75,11 +75,11 @@ const tests: TestCase[] = [
   {
     name: "OpenAI 400 body is parsed into an actionable UI message",
     run: async () => {
-      const request = buildOpenAIImageRequest({ ...baseInput, model: "gpt-image-2" });
+      const request = buildOpenAIImageRequest({ ...baseInput, model: "not-real-openai-image-model" });
       const exception = await openAiResponseException(
         jsonResponse(400, {
           error: {
-            message: "The model `gpt-image-2` does not exist or you do not have access to it.",
+            message: "The model `not-real-openai-image-model` does not exist or you do not have access to it.",
             type: "invalid_request_error",
             code: "unsupported_model"
           }

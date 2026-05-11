@@ -848,6 +848,11 @@ function CreatorStudioStatusPanel({ preview, setup, loading, showDiagnostics }: 
           Studio Bible generation unavailable - provider reason: {providerReason}
         </p>
       ) : null}
+      {!previewReady && preview.conceptRequest?.noBillableGenerationAttempted ? (
+        <p className="mt-3 rounded-md border border-vault-gold/30 bg-vault-gold/8 px-3 py-2 text-xs font-black text-vault-gold">
+          No billable generation attempted
+        </p>
+      ) : null}
       {showDiagnostics && preview.conceptRequest?.diagnostics ? <StudioProviderDiagnosticsPanel diagnostics={preview.conceptRequest.diagnostics} /> : null}
     </SectionCard>
   );
@@ -866,8 +871,20 @@ function StudioProviderDiagnosticsPanel({ diagnostics }: { diagnostics: NonNulla
     ["Prompt fallback", diagnostics.promptFallbackReason],
     ["Route called", diagnostics.routeCalled],
     ["Provider branch", diagnostics.providerDecisionBranch],
+    ["Active image provider", diagnostics.activeImageProvider],
+    ["Active image model", diagnostics.activeImageModel],
+    ["Fallback model used", diagnostics.fallbackModelUsed],
+    ["Attempted models", diagnostics.attemptedModels?.join(", ")],
+    ["Disabled models", diagnostics.disabledModels?.join(", ")],
+    ["Unsupported models", diagnostics.unsupportedModels?.join(", ")],
+    ["Quota status", diagnostics.quotaStatus],
+    ["Last probe", diagnostics.lastProbeResult],
+    ["Last error", diagnostics.lastErrorCode],
     ["Cache", diagnostics.cacheStatus],
     ["Fallback reason", diagnostics.fallbackReason],
+    ["OpenAI fallback enabled", diagnostics.openaiStudioFallbackEnabled === undefined ? undefined : String(diagnostics.openaiStudioFallbackEnabled)],
+    ["Can generate Studio Bible", diagnostics.canGenerateStudioBible === undefined ? undefined : String(diagnostics.canGenerateStudioBible)],
+    ["No billable generation attempted", diagnostics.noBillableGenerationAttempted === undefined ? undefined : String(diagnostics.noBillableGenerationAttempted)],
     ["Studio generation enabled", diagnostics.studioImageGenerationEnabled === undefined ? undefined : String(diagnostics.studioImageGenerationEnabled)]
   ].filter(([, value]) => value !== undefined && value !== "");
   return (
@@ -1064,11 +1081,15 @@ function ConceptPlanNotice({ plan }: { plan: ConceptRequestSummary | null }) {
       </div>
       <div className="mt-3 grid gap-2 text-xs font-bold text-slate-300">
         <p>Provider: <span className="text-white">{providerDisplay(plan.provider)}</span></p>
+        {plan.activeImageProvider ? <p>Active image provider: <span className="text-white">{providerDisplay(plan.activeImageProvider)}</span></p> : null}
+        {plan.activeModel ? <p>Active model: <span className="text-white">{plan.activeModel}</span></p> : null}
+        {plan.fallbackModelUsed ? <p>Fallback model used: <span className="text-white">{plan.fallbackModelUsed}</span></p> : null}
         <p>Images this run: <span className="text-white">{imagesThisRun}</span></p>
         <p>Estimated cost: <span className={paid ? "text-vault-gold" : "text-vault-green"}>{formatUsd(plan.estimatedCostUsd)}</span></p>
         {plan.model ? <p>Model: <span className="text-white">{plan.model}</span></p> : null}
         {plan.cacheStatus ? <p>Cache status: <span className="text-white">{plan.cacheStatus}</span></p> : null}
-        {plan.providerFailureCode ? <p>Provider reason: <span className="text-vault-gold">{plan.providerFailureCode}</span></p> : null}
+        {plan.providerFailureCode || plan.unavailableReason ? <p>Provider reason: <span className="text-vault-gold">{plan.unavailableReason ?? plan.providerFailureCode}</span></p> : null}
+        {plan.noBillableGenerationAttempted ? <p>No billable generation attempted: <span className="text-vault-gold">true</span></p> : null}
         {plan.generationType ? <p>Generation type: <span className="text-white">{generationTypeLabel(plan.generationType)}</span></p> : null}
       </div>
     </div>
@@ -1083,7 +1104,7 @@ function providerDisplay(provider?: string) {
   if (/cached-gemini/i.test(provider)) return "Cached Gemini";
   if (/unavailable|no-studio-sheets/i.test(provider)) return "Gemini unavailable";
   if (/gemini/i.test(provider)) return "Gemini Studio";
-  if (/openai/i.test(provider)) return "OpenAI premium cinematic";
+  if (/openai/i.test(provider)) return "OpenAI Studio fallback";
   if (/cached/i.test(provider)) return "Cached studio preview";
   if (/deterministic/i.test(provider)) return "Deterministic dev fallback";
   if (/premium-fallback|fallback-poster/i.test(provider)) return "Fallback art hidden";
@@ -1115,7 +1136,7 @@ function assetProvider(asset: StudioPreviewAsset) {
 
 function exactGenerationReason(preview: CollectionGeneratorPreview) {
   const warning = preview.warnings?.find((item) => /(?:IMAGEN|GEMINI)_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|(?:AI|Imagen|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
-  if (!warning) return preview.conceptRequest?.providerFailureCode ?? preview.conceptRequest?.providerFailureReason;
+  if (!warning) return preview.conceptRequest?.unavailableReason ?? preview.conceptRequest?.providerFailureReason ?? preview.conceptRequest?.providerFailureCode;
   return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "Studio generation unavailable: ");
 }
 

@@ -172,12 +172,20 @@ function ProfessionalPreviewGate({ preview, onGenerateAiConcept, canGenerateAiCo
 function ConceptRunStatus({ conceptRequest, provider, fallbackHidden }: { conceptRequest: NonNullable<CollectionGeneratorPreview["conceptRequest"]>; provider?: string; fallbackHidden: boolean }) {
   const paid = Boolean(conceptRequest.usesPaidOpenAIImageGeneration);
   const imagesThisRun = conceptRequest.imagesThisRun ?? conceptRequest.imageCount ?? 0;
+  const activeProvider = conceptRequest.activeImageProvider ?? provider ?? conceptRequest.provider;
+  const activeModel = conceptRequest.activeModel ?? conceptRequest.model;
+  const fallbackModelUsed = conceptRequest.fallbackModelUsed && conceptRequest.fallbackModelUsed !== activeModel ? conceptRequest.fallbackModelUsed : undefined;
+  const unavailableReason = conceptRequest.unavailableReason ?? conceptRequest.providerFailureReason ?? conceptRequest.providerFailureCode;
   return (
-    <div className="mt-5 grid gap-3 rounded-lg border border-vault-line bg-black/35 p-4 text-xs font-bold text-slate-300 md:grid-cols-4">
-      <p>Provider <span className="mt-1 block text-sm font-black text-white">{providerLabel(provider ?? conceptRequest.provider)}</span></p>
+    <div className="mt-5 grid gap-3 rounded-lg border border-vault-line bg-black/35 p-4 text-xs font-bold text-slate-300 md:grid-cols-3 xl:grid-cols-6">
+      <p>Active provider <span className="mt-1 block text-sm font-black text-white">{providerLabel(activeProvider)}</span></p>
+      <p>Active model <span className="mt-1 block break-words text-sm font-black text-white">{activeModel ?? "Not selected"}</span></p>
+      <p>Fallback <span className="mt-1 block break-words text-sm font-black text-white">{fallbackModelUsed ?? "None"}</span></p>
       <p>Images <span className="mt-1 block text-sm font-black text-white">{imagesThisRun}</span></p>
       <p>Estimated cost <span className={cn("mt-1 block text-sm font-black", paid ? "text-vault-gold" : "text-vault-green")}>{formatUsd(conceptRequest.estimatedCostUsd)}</span></p>
       <p>Cache <span className={cn("mt-1 block text-sm font-black", conceptRequest.cachedResultAvailable || conceptRequest.cacheStatus === "hit" ? "text-vault-green" : "text-vault-gold")}>{conceptRequest.cachedResultAvailable || conceptRequest.cacheStatus === "hit" ? "Available" : fallbackHidden ? "Fallback hidden" : "Not available"}</span></p>
+      {unavailableReason ? <p className="md:col-span-3 xl:col-span-4">Reason <span className="mt-1 block text-sm font-black text-vault-gold">{unavailableReason}</span></p> : null}
+      {conceptRequest.noBillableGenerationAttempted ? <p className="md:col-span-3 xl:col-span-2"><span className="mt-1 block rounded-md border border-vault-gold/35 bg-vault-gold/10 px-3 py-2 text-sm font-black text-vault-gold">No billable generation attempted</span></p> : null}
     </div>
   );
 }
@@ -547,7 +555,7 @@ function safeDecode(value: string) {
 
 function exactGenerationReason(preview: CollectionGeneratorPreview) {
   const warning = preview.warnings?.find((item) => /(?:IMAGEN|GEMINI)_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|(?:AI|Imagen|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
-  if (!warning) return preview.conceptRequest?.providerFailureCode ?? preview.conceptRequest?.providerFailureReason;
+  if (!warning) return preview.conceptRequest?.unavailableReason ?? preview.conceptRequest?.providerFailureReason ?? preview.conceptRequest?.providerFailureCode;
   return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "Studio generation unavailable: ");
 }
 
@@ -559,7 +567,7 @@ function providerLabel(provider?: string) {
   if (/cached-gemini/i.test(provider)) return "Cached Gemini";
   if (/unavailable|no-studio-sheets/i.test(provider)) return "Gemini unavailable";
   if (/gemini/i.test(provider)) return "Gemini Studio";
-  if (/openai/i.test(provider)) return "OpenAI premium cinematic";
+  if (/openai/i.test(provider)) return "OpenAI Studio fallback";
   if (/cached/i.test(provider)) return "Cached studio preview";
   if (/deterministic/i.test(provider)) return "Deterministic dev fallback";
   if (/premium-fallback|fallback-poster/i.test(provider)) return "Fallback art hidden";

@@ -17,6 +17,7 @@ import {
 
 export type ImageGenerationInput = {
   prompt: string;
+  model?: string;
   referenceImageBase64?: string;
   referenceImageMimeType?: string;
   referenceImageUrl?: string;
@@ -41,6 +42,7 @@ export class OpenAIImageProvider implements ImageProvider {
   private readonly logger = new Logger(OpenAIImageProvider.name);
 
   async generate(input: ImageGenerationInput): Promise<ImageGenerationOutput> {
+    if (!paidAiAllowed()) throw openAiProviderException("PAID_AI_DISABLED", "Paid AI generation is disabled by PAID_AI_GENERATION_ENABLED/DEV_DISABLE_PAID_AI.");
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw openAiProviderException("OPENAI_KEY_MISSING", "OpenAI key missing. Configure image generation before creating an AI studio preview.");
     const request = buildOpenAIImageRequest(input);
@@ -276,6 +278,13 @@ function isOpenAINonRetryable(error: unknown) {
 
 function isOpenAIBillingIssue(openaiError: { code?: string; type?: string; message?: string }) {
   return /billing|hard limit|quota|credit|insufficient_quota|usage limit|payment required/i.test(`${openaiError.code ?? ""} ${openaiError.type ?? ""} ${openaiError.message ?? ""}`);
+}
+
+function paidAiAllowed() {
+  const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development";
+  const paidEnabled = (process.env.PAID_AI_GENERATION_ENABLED ?? "false") === "true";
+  const devDisabled = (process.env.DEV_DISABLE_PAID_AI ?? "true") === "true" && appEnv !== "production";
+  return paidEnabled && !devDisabled;
 }
 
 function safeJson(value: string) {

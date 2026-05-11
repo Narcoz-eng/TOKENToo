@@ -179,7 +179,7 @@ export class GeneratorService {
         "Preview generated without DB persistence.",
         ...studioResult.warnings,
         studioBibleReady ? "Fast Studio Preview is art direction only; final launch/export requires an approved transparent layer manifest and deterministic local composition." : "Fast Studio Preview required before reviewing collection visuals.",
-        "OpenAI is not used for Studio Bible generation. Use Premium Cinematic Render explicitly for optional hero/key art."
+        studioResult.summary.activeImageProvider === "openai" ? "OpenAI Studio fallback generated Studio Bible sheets because Imagen was unavailable and ENABLE_OPENAI_STUDIO_FALLBACK=true." : "OpenAI is only used for Studio Bible generation when ENABLE_OPENAI_STUDIO_FALLBACK=true after Imagen fallback is unavailable."
       ].filter(Boolean)
     };
   }
@@ -1319,6 +1319,12 @@ export class GeneratorService {
       costBreakdown: summary.costBreakdown,
       providerFailureReason: summary.providerFailureReason,
       providerFailureCode: summary.providerFailureCode,
+      activeImageProvider: summary.activeImageProvider,
+      activeModel: summary.activeModel,
+      fallbackModelUsed: summary.fallbackModelUsed,
+      billableGenerationAttempted: summary.billableGenerationAttempted,
+      noBillableGenerationAttempted: summary.noBillableGenerationAttempted,
+      unavailableReason: summary.unavailableReason,
       diagnostics: summary.diagnostics
     };
   }

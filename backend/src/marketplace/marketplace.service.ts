@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException, NotImplementedException } from "@nestjs/common";
 import { FeeEngineService } from "../fee-engine/fee-engine.service";
+import { ProtocolService } from "../protocol/protocol.service";
 import { PrismaService } from "../db/prisma.service";
 import { RiskService } from "../risk/risk.service";
 import type { TokenScan } from "../types";
@@ -9,15 +10,17 @@ export class MarketplaceEngineService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(FeeEngineService) private readonly fees: FeeEngineService,
-    @Inject(RiskService) private readonly risk: RiskService
+    @Inject(RiskService) private readonly risk: RiskService,
+    @Inject(ProtocolService) private readonly protocol: ProtocolService
   ) {}
 
   async createListing(input: { vaultNftId: string; sellerUserId: string; priceSol: number; idempotencyKey?: string; walletAddress?: string }) {
-    const vault = await this.prisma.vaultNFT.findUnique({ where: { id: input.vaultNftId }, include: { collection: { include: { token: true } } } });
+    const vault = await this.prisma.vaultNFT.findUnique({ where: { id: input.vaultNftId }, include: { owner: true, collection: { include: { token: true } } } });
     if (!vault) throw new NotFoundException("Vault NFT not found");
     const seller = await this.prisma.user.findUnique({ where: { id: input.sellerUserId } });
     if (!seller || seller.walletAddress !== input.walletAddress) throw new BadRequestException("Wallet does not own the seller profile.");
-    if (vault.ownerUserId && vault.ownerUserId !== input.sellerUserId) throw new BadRequestException("Seller does not own this Vault NFT.");
+    const ownership = await this.protocol.assertCurrentOwner({ nft: vault, walletAddress: input.walletAddress ?? seller.walletAddress });
+    if (!ownership.verificationAvailable && vault.ownerUserId && vault.ownerUserId !== input.sellerUserId) throw new BadRequestException("Seller does not own this Vault NFT.");
     if (vault.status === "REDEEMED") throw new BadRequestException("Redeemed Vault NFTs cannot be listed.");
     if (input.priceSol <= 0) throw new BadRequestException("priceSol must be positive");
 
@@ -80,9 +83,10 @@ export class MarketplaceEngineService {
   }
 
   async persistInstantSellQuote(input: { vaultNftId: string; walletAddress: string; backingValueSol: number }) {
-    const vault = await this.prisma.vaultNFT.findUnique({ where: { id: input.vaultNftId }, include: { collection: { include: { token: true } } } });
+    const vault = await this.prisma.vaultNFT.findUnique({ where: { id: input.vaultNftId }, include: { owner: true, collection: { include: { token: true } } } });
     if (!vault) throw new NotFoundException("Vault NFT not found");
-    if (vault.ownerUserId) {
+    const ownership = await this.protocol.assertCurrentOwner({ nft: vault, walletAddress: input.walletAddress });
+    if (!ownership.verificationAvailable && vault.ownerUserId) {
       const owner = await this.prisma.user.findUnique({ where: { id: vault.ownerUserId } });
       if (owner?.walletAddress !== input.walletAddress) throw new BadRequestException("Wallet does not own this Vault NFT.");
     }

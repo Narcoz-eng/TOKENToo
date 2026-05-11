@@ -1,9 +1,13 @@
 import { Controller, Get, Inject } from "@nestjs/common";
+import { StudioImageProviderService } from "../generator/studio-image-provider.service";
 import { CapabilitiesService } from "./capabilities.service";
 
 @Controller("system")
 export class SystemController {
-  constructor(@Inject(CapabilitiesService) private readonly capabilities: CapabilitiesService) {}
+  constructor(
+    @Inject(CapabilitiesService) private readonly capabilities: CapabilitiesService,
+    @Inject(StudioImageProviderService) private readonly studioImages: StudioImageProviderService
+  ) {}
 
   @Get("health")
   health() {
@@ -18,6 +22,11 @@ export class SystemController {
   @Get("capabilities")
   status() {
     return this.capabilities.status();
+  }
+
+  @Get("image-providers")
+  imageProviders() {
+    return this.studioImages.imageProviderStatus();
   }
 
   @Get("diagnostics")

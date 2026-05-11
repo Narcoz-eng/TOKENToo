@@ -24,12 +24,17 @@ import { TokenMetadataService } from "./token-metadata/token-metadata.service";
 import { AssetStorageService } from "./generator/asset-storage.service";
 import { StakingController } from "./staking/staking.controller";
 import { StakingService } from "./staking/staking.service";
+import { ProtocolAccountingService } from "./protocol/protocol-accounting.service";
+import { ProtocolController } from "./protocol/protocol.controller";
+import { ProtocolService } from "./protocol/protocol.service";
+import { SolanaTransactionAdapterService } from "./vault-mint/solana-transaction-adapter.service";
 
 @Module({
   imports: [AuthModule, GeneratorModule, VaultMintModule, ProductDataModule],
-  controllers: [AppController, MarketplaceController, RaidController, StakingController, SystemController, TokenMetadataController],
+  controllers: [AppController, MarketplaceController, RaidController, StakingController, SystemController, TokenMetadataController, ProtocolController],
   providers: [
     PrismaService,
+    SolanaTransactionAdapterService,
     TokenScannerService,
     IdentityEngineService,
     ArtGeneratorService,
@@ -39,6 +44,8 @@ import { StakingService } from "./staking/staking.service";
     RiskService,
     MarketplaceEngineService,
     StakingService,
+    ProtocolAccountingService,
+    ProtocolService,
     CapabilitiesService,
     TokenMetadataService,
     AssetStorageService,

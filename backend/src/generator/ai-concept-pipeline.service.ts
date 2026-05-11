@@ -85,7 +85,7 @@ export class AiConceptPipelineService {
     const provider = this.provider();
     if (provider === "premium-fallback") return true;
     if (provider === "cached-only") return false;
-    return (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && Boolean(process.env.OPENAI_API_KEY);
+    return this.paidAiAllowed() && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && Boolean(process.env.OPENAI_API_KEY);
   }
 
   availability() {
@@ -109,6 +109,13 @@ export class AiConceptPipelineService {
         ready: false,
         code: "OPENAI_DISABLED",
         message: "OpenAI disabled. AI studio preview generation is not enabled on this server."
+      };
+    }
+    if (!this.paidAiAllowed()) {
+      return {
+        ready: false,
+        code: "PAID_AI_DISABLED",
+        message: "Paid AI generation is disabled by PAID_AI_GENERATION_ENABLED/DEV_DISABLE_PAID_AI."
       };
     }
     if (!process.env.OPENAI_API_KEY) {
@@ -458,6 +465,13 @@ export class AiConceptPipelineService {
   private estimatedOpenAICostUsd() {
     const configured = Number(process.env.OPENAI_IMAGE_ESTIMATED_COST_USD);
     return Number.isFinite(configured) && configured >= 0 ? configured : 0.08;
+  }
+
+  private paidAiAllowed() {
+    const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development";
+    const paidEnabled = (process.env.PAID_AI_GENERATION_ENABLED ?? "false") === "true";
+    const devDisabled = (process.env.DEV_DISABLE_PAID_AI ?? "true") === "true" && appEnv !== "production";
+    return paidEnabled && !devDisabled;
   }
 
   private requests(style: GeneratedStyleProfile, pack: TraitPackPlan, seedKey: string): ConceptRequest[] {

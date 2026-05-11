@@ -156,12 +156,87 @@ export class SolanaTransactionAdapterService {
   }
 
   async verifyCoreAssetOwnerAndCollection(input: { assetAddress: string; owner: string; collectionAssetAddress: string }) {
+    const proof = await this.getCoreAssetProof({
+      assetAddress: input.assetAddress,
+      collectionAssetAddress: input.collectionAssetAddress
+    });
+    if (!proof.verificationAvailable) {
+      return {
+        ownerMatches: true,
+        collectionMatches: true,
+        asset: proof.asset,
+        currentOwner: proof.currentOwner,
+        verificationAvailable: false,
+        productionReady: false,
+        mode: proof.mode,
+        issues: proof.issues
+      };
+    }
+    return {
+      ownerMatches: proof.currentOwner === input.owner,
+      collectionMatches: proof.collectionMatches,
+      asset: proof.asset,
+      currentOwner: proof.currentOwner,
+      verificationAvailable: true,
+      productionReady: proof.productionReady,
+      mode: proof.mode,
+      issues: proof.issues
+    };
+  }
+
+  async getCoreAssetProof(input: { assetAddress: string; collectionAssetAddress?: string | null }) {
+    const provider = process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock";
+    if (provider !== "devnet") {
+      return {
+        verificationAvailable: false,
+        productionReady: false,
+        mode: provider,
+        currentOwner: null as string | null,
+        collectionMatches: null as boolean | null,
+        asset: null as unknown,
+        issues: [`Live Core asset ownership verification is unavailable with SOLANA_TRANSACTION_PROVIDER=${provider}.`]
+      };
+    }
     const umi = createUmi(this.rpcUrl());
     const asset = await fetchAssetV1(umi, publicKey(input.assetAddress));
-    const ownerMatches = String(asset.owner) === input.owner;
+    const currentOwner = String(asset.owner);
     const updateAuthority = JSON.stringify(asset.updateAuthority ?? {});
-    const collectionMatches = updateAuthority.includes(input.collectionAssetAddress);
-    return { ownerMatches, collectionMatches, asset };
+    const collectionMatches = input.collectionAssetAddress ? updateAuthority.includes(input.collectionAssetAddress) : null;
+    const issues = [input.collectionAssetAddress && !collectionMatches ? "Core asset does not belong to the expected collection." : null].filter(Boolean) as string[];
+    return {
+      verificationAvailable: true,
+      productionReady: issues.length === 0,
+      mode: "devnet",
+      currentOwner,
+      collectionMatches,
+      asset,
+      issues
+    };
+  }
+
+  async verifyWalletTokenBalance(input: { walletAddress: string; tokenMint: string; requiredAmount: string }) {
+    const provider = process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock";
+    if (provider !== "devnet") {
+      return {
+        verificationAvailable: false,
+        sufficient: null as boolean | null,
+        balance: null as string | null,
+        tokenAccount: null as string | null,
+        issues: [`Live wallet token balance verification is unavailable with SOLANA_TRANSACTION_PROVIDER=${provider}.`]
+      };
+    }
+    const owner = new PublicKey(input.walletAddress);
+    const mint = new PublicKey(input.tokenMint);
+    const tokenAccount = this.associatedTokenAddress(mint, owner);
+    const balance = await this.tokenBalance(this.connection(), tokenAccount);
+    const sufficient = BigInt(balance) >= BigInt(input.requiredAmount);
+    return {
+      verificationAvailable: true,
+      sufficient,
+      balance,
+      tokenAccount: tokenAccount.toBase58(),
+      issues: sufficient ? [] : ["Wallet token balance is below the requested lock amount."]
+    };
   }
 
   async verifyMintFinalization(input: {

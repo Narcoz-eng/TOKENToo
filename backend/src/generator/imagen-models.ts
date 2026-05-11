@@ -1,4 +1,5 @@
 export const DEFAULT_IMAGEN_MODEL = "imagen-4.0-fast-generate-001";
+export const DEFAULT_GEMINI_TEXT_MODEL = "gemini-2.5-flash";
 
 export const SUPPORTED_IMAGEN_MODELS = [
   "imagen-4.0-fast-generate-001",
@@ -7,7 +8,20 @@ export const SUPPORTED_IMAGEN_MODELS = [
   "imagen-3.0-generate-002"
 ] as const;
 
+export const IMAGEN_STUDIO_BIBLE_FALLBACK_CHAIN = [
+  "imagen-4.0-fast-generate-001",
+  "imagen-4.0-generate-001",
+  "imagen-3.0-generate-002"
+] as const satisfies readonly SupportedImagenModel[];
+
+export const SUPPORTED_GEMINI_TEXT_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+  "gemini-2.0-flash"
+] as const;
+
 export type SupportedImagenModel = (typeof SUPPORTED_IMAGEN_MODELS)[number];
+export type SupportedGeminiTextModel = (typeof SUPPORTED_GEMINI_TEXT_MODELS)[number];
 
 type ImagenModelNormalization =
   | {
@@ -69,6 +83,25 @@ export function normalizeImagenModel(value?: string | null): ImagenModelNormaliz
     model,
     rawModel,
     normalized: model !== rawModel
+  };
+}
+
+export function normalizeGeminiTextModel(value?: string | null) {
+  const rawModel = (value?.trim() || DEFAULT_GEMINI_TEXT_MODEL).replace(/^["']|["']$/g, "");
+  const normalized = stripModelPrefix(rawModel).toLowerCase();
+  if ((SUPPORTED_GEMINI_TEXT_MODELS as readonly string[]).includes(normalized)) {
+    return {
+      ok: true as const,
+      model: normalized as SupportedGeminiTextModel,
+      rawModel,
+      normalized: normalized !== rawModel
+    };
+  }
+  return {
+    ok: false as const,
+    rawModel,
+    code: "GEMINI_MODEL_UNSUPPORTED" as const,
+    supportedModels: SUPPORTED_GEMINI_TEXT_MODELS
   };
 }
 

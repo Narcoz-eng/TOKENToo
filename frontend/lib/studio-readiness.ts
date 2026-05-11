@@ -35,9 +35,9 @@ export function isRealStudioBibleAsset(asset: StudioPreviewAsset | undefined | n
   const sourceProvider = String(asset.metadata?.sourceProvider ?? asset.generationMetadata?.sourceProvider ?? "").toLowerCase();
   const model = String(asset.model ?? asset.metadata?.model ?? asset.generationMetadata?.model ?? "").toLowerCase();
   const uri = String(asset.uri).toLowerCase();
-  if (/deterministic|wireframe|placeholder|openai|premium-fallback/.test(`${provider} ${sourceProvider}`)) return false;
+  if (/deterministic|wireframe|placeholder|premium-fallback/.test(`${provider} ${sourceProvider}`)) return false;
   if (uri.startsWith("data:image/svg+xml")) return false;
-  return provider === "imagen" || provider === "cached-imagen" || sourceProvider === "imagen" || model.includes("imagen") || provider === "gemini" || provider === "cached-gemini" || sourceProvider === "gemini" || model.includes("gemini");
+  return provider === "imagen" || provider === "cached-imagen" || sourceProvider === "imagen" || model.includes("imagen") || provider === "gemini" || provider === "cached-gemini" || sourceProvider === "gemini" || model.includes("gemini") || provider === "openai" || sourceProvider === "openai" || model.includes("gpt-image");
 }
 
 export function studioPreviewStatusLabel(preview: CollectionGeneratorPreview) {

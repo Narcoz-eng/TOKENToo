@@ -34,9 +34,8 @@ import { StatCard } from "./StatCard";
 import { apiWarnings, unwrapApiData } from "@/lib/api";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
-import { ChestOpenAnimation, LegendaryRevealAnimation, RewardBurstAnimation, StakeAnimation } from "./animations";
+import { RewardBurstAnimation, StakeAnimation } from "./animations";
 import { brandAssets } from "@/lib/brand-assets";
-import { ActionCard } from "./ActionCard";
 import { CollectionGrid } from "./CollectionGrid";
 import { MetricGrid, PageLayout } from "./PageLayout";
 import { StakeFlow, UnstakeFlow, ClaimRewardsFlow } from "./StakingFlows";
@@ -59,6 +58,15 @@ type ProductData = {
   poolConfigured?: boolean;
   founderOnly?: boolean;
   activity?: unknown[];
+  recentMints?: Array<Record<string, unknown>>;
+  marketSnapshot?: {
+    volume24hSol?: number | null;
+    sales24h?: number | null;
+    avgPriceSol?: number | null;
+    uniqueBuyers?: number | null;
+    source?: string;
+    chart?: unknown[];
+  };
   user?: unknown;
 };
 
@@ -99,7 +107,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
     <AppShell active={active} stats={data?.stats}>
       <div className="space-y-5">
         {active === "home" && privateDiagnostics ? <FounderStatusPanel status={capabilityState.data} /> : null}
-        <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
+        {active !== "home" ? <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
           <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-y-0 right-0 hidden h-full w-3/5 object-cover opacity-30 mix-blend-screen lg:block" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/35" />
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -112,7 +120,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
               <UserPlus className="size-4" /> Create Community
             </Link>
           </div>
-        </section>
+        </section> : null}
 
         {blockedByWallet ? <WalletDisconnectedState /> : null}
         {privateDiagnostics ? <SetupWarning warnings={warnings} /> : null}
@@ -207,61 +215,178 @@ function renderProductView(
 
 function HomeDashboardView({ data }: { data: ProductData }) {
   const collections = data.collections ?? [];
-  const raids = data.raids ?? [];
   const stats = data.stats ?? {};
+  const market = data.marketSnapshot ?? {};
+  const recentMints = data.recentMints ?? [];
+  const trending = collections.slice(0, 6);
+  const myVaults = data.nfts ?? [];
   return (
-    <div className="space-y-5">
-      <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
-        <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-45 mix-blend-screen xl:w-3/5" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/28" />
-        <div className="absolute inset-0 grid-mask opacity-40" />
-        <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div>
-            <StatusPill accent="green">Live on Devnet</StatusPill>
-            <h2 className="mt-4 max-w-3xl text-5xl font-black leading-tight">Command center for token-backed gaming communities.</h2>
-            <p className="mt-4 max-w-2xl text-slate-300">Launch faction vaults, coordinate raids, and reward holders with Solana-native NFT identity.</p>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <ActionCard href="/mint" icon={LockKeyhole} title="Mint Vault" body="Lock tokens. Mint vault identity." />
-              <ActionCard href="/raids" icon={Swords} title="Join Raids" body="Activate faction campaigns." />
-              <ActionCard href="/staking" icon={Sparkles} title="Stake NFTs" body="Unlock reward hooks." />
+    <div className="space-y-6">
+      <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg">
+        <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-48 mix-blend-screen xl:w-[58%]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/34" />
+        <div className="absolute inset-0 grid-mask opacity-35" />
+        <div className="relative grid gap-8 p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="max-w-4xl">
+            <div className="flex flex-wrap gap-2">
+              <StatusPill accent="green">Protocol Dashboard</StatusPill>
+              <StatusPill accent="cyan">Solana Vault NFTs</StatusPill>
+            </div>
+            <h1 className="mt-5 max-w-4xl text-5xl font-black leading-tight lg:text-6xl">Energy in motion. Relief. Progress. Belonging.</h1>
+            <p className="mt-4 max-w-2xl text-lg text-slate-300">The protocol for token-backed NFTs. Communities lock their own tokens into reserve vaults, mint tradable Vault NFTs, stake for utility, and prove backing before redemption.</p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link href="/collections" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
+                <Search className="size-4" /> Explore Collections
+              </Link>
+              <Link href="/create-collection" className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-black text-vault-green">
+                <UserPlus className="size-4" /> Create Collection
+              </Link>
             </div>
           </div>
-          <LegendaryRevealAnimation rarity="Legendary" label="Legendary reveal" />
+          <div className="rounded-lg border border-vault-green/25 bg-black/50 p-4 shadow-green">
+            <img src={brandAssets.logo} alt="Phew mascot" className="mx-auto size-28 rounded-lg object-contain drop-shadow-[0_0_28px_rgba(186,255,0,0.35)]" />
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <MiniStat label="TVL" value={formatCurrency(stats.tvlUsd)} />
+              <MiniStat label="Vaults" value={formatMetric(stats.totalVaults ?? stats.nfts)} />
+              <MiniStat label="Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} />
+              <MiniStat label="Trades" value={formatMetric(stats.totalTrades)} />
+            </div>
+          </div>
         </div>
       </section>
 
       <MetricGrid>
-        <StatCard icon={Boxes} label="Communities" value={formatMetric(stats.collections)} />
-        <StatCard icon={LockKeyhole} label="Vault NFTs" value={formatMetric(stats.nfts)} accent="green" />
-        <StatCard icon={Swords} label="Raids" value={formatMetric(stats.raids)} accent="cyan" />
-        <StatCard icon={BadgeDollarSign} label="TVL" value={formatCurrency(stats.tvlUsd)} accent="gold" />
+        <StatCard icon={BadgeDollarSign} label="Protocol TVL" value={formatCurrency(stats.tvlUsd)} accent="gold" />
+        <StatCard icon={Boxes} label="Total Vaults" value={formatMetric(stats.totalVaults ?? stats.nfts)} />
+        <StatCard icon={Users} label="Active Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} accent="green" />
+        <StatCard icon={LockKeyhole} label="Phews Minted" value={formatMetric(stats.phewsMinted ?? stats.nfts)} accent="cyan" />
+        <StatCard icon={WalletCards} label="Total Trades" value={formatMetric(stats.totalTrades)} accent="purple" />
       </MetricGrid>
 
-      {collections.length ? (
-        <SectionCard title="Top Communities" action={<Link href="/collections" className="text-sm font-bold text-vault-green">View all</Link>}>
-          <CollectionGrid collections={collections.slice(0, 4)} />
-        </SectionCard>
-      ) : (
-        <EmptyState title="No launched communities yet" body="Launch the first faction vault to populate this command center with real communities, vaults, raids, and staking activity." action={<Link href="/create-collection" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center rounded-md px-5 text-sm font-black text-black">Create Community</Link>} />
-      )}
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <SectionCard title="Raid Feed">
-          {raids.length ? (
-            <div className="grid gap-3">
-              {raids.slice(0, 3).map((raid) => <RaidCard key={raid.id} raid={raid} collection={collections.find((collection) => collection.id === raid.collectionId || collection.dbId === raid.collectionId) ?? collections[0]} />)}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+        <SectionCard title="Trending Collections" action={<Link href="/collections" className="text-sm font-bold text-vault-green">View all</Link>}>
+          {trending.length ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {trending.map((collection) => (
+                <Link key={collection.id} href={`/collections/${collection.id}`} className="rounded-lg border border-vault-line bg-black/30 p-4 transition hover:border-vault-green/45">
+                  <div className="flex gap-4">
+                    <img src={collection.image} alt={collection.name} className="size-16 rounded-md border border-vault-green/20 object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-black">{collection.name}</p>
+                        <StatusPill accent={collection.reserveHealth === "HEALTHY" ? "green" : collection.reserveHealth === "AT_RISK" ? "gold" : "red"}>{collection.reserveHealth ?? "HEALTHY"}</StatusPill>
+                      </div>
+                      <p className="mt-1 truncate text-sm text-slate-400">{collection.symbol} / {collection.tokenMint || "token mint pending"}</p>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        <MiniMetric label="TVL" value={formatTokenAmount(collection.availableBacking)} />
+                        <MiniMetric label="Floor" value={`${collection.floorSol} SOL`} />
+                        <MiniMetric label="Reserve" value={`${Math.round((collection.reserveRatioBps ?? 0) / 100)}%`} />
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </div>
           ) : (
-            <EmptyBlock title="No raid rooms active" body="Raid cards appear after a launched collection creates live or scheduled raids." />
+            <EmptyBlock title="No launched collections yet" body="Community reserve cards appear after real collections launch. No fake floor, owner, or backing values are invented." />
           )}
         </SectionCard>
-        <SectionCard title="Action Animation Hooks">
-          <div className="grid gap-3">
-            <ChestOpenAnimation rarity="Epic" label="Chest open" />
-            <RewardBurstAnimation rarity="Rare" label="Reward claim" />
+
+        <SectionCard title="Market Snapshot">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MiniStat label="24h volume" value={formatSol(market.volume24hSol)} />
+            <MiniStat label="Sales" value={formatMetric(market.sales24h)} />
+            <MiniStat label="Avg price" value={formatSol(market.avgPriceSol)} />
+            <MiniStat label="Unique buyers" value={formatMetric(market.uniqueBuyers)} />
           </div>
+          <div className="mt-4 h-36 rounded-lg border border-dashed border-vault-line bg-black/25 p-4">
+            <div className="flex h-full items-end gap-2">
+              {[34, 48, 28, 62, 52, 72, 44, 58, 38, 66, 50, 76].map((height, index) => (
+                <span key={index} className="flex-1 rounded-t bg-gradient-to-t from-vault-green/25 to-vault-cyan/70" style={{ height: `${height}%` }} />
+              ))}
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">Source: {market.source ?? "no-sales-yet"}. Empty markets remain empty instead of showing fake liquidity.</p>
         </SectionCard>
       </div>
+
+      <SectionCard title="Protocol Features">
+        <div className="grid gap-3 md:grid-cols-5">
+          <FeatureTile icon={LockKeyhole} title="Backed by tokens" body="Each Vault NFT maps to locked community-token backing." />
+          <FeatureTile icon={WalletCards} title="Trade freely" body="Normal Solana NFT/Core assets remain marketplace compatible." />
+          <FeatureTile icon={Sparkles} title="Stake & earn" body="Staking preserves backing and blocks redemption while active." />
+          <FeatureTile icon={Swords} title="Raids & rewards" body="Collections can attach utility without weakening reserves." />
+          <FeatureTile icon={Shield} title="Protocol security" body="Proof endpoints separate live verification from dev fallback." />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="How It Works">
+        <div className="grid gap-3 md:grid-cols-4">
+          {[
+            ["1", "Lock tokens", "A community member selects a launched collection and locks that token mint."],
+            ["2", "Mint Vault NFT", "The protocol mints a verified collection asset with backing metadata."],
+            ["3", "Trade & Stake", "Ownership can move on marketplaces; staking keeps backing intact."],
+            ["4", "Redeem Anytime", "After unlock, the live NFT owner burns/invalidates and receives tokens."]
+          ].map(([step, heading, body]) => (
+            <div key={step} className="rounded-lg border border-vault-line bg-black/25 p-4">
+              <span className="flex size-8 items-center justify-center rounded-md border border-vault-green/35 bg-vault-green/10 text-sm font-black text-vault-green">{step}</span>
+              <p className="mt-4 font-black">{heading}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <SectionCard title="Recent Mints">
+          {recentMints.length ? (
+            <div className="grid gap-3">
+              {recentMints.slice(0, 6).map((mint) => (
+                <Link key={String(mint.id)} href={`/proof?mint=${encodeURIComponent(String(mint.mint ?? ""))}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-vault-line bg-black/25 p-4 hover:border-vault-green/40">
+                  <div>
+                    <p className="font-bold">{String(mint.collectionName ?? "Vault NFT")}</p>
+                    <p className="mt-1 text-xs text-slate-500">{String(mint.mint ?? "mint pending")}</p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="font-black text-vault-green">{formatTokenAmount(String(mint.lockedAmount ?? "0"))} {String(mint.tokenSymbol ?? "")}</p>
+                    <p className="text-slate-500">{String(mint.status ?? "LOCKED")}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <EmptyBlock title="No confirmed mints yet" body="Confirmed mint rows appear only after mint transactions verify and write a Vault NFT." />
+          )}
+        </SectionCard>
+
+        <SectionCard title="My Vaults">
+          {myVaults.length ? (
+            <MarketplaceGrid items={myVaults} collections={collections} />
+          ) : (
+            <EmptyBlock title="Connect to view vaults" body="Wallet-owned vaults appear from live API ownership data. Marketplace transfers require owner refresh before sensitive actions." />
+          )}
+          <Link href="/proof" className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
+            Open Proof Explorer <ArrowRight className="size-4" />
+          </Link>
+        </SectionCard>
+      </div>
+
+      <section className="phew-panel relative overflow-hidden rounded-lg p-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-vault-green/10 via-transparent to-vault-cyan/10" />
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-black uppercase text-vault-green">Ready to launch your own Phew?</p>
+            <h2 className="mt-2 text-3xl font-black">Create a token-backed NFT vault collection for your community.</h2>
+          </div>
+          <Link href="/create-collection" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
+            Create Collection <ArrowRight className="size-4" />
+          </Link>
+        </div>
+      </section>
+
+      <footer className="border-t border-vault-line py-6 text-sm text-slate-500">
+        Phew Run protocol dashboard. Live proof is marked separately from dev/mock fallback; no fake backing, owner, floor, or paid AI art is shown.
+      </footer>
     </div>
   );
 }
@@ -357,6 +482,14 @@ function CollectionDetailView({ data }: { data: ProductData }) {
           </SectionCard>
         </div>
         <aside className="space-y-5">
+          <SectionCard title="Reserve Proof">
+            <div className="space-y-3">
+              <MiniStat label="Reserve health" value={collection.reserveHealth ?? "HEALTHY"} />
+              <MiniStat label="Available backing" value={`${formatTokenAmount(collection.availableBacking)} ${collection.symbol}`} />
+              <MiniStat label="Reserve PDA" value={collection.reserveVaultPda ?? "Pending launch"} />
+              <Link href={`/collections/${collection.id}`} className="inline-flex h-10 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">Collection Proof</Link>
+            </div>
+          </SectionCard>
           <SectionCard id="traits" title="Trait Language">
             <div className="space-y-3">
               {Object.entries(collection.traitLayers).map(([category, values]) => (
@@ -588,6 +721,25 @@ function InfoTile({ icon: Icon, label, value }: { icon: typeof Crown; label: str
   );
 }
 
+function FeatureTile({ icon: Icon, title, body }: { icon: typeof Crown; title: string; body: string }) {
+  return (
+    <div className="rounded-lg border border-vault-line bg-black/25 p-4">
+      <Icon className="size-5 text-vault-green" />
+      <p className="mt-4 font-black">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-white/5 bg-white/[0.03] p-2">
+      <p className="text-[10px] uppercase text-slate-500">{label}</p>
+      <p className="mt-1 truncate font-bold text-white">{value}</p>
+    </div>
+  );
+}
+
 function EmptyBlock({ title, body }: { title: string; body: string }) {
   return (
     <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-6 text-center">
@@ -603,6 +755,17 @@ function formatMetric(value: unknown) {
 
 function formatCurrency(value: unknown) {
   return typeof value === "number" ? `$${value.toLocaleString()}` : "Not available";
+}
+
+function formatSol(value: unknown) {
+  return typeof value === "number" ? `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })} SOL` : "Not available";
+}
+
+function formatTokenAmount(value: unknown) {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return "Not available";
+  if (value === "0") return "0";
+  const trimmed = value.length > 9 ? `${value.slice(0, -9)}.${value.slice(-9, -6)}` : `0.${value.padStart(9, "0").slice(0, 3)}`;
+  return trimmed.replace(/\.?0+$/, "");
 }
 
 function getPositionId(position: unknown) {

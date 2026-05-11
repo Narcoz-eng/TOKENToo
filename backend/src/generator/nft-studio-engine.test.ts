@@ -3,6 +3,7 @@ import { AiOutputQualityValidatorService } from "./ai-output-quality-validator.s
 import { CuratedLayerPackService } from "./curated-layer-pack.service";
 import { ImagenStudioImageError, ImagenStudioImageProviderService } from "./imagen-studio-image-provider.service";
 import { ProductionLayerPackService } from "./production-layer-pack.service";
+import { resetStudioProviderCircuitBreakers } from "./studio-provider-circuit-breaker";
 import { hasAllRealStudioBibleAssets, StudioImageProviderService } from "./studio-image-provider.service";
 import { StyleBibleEngineService } from "./style-bible-engine.service";
 import { TraitCoverageEngineService } from "./trait-coverage-engine.service";
@@ -201,18 +202,29 @@ async function main() {
   const previousImagenKey = process.env.IMAGEN_API_KEY;
   const previousStudioGeneration = process.env.ENABLE_STUDIO_IMAGE_GENERATION;
   const previousAiGeneration = process.env.ENABLE_AI_IMAGE_GENERATION;
+  const previousPaidAiGeneration = process.env.PAID_AI_GENERATION_ENABLED;
+  const previousDevDisablePaidAi = process.env.DEV_DISABLE_PAID_AI;
   const previousGeminiTextPrompts = process.env.ENABLE_GEMINI_TEXT_PROMPTS;
   const previousAppEnv = process.env.APP_ENV;
   const previousImagenModel = process.env.IMAGEN_IMAGE_MODEL;
   const previousGeminiImageModel = process.env.GEMINI_IMAGE_MODEL;
+  const previousOpenAiKey = process.env.OPENAI_API_KEY;
+  const previousOpenAiStudioFallback = process.env.ENABLE_OPENAI_STUDIO_FALLBACK;
+  const previousOpenAiStudioModel = process.env.OPENAI_STUDIO_IMAGE_MODEL;
   delete process.env.STUDIO_PROVIDER;
   delete process.env.STUDIO_IMAGE_PROVIDER;
   delete process.env.GEMINI_API_KEY;
   delete process.env.IMAGEN_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ENABLE_OPENAI_STUDIO_FALLBACK;
+  delete process.env.OPENAI_STUDIO_IMAGE_MODEL;
   delete process.env.ENABLE_STUDIO_IMAGE_GENERATION;
   delete process.env.ENABLE_AI_IMAGE_GENERATION;
+  delete process.env.PAID_AI_GENERATION_ENABLED;
+  delete process.env.DEV_DISABLE_PAID_AI;
   delete process.env.IMAGEN_IMAGE_MODEL;
   delete process.env.GEMINI_IMAGE_MODEL;
+  resetStudioProviderCircuitBreakers();
   const provider = new StudioImageProviderService();
   const summary = provider.validatePlan(baseStyle, bible, "test-mint");
   assert(summary.provider === "imagen-unavailable", "Imagen should be the default Studio Bible image provider, with no fake sheet fallback when the key is missing");
@@ -247,6 +259,8 @@ async function main() {
   process.env.STUDIO_PROVIDER = "gemini";
   process.env.GEMINI_API_KEY = "test-google-key";
   process.env.ENABLE_STUDIO_IMAGE_GENERATION = "true";
+  process.env.PAID_AI_GENERATION_ENABLED = "true";
+  process.env.DEV_DISABLE_PAID_AI = "false";
   process.env.ENABLE_GEMINI_TEXT_PROMPTS = "false";
   for (const acceptedModel of ["imagen-4.0-fast-generate-001", "imagen-4.0-generate-001", "imagen-4.0-ultra-generate-001", "imagen-3.0-generate-002"]) {
     process.env.IMAGEN_IMAGE_MODEL = acceptedModel;
@@ -269,9 +283,11 @@ async function main() {
     styleVersion: 1,
     rarityVersion: "preview"
   });
-  assert(unsupportedModelProbe.calls.length === 0, "Unsupported Gemini image model must not call Imagen");
-  assert(unsupportedModel.summary.providerFailureCode === "IMAGEN_MODEL_UNSUPPORTED", "Unsupported image model should surface IMAGEN_MODEL_UNSUPPORTED");
-  assert(unsupportedModel.summary.imagesThisRun === 0, "Unsupported image model should not claim generated images");
+  assert(unsupportedModelProbe.calls.length === 5, "Unsupported selected model should not be called, but the supported fallback chain should generate sheets");
+  assert(unsupportedModelProbe.calls.every((call) => call.model !== "gemini-2.5-flash-image"), "Unsupported selected Gemini image model must never be sent to Imagen");
+  assert(unsupportedModel.summary.provider === "imagen", "Unsupported selected model should fall back to Imagen, not surface an unsupported-model user flow");
+  assert(unsupportedModel.summary.providerFailureCode === undefined, "Successful fallback should not surface IMAGEN_MODEL_UNSUPPORTED");
+  assert(unsupportedModel.summary.imagesThisRun === 5, "Fallback generation should report five generated sheets");
 
   delete process.env.IMAGEN_IMAGE_MODEL;
   process.env.GEMINI_IMAGE_MODEL = "imagen-4.0-fast-generate-001";
@@ -291,6 +307,29 @@ async function main() {
   assert(configured.summary.estimatedCostUsd > 0, "Imagen generation should include a positive cost estimate");
   assert(hasAllRealStudioBibleAssets(configured.assets), "Imagen output should count as a real Studio Bible only when all five assets exist");
 
+  resetStudioProviderCircuitBreakers();
+  process.env.IMAGEN_IMAGE_MODEL = "imagen-4.0-fast-generate-001";
+  const fallbackToImagen3 = fakeImagenProvider(undefined, (input) => {
+    if (input.model === "imagen-4.0-fast-generate-001" || input.model === "imagen-4.0-generate-001") {
+      throw new ImagenStudioImageError("IMAGEN_MODEL_UNSUPPORTED", "IMAGEN_MODEL_UNSUPPORTED");
+    }
+  });
+  const imagen3Fallback = await new StudioImageProviderService(fallbackToImagen3 as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(fallbackToImagen3.calls.filter((call) => call.model === "imagen-4.0-fast-generate-001").length === 1, "Unsupported Imagen 4 Fast should be probed once");
+  assert(fallbackToImagen3.calls.filter((call) => call.model === "imagen-4.0-generate-001").length === 1, "Unsupported Imagen 4 Standard should be probed once");
+  assert(fallbackToImagen3.calls.filter((call) => call.model === "imagen-3.0-generate-002").length === 5, "Imagen 3 fallback should generate all five sheets");
+  assert(imagen3Fallback.summary.model === "imagen-3.0-generate-002", "Unsupported Imagen 4 should fall back to Imagen 3");
+  assert(imagen3Fallback.summary.providerFailureCode === undefined, "Successful Imagen 3 fallback must not surface IMAGEN_MODEL_UNSUPPORTED");
+  assert(hasAllRealStudioBibleAssets(imagen3Fallback.assets), "Imagen 3 fallback should produce all five real Studio Bible assets");
+
+  resetStudioProviderCircuitBreakers();
   const failingImagen = fakeImagenProvider(new ImagenStudioImageError("IMAGEN_REQUEST_FAILED", "IMAGEN_REQUEST_FAILED"));
   const failed = await new StudioImageProviderService(failingImagen as any).generateStudioAssets({
     tokenMint: "test-mint",
@@ -300,11 +339,12 @@ async function main() {
     styleVersion: 1,
     rarityVersion: "preview"
   });
-  assert(failingImagen.calls.length === 5, "Imagen failure should still attempt the five Studio Bible sheets in the parallel batch");
+  assert(failingImagen.calls.length === 1, "Imagen request failure should stop the batch instead of retry-looping all five sheets");
   assert(failed.assets.length === 0, "Imagen configured but failed -> deterministic fallback must not be silently marked ready");
   assert(failed.summary.provider !== "deterministic-render", "Imagen failure must not report deterministic-render");
   assert(failed.summary.providerFailureCode === "IMAGEN_REQUEST_FAILED", "Imagen failure should surface IMAGEN_REQUEST_FAILED");
 
+  resetStudioProviderCircuitBreakers();
   const quotaImagen = fakeImagenProvider(new ImagenStudioImageError("IMAGEN_QUOTA_EXCEEDED", "IMAGEN_QUOTA_EXCEEDED"));
   const quotaFailed = await new StudioImageProviderService(quotaImagen as any).generateStudioAssets({
     tokenMint: "test-mint",
@@ -316,6 +356,52 @@ async function main() {
   });
   assert(quotaFailed.assets.length === 0, "Imagen quota failure must not produce deterministic Studio Bible assets");
   assert(quotaFailed.summary.providerFailureCode === "IMAGEN_QUOTA_EXCEEDED", "Imagen quota failure should surface IMAGEN_QUOTA_EXCEEDED");
+  const quotaBlocked = await new StudioImageProviderService(quotaImagen as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(quotaImagen.calls.length === 1, "Imagen quota circuit breaker should stop retry-looping provider calls");
+  assert(quotaBlocked.summary.noBillableGenerationAttempted, "Quota backoff should block before any new billable generation attempt");
+
+  resetStudioProviderCircuitBreakers();
+  delete process.env.IMAGEN_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-openai-key";
+  delete process.env.ENABLE_OPENAI_STUDIO_FALLBACK;
+  const openAiDisabled = fakeOpenAIProvider();
+  const noOpenAiFallback = await new StudioImageProviderService(fakeImagenProvider() as any, undefined as any, openAiDisabled as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(openAiDisabled.calls.length === 0, "OpenAI fallback must not run unless ENABLE_OPENAI_STUDIO_FALLBACK=true");
+  assert(noOpenAiFallback.summary.providerFailureCode === "IMAGEN_KEY_MISSING", "Without explicit OpenAI fallback, missing Imagen auth should block generation");
+
+  process.env.ENABLE_OPENAI_STUDIO_FALLBACK = "true";
+  const openAiEnabled = fakeOpenAIProvider();
+  const openAiFallback = await new StudioImageProviderService(fakeImagenProvider() as any, undefined as any, openAiEnabled as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(openAiEnabled.calls.length === 5, "OpenAI fallback should generate all five sheets only when explicitly enabled");
+  assert(openAiFallback.summary.provider === "openai", "Explicit OpenAI fallback should report provider=openai");
+  assert(openAiFallback.summary.model === "gpt-image-1", "OpenAI fallback should use gpt-image-1 by default");
+  assert(hasAllRealStudioBibleAssets(openAiFallback.assets), "Explicit OpenAI fallback assets should count only when all five real sheets exist");
+
+  process.env.GEMINI_API_KEY = "test-google-key";
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ENABLE_OPENAI_STUDIO_FALLBACK;
   const originalFetch = globalThis.fetch;
   try {
     const fetchedUrls: string[] = [];
@@ -420,12 +506,23 @@ async function main() {
   else process.env.ENABLE_STUDIO_IMAGE_GENERATION = previousStudioGeneration;
   if (previousAiGeneration === undefined) delete process.env.ENABLE_AI_IMAGE_GENERATION;
   else process.env.ENABLE_AI_IMAGE_GENERATION = previousAiGeneration;
+  if (previousPaidAiGeneration === undefined) delete process.env.PAID_AI_GENERATION_ENABLED;
+  else process.env.PAID_AI_GENERATION_ENABLED = previousPaidAiGeneration;
+  if (previousDevDisablePaidAi === undefined) delete process.env.DEV_DISABLE_PAID_AI;
+  else process.env.DEV_DISABLE_PAID_AI = previousDevDisablePaidAi;
   if (previousGeminiTextPrompts === undefined) delete process.env.ENABLE_GEMINI_TEXT_PROMPTS;
   else process.env.ENABLE_GEMINI_TEXT_PROMPTS = previousGeminiTextPrompts;
   if (previousImagenModel === undefined) delete process.env.IMAGEN_IMAGE_MODEL;
   else process.env.IMAGEN_IMAGE_MODEL = previousImagenModel;
   if (previousGeminiImageModel === undefined) delete process.env.GEMINI_IMAGE_MODEL;
   else process.env.GEMINI_IMAGE_MODEL = previousGeminiImageModel;
+  if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY = previousOpenAiKey;
+  if (previousOpenAiStudioFallback === undefined) delete process.env.ENABLE_OPENAI_STUDIO_FALLBACK;
+  else process.env.ENABLE_OPENAI_STUDIO_FALLBACK = previousOpenAiStudioFallback;
+  if (previousOpenAiStudioModel === undefined) delete process.env.OPENAI_STUDIO_IMAGE_MODEL;
+  else process.env.OPENAI_STUDIO_IMAGE_MODEL = previousOpenAiStudioModel;
+  resetStudioProviderCircuitBreakers();
 
   const layerStatus = new ProductionLayerPackService().approvedLayerManifestStatus(pack);
   assert(!layerStatus.approved, "Final export should be blocked without an approved transparent PNG/WebP layer manifest");
@@ -489,14 +586,31 @@ function fakeCuratedLayerDb() {
   };
 }
 
-function fakeImagenProvider(error?: Error) {
+function fakeImagenProvider(error?: Error, beforeReturn?: (input: any) => void) {
   const calls: any[] = [];
   return {
     calls,
     generateStudioBible: async (input: any) => {
       calls.push(input);
+      beforeReturn?.(input);
       if (error) throw error;
       return { uri: `data:image/png;base64,${Buffer.from(input.generationType).toString("base64")}` };
+    }
+  };
+}
+
+function fakeOpenAIProvider(error?: Error) {
+  const calls: any[] = [];
+  return {
+    calls,
+    generate: async (input: any) => {
+      calls.push(input);
+      if (error) throw error;
+      return {
+        provider: "openai",
+        mimeType: "image/png",
+        bytes: Buffer.from(input.prompt.slice(0, 16) || "openai")
+      };
     }
   };
 }

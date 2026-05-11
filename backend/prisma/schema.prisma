@@ -20,6 +20,21 @@ enum VaultStatus {
   STAKED
 }
 
+enum ReserveVaultStatus {
+  ACTIVE
+  PAUSED
+  INSOLVENT
+  EMERGENCY
+}
+
+enum VaultPositionStatus {
+  LOCKED
+  REDEEMABLE
+  STAKED
+  REDEEMED
+  CLOSED
+}
+
 enum StakingStatus {
   ACTIVE
   UNSTAKED
@@ -558,6 +573,8 @@ model Collection {
   buybackEvents         BuybackEvent[]
   mintTransactions      MintTransaction[]
   instantSellQuotes     InstantSellQuote[]
+  reserveVault          ReserveVault?
+  vaultPositions        VaultPosition[]
 
   @@index([status])
   @@index([communityLevel])
@@ -596,10 +613,58 @@ model VaultNFT {
   redeemTransactions RedeemTransaction[]
   listingTransactions ListingTransaction[]
   instantSellQuotes InstantSellQuote[]
+  vaultPosition     VaultPosition?
 
   @@index([collectionId, status])
   @@index([ownerUserId])
   @@index([unlocksAt])
+}
+
+model ReserveVault {
+  id                    String             @id @default(uuid()) @db.Uuid
+  collectionId          String             @unique @db.Uuid
+  tokenMint             String
+  reserveVaultPda       String             @unique
+  totalLocked           Decimal            @default(0) @db.Decimal(38, 0)
+  totalRedeemed         Decimal            @default(0) @db.Decimal(38, 0)
+  totalStaked           Decimal            @default(0) @db.Decimal(38, 0)
+  availableBacking      Decimal            @default(0) @db.Decimal(38, 0)
+  reserveRatioBps       Int                @default(10000)
+  lastOnChainVerifiedAt DateTime?
+  status                ReserveVaultStatus @default(ACTIVE)
+  verificationMetadata  Json               @default("{}")
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  collection            Collection         @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([tokenMint, status])
+  @@index([status])
+}
+
+model VaultPosition {
+  id                  String              @id @default(uuid()) @db.Uuid
+  vaultNftId          String              @unique @db.Uuid
+  collectionId        String              @db.Uuid
+  tokenMint           String
+  positionPda         String              @unique
+  nftMint             String              @unique
+  ownerWalletSnapshot String?
+  lockedAmount        Decimal             @db.Decimal(38, 0)
+  lockDurationDays    Int
+  unlocksAt           DateTime
+  redeemedAt          DateTime?
+  stakedAt            DateTime?
+  status              VaultPositionStatus @default(LOCKED)
+  lastVerifiedAt      DateTime?
+  verificationMetadata Json                @default("{}")
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  vaultNft            VaultNFT            @relation(fields: [vaultNftId], references: [id], onDelete: Cascade)
+  collection          Collection          @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, status])
+  @@index([ownerWalletSnapshot, status])
+  @@index([tokenMint])
 }
 
 model TraitPack {

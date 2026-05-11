@@ -27,6 +27,8 @@ export type SystemCapabilities = {
   programAccountExists: boolean;
   programAccountExecutable: boolean;
   aiGenerationEnabled: boolean;
+  paidAiGenerationEnabled: boolean;
+  devPaidAiDisabled: boolean;
   localPreviewProviderEnabled: boolean;
   approvedLayerPackAvailable: boolean;
   demoCuratedLayerPackEnabled: boolean;
@@ -112,6 +114,8 @@ export class CapabilitiesService {
         programAccountExists: programAccount.exists,
         programAccountExecutable: programAccount.executable,
         aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+        paidAiGenerationEnabled: this.paidAiGenerationEnabled(),
+        devPaidAiDisabled: this.devPaidAiDisabled(),
         localPreviewProviderEnabled: this.localPreviewProviderEnabled(),
         approvedLayerPackAvailable: this.approvedLayerPackAvailable(),
         demoCuratedLayerPackEnabled: this.demoCuratedLayerPackEnabled(),
@@ -150,6 +154,8 @@ export class CapabilitiesService {
       programAccountExists: programAccount.exists,
       programAccountExecutable: programAccount.executable,
       aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+      paidAiGenerationEnabled: this.paidAiGenerationEnabled(),
+      devPaidAiDisabled: this.devPaidAiDisabled(),
       localPreviewProviderEnabled: this.localPreviewProviderEnabled(),
       approvedLayerPackAvailable: this.approvedLayerPackAvailable(),
       demoCuratedLayerPackEnabled: this.demoCuratedLayerPackEnabled(),
@@ -300,19 +306,30 @@ export class CapabilitiesService {
 
   private fastStudioPreviewAvailable() {
     const provider = this.studioImageProvider();
-    if (provider === "openai") return false;
     if (provider === "deterministic-render") return true;
-    return this.imagenApiKeyPresent() && this.studioImageGenerationEnabled();
+    return (this.imagenApiKeyPresent() && this.studioImageGenerationEnabled()) || this.openAIStudioFallbackAvailable();
   }
 
   private premiumCinematicAvailable() {
     const provider = this.cinematicProvider();
     if (provider === "gemini") return Boolean(process.env.GEMINI_API_KEY);
-    return Boolean(process.env.OPENAI_API_KEY) && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true";
+    return Boolean(process.env.OPENAI_API_KEY) && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && this.paidAiAllowed();
   }
 
   private studioImageGenerationEnabled() {
-    return (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") === "true" || (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true";
+    return this.paidAiAllowed() && ((process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") === "true" || (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true");
+  }
+
+  private paidAiGenerationEnabled() {
+    return (process.env.PAID_AI_GENERATION_ENABLED ?? "false") === "true";
+  }
+
+  private devPaidAiDisabled() {
+    return (process.env.DEV_DISABLE_PAID_AI ?? "true") === "true" && (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") !== "production";
+  }
+
+  private paidAiAllowed() {
+    return this.paidAiGenerationEnabled() && !this.devPaidAiDisabled();
   }
 
   private studioImageProvider() {
@@ -328,6 +345,10 @@ export class CapabilitiesService {
 
   private geminiTextApiKeyPresent() {
     return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.IMAGEN_API_KEY);
+  }
+
+  private openAIStudioFallbackAvailable() {
+    return (process.env.ENABLE_OPENAI_STUDIO_FALLBACK ?? "false") === "true" && Boolean(process.env.OPENAI_API_KEY);
   }
 
   private tokenMetadataAvailable(heliusAvailable: boolean, programExecutable: boolean) {
@@ -463,6 +484,11 @@ export class CapabilitiesService {
       "ENABLE_GEMINI_TEXT_PROMPTS",
       "CINEMATIC_PROVIDER",
       "AI_CONCEPT_PROVIDER",
+      "ENABLE_OPENAI_STUDIO_FALLBACK",
+      "PAID_AI_GENERATION_ENABLED",
+      "DEV_DISABLE_PAID_AI",
+      "OPENAI_STUDIO_IMAGE_MODEL",
+      "OPENAI_IMAGE_MODEL",
       "AI_CONCEPT_LOW_COST_MODE",
       "AI_CONCEPT_MAX_IMAGES_PER_RUN",
       "AI_CONCEPT_CACHE_TTL",
@@ -597,9 +623,8 @@ export class CapabilitiesService {
   private setupModes(capabilities: SystemCapabilities): SetupMode[] {
     const studioProvider = this.studioImageProvider();
     const creativeMissing = [
-      ...(studioProvider === "imagen" && !capabilities.imagenImagesAvailable ? ["IMAGEN_API_KEY or GEMINI_API_KEY"] : []),
-      ...(studioProvider === "imagen" && capabilities.imagenImagesAvailable && !this.studioImageGenerationEnabled() ? ["ENABLE_STUDIO_IMAGE_GENERATION=true"] : []),
-      ...(studioProvider === "openai" ? ["STUDIO_IMAGE_PROVIDER must be imagen or deterministic-render"] : [])
+      ...(studioProvider === "imagen" && !capabilities.imagenImagesAvailable && !this.openAIStudioFallbackAvailable() ? ["IMAGEN_API_KEY or GEMINI_API_KEY"] : []),
+      ...(studioProvider === "imagen" && capabilities.imagenImagesAvailable && !this.studioImageGenerationEnabled() && !this.openAIStudioFallbackAvailable() ? ["ENABLE_STUDIO_IMAGE_GENERATION=true"] : [])
     ];
     const devnetLayerPackReady = this.realApprovedLayerPackAvailable() || capabilities.demoCuratedLayerPackAllowed;
     const devnetMissing = [
@@ -672,21 +697,21 @@ export class CapabilitiesService {
         {
           key: "STUDIO_IMAGE_PROVIDER",
           label: "STUDIO_IMAGE_PROVIDER",
-          ok: this.studioImageProvider() !== "openai",
+          ok: this.studioImageProvider() !== "openai" || this.openAIStudioFallbackAvailable(),
           requiredFor: ["Creative Preview Mode"],
-          fix: "Set STUDIO_IMAGE_PROVIDER=imagen for Fast Studio Preview sheets."
+          fix: "Set STUDIO_IMAGE_PROVIDER=imagen for Fast Studio Preview sheets, or enable explicit OpenAI fallback with ENABLE_OPENAI_STUDIO_FALLBACK=true."
         },
         {
           key: "IMAGEN_API_KEY",
           label: "IMAGEN_API_KEY / GEMINI_API_KEY",
-          ok: capabilities.imagenImagesAvailable || this.studioImageProvider() === "deterministic-render",
+          ok: capabilities.imagenImagesAvailable || this.studioImageProvider() === "deterministic-render" || this.openAIStudioFallbackAvailable(),
           requiredFor: ["Creative Preview Mode"],
-          fix: "Add IMAGEN_API_KEY, GOOGLE_AI_API_KEY, or GEMINI_API_KEY to use Imagen Studio Bible sheets. Deterministic local sheets are not used as creator-facing Imagen substitutes."
+          fix: "Add IMAGEN_API_KEY, GOOGLE_AI_API_KEY, or GEMINI_API_KEY to use Imagen Studio Bible sheets, or enable OpenAI Studio fallback explicitly."
         },
         {
           key: "ENABLE_STUDIO_IMAGE_GENERATION",
           label: "ENABLE_STUDIO_IMAGE_GENERATION",
-          ok: this.studioImageProvider() !== "imagen" || this.studioImageGenerationEnabled(),
+          ok: this.studioImageProvider() !== "imagen" || this.studioImageGenerationEnabled() || this.openAIStudioFallbackAvailable(),
           requiredFor: ["Creative Preview Mode"],
           fix: "Set ENABLE_STUDIO_IMAGE_GENERATION=true or ENABLE_AI_IMAGE_GENERATION=true so Fast Studio Preview can call Imagen."
         },
@@ -748,9 +773,11 @@ export class CapabilitiesService {
     if (!capabilities.databaseAvailable) warnings.push("Database is unavailable; public reads use empty states and writes are blocked.");
     if (!capabilities.heliusConfigured) warnings.push("HELIUS_API_KEY is missing; CA-first token scanning is blocked.");
     if (capabilities.heliusConfigured && !capabilities.heliusReachable) warnings.push(`Helius is configured but unreachable or unhealthy${getLastHeliusErrorCode() ? ` (${getLastHeliusErrorCode()})` : ""}.`);
-    if (this.studioProvider() === "openai" || this.studioImageProvider() === "openai") warnings.push("OpenAI is not allowed for Studio Bible generation; use Gemini for text planning and Imagen for Studio Bible sheets.");
+    if ((this.studioProvider() === "openai" || this.studioImageProvider() === "openai") && !this.openAIStudioFallbackAvailable()) warnings.push("OpenAI Studio Bible fallback is disabled; use Imagen or set ENABLE_OPENAI_STUDIO_FALLBACK=true with OPENAI_API_KEY.");
+    if (!capabilities.paidAiGenerationEnabled) warnings.push("Paid AI image generation is disabled by default; Studio pages use cached/local placeholders until an explicit paid action is enabled.");
+    if (capabilities.devPaidAiDisabled) warnings.push("DEV_DISABLE_PAID_AI=true blocks Gemini/Imagen/OpenAI image calls in development and tests.");
     if (this.studioImageProvider() === "imagen" && !capabilities.imagenImagesAvailable) warnings.push("Imagen API key is missing; Fast Studio Preview will not emit creator-facing Studio Bible sheets until Imagen image generation is configured.");
-    if (this.studioImageProvider() === "imagen" && capabilities.imagenImagesAvailable && !this.studioImageGenerationEnabled()) warnings.push("Imagen Studio Bible generation is disabled; set ENABLE_STUDIO_IMAGE_GENERATION=true or ENABLE_AI_IMAGE_GENERATION=true.");
+    if (this.studioImageProvider() === "imagen" && capabilities.imagenImagesAvailable && !this.studioImageGenerationEnabled() && !this.openAIStudioFallbackAvailable()) warnings.push("Imagen Studio Bible generation is disabled; set ENABLE_STUDIO_IMAGE_GENERATION=true or ENABLE_AI_IMAGE_GENERATION=true.");
     if (this.cinematicProvider() === "openai" && !capabilities.openaiImagesAvailable) warnings.push("Premium Cinematic Render is configured for OpenAI but OPENAI_API_KEY is missing.");
     if (!capabilities.permanentStorageConfigured) warnings.push("Permanent storage is not configured; launch and final mint assets are blocked.");
     if (!this.realApprovedLayerPackAvailable()) warnings.push(capabilities.demoCuratedLayerPackAllowed ? "Using devnet demo layer pack; production launch remains blocked until a real curated or artist-approved layer pack is configured." : "Approved curated layer pack is missing; production launch is blocked.");

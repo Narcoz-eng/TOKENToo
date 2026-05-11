@@ -5,10 +5,15 @@ import { PrismaService } from "../db/prisma.service";
 
 type HomeStats = {
   collections: number;
+  activeCommunities: number;
   nfts: number | null;
   raids: number;
   totalVaults: number | null;
   tvlUsd: number | null;
+  phewsMinted: number | null;
+  totalTrades: number;
+  volume24hSol: number | null;
+  uniqueBuyers: number | null;
 };
 
 class ProductReadTimeoutError extends Error {}
@@ -89,11 +94,13 @@ export class ProductDataService {
       this.safeHomeRead("stats", this.emptyStats(), () => this.stats())
     ]);
     return {
-      title: "Phew.run Faction Network",
-      subtitle: "Real token-backed vault NFTs, communities, raids, and liquidity tools on Solana.",
+      title: "Phew Run Protocol",
+      subtitle: "The protocol for token-backed NFTs on Solana.",
       collections: collections.filter((collection) => collection.qualityTier !== "Basic"),
       raids,
       activity,
+      recentMints: await this.safeHomeRead("recent mints", [], () => this.recentMints()),
+      marketSnapshot: await this.safeHomeRead("market snapshot", this.emptyMarketSnapshot(), () => this.marketSnapshot()),
       stats,
       empty: collections.length === 0 && raids.length === 0 && activity.length === 0
     };
@@ -105,7 +112,9 @@ export class ProductDataService {
         orderBy: [{ communityLevel: "desc" }, { createdAt: "desc" }],
         include: {
           token: true,
-          vaultNfts: { take: 1, orderBy: { createdAt: "desc" } }
+          reserveVault: true,
+          vaultNfts: { take: 4, orderBy: { createdAt: "desc" } },
+          _count: { select: { vaultNfts: true, sales: true } }
         }
       });
       return records.map((collection) => this.collectionDto(collection));
@@ -121,6 +130,7 @@ export class ProductDataService {
           where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
           include: {
             token: true,
+            reserveVault: true,
             vaultNfts: { orderBy: { createdAt: "desc" }, take: 12 },
             raidRooms: { orderBy: { createdAt: "desc" }, take: 8, include: { missions: true, participations: true } },
             listings: { where: { status: "ACTIVE" }, take: 12, include: { vaultNft: true } }
@@ -247,7 +257,7 @@ export class ProductDataService {
 
   async vaultNfts() {
     return this.safeRead("vault NFTs", [], async () => {
-      const records = await this.prisma.vaultNFT.findMany({ orderBy: { createdAt: "desc" }, take: 80, include: { collection: true } });
+      const records = await this.prisma.vaultNFT.findMany({ orderBy: { createdAt: "desc" }, take: 80, include: { collection: { include: { token: true, reserveVault: true } } } });
       return records.map((nft) => this.nftDto(nft, nft.collectionId));
     });
   }
@@ -285,22 +295,91 @@ export class ProductDataService {
     }));
   }
 
+  private async recentMints() {
+    const records = await this.prisma.vaultNFT.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { owner: true, collection: { include: { token: true } } }
+    });
+    return records.map((nft) => ({
+      id: nft.id,
+      mint: nft.mint,
+      collectionId: nft.collectionId,
+      collectionName: nft.collection.name,
+      tokenSymbol: nft.collection.token.symbol,
+      lockedAmount: nft.amount.toString(),
+      owner: nft.owner?.walletAddress ?? null,
+      status: nft.status,
+      createdAt: nft.createdAt.toISOString()
+    }));
+  }
+
+  private async marketSnapshot() {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [sales, volume, avg, uniqueBuyers] = await Promise.all([
+      this.prisma.sale.count({ where: { createdAt: { gte: since } } }),
+      this.prisma.sale.aggregate({ _sum: { priceSol: true }, where: { createdAt: { gte: since } } }),
+      this.prisma.sale.aggregate({ _avg: { priceSol: true }, where: { createdAt: { gte: since } } }),
+      this.prisma.sale.findMany({ distinct: ["buyerUserId"], where: { buyerUserId: { not: null }, createdAt: { gte: since } }, select: { buyerUserId: true } })
+    ]);
+    return {
+      volume24hSol: this.numberOrNull(volume._sum.priceSol),
+      sales24h: sales,
+      avgPriceSol: this.numberOrNull(avg._avg.priceSol),
+      uniqueBuyers: uniqueBuyers.length,
+      source: sales > 0 ? "persisted-sales" : "no-sales-yet",
+      chart: []
+    };
+  }
+
   private async stats(): Promise<HomeStats> {
-    const [collections, nfts, raids] = await Promise.all([this.prisma.collection.count(), this.prisma.vaultNFT.count(), this.prisma.raidRoom.count()]);
-    return { collections, nfts, raids, totalVaults: nfts, tvlUsd: null };
+    const [collections, activeCommunities, nfts, raids, trades, uniqueBuyerRows, volume] = await Promise.all([
+      this.prisma.collection.count(),
+      this.prisma.collection.count({ where: { status: "ACTIVE", launchStatus: "CONFIRMED" } }),
+      this.prisma.vaultNFT.count(),
+      this.prisma.raidRoom.count(),
+      this.prisma.sale.count(),
+      this.prisma.sale.findMany({ distinct: ["buyerUserId"], where: { buyerUserId: { not: null } }, select: { buyerUserId: true } }),
+      this.prisma.sale.aggregate({ _sum: { priceSol: true }, where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } })
+    ]);
+    return {
+      collections,
+      activeCommunities,
+      nfts,
+      raids,
+      totalVaults: nfts,
+      tvlUsd: null,
+      phewsMinted: nfts,
+      totalTrades: trades,
+      volume24hSol: this.numberOrNull(volume._sum.priceSol),
+      uniqueBuyers: uniqueBuyerRows.length
+    };
   }
 
   private emptyStats(): HomeStats {
-    return { collections: 0, nfts: null, raids: 0, totalVaults: null, tvlUsd: null };
+    return { collections: 0, activeCommunities: 0, nfts: null, raids: 0, totalVaults: null, tvlUsd: null, phewsMinted: null, totalTrades: 0, volume24hSol: null, uniqueBuyers: null };
+  }
+
+  private emptyMarketSnapshot() {
+    return {
+      volume24hSol: null,
+      sales24h: 0,
+      avgPriceSol: null,
+      uniqueBuyers: 0,
+      source: "no-sales-yet",
+      chart: []
+    };
   }
 
   private emptyHome() {
     return {
-      title: "Phew.run Faction Network",
-      subtitle: "Real token-backed vault NFTs, communities, raids, and liquidity tools on Solana.",
+      title: "Phew Run Protocol",
+      subtitle: "The protocol for token-backed NFTs on Solana.",
       collections: [],
       raids: [],
       activity: [],
+      recentMints: [],
+      marketSnapshot: this.emptyMarketSnapshot(),
       stats: this.emptyStats(),
       empty: true
     };
@@ -347,7 +426,8 @@ export class ProductDataService {
       solanaAvailable: Boolean(process.env.SOLANA_RPC_URL || process.env.ANCHOR_PROVIDER_URL || process.env.PROGRAM_ID),
       walletConfigured: Boolean(process.env.DEVNET_TEST_WALLET_PUBLIC_KEY || process.env.ANCHOR_WALLET),
       devnetProgramConfigured: Boolean(process.env.PROGRAM_ID && process.env.PROGRAM_ID !== "11111111111111111111111111111111"),
-      aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+      aiGenerationEnabled: (process.env.PAID_AI_GENERATION_ENABLED ?? "false") === "true" && (process.env.DEV_DISABLE_PAID_AI ?? "true") !== "true" && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
+      paidAiGenerationEnabled: (process.env.PAID_AI_GENERATION_ENABLED ?? "false") === "true",
       productionStorageAvailable: permanentStorage,
       tokenMetadataAvailable: permanentStorage && Boolean(process.env.PROGRAM_ID)
     };
@@ -437,6 +517,10 @@ export class ProductDataService {
     const riskScore = Number(token.riskScore ?? 0);
     const level = collection.communityLevel ?? 1;
     const xp = collection.communityXp ?? 0;
+    const reserve = collection.reserveVault;
+    const vaultCount = Number(collection._count?.vaultNfts ?? collection.vaultNfts?.length ?? 0);
+    const reserveRatioBps = Number(reserve?.reserveRatioBps ?? (collection.emergencyFlag ? 0 : 10000));
+    const reserveHealth = collection.emergencyFlag || reserve?.status === "EMERGENCY" ? "EMERGENCY" : reserve?.status === "INSOLVENT" || reserveRatioBps < 10000 ? "AT_RISK" : reserve?.status === "PAUSED" ? "PAUSED" : "HEALTHY";
     return {
       id: collection.slug ?? collection.id,
       dbId: collection.id,
@@ -456,8 +540,8 @@ export class ProductDataService {
       volume24hSol: Number(collection.volume24hSol ?? 0),
       volumeSol: Number(collection.volume24hSol ?? 0),
       holders: Number(token.holders ?? 0),
-      vaults: collection.vaultNfts?.length ?? 0,
-      minted: collection.vaultNfts?.length ?? 0,
+      vaults: vaultCount,
+      minted: vaultCount,
       supply: 10000,
       level,
       xp,
@@ -466,6 +550,16 @@ export class ProductDataService {
       online: 0,
       riskScore,
       riskTier: riskScore >= 75 ? "SAFE" : riskScore >= 60 ? "MEDIUM" : "HIGH RISK",
+      reserveHealth,
+      reserveRatioBps,
+      totalLocked: reserve?.totalLocked?.toString?.() ?? "0",
+      availableBacking: reserve?.availableBacking?.toString?.() ?? "0",
+      totalStaked: reserve?.totalStaked?.toString?.() ?? "0",
+      totalRedeemed: reserve?.totalRedeemed?.toString?.() ?? "0",
+      reserveVaultPda: reserve?.reserveVaultPda ?? collection.tokenVaultPda ?? null,
+      collectionAssetAddress: collection.collectionAssetAddress ?? null,
+      launchStatus: collection.launchStatus ?? "DRAFT",
+      sales: Number(collection._count?.sales ?? 0),
       qualityTier: collection.identityLockedAt ? "Premium" : "Basic",
       instantSellEnabled: !collection.instantSellDisabled && !collection.emergencyFlag && riskScore >= 60,
       palette,
@@ -559,6 +653,12 @@ export class ProductDataService {
 
   private array(value: unknown, fallback: string[]) {
     return Array.isArray(value) ? value.map(String) : fallback;
+  }
+
+  private numberOrNull(value: unknown) {
+    if (value === null || value === undefined) return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
   }
 
   private record(value: unknown) {

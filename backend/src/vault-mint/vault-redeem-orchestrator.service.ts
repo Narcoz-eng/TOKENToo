@@ -2,12 +2,16 @@ import { BadRequestException, ConflictException, Inject, Injectable, NotFoundExc
 import type { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { PrismaService } from "../db/prisma.service";
+import { ProtocolAccountingService } from "../protocol/protocol-accounting.service";
+import { ProtocolService } from "../protocol/protocol.service";
 import { SolanaTransactionAdapterService } from "./solana-transaction-adapter.service";
 
 @Injectable()
 export class VaultRedeemOrchestratorService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(ProtocolAccountingService) private readonly accounting: ProtocolAccountingService,
+    @Inject(ProtocolService) private readonly protocol: ProtocolService,
     @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
   ) {}
 
@@ -107,14 +111,20 @@ export class VaultRedeemOrchestratorService {
         where: { id: tx.vaultNftId },
         data: { status: "REDEEMED", redeemedAt: new Date(), redeemable: false }
       });
+      await this.accounting.syncVaultPosition(tx.vaultNftId, {
+        ownerWallet: walletAddress,
+        verified: (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "devnet",
+        metadata: { source: "redeem-post-confirm" }
+      });
     }
     return updated;
   }
 
   private async nftForRedeem(id: string, walletAddress: string) {
-    const nft = await this.prisma.vaultNFT.findUnique({ where: { id }, include: { owner: true, collection: true } });
+    const nft = await this.prisma.vaultNFT.findUnique({ where: { id }, include: { owner: true, collection: { include: { token: true } } } });
     if (!nft) throw new NotFoundException("Vault NFT not found");
-    if (nft.owner?.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this Vault NFT.");
+    const ownership = await this.protocol.assertCurrentOwner({ nft, walletAddress });
+    if (!ownership.verificationAvailable && nft.owner?.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this Vault NFT.");
     return nft;
   }
 

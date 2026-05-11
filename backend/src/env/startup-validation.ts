@@ -17,6 +17,8 @@ export function validateStartupEnvironment() {
   process.env.ENABLE_GEMINI_TEXT_PROMPTS ??= "true";
   process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-1.5";
   process.env.OPENAI_IMAGE_QUALITY ??= "high";
+  process.env.PAID_AI_GENERATION_ENABLED ??= "false";
+  process.env.DEV_DISABLE_PAID_AI ??= appEnv === "production" ? "false" : "true";
   process.env.ENABLE_STUDIO_IMAGE_GENERATION ??= process.env.ENABLE_AI_IMAGE_GENERATION ?? "false";
   process.env.ENABLE_AI_IMAGE_GENERATION ??= "false";
   process.env.REQUIRED_LAUNCH_ASSET_STATUS ??= appEnv === "production" ? "ARTIST_APPROVED" : "CURATED_LAYER_READY";
@@ -42,6 +44,13 @@ export function validateStartupEnvironment() {
   }
   if ((process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && !process.env.OPENAI_API_KEY) {
     issues.push({ code: "OPENAI_MISSING", severity: appEnv === "production" ? "warning" : "info", message: "OPENAI_API_KEY is required when ENABLE_AI_IMAGE_GENERATION=true." });
+  }
+  if ((process.env.PAID_AI_GENERATION_ENABLED ?? "false") !== "true" && ((process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" || (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") === "true")) {
+    issues.push({ code: "PAID_AI_DISABLED", severity: "info", message: "Paid AI image generation env flags are ignored until PAID_AI_GENERATION_ENABLED=true." });
+  }
+  if ((process.env.DEV_DISABLE_PAID_AI ?? "true") === "true" && appEnv !== "production") {
+    process.env.ENABLE_AI_IMAGE_GENERATION = "false";
+    process.env.ENABLE_STUDIO_IMAGE_GENERATION = "false";
   }
   if ((process.env.STUDIO_PROVIDER ?? "gemini").toLowerCase() === "openai" || (process.env.STUDIO_IMAGE_PROVIDER ?? "imagen").toLowerCase() === "openai") {
     issues.push({ code: "STUDIO_PROVIDER_OPENAI", severity: appEnv === "production" ? "warning" : "info", message: "OpenAI is not allowed for Studio Bible generation; use Gemini for text planning and Imagen for Studio Bible sheets." });

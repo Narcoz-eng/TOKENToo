@@ -5,6 +5,7 @@ import { AssetProductionLayerService } from "../generator/asset-production-layer
 import { AssetStorageService } from "../generator/asset-storage.service";
 import type { GeneratedStyleProfile, TraitPackPlan } from "../generator/generator.types";
 import { PrismaService } from "../db/prisma.service";
+import { ProtocolAccountingService } from "../protocol/protocol-accounting.service";
 import { SolanaTransactionAdapterService } from "./solana-transaction-adapter.service";
 import type { CreateMintIntentInput, SubmitMintTransactionInput } from "./vault-mint.types";
 
@@ -14,6 +15,7 @@ export class VaultMintOrchestratorService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AssetProductionLayerService) private readonly assetProduction: AssetProductionLayerService,
     @Inject(AssetStorageService) private readonly storage: AssetStorageService,
+    @Inject(ProtocolAccountingService) private readonly accounting: ProtocolAccountingService,
     @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
   ) {}
 
@@ -22,7 +24,12 @@ export class VaultMintOrchestratorService {
     const requestHash = this.hash(normalized);
     const existing = await this.prisma.mintTransaction.findUnique({ where: { idempotencyKey: normalized.idempotencyKey } });
     if (existing && existing.requestHash !== requestHash) throw new ConflictException("idempotencyKey was already used for a different mint request");
-    if (existing && existing.status === "CONFIRMED") return existing;
+    if (existing && existing.status === "CONFIRMED") {
+      const existingNft = await this.prisma.vaultNFT.findUnique({ where: { mintTransactionId: existing.id } });
+      if (existingNft) await this.accounting.syncVaultPosition(existingNft.id, { ownerWallet: existing.walletAddress });
+      await this.accounting.recalculateReserve(existing.collectionId);
+      return existing;
+    }
 
     const collection = await this.prisma.collection.findUnique({
       where: { id: normalized.collectionId },
@@ -39,6 +46,13 @@ export class VaultMintOrchestratorService {
       throw new BadRequestException("Collection is paused, risk disabled, or under emergency controls.");
     }
     if (collection.token.mint !== normalized.tokenMint) throw new BadRequestException("Token mint does not match the collection profile.");
+    const balance = await this.solana.verifyWalletTokenBalance({
+      walletAddress: normalized.walletAddress,
+      tokenMint: normalized.tokenMint,
+      requiredAmount: normalized.amount
+    });
+    if (balance.verificationAvailable && !balance.sufficient) throw new BadRequestException(`Wallet token balance is below the requested lock amount. Balance: ${balance.balance ?? "0"}.`);
+    if (!balance.verificationAvailable && this.productionMintRequested()) throw new BadRequestException("Production minting requires live wallet token balance verification.");
     if (this.productionMintRequested() && (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") === "mock") {
       throw new BadRequestException("Production minting is blocked until FINAL_ASSET_STORAGE_PROVIDER is immutable storage.");
     }
@@ -181,10 +195,16 @@ export class VaultMintOrchestratorService {
 
     if (!result.confirmed || tx.vaultNft) return updated;
     const unlocksAt = new Date(Date.now() + tx.lockDuration * 24 * 60 * 60 * 1000);
-    await this.prisma.vaultNFT.create({
+    const owner = await this.prisma.user.upsert({
+      where: { walletAddress: tx.walletAddress },
+      update: {},
+      create: { walletAddress: tx.walletAddress, username: tx.walletAddress.slice(0, 6) }
+    });
+    const vaultNft = await this.prisma.vaultNFT.create({
       data: {
         collectionId: tx.collectionId,
         tokenId: tx.collection.tokenId,
+        ownerUserId: owner.id,
         mintTransactionId: tx.id,
         mint: updated.nftMint ?? `pending_${tx.id}`,
         metadataUri: updated.metadataUri ?? "",
@@ -199,6 +219,11 @@ export class VaultMintOrchestratorService {
         status: "LOCKED",
         traits: this.json({ source: "mint-orchestrator", metadataUri: updated.metadataUri })
       }
+    });
+    await this.accounting.syncVaultPosition(vaultNft.id, {
+      ownerWallet: tx.walletAddress,
+      verified: (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "devnet",
+      metadata: { source: "mint-post-confirm" }
     });
 
     return this.getMintTransaction(id, walletAddress);

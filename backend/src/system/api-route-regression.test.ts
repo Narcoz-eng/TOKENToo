@@ -14,6 +14,10 @@ async function main() {
 
     const home = await product.home();
     assert(home && typeof home === "object" && "ok" in home, "ProductDataController.home did not return an API envelope.");
+    const homeData = (home as { data?: { title?: string; marketSnapshot?: unknown; stats?: Record<string, unknown> } }).data;
+    assert(homeData?.title === "Phew Run Protocol", "ProductDataController.home should render the protocol dashboard title.");
+    assert(Boolean(homeData?.marketSnapshot), "ProductDataController.home should include marketSnapshot data for the dashboard.");
+    assert("activeCommunities" in (homeData?.stats ?? {}), "ProductDataController.home stats should include activeCommunities.");
 
     const presets = generator.presets();
     assert(Array.isArray(presets) && presets.length > 0, "GeneratorController.presets did not return presets.");

@@ -13,6 +13,7 @@
     "generator:quality-samples": "tsx src/generator/run-quality-samples.ts",
     "test:helius-config": "tsx src/token-scanner/helius-config.test.ts",
     "test:openai-image-request": "tsx src/generator/openai-image-request.test.ts && tsx src/generator/nft-studio-engine.test.ts",
+    "test:protocol": "tsx src/protocol/protocol-foundation.test.ts",
     "audit:production": "tsx src/audit/production-audit.ts",
     "test:database-url": "tsx src/db/database-url.test.ts",
     "scan:helius": "tsx src/audit/production-audit.ts",

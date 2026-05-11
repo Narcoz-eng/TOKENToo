@@ -6,11 +6,13 @@ import { SolanaTransactionAdapterService } from "./solana-transaction-adapter.se
 import { VaultMintController } from "./vault-mint.controller";
 import { VaultMintOrchestratorService } from "./vault-mint-orchestrator.service";
 import { VaultRedeemOrchestratorService } from "./vault-redeem-orchestrator.service";
+import { ProtocolAccountingService } from "../protocol/protocol-accounting.service";
+import { ProtocolService } from "../protocol/protocol.service";
 
 @Module({
   imports: [AuthModule, GeneratorModule],
   controllers: [VaultMintController],
-  providers: [PrismaService, SolanaTransactionAdapterService, VaultMintOrchestratorService, VaultRedeemOrchestratorService],
+  providers: [PrismaService, SolanaTransactionAdapterService, ProtocolAccountingService, ProtocolService, VaultMintOrchestratorService, VaultRedeemOrchestratorService],
   exports: [VaultMintOrchestratorService]
 })
 export class VaultMintModule {}

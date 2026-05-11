@@ -62,6 +62,12 @@ assert(hasRealStudioBibleAssets(preview(cachedImagenAssets)), "Cached Imagen ass
 const cachedGeminiAssets = studioBibleAssetTypes.map((type) => asset(type, "cached-gemini"));
 assert(hasRealStudioBibleAssets(preview(cachedGeminiAssets)), "Cached Gemini assets should count as real Studio Bible assets");
 
+const openAiFallbackAssets = studioBibleAssetTypes.map((type) => asset(type, "openai"));
+assert(hasRealStudioBibleAssets(preview(openAiFallbackAssets)), "Explicit OpenAI fallback assets should count as real Studio Bible assets");
+
+const openAiFallbackMissingOne = openAiFallbackAssets.slice(0, 4);
+assert(!hasRealStudioBibleAssets(preview(openAiFallbackMissingOne)), "OpenAI fallback must still require all five Studio Bible assets");
+
 const deterministicAssets = studioBibleAssetTypes.map((type) => asset(type, "deterministic-render", "data:image/svg+xml,%3Csvg%3E%3C/svg%3E"));
 assert(!hasRealStudioBibleAssets(preview(deterministicAssets)), "Cached deterministic assets must not count as real Studio Bible assets");
 assert(studioPreviewStatusLabel(preview(deterministicAssets)) === "Studio preview pending", "Deterministic assets must not show Studio Bible ready");

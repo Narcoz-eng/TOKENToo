@@ -29,6 +29,16 @@ export type VaultCollection = {
   online: number;
   riskScore: number;
   riskTier: "SAFE" | "MEDIUM" | "HIGH RISK";
+  reserveHealth?: "HEALTHY" | "AT_RISK" | "PAUSED" | "EMERGENCY";
+  reserveRatioBps?: number;
+  totalLocked?: string;
+  availableBacking?: string;
+  totalStaked?: string;
+  totalRedeemed?: string;
+  reserveVaultPda?: string | null;
+  collectionAssetAddress?: string | null;
+  launchStatus?: string;
+  sales?: number;
   qualityTier: "Basic" | "Premium" | "Legendary-ready";
   instantSellEnabled: boolean;
   palette: string[];
@@ -89,6 +99,8 @@ export type VaultNft = {
   aura: string;
   background: string;
   badges: string[];
+  mint?: string;
+  metadataUri?: string;
 };
 
 export type RaidMission = {
@@ -423,6 +435,12 @@ export type ConceptRequestSummary = {
   cacheStatus?: string;
   assets?: StudioPreviewAssetType[];
   estimatedCostUsd?: number;
+  activeImageProvider?: string;
+  activeModel?: string;
+  fallbackModelUsed?: string;
+  billableGenerationAttempted?: boolean;
+  noBillableGenerationAttempted?: boolean;
+  unavailableReason?: string;
   costBreakdown?: Array<{
     provider?: string;
     model?: string;
@@ -446,6 +464,20 @@ export type ConceptRequestSummary = {
     promptFallbackReason?: string;
     routeCalled?: string;
     providerDecisionBranch?: string;
+    activeImageProvider?: string;
+    activeImageModel?: string;
+    supportedModels?: string[];
+    unsupportedModels?: string[];
+    disabledModels?: string[];
+    attemptedModels?: string[];
+    fallbackModelUsed?: string;
+    billableGenerationAttempted?: boolean;
+    noBillableGenerationAttempted?: boolean;
+    quotaStatus?: string;
+    lastProbeResult?: string;
+    lastErrorCode?: string;
+    openaiStudioFallbackEnabled?: boolean;
+    canGenerateStudioBible?: boolean;
     cacheStatus?: string;
     fallbackReason?: string;
   };

@@ -621,12 +621,21 @@ export type StudioGenerationType = "studio_bible" | "trait_catalog" | "rarity_la
 export type StudioCacheStatus = "hit" | "miss" | "generated" | "disabled";
 
 export type StudioProviderFailureCode =
+  | "STUDIO_PREFLIGHT_FAILED"
+  | "STUDIO_IMAGE_PROVIDER_UNAVAILABLE"
+  | "PAID_AI_DISABLED"
   | "IMAGEN_KEY_MISSING"
   | "IMAGEN_DISABLED"
   | "IMAGEN_REQUEST_FAILED"
   | "IMAGEN_QUOTA_EXCEEDED"
   | "IMAGEN_MODEL_UNSUPPORTED"
   | "IMAGEN_TIMEOUT"
+  | "OPENAI_KEY_MISSING"
+  | "OPENAI_DISABLED"
+  | "OPENAI_REQUEST_FAILED"
+  | "OPENAI_BILLING_UNAVAILABLE"
+  | "OPENAI_UNSUPPORTED_MODEL"
+  | "OPENAI_IMAGE_TIMEOUT"
   | "GEMINI_KEY_MISSING"
   | "GEMINI_DISABLED"
   | "GEMINI_REQUEST_FAILED"
@@ -647,6 +656,20 @@ export type StudioProviderDiagnostics = {
   promptFallbackReason?: string;
   routeCalled: string;
   providerDecisionBranch: string;
+  activeImageProvider?: string;
+  activeImageModel?: string;
+  supportedModels?: string[];
+  unsupportedModels?: string[];
+  disabledModels?: string[];
+  attemptedModels?: string[];
+  fallbackModelUsed?: string;
+  billableGenerationAttempted?: boolean;
+  noBillableGenerationAttempted?: boolean;
+  quotaStatus?: string;
+  lastProbeResult?: string;
+  lastErrorCode?: string;
+  openaiStudioFallbackEnabled?: boolean;
+  canGenerateStudioBible?: boolean;
   cacheStatus: StudioCacheStatus;
   fallbackReason?: string;
 };
@@ -672,6 +695,12 @@ export type StudioGenerationSummary = {
   assets: PreviewAssetPlan["type"][];
   providerFailureCode?: StudioProviderFailureCode;
   providerFailureReason?: string;
+  activeImageProvider?: string;
+  activeModel?: string;
+  fallbackModelUsed?: string;
+  billableGenerationAttempted?: boolean;
+  noBillableGenerationAttempted?: boolean;
+  unavailableReason?: string;
   diagnostics?: StudioProviderDiagnostics;
 };
 

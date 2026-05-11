@@ -1,4 +1,4 @@
-export const DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-1.5";
+export const DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-1";
 export const DEFAULT_OPENAI_IMAGE_SIZE = "1024x1024";
 export const DEFAULT_OPENAI_IMAGE_QUALITY = "high";
 export const OPENAI_IMAGE_PROMPT_MAX_LENGTH = 32_000;
@@ -7,7 +7,7 @@ export const OPENAI_REFERENCE_IMAGE_URL_MAX_LENGTH = 20_971_520;
 export const OPENAI_IMAGE_GENERATION_ENDPOINT = "https://api.openai.com/v1/images/generations";
 export const OPENAI_IMAGE_EDIT_ENDPOINT = "https://api.openai.com/v1/images/edits";
 
-export const SUPPORTED_OPENAI_IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-2", "gpt-image-2-2026-04-21", "gpt-image-1", "gpt-image-1-mini"] as const;
+export const SUPPORTED_OPENAI_IMAGE_MODELS = ["gpt-image-1", "gpt-image-1-mini"] as const;
 export const SUPPORTED_OPENAI_IMAGE_SIZES = ["1024x1024", "1024x1536", "1536x1024"] as const;
 export const SUPPORTED_OPENAI_IMAGE_QUALITIES = ["low", "medium", "high", "auto"] as const;
 export const SUPPORTED_REFERENCE_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
@@ -257,7 +257,8 @@ function isSupportedReferenceMimeType(value: string) {
 }
 
 function isFlexibleSizeModel(model: string) {
-  return model === "gpt-image-2" || model === "gpt-image-2-2026-04-21";
+  void model;
+  return false;
 }
 
 function isValidFlexibleImageSize(value: string) {
