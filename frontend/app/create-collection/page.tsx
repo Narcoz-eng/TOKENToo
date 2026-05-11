@@ -1148,6 +1148,7 @@ function defaultSetupItems(): SetupChecklist["items"] {
     "STUDIO_PROVIDER",
     "STUDIO_IMAGE_PROVIDER",
     "IMAGEN_IMAGE_MODEL",
+    "GEMINI_IMAGE_MODEL",
     "GEMINI_API_KEY",
     "ENABLE_STUDIO_IMAGE_GENERATION",
     "CINEMATIC_PROVIDER",

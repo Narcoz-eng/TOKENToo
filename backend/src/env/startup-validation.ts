@@ -1,6 +1,7 @@
 import { recordStartupValidation, type StartupCheck } from "./startup-state";
 import { normalizeHeliusConfig } from "../token-scanner/helius-config";
 import { databaseUrlDiagnostics } from "../db/database-url";
+import { DEFAULT_IMAGEN_MODEL, normalizeImagenModel } from "../generator/imagen-models";
 
 export function validateStartupEnvironment() {
   const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development";
@@ -10,7 +11,8 @@ export function validateStartupEnvironment() {
   process.env.STUDIO_PROVIDER ??= "gemini";
   process.env.STUDIO_IMAGE_PROVIDER ??= "imagen";
   process.env.CINEMATIC_PROVIDER ??= "openai";
-  process.env.IMAGEN_IMAGE_MODEL ??= "imagen-4.0-fast-generate-001";
+  process.env.GEMINI_IMAGE_MODEL ??= DEFAULT_IMAGEN_MODEL;
+  process.env.IMAGEN_IMAGE_MODEL ??= process.env.GEMINI_IMAGE_MODEL ?? DEFAULT_IMAGEN_MODEL;
   process.env.GEMINI_TEXT_MODEL ??= "gemini-2.5-flash";
   process.env.ENABLE_GEMINI_TEXT_PROMPTS ??= "true";
   process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-1.5";
@@ -43,6 +45,17 @@ export function validateStartupEnvironment() {
   }
   if ((process.env.STUDIO_PROVIDER ?? "gemini").toLowerCase() === "openai" || (process.env.STUDIO_IMAGE_PROVIDER ?? "imagen").toLowerCase() === "openai") {
     issues.push({ code: "STUDIO_PROVIDER_OPENAI", severity: appEnv === "production" ? "warning" : "info", message: "OpenAI is not allowed for Studio Bible generation; use Gemini for text planning and Imagen for Studio Bible sheets." });
+  }
+  const imagenModel = normalizeImagenModel(process.env.IMAGEN_IMAGE_MODEL);
+  if (imagenModel.ok) {
+    process.env.IMAGEN_IMAGE_MODEL = imagenModel.model;
+    process.env.GEMINI_IMAGE_MODEL = imagenModel.model;
+  } else {
+    issues.push({
+      code: "IMAGEN_MODEL_UNSUPPORTED",
+      severity: appEnv === "production" ? "warning" : "info",
+      message: `Unsupported Imagen model "${imagenModel.rawModel}". Use one of: ${imagenModel.supportedModels.join(", ")}.`
+    });
   }
   if ((process.env.STUDIO_IMAGE_PROVIDER ?? "imagen").toLowerCase() === "imagen" && (process.env.IMAGEN_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY) && (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") !== "true" && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") !== "true") {
     issues.push({ code: "IMAGEN_DISABLED", severity: appEnv === "production" ? "warning" : "info", message: "Imagen Studio Bible generation is configured but disabled. Set ENABLE_STUDIO_IMAGE_GENERATION=true or ENABLE_AI_IMAGE_GENERATION=true." });

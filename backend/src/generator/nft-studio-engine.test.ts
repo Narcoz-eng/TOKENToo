@@ -211,6 +211,8 @@ async function main() {
   delete process.env.IMAGEN_API_KEY;
   delete process.env.ENABLE_STUDIO_IMAGE_GENERATION;
   delete process.env.ENABLE_AI_IMAGE_GENERATION;
+  delete process.env.IMAGEN_IMAGE_MODEL;
+  delete process.env.GEMINI_IMAGE_MODEL;
   const provider = new StudioImageProviderService();
   const summary = provider.validatePlan(baseStyle, bible, "test-mint");
   assert(summary.provider === "imagen-unavailable", "Imagen should be the default Studio Bible image provider, with no fake sheet fallback when the key is missing");
@@ -246,7 +248,33 @@ async function main() {
   process.env.GEMINI_API_KEY = "test-google-key";
   process.env.ENABLE_STUDIO_IMAGE_GENERATION = "true";
   process.env.ENABLE_GEMINI_TEXT_PROMPTS = "false";
-  process.env.GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
+  for (const acceptedModel of ["imagen-4.0-fast-generate-001", "imagen-4.0-generate-001", "imagen-4.0-ultra-generate-001", "imagen-3.0-generate-002"]) {
+    process.env.IMAGEN_IMAGE_MODEL = acceptedModel;
+    const acceptedSummary = new StudioImageProviderService(fakeImagenProvider() as any).validatePlan(baseStyle, bible, "test-mint");
+    assert(acceptedSummary.provider === "imagen", `${acceptedModel} should be accepted as an Imagen Studio Bible model`);
+    assert(acceptedSummary.model === acceptedModel, `${acceptedModel} should be preserved as the selected model`);
+    assert(acceptedSummary.imagesThisRun === 5, `${acceptedModel} should still estimate five Studio Bible images`);
+  }
+  process.env.IMAGEN_IMAGE_MODEL = "models/imagen-4-fast-generate-001";
+  const normalizedModelSummary = new StudioImageProviderService(fakeImagenProvider() as any).validatePlan(baseStyle, bible, "test-mint");
+  assert(normalizedModelSummary.model === "imagen-4.0-fast-generate-001", "Old Imagen aliases should normalize to imagen-4.0-fast-generate-001");
+
+  process.env.IMAGEN_IMAGE_MODEL = "gemini-2.5-flash-image";
+  const unsupportedModelProbe = fakeImagenProvider();
+  const unsupportedModel = await new StudioImageProviderService(unsupportedModelProbe as any).generateStudioAssets({
+    tokenMint: "test-mint",
+    style: baseStyle,
+    plan: bible,
+    deterministicAssets: studioAssets,
+    styleVersion: 1,
+    rarityVersion: "preview"
+  });
+  assert(unsupportedModelProbe.calls.length === 0, "Unsupported Gemini image model must not call Imagen");
+  assert(unsupportedModel.summary.providerFailureCode === "IMAGEN_MODEL_UNSUPPORTED", "Unsupported image model should surface IMAGEN_MODEL_UNSUPPORTED");
+  assert(unsupportedModel.summary.imagesThisRun === 0, "Unsupported image model should not claim generated images");
+
+  delete process.env.IMAGEN_IMAGE_MODEL;
+  process.env.GEMINI_IMAGE_MODEL = "imagen-4.0-fast-generate-001";
   const imagenFake = fakeImagenProvider();
   const configured = await new StudioImageProviderService(imagenFake as any).generateStudioAssets({
     tokenMint: "test-mint",
@@ -289,12 +317,31 @@ async function main() {
   assert(quotaFailed.assets.length === 0, "Imagen quota failure must not produce deterministic Studio Bible assets");
   assert(quotaFailed.summary.providerFailureCode === "IMAGEN_QUOTA_EXCEEDED", "Imagen quota failure should surface IMAGEN_QUOTA_EXCEEDED");
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async () =>
-    new Response(JSON.stringify({ error: { message: "Imagen 3 is only available on paid plans. Please upgrade your account." } }), {
-      status: 400,
-      headers: { "content-type": "application/json" }
-    })) as typeof fetch;
   try {
+    const fetchedUrls: string[] = [];
+    globalThis.fetch = (async (url: RequestInfo | URL) => {
+      fetchedUrls.push(String(url));
+      return new Response(JSON.stringify({ generatedImages: [{ image: { imageBytes: "ZmFrZQ==", mimeType: "image/png" } }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+    const directNormalized = await new ImagenStudioImageProviderService().generateStudioBible({
+      prompt: "test",
+      generationType: "studio_bible",
+      studioCacheKey: "direct-model-normalization",
+      model: "models/imagen-4-fast-generate-001",
+      apiKey: "test-google-key",
+      timeoutMs: 1000
+    });
+    assert(directNormalized.model === "imagen-4.0-fast-generate-001", "Direct Imagen provider calls should normalize old model aliases");
+    assert(fetchedUrls[0]?.includes("imagen-4.0-fast-generate-001"), "Direct Imagen provider should call the normalized model endpoint");
+
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ error: { message: "Imagen 3 is only available on paid plans. Please upgrade your account." } }), {
+        status: 400,
+        headers: { "content-type": "application/json" }
+      })) as typeof fetch;
     await new ImagenStudioImageProviderService().generateStudioBible({
       prompt: "test",
       generationType: "studio_bible",

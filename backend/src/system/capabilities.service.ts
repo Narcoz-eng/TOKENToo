@@ -452,6 +452,7 @@ export class CapabilitiesService {
       "STUDIO_IMAGE_PROVIDER",
       "IMAGEN_API_KEY",
       "IMAGEN_IMAGE_MODEL",
+      "GEMINI_IMAGE_MODEL",
       "IMAGEN_IMAGE_TIMEOUT_MS",
       "IMAGEN_IMAGE_ESTIMATED_COST_USD",
       "IMAGEN_ASPECT_RATIO",

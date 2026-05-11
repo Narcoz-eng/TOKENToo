@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { GeminiStudioPromptError, GeminiStudioPromptProviderService, type StudioPromptGenerationResult } from "./gemini-studio-prompt-provider.service";
 import { ImagenStudioImageError, ImagenStudioImageProviderService, type ImagenStudioErrorCode } from "./imagen-studio-image-provider.service";
+import { DEFAULT_IMAGEN_MODEL, normalizeImagenModel } from "./imagen-models";
 import type {
   GeneratedStyleProfile,
   PreviewAssetPlan,
@@ -531,6 +532,17 @@ export class StudioImageProviderService {
         fallbackReason: production ? "DETERMINISTIC_BLOCKED_PRODUCTION" : "EXPLICIT_DETERMINISTIC_PROVIDER"
       };
     }
+    const model = this.modelNormalization();
+    if (!model.ok) {
+      return {
+        provider,
+        canCallImage: false,
+        useDeterministic: false,
+        branch: "imagen-model-unsupported",
+        failureCode: "IMAGEN_MODEL_UNSUPPORTED",
+        fallbackReason: fallbackReason ?? `IMAGEN_MODEL_UNSUPPORTED:${model.rawModel}`
+      };
+    }
     if (!this.imagenApiKey()) {
       return {
         provider,
@@ -623,9 +635,16 @@ export class StudioImageProviderService {
   }
 
   private model() {
-    const configuredImagen = process.env.IMAGEN_IMAGE_MODEL?.trim();
-    if (configuredImagen) return configuredImagen;
-    return "imagen-4.0-fast-generate-001";
+    const model = this.modelNormalization();
+    return model.ok ? model.model : model.rawModel;
+  }
+
+  private modelNormalization() {
+    return normalizeImagenModel(this.configuredImagenModel());
+  }
+
+  private configuredImagenModel() {
+    return process.env.IMAGEN_IMAGE_MODEL?.trim() || process.env.GEMINI_IMAGE_MODEL?.trim() || DEFAULT_IMAGEN_MODEL;
   }
 
   private geminiTextModel() {

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { normalizeImagenModel } from "./imagen-models";
 import type { StudioGenerationType } from "./generator.types";
 
 export type ImagenStudioErrorCode =
@@ -53,6 +54,15 @@ export class ImagenStudioImageProviderService {
   private readonly logger = new Logger(ImagenStudioImageProviderService.name);
 
   async generateStudioBible(input: GenerateStudioBibleInput) {
+    const model = normalizeImagenModel(input.model);
+    if (!model.ok) {
+      throw new ImagenStudioImageError("IMAGEN_MODEL_UNSUPPORTED", "IMAGEN_MODEL_UNSUPPORTED", {
+        generationType: input.generationType,
+        studioCacheKey: input.studioCacheKey,
+        model: input.model,
+        supportedModels: model.supportedModels
+      });
+    }
     const apiKey = input.apiKey ?? process.env.IMAGEN_API_KEY ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
     if (!apiKey) {
       throw new ImagenStudioImageError("IMAGEN_KEY_MISSING", "IMAGEN_KEY_MISSING", {
@@ -68,7 +78,7 @@ export class ImagenStudioImageProviderService {
     const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? Number(process.env.IMAGEN_IMAGE_TIMEOUT_MS ?? 90_000));
 
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:predict`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model.model)}:predict`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -95,7 +105,7 @@ export class ImagenStudioImageProviderService {
             status: response.status,
             generationType: input.generationType,
             studioCacheKey: input.studioCacheKey,
-            model: input.model,
+            model: model.model,
             body
           })
         );
@@ -108,14 +118,14 @@ export class ImagenStudioImageProviderService {
         throw new ImagenStudioImageError("IMAGEN_REQUEST_FAILED", "IMAGEN_REQUEST_FAILED", {
           generationType: input.generationType,
           studioCacheKey: input.studioCacheKey,
-          model: input.model,
+          model: model.model,
           reason: "missing_imagen_image_bytes"
         });
       }
       return {
         uri: `data:${image.mimeType ?? "image/png"};base64,${image.data}`,
         mimeType: image.mimeType ?? "image/png",
-        model: input.model
+        model: model.model
       };
     } catch (error) {
       if (error instanceof ImagenStudioImageError) throw error;
@@ -123,7 +133,7 @@ export class ImagenStudioImageProviderService {
         throw new ImagenStudioImageError("IMAGEN_TIMEOUT", "IMAGEN_TIMEOUT", {
           generationType: input.generationType,
           studioCacheKey: input.studioCacheKey,
-          model: input.model
+          model: model.model
         });
       }
       const name = error instanceof Error ? error.name : typeof error;
@@ -134,6 +144,7 @@ export class ImagenStudioImageProviderService {
           generationType: input.generationType,
           studioCacheKey: input.studioCacheKey,
           model: input.model,
+          normalizedModel: model.model,
           errorClass: name,
           message
         })
@@ -141,7 +152,7 @@ export class ImagenStudioImageProviderService {
       throw new ImagenStudioImageError("IMAGEN_REQUEST_FAILED", "IMAGEN_REQUEST_FAILED", {
         generationType: input.generationType,
         studioCacheKey: input.studioCacheKey,
-        model: input.model,
+        model: model.model,
         errorClass: name,
         raw: message
       });
