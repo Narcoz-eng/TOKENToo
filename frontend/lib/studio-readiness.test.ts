@@ -5,16 +5,16 @@ function assert(condition: unknown, message: string) {
   if (!condition) throw new Error(message);
 }
 
-function asset(type: StudioPreviewAsset["type"], provider = "gemini", uri = "data:image/png;base64,ZmFrZQ=="): StudioPreviewAsset {
+function asset(type: StudioPreviewAsset["type"], provider = "imagen", uri = "data:image/png;base64,ZmFrZQ=="): StudioPreviewAsset {
   return {
     type,
     label: type,
     uri,
     provider,
-    model: provider === "deterministic-render" ? "style-bible-engine" : "gemini-2.5-flash-image",
-    cacheStatus: provider === "cached-gemini" ? "hit" : "generated",
-    metadata: { provider, sourceProvider: provider === "cached-gemini" ? "gemini" : provider },
-    generationMetadata: { provider, sourceProvider: provider === "cached-gemini" ? "gemini" : provider }
+    model: provider === "deterministic-render" ? "style-bible-engine" : provider.includes("gemini") ? "gemini-2.5-flash-image" : "imagen-4.0-fast-generate-001",
+    cacheStatus: provider.includes("cached") ? "hit" : "generated",
+    metadata: { provider, sourceProvider: provider === "cached-gemini" ? "gemini" : provider === "cached-imagen" ? "imagen" : provider },
+    generationMetadata: { provider, sourceProvider: provider === "cached-gemini" ? "gemini" : provider === "cached-imagen" ? "imagen" : provider }
   };
 }
 
@@ -48,13 +48,16 @@ function preview(assets: StudioPreviewAsset[], productionAssetStatus: Collection
   } as CollectionGeneratorPreview;
 }
 
-const geminiAssets = studioBibleAssetTypes.map((type) => asset(type));
-assert(hasRealStudioBibleAssets(preview(geminiAssets)), "Gemini assets should set Studio Bible ready");
-assert(studioPreviewStatusLabel(preview(geminiAssets)) === "Studio Bible ready", "Gemini assets should show Studio Bible ready");
+const imagenAssets = studioBibleAssetTypes.map((type) => asset(type));
+assert(hasRealStudioBibleAssets(preview(imagenAssets)), "Imagen assets should set Studio Bible ready");
+assert(studioPreviewStatusLabel(preview(imagenAssets)) === "Studio Bible ready", "Imagen assets should show Studio Bible ready");
 
-const missingAssets = geminiAssets.slice(0, 4);
+const missingAssets = imagenAssets.slice(0, 4);
 assert(!hasRealStudioBibleAssets(preview(missingAssets)), "Missing assets should keep UI in preview-required state");
 assert(studioPreviewStatusLabel(preview(missingAssets)) === "Studio preview pending", "Missing assets should not show Studio Bible ready");
+
+const cachedImagenAssets = studioBibleAssetTypes.map((type) => asset(type, "cached-imagen"));
+assert(hasRealStudioBibleAssets(preview(cachedImagenAssets)), "Cached Imagen assets should count as real Studio Bible assets");
 
 const cachedGeminiAssets = studioBibleAssetTypes.map((type) => asset(type, "cached-gemini"));
 assert(hasRealStudioBibleAssets(preview(cachedGeminiAssets)), "Cached Gemini assets should count as real Studio Bible assets");

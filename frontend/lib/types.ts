@@ -435,9 +435,15 @@ export type ConceptRequestSummary = {
   providerFailureCode?: string;
   diagnostics?: {
     envStudioProvider?: string;
+    envStudioImageProvider?: string;
     geminiApiKeyPresent?: boolean;
+    imagenApiKeyPresent?: boolean;
     studioImageGenerationEnabled?: boolean;
     modelSelected?: string;
+    geminiTextModelSelected?: string;
+    promptProvider?: "gemini-text" | "local-prompt-pack";
+    promptProviderDecisionBranch?: string;
+    promptFallbackReason?: string;
     routeCalled?: string;
     providerDecisionBranch?: string;
     cacheStatus?: string;

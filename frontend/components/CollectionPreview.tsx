@@ -32,7 +32,7 @@ export function CollectionPreview({
   const visualSamples = professionalPreview ? samples.filter((sample) => Boolean(sample.image) && !isLegacyPlaceholderVisual(sample.image, sample.provider)) : [];
   const tags = identityTags(preview);
   const pitch = culturePitch(preview);
-  const generationUnavailable = Boolean(preview.conceptRequest?.providerFailureCode || preview.warnings?.some((warning) => /GEMINI_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|AI (?:concept|studio) generation unavailable/i.test(warning)));
+  const generationUnavailable = Boolean(preview.conceptRequest?.providerFailureCode || preview.warnings?.some((warning) => /(?:IMAGEN|GEMINI)_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|AI (?:concept|studio) generation unavailable/i.test(warning)));
   const hiddenFallbackArt = /premium-fallback|fallback-poster/i.test(preview.assetProvider ?? "") || preview.samples.some((sample) => /premium-fallback/i.test(sample.provider ?? ""));
   const conceptRequest = preview.conceptRequest;
 
@@ -183,7 +183,7 @@ function ConceptRunStatus({ conceptRequest, provider, fallbackHidden }: { concep
 }
 
 function ProfessionalPreviewRequirement({ preview, onGenerateAiConcept, canGenerateAiConcept, loading }: { preview: CollectionGeneratorPreview; onGenerateAiConcept?: () => void; canGenerateAiConcept: boolean; loading: boolean }) {
-  const generationUnavailable = Boolean(preview.conceptRequest?.providerFailureCode || preview.warnings?.some((warning) => /GEMINI_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|AI (?:concept|studio) generation unavailable/i.test(warning)));
+  const generationUnavailable = Boolean(preview.conceptRequest?.providerFailureCode || preview.warnings?.some((warning) => /(?:IMAGEN|GEMINI)_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|AI (?:concept|studio) generation unavailable/i.test(warning)));
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -546,13 +546,16 @@ function safeDecode(value: string) {
 }
 
 function exactGenerationReason(preview: CollectionGeneratorPreview) {
-  const warning = preview.warnings?.find((item) => /GEMINI_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|(?:AI|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
+  const warning = preview.warnings?.find((item) => /(?:IMAGEN|GEMINI)_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|(?:AI|Imagen|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
   if (!warning) return preview.conceptRequest?.providerFailureCode ?? preview.conceptRequest?.providerFailureReason;
   return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "Studio generation unavailable: ");
 }
 
 function providerLabel(provider?: string) {
   if (!provider) return "Automatic fallback";
+  if (/cached-imagen/i.test(provider)) return "Cached Imagen";
+  if (/imagen/i.test(provider) && /unavailable/i.test(provider)) return "Imagen unavailable";
+  if (/imagen/i.test(provider)) return "Imagen Studio";
   if (/cached-gemini/i.test(provider)) return "Cached Gemini";
   if (/unavailable|no-studio-sheets/i.test(provider)) return "Gemini unavailable";
   if (/gemini/i.test(provider)) return "Gemini Studio";

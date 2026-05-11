@@ -8,8 +8,11 @@ export function validateStartupEnvironment() {
   const strict = (process.env.STRICT_STARTUP_VALIDATION ?? "false") === "true";
   const issues: StartupCheck[] = [];
   process.env.STUDIO_PROVIDER ??= "gemini";
+  process.env.STUDIO_IMAGE_PROVIDER ??= "imagen";
   process.env.CINEMATIC_PROVIDER ??= "openai";
-  process.env.GEMINI_IMAGE_MODEL ??= "gemini-2.5-flash-image";
+  process.env.IMAGEN_IMAGE_MODEL ??= "imagen-4.0-fast-generate-001";
+  process.env.GEMINI_TEXT_MODEL ??= "gemini-2.5-flash";
+  process.env.ENABLE_GEMINI_TEXT_PROMPTS ??= "true";
   process.env.OPENAI_IMAGE_MODEL ??= "gpt-image-1.5";
   process.env.OPENAI_IMAGE_QUALITY ??= "high";
   process.env.ENABLE_STUDIO_IMAGE_GENERATION ??= process.env.ENABLE_AI_IMAGE_GENERATION ?? "false";
@@ -38,11 +41,11 @@ export function validateStartupEnvironment() {
   if ((process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" && !process.env.OPENAI_API_KEY) {
     issues.push({ code: "OPENAI_MISSING", severity: appEnv === "production" ? "warning" : "info", message: "OPENAI_API_KEY is required when ENABLE_AI_IMAGE_GENERATION=true." });
   }
-  if ((process.env.STUDIO_PROVIDER ?? "gemini").toLowerCase() === "openai") {
-    issues.push({ code: "STUDIO_PROVIDER_OPENAI", severity: appEnv === "production" ? "warning" : "info", message: "STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; use gemini or deterministic-render." });
+  if ((process.env.STUDIO_PROVIDER ?? "gemini").toLowerCase() === "openai" || (process.env.STUDIO_IMAGE_PROVIDER ?? "imagen").toLowerCase() === "openai") {
+    issues.push({ code: "STUDIO_PROVIDER_OPENAI", severity: appEnv === "production" ? "warning" : "info", message: "OpenAI is not allowed for Studio Bible generation; use Gemini for text planning and Imagen for Studio Bible sheets." });
   }
-  if ((process.env.STUDIO_PROVIDER ?? "gemini").toLowerCase() === "gemini" && process.env.GEMINI_API_KEY && (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") !== "true" && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") !== "true") {
-    issues.push({ code: "GEMINI_DISABLED", severity: appEnv === "production" ? "warning" : "info", message: "Gemini Studio Bible generation is configured but disabled. Set ENABLE_STUDIO_IMAGE_GENERATION=true or ENABLE_AI_IMAGE_GENERATION=true." });
+  if ((process.env.STUDIO_IMAGE_PROVIDER ?? "imagen").toLowerCase() === "imagen" && (process.env.IMAGEN_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY) && (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") !== "true" && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") !== "true") {
+    issues.push({ code: "IMAGEN_DISABLED", severity: appEnv === "production" ? "warning" : "info", message: "Imagen Studio Bible generation is configured but disabled. Set ENABLE_STUDIO_IMAGE_GENERATION=true or ENABLE_AI_IMAGE_GENERATION=true." });
   }
   if ((process.env.DEMO_CURATED_LAYER_PACK ?? "false") === "true" && appEnv === "production") {
     issues.push({ code: "DEMO_LAYER_PACK_IN_PRODUCTION", severity: "fatal", message: "DEMO_CURATED_LAYER_PACK is devnet demo only and must be disabled in production." });

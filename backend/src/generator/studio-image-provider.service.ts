@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { createHash } from "node:crypto";
-import { GeminiStudioImageError, GeminiStudioImageProviderService, type GeminiStudioErrorCode } from "./gemini-studio-image-provider.service";
+import { GeminiStudioPromptError, GeminiStudioPromptProviderService, type StudioPromptGenerationResult } from "./gemini-studio-prompt-provider.service";
+import { ImagenStudioImageError, ImagenStudioImageProviderService, type ImagenStudioErrorCode } from "./imagen-studio-image-provider.service";
 import type {
   GeneratedStyleProfile,
   PreviewAssetPlan,
@@ -36,11 +37,11 @@ type GenerateStudioAssetsInput = {
 };
 
 type ProviderDecision = {
-  provider: "gemini" | "openai" | "deterministic-render";
-  canCallGemini: boolean;
+  provider: "imagen" | "openai" | "deterministic-render";
+  canCallImage: boolean;
   useDeterministic: boolean;
   branch: string;
-  failureCode?: GeminiStudioErrorCode;
+  failureCode?: ImagenStudioErrorCode;
   fallbackReason?: string;
 };
 
@@ -60,8 +61,11 @@ export class StudioImageProviderService {
 
   constructor(
     @Optional()
-    @Inject(GeminiStudioImageProviderService)
-    private readonly geminiProvider: GeminiStudioImageProviderService = new GeminiStudioImageProviderService()
+    @Inject(ImagenStudioImageProviderService)
+    private readonly imagenProvider: ImagenStudioImageProviderService = new ImagenStudioImageProviderService(),
+    @Optional()
+    @Inject(GeminiStudioPromptProviderService)
+    private readonly promptProvider: GeminiStudioPromptProviderService = new GeminiStudioPromptProviderService()
   ) {}
 
   validatePlan(style: GeneratedStyleProfile, plan: StyleBiblePlan, tokenMint: string, styleVersion = 1, rarityVersion = "rarity-v1"): StudioGenerationSummary {
@@ -71,11 +75,11 @@ export class StudioImageProviderService {
       const prompt = this.promptFor(plan, request);
       return {
         provider: this.costProviderForDecision(decision),
-        model: decision.canCallGemini ? model : decision.provider === "deterministic-render" ? "style-bible-engine" : model,
+        model: decision.canCallImage ? model : decision.provider === "deterministic-render" ? "style-bible-engine" : model,
         generationType: request.generationType,
         promptHash: this.hash(prompt),
-        estimatedCostUsd: decision.canCallGemini ? this.estimatedGeminiCostUsd() : 0,
-        cacheStatus: decision.canCallGemini ? "miss" as StudioCacheStatus : "disabled" as StudioCacheStatus
+        estimatedCostUsd: decision.canCallImage ? this.estimatedImagenCostUsd() : 0,
+        cacheStatus: decision.canCallImage ? "miss" as StudioCacheStatus : "disabled" as StudioCacheStatus
       };
     });
     void style;
@@ -83,14 +87,14 @@ export class StudioImageProviderService {
     void styleVersion;
     void rarityVersion;
     return this.summary({
-      provider: decision.canCallGemini ? "gemini" : decision.provider === "deterministic-render" ? "deterministic-render" : "gemini-unavailable",
-      model: decision.canCallGemini ? model : decision.provider === "deterministic-render" ? "style-bible-engine" : model,
+      provider: decision.canCallImage ? "imagen" : decision.provider === "deterministic-render" ? "deterministic-render" : "imagen-unavailable",
+      model: decision.canCallImage ? model : decision.provider === "deterministic-render" ? "style-bible-engine" : model,
       assets: [],
       costBreakdown,
-      cacheStatus: decision.canCallGemini ? "miss" : "disabled",
-      imagesThisRun: decision.canCallGemini ? studioAssetRequests.length : 0,
+      cacheStatus: decision.canCallImage ? "miss" : "disabled",
+      imagesThisRun: decision.canCallImage ? studioAssetRequests.length : 0,
       estimatedCostUsd: this.sumCost(costBreakdown),
-      diagnostics: this.diagnostics(decision, "POST /generator/ai-concept/validate-request", decision.canCallGemini ? "miss" : "disabled"),
+      diagnostics: this.diagnostics(decision, "POST /generator/ai-concept/validate-request", decision.canCallImage ? "miss" : "disabled", undefined, this.promptPlanDiagnostics()),
       failureCode: decision.failureCode,
       failureReason: decision.failureCode
     });
@@ -105,17 +109,17 @@ export class StudioImageProviderService {
     const decision = this.providerDecision(routeCalled, "miss");
 
     if (decision.provider === "openai") {
-      warnings.push("GEMINI_DISABLED: STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; OpenAI is reserved for explicit Premium Cinematic Render.");
+      warnings.push("IMAGEN_DISABLED: STUDIO_PROVIDER=openai is not allowed for Studio Bible generation; OpenAI is reserved for explicit Premium Cinematic Render.");
     }
 
-    if (!decision.canCallGemini) {
+    if (!decision.canCallImage) {
       if (decision.failureCode) warnings.push(`${decision.failureCode}: ${this.failureMessage(decision.failureCode)}`);
       const deterministicAssets = decision.useDeterministic ? this.deterministicFallbackAssets(input.deterministicAssets, input.plan) : [];
       const deterministicCost = deterministicAssets.map((asset) => this.costLine(asset, this.requestForAsset(asset.type), "disabled"));
       return {
         assets: deterministicAssets,
         summary: this.summary({
-          provider: decision.provider === "deterministic-render" ? "deterministic-render" : "gemini-unavailable",
+          provider: decision.provider === "deterministic-render" ? "deterministic-render" : "imagen-unavailable",
           model: decision.provider === "deterministic-render" ? "style-bible-engine" : model,
           assets: deterministicAssets,
           costBreakdown: deterministicCost,
@@ -141,7 +145,7 @@ export class StudioImageProviderService {
 
     const generationRequests: Array<{
       request: StudioAssetRequest;
-      prompt: string;
+      basePrompt: string;
       promptHash: string;
       studioCacheKey: string;
     }> = [];
@@ -152,9 +156,10 @@ export class StudioImageProviderService {
       const studioCacheKey = this.cacheKey(input.tokenMint, input.style, input.plan, input.styleVersion, input.rarityVersion ?? "rarity-v1", request.generationType, promptHash);
       const cached = cachedByKey.get(studioCacheKey);
       if (cached) {
+        const cachedSourceProvider = this.realAssetSourceProvider(cached);
         const asset = this.withStudioMetadata(cached, request, {
-          provider: "cached-gemini",
-          sourceProvider: "gemini",
+          provider: cachedSourceProvider === "gemini" ? "cached-gemini" : "cached-imagen",
+          sourceProvider: cachedSourceProvider,
           model: String(cached.generationMetadata?.model ?? cached.metadata.model ?? model),
           prompt,
           promptHash,
@@ -167,28 +172,33 @@ export class StudioImageProviderService {
         continue;
       }
 
-      generationRequests.push({ request, prompt, promptHash, studioCacheKey });
+      generationRequests.push({ request, basePrompt: prompt, promptHash, studioCacheKey });
     }
 
+    const promptResult = generationRequests.length
+      ? await this.generatePromptPack(input, generationRequests.map(({ request, basePrompt }) => ({ request, basePrompt })), routeCalled)
+      : this.cacheHitPromptDiagnostics();
+
     const batchController = new AbortController();
-    const generatedPromises = generationRequests.map(async ({ request, prompt, promptHash, studioCacheKey }) => {
-      const generated = await this.geminiProvider.generateStudioBible({
+    const generatedPromises = generationRequests.map(async ({ request, basePrompt, promptHash, studioCacheKey }) => {
+      const prompt = promptResult.prompts[request.type] ?? basePrompt;
+      const generated = await this.imagenProvider.generateStudioBible({
         prompt,
         generationType: request.generationType,
         studioCacheKey,
         model,
-        apiKey: process.env.GEMINI_API_KEY,
-        timeoutMs: Number(process.env.GEMINI_IMAGE_TIMEOUT_MS ?? 90_000),
+        apiKey: this.imagenApiKey(),
+        timeoutMs: Number(process.env.IMAGEN_IMAGE_TIMEOUT_MS ?? 90_000),
         signal: batchController.signal
       });
       const asset = this.withStudioMetadata(this.emptyStudioAsset(request, input.plan), request, {
-        provider: "gemini",
-        sourceProvider: "gemini",
+        provider: "imagen",
+        sourceProvider: "imagen",
         model,
         prompt,
         promptHash,
         studioCacheKey,
-        estimatedCostUsd: this.estimatedGeminiCostUsd(),
+        estimatedCostUsd: this.estimatedImagenCostUsd(),
         cacheStatus: "generated",
         uri: generated.uri
       });
@@ -205,7 +215,7 @@ export class StudioImageProviderService {
       warnings.push(`${failureCode}: ${failureReason}`);
       this.logger.warn(
         JSON.stringify({
-          event: "gemini_studio_generation_aborted",
+          event: "imagen_studio_generation_aborted",
           code: failureCode,
           generationType: "studio_bible_batch",
           model,
@@ -217,14 +227,14 @@ export class StudioImageProviderService {
       return {
         assets: [],
         summary: this.summary({
-          provider: "gemini",
+          provider: "imagen",
           model,
           assets: [],
           costBreakdown,
           cacheStatus: "miss",
           imagesThisRun: 0,
           estimatedCostUsd: 0,
-          diagnostics: this.diagnostics({ ...decision, branch: "gemini-request-failed", fallbackReason: failureCode }, routeCalled, "miss", failureCode),
+          diagnostics: this.diagnostics({ ...decision, branch: "imagen-request-failed", fallbackReason: failureCode }, routeCalled, "miss", failureCode, promptResult),
           failureCode,
           failureReason: failureCode
         }),
@@ -238,7 +248,7 @@ export class StudioImageProviderService {
     }
 
     const cacheStatus: StudioCacheStatus = assets.length === studioAssetRequests.length && assets.every((asset) => asset.generationMetadata?.cacheStatus === "hit") ? "hit" : "miss";
-    const provider = cacheStatus === "hit" ? "cached-gemini" : "gemini";
+    const provider = cacheStatus === "hit" ? assets.every((asset) => this.realAssetSourceProvider(asset) === "gemini") ? "cached-gemini" : "cached-imagen" : "imagen";
     return {
       assets,
       summary: this.summary({
@@ -249,7 +259,7 @@ export class StudioImageProviderService {
         cacheStatus,
         imagesThisRun: assets.length,
         estimatedCostUsd: this.sumCost(costBreakdown),
-        diagnostics: this.diagnostics({ ...decision, branch: cacheStatus === "hit" ? "cache-hit-gemini" : "gemini-generated" }, routeCalled, cacheStatus)
+        diagnostics: this.diagnostics({ ...decision, branch: cacheStatus === "hit" ? "cache-hit-imagen" : "imagen-generated" }, routeCalled, cacheStatus, undefined, promptResult)
       }),
       warnings
     };
@@ -260,7 +270,7 @@ export class StudioImageProviderService {
     request: StudioAssetRequest,
     values: {
       provider: PreviewAssetPlan["provider"];
-      sourceProvider: "gemini" | "deterministic-render";
+      sourceProvider: "imagen" | "gemini" | "deterministic-render";
       model: string;
       prompt: string;
       promptHash: string;
@@ -314,7 +324,7 @@ export class StudioImageProviderService {
       uri: "",
       productionAssetStatus: "AI_CONCEPT",
       previewClassification: "AI_CONCEPT_PREVIEW",
-      provider: "gemini",
+      provider: "imagen",
       metadata: {
         artTeam: plan.artTeam.id,
         collectionName: plan.collectionName
@@ -368,7 +378,7 @@ export class StudioImageProviderService {
   private costLine(asset: PreviewAssetPlan, request: StudioAssetRequest, cacheStatus?: StudioCacheStatus): StudioGenerationCostLine {
     const sourceProvider = String(asset.generationMetadata?.sourceProvider ?? asset.metadata.sourceProvider ?? asset.provider);
     return {
-      provider: asset.provider === "cached-gemini" || (asset.provider === "cached" && sourceProvider === "gemini") ? "cached-gemini" : this.costProvider(asset.provider),
+      provider: asset.provider === "cached-imagen" || (asset.provider === "cached" && sourceProvider === "imagen") ? "cached-imagen" : asset.provider === "cached-gemini" || (asset.provider === "cached" && sourceProvider === "gemini") ? "cached-gemini" : this.costProvider(asset.provider),
       model: String(asset.generationMetadata?.model ?? asset.metadata.model ?? "unknown"),
       generationType: request.generationType,
       promptHash: String(asset.promptHash ?? asset.generationMetadata?.promptHash ?? ""),
@@ -378,18 +388,86 @@ export class StudioImageProviderService {
   }
 
   private costProvider(provider: PreviewAssetPlan["provider"]): StudioGenerationCostLine["provider"] {
-    if (provider === "gemini" || provider === "gemini-unavailable" || provider === "cached-gemini" || provider === "cached" || provider === "deterministic-render" || provider === "openai") return provider;
+    if (provider === "imagen" || provider === "imagen-unavailable" || provider === "cached-imagen" || provider === "gemini" || provider === "gemini-unavailable" || provider === "cached-gemini" || provider === "cached" || provider === "deterministic-render" || provider === "openai") return provider;
     return "deterministic-render";
   }
 
   private costProviderForDecision(decision: ProviderDecision): StudioGenerationCostLine["provider"] {
-    if (decision.canCallGemini) return "gemini";
+    if (decision.canCallImage) return "imagen";
     if (decision.provider === "deterministic-render") return "deterministic-render";
-    return "gemini-unavailable";
+    return "imagen-unavailable";
+  }
+
+  private realAssetSourceProvider(asset: PreviewAssetPlan): "imagen" | "gemini" {
+    const provider = String(asset.provider ?? asset.metadata.provider ?? asset.generationMetadata?.provider ?? "").toLowerCase();
+    const sourceProvider = String(asset.metadata.sourceProvider ?? asset.generationMetadata?.sourceProvider ?? "").toLowerCase();
+    const model = String(asset.metadata.model ?? asset.generationMetadata?.model ?? "").toLowerCase();
+    if (provider === "gemini" || provider === "cached-gemini" || sourceProvider === "gemini" || model.includes("gemini")) return "gemini";
+    return "imagen";
   }
 
   private requestForAsset(type: PreviewAssetPlan["type"]) {
     return studioAssetRequests.find((request) => request.type === type) ?? studioAssetRequests[0];
+  }
+
+  private async generatePromptPack(
+    input: GenerateStudioAssetsInput,
+    requests: Array<{ request: StudioAssetRequest; basePrompt: string }>,
+    routeCalled: string
+  ): Promise<StudioPromptGenerationResult> {
+    const local = (branch: string, fallbackReason?: string): StudioPromptGenerationResult => ({
+      prompts: Object.fromEntries(requests.map(({ request, basePrompt }) => [request.type, basePrompt])),
+      provider: "local-prompt-pack",
+      model: this.geminiTextModel(),
+      branch,
+      fallbackReason
+    });
+
+    if (!this.geminiTextPromptEnabled()) return local("gemini-text-disabled-local-prompt-pack", "GEMINI_DISABLED");
+    if (!this.geminiTextApiKey()) return local("gemini-text-key-missing-local-prompt-pack", "GEMINI_KEY_MISSING");
+
+    try {
+      return await this.promptProvider.generateStudioPrompts({
+        style: input.style,
+        plan: input.plan,
+        requests: requests.map(({ request, basePrompt }) => ({
+          key: request.type,
+          generationType: request.generationType,
+          basePrompt
+        })),
+        model: this.geminiTextModel(),
+        apiKey: this.geminiTextApiKey(),
+        timeoutMs: Number(process.env.GEMINI_TEXT_TIMEOUT_MS ?? 30_000)
+      });
+    } catch (error) {
+      const failureCode = error instanceof GeminiStudioPromptError ? error.code : "GEMINI_REQUEST_FAILED";
+      this.logger.warn(
+        JSON.stringify({
+          event: "gemini_studio_prompt_fallback",
+          code: failureCode,
+          routeCalled,
+          model: this.geminiTextModel(),
+          errorClass: error instanceof Error ? error.name : typeof error,
+          message: error instanceof Error ? error.message : String(error)
+        })
+      );
+      return local("gemini-text-failed-local-prompt-pack", failureCode);
+    }
+  }
+
+  private cacheHitPromptDiagnostics(): StudioPromptGenerationResult {
+    return {
+      prompts: {},
+      provider: "local-prompt-pack",
+      model: this.geminiTextModel(),
+      branch: "cache-hit-no-prompt-provider-call"
+    };
+  }
+
+  private promptPlanDiagnostics(): StudioPromptGenerationResult {
+    if (!this.geminiTextPromptEnabled()) return { prompts: {}, provider: "local-prompt-pack", model: this.geminiTextModel(), branch: "gemini-text-disabled-local-prompt-pack", fallbackReason: "GEMINI_DISABLED" };
+    if (!this.geminiTextApiKey()) return { prompts: {}, provider: "local-prompt-pack", model: this.geminiTextModel(), branch: "gemini-text-key-missing-local-prompt-pack", fallbackReason: "GEMINI_KEY_MISSING" };
+    return { prompts: {}, provider: "gemini-text", model: this.geminiTextModel(), branch: "gemini-text-configured" };
   }
 
   private promptFor(plan: StyleBiblePlan, request: StudioAssetRequest) {
@@ -432,14 +510,14 @@ export class StudioImageProviderService {
   private providerDecision(routeCalled: string, cacheStatus: StudioCacheStatus, fallbackReason?: string): ProviderDecision {
     void routeCalled;
     void cacheStatus;
-    const provider = this.configuredStudioProvider();
+    const provider = this.configuredStudioImageProvider();
     if (provider === "openai") {
       return {
         provider,
-        canCallGemini: false,
+        canCallImage: false,
         useDeterministic: false,
-        branch: "studio-provider-openai-disabled",
-        failureCode: "GEMINI_DISABLED",
+        branch: "studio-image-provider-openai-disabled",
+        failureCode: "IMAGEN_DISABLED",
         fallbackReason: fallbackReason ?? "STUDIO_PROVIDER_OPENAI"
       };
     }
@@ -447,41 +525,47 @@ export class StudioImageProviderService {
       const production = (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") === "production";
       return {
         provider,
-        canCallGemini: false,
+        canCallImage: false,
         useDeterministic: !production,
         branch: production ? "deterministic-blocked-production" : "explicit-deterministic-dev-fallback",
         fallbackReason: production ? "DETERMINISTIC_BLOCKED_PRODUCTION" : "EXPLICIT_DETERMINISTIC_PROVIDER"
       };
     }
-    if (!process.env.GEMINI_API_KEY) {
+    if (!this.imagenApiKey()) {
       return {
         provider,
-        canCallGemini: false,
+        canCallImage: false,
         useDeterministic: false,
-        branch: "gemini-key-missing",
-        failureCode: "GEMINI_KEY_MISSING",
-        fallbackReason: fallbackReason ?? "GEMINI_API_KEY_MISSING"
+        branch: "imagen-key-missing",
+        failureCode: "IMAGEN_KEY_MISSING",
+        fallbackReason: fallbackReason ?? "IMAGEN_OR_GOOGLE_API_KEY_MISSING"
       };
     }
     if (!this.studioImageGenerationEnabled()) {
       return {
         provider,
-        canCallGemini: false,
+        canCallImage: false,
         useDeterministic: false,
-        branch: "gemini-disabled-by-env",
-        failureCode: "GEMINI_DISABLED",
+        branch: "imagen-disabled-by-env",
+        failureCode: "IMAGEN_DISABLED",
         fallbackReason: fallbackReason ?? "STUDIO_IMAGE_GENERATION_DISABLED"
       };
     }
-    return { provider, canCallGemini: true, useDeterministic: false, branch: "gemini-configured" };
+    return { provider, canCallImage: true, useDeterministic: false, branch: "imagen-configured" };
   }
 
-  private diagnostics(decision: ProviderDecision, routeCalled: string, cacheStatus: StudioCacheStatus, fallbackReason?: string): StudioProviderDiagnostics {
+  private diagnostics(decision: ProviderDecision, routeCalled: string, cacheStatus: StudioCacheStatus, fallbackReason?: string, promptResult = this.promptPlanDiagnostics()): StudioProviderDiagnostics {
     return {
       envStudioProvider: process.env.STUDIO_PROVIDER?.trim() || "gemini",
+      envStudioImageProvider: process.env.STUDIO_IMAGE_PROVIDER?.trim() || "imagen",
       geminiApiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
+      imagenApiKeyPresent: Boolean(this.imagenApiKey()),
       studioImageGenerationEnabled: this.studioImageGenerationEnabled(),
       modelSelected: this.model(),
+      geminiTextModelSelected: this.geminiTextModel(),
+      promptProvider: promptResult.provider,
+      promptProviderDecisionBranch: promptResult.branch,
+      promptFallbackReason: promptResult.fallbackReason,
       routeCalled,
       providerDecisionBranch: decision.branch,
       cacheStatus,
@@ -498,7 +582,7 @@ export class StudioImageProviderService {
     imagesThisRun: number;
     estimatedCostUsd: number;
     diagnostics: StudioProviderDiagnostics;
-    failureCode?: GeminiStudioErrorCode;
+    failureCode?: ImagenStudioErrorCode;
     failureReason?: string;
   }): StudioGenerationSummary {
     return {
@@ -517,21 +601,21 @@ export class StudioImageProviderService {
     };
   }
 
-  private providerFailureCode(error: unknown): GeminiStudioErrorCode {
-    if (error instanceof GeminiStudioImageError) return error.code;
-    if (error instanceof DOMException && error.name === "AbortError") return "GEMINI_TIMEOUT";
-    return "GEMINI_REQUEST_FAILED";
+  private providerFailureCode(error: unknown): ImagenStudioErrorCode {
+    if (error instanceof ImagenStudioImageError) return error.code;
+    if (error instanceof DOMException && error.name === "AbortError") return "IMAGEN_TIMEOUT";
+    return "IMAGEN_REQUEST_FAILED";
   }
 
-  private failureMessage(code: GeminiStudioErrorCode) {
+  private failureMessage(code: ImagenStudioErrorCode) {
     return code;
   }
 
-  private configuredStudioProvider(): ProviderDecision["provider"] {
-    const provider = (process.env.STUDIO_PROVIDER ?? "gemini").trim().toLowerCase();
+  private configuredStudioImageProvider(): ProviderDecision["provider"] {
+    const provider = (process.env.STUDIO_IMAGE_PROVIDER ?? process.env.STUDIO_PROVIDER ?? "imagen").trim().toLowerCase();
     if (provider === "openai") return "openai";
     if (provider === "deterministic-render" || provider === "deterministic") return "deterministic-render";
-    return "gemini";
+    return "imagen";
   }
 
   private studioImageGenerationEnabled() {
@@ -539,12 +623,32 @@ export class StudioImageProviderService {
   }
 
   private model() {
-    return process.env.GEMINI_IMAGE_MODEL?.trim() || "gemini-2.5-flash-image";
+    const configuredImagen = process.env.IMAGEN_IMAGE_MODEL?.trim();
+    if (configuredImagen) return configuredImagen;
+    return "imagen-4.0-fast-generate-001";
   }
 
-  private estimatedGeminiCostUsd() {
-    const configured = Number(process.env.GEMINI_IMAGE_ESTIMATED_COST_USD);
-    return Number.isFinite(configured) && configured >= 0 ? configured : 0.039;
+  private geminiTextModel() {
+    return process.env.GEMINI_TEXT_MODEL?.trim() || process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  }
+
+  private geminiTextPromptEnabled() {
+    const provider = (process.env.STUDIO_PROVIDER ?? "gemini").trim().toLowerCase();
+    const explicitlyDisabled = (process.env.ENABLE_GEMINI_TEXT_PROMPTS ?? "true") === "false";
+    return !explicitlyDisabled && provider !== "deterministic" && provider !== "deterministic-render" && provider !== "openai";
+  }
+
+  private geminiTextApiKey() {
+    return process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.IMAGEN_API_KEY;
+  }
+
+  private imagenApiKey() {
+    return process.env.IMAGEN_API_KEY ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
+  }
+
+  private estimatedImagenCostUsd() {
+    const configured = Number(process.env.IMAGEN_IMAGE_ESTIMATED_COST_USD);
+    return Number.isFinite(configured) && configured >= 0 ? configured : 0.02;
   }
 
   private sumCost(lines: StudioGenerationCostLine[]) {
@@ -564,7 +668,7 @@ export function isRealStudioBibleAsset(asset: PreviewAssetPlan | undefined | nul
   const uri = String(asset.uri).toLowerCase();
   if (/deterministic|wireframe|placeholder|openai|premium-fallback/.test(`${provider} ${sourceProvider}`)) return false;
   if (uri.startsWith("data:image/svg+xml")) return false;
-  return provider === "gemini" || provider === "cached-gemini" || sourceProvider === "gemini" || model.includes("gemini");
+  return provider === "imagen" || provider === "cached-imagen" || sourceProvider === "imagen" || model.includes("imagen") || provider === "gemini" || provider === "cached-gemini" || sourceProvider === "gemini" || model.includes("gemini");
 }
 
 export function hasAllRealStudioBibleAssets(assets: PreviewAssetPlan[]) {

@@ -37,7 +37,7 @@ export function isRealStudioBibleAsset(asset: StudioPreviewAsset | undefined | n
   const uri = String(asset.uri).toLowerCase();
   if (/deterministic|wireframe|placeholder|openai|premium-fallback/.test(`${provider} ${sourceProvider}`)) return false;
   if (uri.startsWith("data:image/svg+xml")) return false;
-  return provider === "gemini" || provider === "cached-gemini" || sourceProvider === "gemini" || model.includes("gemini");
+  return provider === "imagen" || provider === "cached-imagen" || sourceProvider === "imagen" || model.includes("imagen") || provider === "gemini" || provider === "cached-gemini" || sourceProvider === "gemini" || model.includes("gemini");
 }
 
 export function studioPreviewStatusLabel(preview: CollectionGeneratorPreview) {

@@ -600,11 +600,14 @@ export type PreviewAssetPlan = {
     | "wireframe"
     | "gemini"
     | "gemini-unavailable"
+    | "imagen"
+    | "imagen-unavailable"
     | "openai"
     | "premium-fallback"
     | "local-placeholder"
     | "cached"
     | "cached-gemini"
+    | "cached-imagen"
     | "curated"
     | "artist"
     | "deterministic-render";
@@ -613,11 +616,17 @@ export type PreviewAssetPlan = {
   metadata: Record<string, unknown>;
 };
 
-export type StudioProviderId = "gemini" | "openai" | "deterministic-render" | "cached" | "cached-gemini";
+export type StudioProviderId = "gemini" | "imagen" | "openai" | "deterministic-render" | "cached" | "cached-gemini" | "cached-imagen";
 export type StudioGenerationType = "studio_bible" | "trait_catalog" | "rarity_ladder" | "mood_sheet" | "layer_breakdown" | "hero_concept";
 export type StudioCacheStatus = "hit" | "miss" | "generated" | "disabled";
 
 export type StudioProviderFailureCode =
+  | "IMAGEN_KEY_MISSING"
+  | "IMAGEN_DISABLED"
+  | "IMAGEN_REQUEST_FAILED"
+  | "IMAGEN_QUOTA_EXCEEDED"
+  | "IMAGEN_MODEL_UNSUPPORTED"
+  | "IMAGEN_TIMEOUT"
   | "GEMINI_KEY_MISSING"
   | "GEMINI_DISABLED"
   | "GEMINI_REQUEST_FAILED"
@@ -627,9 +636,15 @@ export type StudioProviderFailureCode =
 
 export type StudioProviderDiagnostics = {
   envStudioProvider: string;
+  envStudioImageProvider?: string;
   geminiApiKeyPresent: boolean;
+  imagenApiKeyPresent?: boolean;
   studioImageGenerationEnabled: boolean;
   modelSelected: string;
+  geminiTextModelSelected?: string;
+  promptProvider?: "gemini-text" | "local-prompt-pack";
+  promptProviderDecisionBranch?: string;
+  promptFallbackReason?: string;
   routeCalled: string;
   providerDecisionBranch: string;
   cacheStatus: StudioCacheStatus;
@@ -637,7 +652,7 @@ export type StudioProviderDiagnostics = {
 };
 
 export type StudioGenerationCostLine = {
-  provider: StudioProviderId | "gemini-unavailable";
+  provider: StudioProviderId | "gemini-unavailable" | "imagen-unavailable";
   model: string;
   generationType: StudioGenerationType;
   promptHash: string;
@@ -646,7 +661,7 @@ export type StudioGenerationCostLine = {
 };
 
 export type StudioGenerationSummary = {
-  provider: StudioProviderId | "gemini-unavailable";
+  provider: StudioProviderId | "gemini-unavailable" | "imagen-unavailable";
   model: string;
   imageCount: number;
   imagesThisRun: number;

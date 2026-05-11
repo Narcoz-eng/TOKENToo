@@ -1,7 +1,7 @@
 import { selectArtTeam } from "./art-team-engine";
 import { AiOutputQualityValidatorService } from "./ai-output-quality-validator.service";
 import { CuratedLayerPackService } from "./curated-layer-pack.service";
-import { GeminiStudioImageError } from "./gemini-studio-image-provider.service";
+import { ImagenStudioImageError, ImagenStudioImageProviderService } from "./imagen-studio-image-provider.service";
 import { ProductionLayerPackService } from "./production-layer-pack.service";
 import { hasAllRealStudioBibleAssets, StudioImageProviderService } from "./studio-image-provider.service";
 import { StyleBibleEngineService } from "./style-bible-engine.service";
@@ -196,21 +196,28 @@ async function main() {
   }
 
   const previousStudioProvider = process.env.STUDIO_PROVIDER;
+  const previousStudioImageProvider = process.env.STUDIO_IMAGE_PROVIDER;
   const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const previousImagenKey = process.env.IMAGEN_API_KEY;
   const previousStudioGeneration = process.env.ENABLE_STUDIO_IMAGE_GENERATION;
   const previousAiGeneration = process.env.ENABLE_AI_IMAGE_GENERATION;
+  const previousGeminiTextPrompts = process.env.ENABLE_GEMINI_TEXT_PROMPTS;
   const previousAppEnv = process.env.APP_ENV;
-  const previousGeminiModel = process.env.GEMINI_IMAGE_MODEL;
+  const previousImagenModel = process.env.IMAGEN_IMAGE_MODEL;
+  const previousGeminiImageModel = process.env.GEMINI_IMAGE_MODEL;
   delete process.env.STUDIO_PROVIDER;
+  delete process.env.STUDIO_IMAGE_PROVIDER;
   delete process.env.GEMINI_API_KEY;
+  delete process.env.IMAGEN_API_KEY;
   delete process.env.ENABLE_STUDIO_IMAGE_GENERATION;
   delete process.env.ENABLE_AI_IMAGE_GENERATION;
   const provider = new StudioImageProviderService();
   const summary = provider.validatePlan(baseStyle, bible, "test-mint");
-  assert(summary.provider === "gemini-unavailable", "Gemini should be the default Studio Bible provider, with no fake sheet fallback when the key is missing");
-  assert(summary.providerFailureCode === "GEMINI_KEY_MISSING", "Missing Gemini key should return the exact GEMINI_KEY_MISSING code");
-  assert(summary.imageCount === 0, "Missing Gemini key should not claim images were generated this run");
-  assert(summary.estimatedCostUsd === 0, "Missing Gemini key should not estimate paid preview cost");
+  assert(summary.provider === "imagen-unavailable", "Imagen should be the default Studio Bible image provider, with no fake sheet fallback when the key is missing");
+  assert(summary.providerFailureCode === "IMAGEN_KEY_MISSING", "Missing Imagen key should return the exact IMAGEN_KEY_MISSING code");
+  assert(summary.model === "imagen-4.0-fast-generate-001", "Studio Bible image model should default to Imagen 4 Fast, not gemini-2.5-flash-image");
+  assert(summary.imageCount === 0, "Missing Imagen key should not claim images were generated this run");
+  assert(summary.estimatedCostUsd === 0, "Missing Imagen key should not estimate paid preview cost");
   const generated = await provider.generateStudioAssets({
     tokenMint: "test-mint",
     style: baseStyle,
@@ -219,9 +226,9 @@ async function main() {
     styleVersion: 1,
     rarityVersion: "preview"
   });
-  assert(generated.assets.length === 0, "Studio provider must not return deterministic template sheets when Gemini is unavailable");
+  assert(generated.assets.length === 0, "Studio provider must not return deterministic template sheets when Imagen is unavailable");
   assert(generated.assets.every((asset) => asset.provider !== "openai"), "OpenAI must not generate default Studio Bible assets");
-  assert(generated.summary.providerFailureCode === "GEMINI_KEY_MISSING", "Missing Gemini should be an honest no-sheet state with an exact code");
+  assert(generated.summary.providerFailureCode === "IMAGEN_KEY_MISSING", "Missing Imagen should be an honest no-sheet state with an exact code");
   assert(generated.summary.costBreakdown.every((line) => line.generationType && typeof line.estimatedCostUsd === "number"), "Studio provider should return per-asset cost metadata when provider calls are attempted");
   const cached = await provider.generateStudioAssets({
     tokenMint: "test-mint",
@@ -232,15 +239,16 @@ async function main() {
     rarityVersion: "preview",
     cachedAssets: generated.assets
   });
-  assert(cached.assets.length === 0, "No fake cached Studio Bible assets should exist when Gemini never generated sheets");
+  assert(cached.assets.length === 0, "No fake cached Studio Bible assets should exist when Imagen never generated sheets");
   assert(cached.summary.estimatedCostUsd === 0, "Cached Studio Bible reuse should not estimate new provider cost");
 
   process.env.STUDIO_PROVIDER = "gemini";
-  process.env.GEMINI_API_KEY = "test-gemini-key";
+  process.env.GEMINI_API_KEY = "test-google-key";
   process.env.ENABLE_STUDIO_IMAGE_GENERATION = "true";
+  process.env.ENABLE_GEMINI_TEXT_PROMPTS = "false";
   process.env.GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
-  const geminiFake = fakeGeminiProvider();
-  const configured = await new StudioImageProviderService(geminiFake as any).generateStudioAssets({
+  const imagenFake = fakeImagenProvider();
+  const configured = await new StudioImageProviderService(imagenFake as any).generateStudioAssets({
     tokenMint: "test-mint",
     style: baseStyle,
     plan: bible,
@@ -248,15 +256,15 @@ async function main() {
     styleVersion: 1,
     rarityVersion: "preview"
   });
-  assert(geminiFake.calls.length === 5, "Gemini configured -> GeminiProvider.generateStudioBible should be called for all five Studio Bible sheets");
-  assert(configured.summary.provider === "gemini", "Gemini generation should report provider=gemini");
-  assert(configured.summary.model === "gemini-2.5-flash-image", "Gemini generation should report the configured image model");
-  assert(configured.summary.imagesThisRun === 5, "Gemini generation should report five images this run");
-  assert(configured.summary.estimatedCostUsd > 0, "Gemini generation should include a positive cost estimate");
-  assert(hasAllRealStudioBibleAssets(configured.assets), "Gemini output should count as a real Studio Bible only when all five assets exist");
+  assert(imagenFake.calls.length === 5, "Imagen configured -> ImagenProvider.generateStudioBible should be called for all five Studio Bible sheets");
+  assert(configured.summary.provider === "imagen", "Imagen generation should report provider=imagen");
+  assert(configured.summary.model === "imagen-4.0-fast-generate-001", "Imagen generation should report the default Imagen 4 Fast image model");
+  assert(configured.summary.imagesThisRun === 5, "Imagen generation should report five images this run");
+  assert(configured.summary.estimatedCostUsd > 0, "Imagen generation should include a positive cost estimate");
+  assert(hasAllRealStudioBibleAssets(configured.assets), "Imagen output should count as a real Studio Bible only when all five assets exist");
 
-  const failingGemini = fakeGeminiProvider(new GeminiStudioImageError("GEMINI_REQUEST_FAILED", "GEMINI_REQUEST_FAILED"));
-  const failed = await new StudioImageProviderService(failingGemini as any).generateStudioAssets({
+  const failingImagen = fakeImagenProvider(new ImagenStudioImageError("IMAGEN_REQUEST_FAILED", "IMAGEN_REQUEST_FAILED"));
+  const failed = await new StudioImageProviderService(failingImagen as any).generateStudioAssets({
     tokenMint: "test-mint",
     style: baseStyle,
     plan: bible,
@@ -264,13 +272,13 @@ async function main() {
     styleVersion: 1,
     rarityVersion: "preview"
   });
-  assert(failingGemini.calls.length === 5, "Gemini failure should still attempt the five Studio Bible sheets in the parallel batch");
-  assert(failed.assets.length === 0, "Gemini configured but failed -> deterministic fallback must not be silently marked ready");
-  assert(failed.summary.provider !== "deterministic-render", "Gemini failure must not report deterministic-render");
-  assert(failed.summary.providerFailureCode === "GEMINI_REQUEST_FAILED", "Gemini failure should surface GEMINI_REQUEST_FAILED");
+  assert(failingImagen.calls.length === 5, "Imagen failure should still attempt the five Studio Bible sheets in the parallel batch");
+  assert(failed.assets.length === 0, "Imagen configured but failed -> deterministic fallback must not be silently marked ready");
+  assert(failed.summary.provider !== "deterministic-render", "Imagen failure must not report deterministic-render");
+  assert(failed.summary.providerFailureCode === "IMAGEN_REQUEST_FAILED", "Imagen failure should surface IMAGEN_REQUEST_FAILED");
 
-  const quotaGemini = fakeGeminiProvider(new GeminiStudioImageError("GEMINI_QUOTA_EXCEEDED", "GEMINI_QUOTA_EXCEEDED"));
-  const quotaFailed = await new StudioImageProviderService(quotaGemini as any).generateStudioAssets({
+  const quotaImagen = fakeImagenProvider(new ImagenStudioImageError("IMAGEN_QUOTA_EXCEEDED", "IMAGEN_QUOTA_EXCEEDED"));
+  const quotaFailed = await new StudioImageProviderService(quotaImagen as any).generateStudioAssets({
     tokenMint: "test-mint",
     style: baseStyle,
     plan: bible,
@@ -278,11 +286,32 @@ async function main() {
     styleVersion: 1,
     rarityVersion: "preview"
   });
-  assert(quotaFailed.assets.length === 0, "Gemini quota failure must not produce deterministic Studio Bible assets");
-  assert(quotaFailed.summary.providerFailureCode === "GEMINI_QUOTA_EXCEEDED", "Gemini quota failure should surface GEMINI_QUOTA_EXCEEDED");
+  assert(quotaFailed.assets.length === 0, "Imagen quota failure must not produce deterministic Studio Bible assets");
+  assert(quotaFailed.summary.providerFailureCode === "IMAGEN_QUOTA_EXCEEDED", "Imagen quota failure should surface IMAGEN_QUOTA_EXCEEDED");
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ error: { message: "Imagen 3 is only available on paid plans. Please upgrade your account." } }), {
+      status: 400,
+      headers: { "content-type": "application/json" }
+    })) as typeof fetch;
+  try {
+    await new ImagenStudioImageProviderService().generateStudioBible({
+      prompt: "test",
+      generationType: "studio_bible",
+      studioCacheKey: "paid-plan-mapping",
+      model: "imagen-4.0-fast-generate-001",
+      apiKey: "test-google-key",
+      timeoutMs: 1000
+    });
+    assert(false, "Imagen paid-plan rejection should throw");
+  } catch (error) {
+    assert(error instanceof ImagenStudioImageError && error.code === "IMAGEN_QUOTA_EXCEEDED", "Imagen paid-plan rejection should map to IMAGEN_QUOTA_EXCEEDED");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 
-  const cacheProbe = fakeGeminiProvider();
-  const cachedGemini = await new StudioImageProviderService(cacheProbe as any).generateStudioAssets({
+  const cacheProbe = fakeImagenProvider();
+  const cachedImagen = await new StudioImageProviderService(cacheProbe as any).generateStudioAssets({
     tokenMint: "test-mint",
     style: baseStyle,
     plan: bible,
@@ -291,11 +320,11 @@ async function main() {
     rarityVersion: "preview",
     cachedAssets: configured.assets
   });
-  assert(cacheProbe.calls.length === 0, "Gemini cache hit should not call the provider");
-  assert(cachedGemini.summary.provider === "cached-gemini", "Gemini cache hit should report Cached Gemini");
-  assert(hasAllRealStudioBibleAssets(cachedGemini.assets), "Cached Gemini assets should count as real Studio Bible assets");
+  assert(cacheProbe.calls.length === 0, "Imagen cache hit should not call the provider");
+  assert(cachedImagen.summary.provider === "cached-imagen", "Imagen cache hit should report Cached Imagen");
+  assert(hasAllRealStudioBibleAssets(cachedImagen.assets), "Cached Imagen assets should count as real Studio Bible assets");
 
-  const deterministicCacheProbe = fakeGeminiProvider();
+  const deterministicCacheProbe = fakeImagenProvider();
   const deterministicCache = configured.assets.map((asset) => ({
     ...asset,
     uri: "data:image/svg+xml,%3Csvg%3E%3C/svg%3E",
@@ -312,12 +341,12 @@ async function main() {
     rarityVersion: "preview",
     cachedAssets: deterministicCache
   });
-  assert(deterministicCacheProbe.calls.length === 5, "Deterministic cached sheets should be ignored and should not block real Gemini generation");
-  assert(hasAllRealStudioBibleAssets(ignoredDeterministicCache.assets), "Ignored deterministic cache should be replaced by real Gemini assets");
+  assert(deterministicCacheProbe.calls.length === 5, "Deterministic cached sheets should be ignored and should not block real Imagen generation");
+  assert(hasAllRealStudioBibleAssets(ignoredDeterministicCache.assets), "Ignored deterministic cache should be replaced by real Imagen assets");
 
   process.env.STUDIO_PROVIDER = "deterministic";
   process.env.APP_ENV = "production";
-  const deterministicProduction = await new StudioImageProviderService(fakeGeminiProvider() as any).generateStudioAssets({
+  const deterministicProduction = await new StudioImageProviderService(fakeImagenProvider() as any).generateStudioAssets({
     tokenMint: "test-mint",
     style: baseStyle,
     plan: bible,
@@ -334,14 +363,22 @@ async function main() {
   assert(!aiIssues.some((issue) => /missing banner|rarity character/i.test(issue)), `Studio Bible validation should not require cinematic OpenAI assets: ${aiIssues.join(", ")}`);
   if (previousStudioProvider === undefined) delete process.env.STUDIO_PROVIDER;
   else process.env.STUDIO_PROVIDER = previousStudioProvider;
+  if (previousStudioImageProvider === undefined) delete process.env.STUDIO_IMAGE_PROVIDER;
+  else process.env.STUDIO_IMAGE_PROVIDER = previousStudioImageProvider;
   if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
   else process.env.GEMINI_API_KEY = previousGeminiKey;
+  if (previousImagenKey === undefined) delete process.env.IMAGEN_API_KEY;
+  else process.env.IMAGEN_API_KEY = previousImagenKey;
   if (previousStudioGeneration === undefined) delete process.env.ENABLE_STUDIO_IMAGE_GENERATION;
   else process.env.ENABLE_STUDIO_IMAGE_GENERATION = previousStudioGeneration;
   if (previousAiGeneration === undefined) delete process.env.ENABLE_AI_IMAGE_GENERATION;
   else process.env.ENABLE_AI_IMAGE_GENERATION = previousAiGeneration;
-  if (previousGeminiModel === undefined) delete process.env.GEMINI_IMAGE_MODEL;
-  else process.env.GEMINI_IMAGE_MODEL = previousGeminiModel;
+  if (previousGeminiTextPrompts === undefined) delete process.env.ENABLE_GEMINI_TEXT_PROMPTS;
+  else process.env.ENABLE_GEMINI_TEXT_PROMPTS = previousGeminiTextPrompts;
+  if (previousImagenModel === undefined) delete process.env.IMAGEN_IMAGE_MODEL;
+  else process.env.IMAGEN_IMAGE_MODEL = previousImagenModel;
+  if (previousGeminiImageModel === undefined) delete process.env.GEMINI_IMAGE_MODEL;
+  else process.env.GEMINI_IMAGE_MODEL = previousGeminiImageModel;
 
   const layerStatus = new ProductionLayerPackService().approvedLayerManifestStatus(pack);
   assert(!layerStatus.approved, "Final export should be blocked without an approved transparent PNG/WebP layer manifest");
@@ -405,7 +442,7 @@ function fakeCuratedLayerDb() {
   };
 }
 
-function fakeGeminiProvider(error?: Error) {
+function fakeImagenProvider(error?: Error) {
   const calls: any[] = [];
   return {
     calls,

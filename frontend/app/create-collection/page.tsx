@@ -32,7 +32,8 @@ type StudioWorkflowActionName =
   | "approve-cinematic-direction";
 type SystemCapabilities = {
   databaseAvailable?: boolean;
-  geminiImagesAvailable?: boolean;
+  geminiTextAvailable?: boolean;
+  imagenImagesAvailable?: boolean;
   fastStudioPreviewAvailable?: boolean;
   premiumCinematicAvailable?: boolean;
   openaiImagesAvailable?: boolean;
@@ -855,8 +856,14 @@ function CreatorStudioStatusPanel({ preview, setup, loading, showDiagnostics }: 
 function StudioProviderDiagnosticsPanel({ diagnostics }: { diagnostics: NonNullable<ConceptRequestSummary["diagnostics"]> }) {
   const rows = [
     ["STUDIO_PROVIDER", diagnostics.envStudioProvider],
+    ["STUDIO_IMAGE_PROVIDER", diagnostics.envStudioImageProvider],
     ["GEMINI_API_KEY present", diagnostics.geminiApiKeyPresent === undefined ? undefined : String(diagnostics.geminiApiKeyPresent)],
+    ["Imagen key present", diagnostics.imagenApiKeyPresent === undefined ? undefined : String(diagnostics.imagenApiKeyPresent)],
     ["Model selected", diagnostics.modelSelected],
+    ["Gemini text model", diagnostics.geminiTextModelSelected],
+    ["Prompt provider", diagnostics.promptProvider],
+    ["Prompt branch", diagnostics.promptProviderDecisionBranch],
+    ["Prompt fallback", diagnostics.promptFallbackReason],
     ["Route called", diagnostics.routeCalled],
     ["Provider branch", diagnostics.providerDecisionBranch],
     ["Cache", diagnostics.cacheStatus],
@@ -1070,6 +1077,9 @@ function ConceptPlanNotice({ plan }: { plan: ConceptRequestSummary | null }) {
 
 function providerDisplay(provider?: string) {
   if (!provider) return "Automatic fallback";
+  if (/cached-imagen/i.test(provider)) return "Cached Imagen";
+  if (/imagen/i.test(provider) && /unavailable/i.test(provider)) return "Imagen unavailable";
+  if (/imagen/i.test(provider)) return "Imagen Studio";
   if (/cached-gemini/i.test(provider)) return "Cached Gemini";
   if (/unavailable|no-studio-sheets/i.test(provider)) return "Gemini unavailable";
   if (/gemini/i.test(provider)) return "Gemini Studio";
@@ -1104,7 +1114,7 @@ function assetProvider(asset: StudioPreviewAsset) {
 }
 
 function exactGenerationReason(preview: CollectionGeneratorPreview) {
-  const warning = preview.warnings?.find((item) => /GEMINI_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|(?:AI|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
+  const warning = preview.warnings?.find((item) => /(?:IMAGEN|GEMINI)_(?:KEY_MISSING|DISABLED|REQUEST_FAILED|QUOTA_EXCEEDED|MODEL_UNSUPPORTED|TIMEOUT)|(?:AI|Imagen|Gemini|Studio Bible|studio) (?:concept|studio|generation|image)?\s*unavailable/i.test(item));
   if (!warning) return preview.conceptRequest?.providerFailureCode ?? preview.conceptRequest?.providerFailureReason;
   return warning.replace(/^AI (?:concept|studio) generation unavailable:\s*/i, "Studio generation unavailable: ");
 }
@@ -1136,6 +1146,8 @@ function ActionButton({ icon: Icon, label, disabled, onClick, primary = false }:
 function defaultSetupItems(): SetupChecklist["items"] {
   return [
     "STUDIO_PROVIDER",
+    "STUDIO_IMAGE_PROVIDER",
+    "IMAGEN_IMAGE_MODEL",
     "GEMINI_API_KEY",
     "ENABLE_STUDIO_IMAGE_GENERATION",
     "CINEMATIC_PROVIDER",
@@ -1656,7 +1668,7 @@ function mapRunToPreview(run: GeneratorRun, preset: string): CollectionGenerator
     unlocks: asRecord<string[]>(profile.traitPack?.unlockSchedule),
     assetProvider: run.studioProvider ?? "persisted-generator-run",
     conceptRequest: {
-      provider: run.studioProvider ?? (studioAssets.some((asset) => asset.provider === "gemini") ? "gemini" : studioAssets.some((asset) => /cached-gemini|cached/i.test(asset.provider ?? "")) ? "cached-gemini" : previews.some((asset) => asset.provider === "openai") ? "openai" : previews.some((asset) => asset.provider === "premium-fallback") ? "premium-fallback" : previews.some((asset) => asset.provider === "local-placeholder") ? "legacy-placeholder" : "persisted"),
+      provider: run.studioProvider ?? (studioAssets.some((asset) => asset.provider === "imagen") ? "imagen" : studioAssets.some((asset) => asset.provider === "gemini") ? "gemini" : studioAssets.some((asset) => /cached-imagen/i.test(asset.provider ?? "")) ? "cached-imagen" : studioAssets.some((asset) => /cached-gemini|cached/i.test(asset.provider ?? "")) ? "cached-gemini" : previews.some((asset) => asset.provider === "openai") ? "openai" : previews.some((asset) => asset.provider === "premium-fallback") ? "premium-fallback" : previews.some((asset) => asset.provider === "local-placeholder") ? "legacy-placeholder" : "persisted"),
       imageCount: studioAssets.length || previews.filter((asset) => asset.type === "BANNER" || asset.type === "SAMPLE_NFT").length,
       imagesThisRun: studioAssets.length,
       estimatedOpenAIRequestCount: 0,

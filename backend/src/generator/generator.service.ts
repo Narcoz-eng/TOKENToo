@@ -169,7 +169,8 @@ export class GeneratorService {
       capabilities: {
         openaiImagesAvailable: Boolean(process.env.OPENAI_API_KEY),
         pinataAvailable: Boolean(process.env.PINATA_JWT),
-        geminiImagesAvailable: Boolean(process.env.GEMINI_API_KEY),
+        geminiTextAvailable: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.IMAGEN_API_KEY),
+        imagenImagesAvailable: Boolean(process.env.IMAGEN_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY),
         aiGenerationEnabled: (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true",
         productionStorageAvailable: (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") !== "mock" && Boolean(process.env.PINATA_JWT)
       },
@@ -1323,6 +1324,9 @@ export class GeneratorService {
   }
 
   private studioProviderLabel(summary: StudioGenerationSummary) {
+    if (summary.provider === "imagen") return "imagen-fast-studio-preview";
+    if (summary.provider === "cached-imagen") return "cached-imagen-studio-bible-preview";
+    if (summary.provider === "imagen-unavailable") return "imagen-unavailable-no-studio-sheets";
     if (summary.provider === "gemini") return "gemini-fast-studio-preview";
     if (summary.provider === "cached" || summary.provider === "cached-gemini") return "cached-gemini-studio-bible-preview";
     if (summary.provider === "gemini-unavailable") return "gemini-unavailable-no-studio-sheets";
