@@ -51,6 +51,17 @@ export class VaultRedeemOrchestratorService {
     if (!verification.verificationAvailable && this.productionMode()) throw new BadRequestException("Production redeem build requires live NFT ownership and collection verification.");
     if (!verification.ownerMatches) throw new BadRequestException("Wallet does not own the Core asset.");
     if (!verification.collectionMatches) throw new BadRequestException("Core asset does not belong to the expected collection.");
+    const position = await this.solana.verifyVaultPositionPda({
+      walletAddress,
+      tokenMint: nft.collection.token.mint,
+      nftAssetAddress: nft.mint,
+      vaultPositionPda: nft.positionPda,
+      expectedAmount: nft.amount.toString(),
+      expectedRedeemed: false,
+      expectedStaked: false
+    });
+    if (position.verificationAvailable && !position.passed) throw new BadRequestException(`Vault position PDA verification failed: ${position.issues.join(" ")}`);
+    if (!position.verificationAvailable && this.productionMode()) throw new BadRequestException("Production redeem build requires live vault position PDA verification.");
 
     const unsignedTransaction = await this.solana.buildRedeemTransaction({
       transactionId: tx.id,
@@ -87,7 +98,8 @@ export class VaultRedeemOrchestratorService {
         preRedeemVaultTokenBalance: typeof summary.preRedeemVaultTokenBalance === "string" ? summary.preRedeemVaultTokenBalance : undefined
       });
       if (!finalization.passed) {
-        const coreUnverified = !finalization.coreAssetInvalidated;
+        const issues = (finalization.issues ?? []) as string[];
+        const coreUnverified = issues.length === 1 && /Core asset still exists/i.test(String(issues[0]));
         return this.prisma.redeemTransaction.update({
           where: { id },
           data: {

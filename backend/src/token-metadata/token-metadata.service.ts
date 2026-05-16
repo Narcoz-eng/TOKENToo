@@ -4,6 +4,7 @@ import { requireDbForWrite } from "../db/db-safety";
 import { PrismaService } from "../db/prisma.service";
 import { AssetStorageService } from "../generator/asset-storage.service";
 import { normalizeHeliusConfig, setLastHeliusErrorCode } from "../token-scanner/helius-config";
+import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
 
 export type TokenMetadataInput = {
   mint: string;
@@ -20,7 +21,8 @@ export type TokenMetadataInput = {
 export class TokenMetadataService {
   constructor(
     @Inject(AssetStorageService) private readonly storage: AssetStorageService,
-    @Inject(PrismaService) private readonly prisma: PrismaService
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
   ) {}
 
   async uploadTokenLogo(input: { mint: string; logoDataUri?: string; logoUrl?: string }) {
@@ -42,11 +44,18 @@ export class TokenMetadataService {
     });
   }
 
-  async createOrUpdateTokenMetadata(input: TokenMetadataInput) {
+  async createOrUpdateTokenMetadata(input: TokenMetadataInput, walletAddress: string) {
     await requireDbForWrite(this.prisma);
     const uri = await this.uploadTokenMetadataJson(input);
     const token = await this.prisma.token.findUnique({ where: { mint: input.mint } });
     const logoUri = input.logoUrl ?? null;
+    const unsignedTransaction = await this.solana.buildTokenMetadataWriteTransaction({
+      walletAddress,
+      mint: input.mint,
+      name: input.name,
+      symbol: input.symbol,
+      metadataUri: uri
+    });
     await this.prisma.tokenMetadataRecord.upsert({
       where: { mint: input.mint },
       update: {
@@ -56,9 +65,13 @@ export class TokenMetadataService {
         description: input.description,
         logoUri,
         metadataUri: uri,
-        provider: "backend",
-        onChainWriteStatus: "PROVIDER_NOT_CONFIGURED",
-        metadata: input.extensions ?? {}
+        provider: "metaplex-token-metadata",
+        onChainWriteStatus: unsignedTransaction.base64UnsignedTransaction ? "TX_BUILT" : "PROVIDER_NOT_CONFIGURED",
+        metadata: {
+          ...(input.extensions ?? {}),
+          metadataPda: unsignedTransaction.metadataPda,
+          unsignedTransaction
+        }
       },
       create: {
         tokenId: token?.id,
@@ -68,18 +81,77 @@ export class TokenMetadataService {
         description: input.description,
         logoUri,
         metadataUri: uri,
-        provider: "backend",
-        onChainWriteStatus: "PROVIDER_NOT_CONFIGURED",
-        metadata: input.extensions ?? {}
+        provider: "metaplex-token-metadata",
+        onChainWriteStatus: unsignedTransaction.base64UnsignedTransaction ? "TX_BUILT" : "PROVIDER_NOT_CONFIGURED",
+        metadata: {
+          ...(input.extensions ?? {}),
+          metadataPda: unsignedTransaction.metadataPda,
+          unsignedTransaction
+        }
       }
     });
     return {
-      ok: false,
-      code: "PROVIDER_NOT_CONFIGURED",
-      message: "Token metadata JSON is uploaded, but on-chain SPL token metadata write support is not configured in this build.",
-      action: "Install/configure the Token Metadata program adapter, then write this URI to the mint metadata account.",
-      metadataUri: uri
+      ok: Boolean(unsignedTransaction.base64UnsignedTransaction),
+      code: unsignedTransaction.base64UnsignedTransaction ? "TOKEN_METADATA_TX_BUILT" : "PROVIDER_NOT_CONFIGURED",
+      message: unsignedTransaction.base64UnsignedTransaction
+        ? "Token metadata JSON is uploaded and a wallet-signed Metaplex Token Metadata write transaction is ready."
+        : "Token metadata JSON is uploaded, but the on-chain write adapter requires SOLANA_TRANSACTION_PROVIDER=devnet.",
+      metadataUri: uri,
+      unsignedTransaction
     };
+  }
+
+  async submitTokenMetadataWrite(mint: string, input: { signedTransaction?: string; txSignature?: string }, walletAddress: string) {
+    await requireDbForWrite(this.prisma);
+    this.assertMint(mint);
+    const record = await this.prisma.tokenMetadataRecord.findUnique({ where: { mint } });
+    if (!record?.metadataUri) throw new BadRequestException("Token metadata record must be created before submit.");
+    const result = await this.solana.submitAndConfirm({
+      transactionId: record.id,
+      signedTransaction: input.signedTransaction,
+      txSignature: input.txSignature
+    });
+    if (!result.confirmed) {
+      return this.prisma.tokenMetadataRecord.update({
+        where: { mint },
+        data: {
+          onChainWriteStatus: result.status,
+          onChainTxSignature: result.txSignature,
+          verificationStatus: result.message
+        }
+      });
+    }
+    const verification = await this.solana.verifyTokenMetadataAccount({
+      mint,
+      expectedUri: record.metadataUri,
+      expectedName: record.name,
+      expectedSymbol: record.symbol
+    });
+    if (verification.verificationAvailable && !verification.passed) {
+      await this.prisma.tokenMetadataRecord.update({
+        where: { mint },
+        data: {
+          onChainWriteStatus: "FAILED",
+          onChainTxSignature: result.txSignature,
+          verificationStatus: JSON.stringify(verification.issues)
+        }
+      });
+      throw new BadRequestException(`Token metadata transaction confirmed but verification failed: ${verification.issues.join(" ")}`);
+    }
+    return this.prisma.tokenMetadataRecord.update({
+      where: { mint },
+      data: {
+        onChainWriteStatus: "CONFIRMED",
+        onChainTxSignature: result.txSignature,
+        indexed: verification.passed,
+        verificationStatus: verification.passed ? "verified" : "confirmed_unverified",
+        metadata: {
+          ...this.record(record.metadata),
+          submittedBy: walletAddress,
+          verification
+        }
+      }
+    });
   }
 
   async fetchTokenMetadata(mint: string) {
@@ -138,8 +210,8 @@ export class TokenMetadataService {
       tokenMetadataAvailable: Boolean(process.env.PROGRAM_ID && (process.env.PINATA_JWT || process.env.IRYS_PRIVATE_KEY || process.env.ARWEAVE_KEY)),
       heliusAvailable: Boolean(normalizeHeliusConfig().heliusApiKey),
       storageAvailable: Boolean(process.env.PINATA_JWT),
-      onChainWriteAdapter: false,
-      warning: "Metadata upload/status hooks are present. On-chain token metadata write adapter is a setup blocker, not a fake success."
+      onChainWriteAdapter: (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "devnet",
+      warning: (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "devnet" ? undefined : "On-chain token metadata write adapter requires SOLANA_TRANSACTION_PROVIDER=devnet."
     };
   }
 
@@ -149,5 +221,9 @@ export class TokenMetadataService {
     } catch {
       throw new BadRequestException("Invalid Solana mint address.");
     }
+  }
+
+  private record(value: unknown) {
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   }
 }

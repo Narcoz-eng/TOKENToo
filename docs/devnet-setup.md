@@ -149,7 +149,7 @@ Supabase Storage is preview-only. Final NFT image and metadata must use immutabl
 
 Current build supports Pinata final uploads. Arweave/Irys env is recognized as a production requirement but needs an adapter before launch can pass.
 
-## 8. Create Core Collection Asset
+## 8. Launch Community Profile + Reserve
 
 Flow:
 
@@ -158,12 +158,21 @@ Flow:
 3. Call `POST /generator/runs/:id/launch-collection/build`.
 4. Sign returned `launchUnsignedTransaction.base64UnsignedTransaction` with the test wallet.
 5. Submit with `POST /generator/runs/:id/launch-collection/submit`.
-6. Copy the confirmed `collectionAssetAddress`.
+6. Confirm the response has `launchStatus=CONFIRMED`, `onchainProfilePda`, `feeVaultPda`, and `tokenVaultPda`.
+
+The launch transaction now creates the Metaplex Core collection asset, initializes the Anchor collection profile/fee vault/token vault state when missing, and creates the PDA-owned SPL reserve token account idempotently. The database is only marked confirmed after those accounts verify on devnet.
+
+For CA-first communities created with `POST /communities/from-token`, use the matching protocol endpoints:
+
+```text
+POST /communities/:id/launch/build
+POST /communities/:id/launch/submit
+```
 
 Set:
 
 ```env
-DEVNET_TEST_COLLECTION_ASSET=<confirmed Core collection asset>
+DEVNET_TEST_COLLECTION_ASSET=<optional confirmed Core collection asset for manual smoke tests>
 ```
 
 ## 9. Required Devnet Env
@@ -185,6 +194,9 @@ HELIUS_API_KEY=
 DEVNET_TEST_TOKEN_MINT=
 DEVNET_TEST_WALLET_PUBLIC_KEY=
 DEVNET_TEST_COLLECTION_ASSET=
+COMMUNITY_CREATION_MIN_CREATOR_TOKEN_BALANCE_RAW=0
+STAKING_TRANSACTION_PROVIDER=disabled
+ENABLE_LOCAL_STAKING_ACCOUNTING=false
 ```
 
 Vercel Supabase integration still provides:
@@ -216,7 +228,7 @@ Optional flags:
 
 - `--create-token`: creates a devnet SPL token mint, creates the wallet ATA, mints test tokens, and prints `DEVNET_TEST_TOKEN_MINT`.
 - `--mint-test-tokens`: mints more tokens to the configured devnet test wallet.
-- `--create-collection-asset`: uploads devnet collection metadata to Pinata, creates a Metaplex Core collection asset, signs with `ANCHOR_WALLET`, confirms it, and prints `DEVNET_TEST_COLLECTION_ASSET`.
+- `--create-collection-asset`: optional legacy helper that uploads devnet collection metadata to Pinata, creates a Metaplex Core collection asset, signs with `ANCHOR_WALLET`, confirms it, and prints `DEVNET_TEST_COLLECTION_ASSET`.
 - `--print-env`: prints a final redacted `.env` block.
 
-If `devnet:e2e` skips, it prints the exact missing env vars and where to get them. The current script validates/builds the devnet transaction path; full automated signing/submission requires a funded signer path or key management flow and remains a launch blocker until completed.
+If `devnet:e2e` skips, it prints the exact missing env vars and where to get them. The script now signs and submits the community launch, mint, redeem, and double-redeem rejection flow with `ANCHOR_WALLET`, then verifies Anchor PDA state and PDA-owned SPL reserve custody.

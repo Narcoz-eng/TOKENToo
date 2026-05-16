@@ -21,6 +21,10 @@ const purchaseSchema = z.object({
   idempotencyKey: z.string().optional()
 });
 
+const refreshOwnersSchema = z.object({
+  limit: z.number().int().positive().max(200).optional()
+});
+
 @Controller("marketplace")
 export class MarketplaceController {
   constructor(@Inject(MarketplaceEngineService) private readonly marketplace: MarketplaceEngineService) {}
@@ -40,6 +44,12 @@ export class MarketplaceController {
   @UseGuards(WalletAuthGuard)
   instantSellQuote(@Body() body: unknown, @WalletAddress() walletAddress: string) {
     return this.marketplace.persistInstantSellQuote({ ...quoteSchema.parse(body), walletAddress });
+  }
+
+  @Post("owners/refresh")
+  @UseGuards(WalletAuthGuard)
+  refreshOwners(@Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.marketplace.refreshOwnerSnapshots({ ...refreshOwnersSchema.parse(body ?? {}), walletAddress });
   }
 
   @Post("purchases/intents")

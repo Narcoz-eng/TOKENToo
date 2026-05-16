@@ -28,6 +28,17 @@ export class StakingService {
       };
     }
     const ownership = await this.protocol.assertCurrentOwner({ nft, walletAddress: input.walletAddress });
+    if (!this.localStakingAccountingEnabled() && !this.productionStakingAdapterAvailable()) {
+      return {
+        ok: true,
+        action: "STAKE_VAULT",
+        status: "SKIPPED",
+        idempotencyKey: input.idempotencyKey,
+        verification: ownership,
+        productionReady: false,
+        message: "Staking transaction adapter is not implemented; no local staking state was mutated."
+      };
+    }
     const user = await this.prisma.user.upsert({
       where: { walletAddress: input.walletAddress },
       update: {},
@@ -77,6 +88,16 @@ export class StakingService {
       return { ok: true, idempotent: true, action: "UNSTAKE_VAULT", position, message: "Staking position is already inactive." };
     }
     const ownership = await this.protocol.assertCurrentOwner({ nft: position.vaultNft, walletAddress: input.walletAddress });
+    if (!this.localStakingAccountingEnabled() && !this.productionStakingAdapterAvailable()) {
+      return {
+        ok: true,
+        action: "UNSTAKE_VAULT",
+        status: "SKIPPED",
+        idempotencyKey: input.idempotencyKey,
+        verification: ownership,
+        message: "Unstake transaction adapter is not implemented; no local staking state was mutated."
+      };
+    }
     const nextStatus = position.vaultNft.redeemedAt ? "REDEEMED" : new Date() >= position.vaultNft.unlocksAt ? "REDEEMABLE" : "LOCKED";
     const updated = await this.prisma.$transaction(async (tx) => {
       const unstaked = await tx.stakingPosition.update({
@@ -114,6 +135,20 @@ export class StakingService {
     if (position.user.walletAddress !== input.walletAddress) throw new ConflictException("Wallet does not own this staking position.");
     if (position.status !== "ACTIVE") throw new BadRequestException("Only active staking positions can claim rewards.");
     const ownership = await this.protocol.assertCurrentOwner({ nft: position.vaultNft, walletAddress: input.walletAddress });
+    if (!this.productionStakingAdapterAvailable()) {
+      return {
+        ok: true,
+        action: "CLAIM_REWARDS",
+        status: "SKIPPED",
+        idempotencyKey: input.idempotencyKey,
+        stakingPositionId: position.id,
+        rewardsAccruedSol: position.rewardsAccruedSol.toString(),
+        xpAccrued: position.xpAccrued,
+        verification: ownership,
+        payoutStatus: "SKIPPED_NO_ADAPTER",
+        message: "Rewards payout adapter is not implemented; accrued accounting is reported but no payout is faked."
+      };
+    }
     return {
       ok: true,
       action: "CLAIM_REWARDS",
@@ -132,6 +167,10 @@ export class StakingService {
   }
 
   private productionStakingAdapterAvailable() {
-    return (process.env.STAKING_TRANSACTION_PROVIDER ?? "mock") !== "mock" && (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") === "production";
+    return (process.env.STAKING_TRANSACTION_PROVIDER ?? "disabled") !== "disabled" && false;
+  }
+
+  private localStakingAccountingEnabled() {
+    return (process.env.ENABLE_LOCAL_STAKING_ACCOUNTING ?? "false") === "true" && (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") !== "production";
   }
 }

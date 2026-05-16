@@ -1,6 +1,7 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../db/prisma.service";
+import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
 
 type TxLike = Pick<
   PrismaService,
@@ -9,7 +10,10 @@ type TxLike = Pick<
 
 @Injectable()
 export class ProtocolAccountingService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Optional() @Inject(SolanaTransactionAdapterService) private readonly solana?: SolanaTransactionAdapterService
+  ) {}
 
   async syncVaultPosition(vaultNftId: string, options: { ownerWallet?: string; verified?: boolean; metadata?: Record<string, unknown> } = {}) {
     const nft = await this.prisma.vaultNFT.findUnique({
@@ -70,40 +74,59 @@ export class ProtocolAccountingService {
     const totalRedeemed = this.decimalString(redeemed._sum.amount);
     const totalStaked = this.decimalString(staked._sum.amount);
     const availableBacking = this.decimalString(active._sum.amount);
-    const obligations = BigInt(availableBacking);
-    const ratio = obligations === 0n ? 10000 : Math.min(10000, Number((BigInt(availableBacking) * 10000n) / obligations));
     const reserveVaultPda = collection.tokenVaultPda ?? this.pendingReservePda(collection.id);
+    const obligations = BigInt(availableBacking);
+    const custody = await this.liveCustody(collection.token.mint, obligations.toString(), tx === this.prisma);
+    const chainBalance = custody.verificationAvailable ? BigInt(custody.balance ?? "0") : obligations;
+    const ratio = obligations === 0n ? 10000 : Math.min(10000, Number((chainBalance * 10000n) / obligations));
+    const reserveStatus = collection.emergencyFlag
+      ? "EMERGENCY"
+      : collection.status === "PAUSED" || collection.status === "RISK_DISABLED"
+        ? "PAUSED"
+        : custody.verificationAvailable && chainBalance < obligations
+          ? "INSOLVENT"
+          : "ACTIVE";
+    const verificationMetadata = custody.verificationAvailable
+      ? {
+          source: "on-chain-custody",
+          reserveVaultTokenAccount: custody.addresses?.reserveVaultTokenAccount ?? reserveVaultPda,
+          tokenVaultAuthority: custody.addresses?.tokenVaultAuthority,
+          chainBalance: custody.balance ?? "0",
+          localOutstandingBacking: availableBacking,
+          issues: custody.issues
+        }
+      : {
+          source: "db-accounting",
+          warning: "Reserve totals are local accounting until live on-chain reserve verification succeeds.",
+          issues: custody.issues
+        };
 
     return tx.reserveVault.upsert({
       where: { collectionId },
       update: {
         tokenMint: collection.token.mint,
-        reserveVaultPda,
+        reserveVaultPda: custody.addresses?.reserveVaultTokenAccount ?? reserveVaultPda,
         totalLocked,
         totalRedeemed,
         totalStaked,
-        availableBacking,
+        availableBacking: custody.verificationAvailable ? (custody.balance ?? "0") : availableBacking,
         reserveRatioBps: ratio,
-        status: collection.emergencyFlag ? "EMERGENCY" : collection.status === "PAUSED" || collection.status === "RISK_DISABLED" ? "PAUSED" : "ACTIVE",
-        verificationMetadata: this.json({
-          source: "db-accounting",
-          warning: "Reserve totals are local accounting until live on-chain reserve verification succeeds."
-        })
+        status: reserveStatus,
+        lastOnChainVerifiedAt: custody.verificationAvailable ? new Date() : undefined,
+        verificationMetadata: this.json(verificationMetadata)
       },
       create: {
         collectionId,
         tokenMint: collection.token.mint,
-        reserveVaultPda,
+        reserveVaultPda: custody.addresses?.reserveVaultTokenAccount ?? reserveVaultPda,
         totalLocked,
         totalRedeemed,
         totalStaked,
-        availableBacking,
+        availableBacking: custody.verificationAvailable ? (custody.balance ?? "0") : availableBacking,
         reserveRatioBps: ratio,
-        status: collection.emergencyFlag ? "EMERGENCY" : collection.status === "PAUSED" || collection.status === "RISK_DISABLED" ? "PAUSED" : "ACTIVE",
-        verificationMetadata: this.json({
-          source: "db-accounting",
-          warning: "Reserve totals are local accounting until live on-chain reserve verification succeeds."
-        })
+        status: reserveStatus,
+        lastOnChainVerifiedAt: custody.verificationAvailable ? new Date() : undefined,
+        verificationMetadata: this.json(verificationMetadata)
       }
     });
   }
@@ -131,5 +154,26 @@ export class ProtocolAccountingService {
 
   private json(value: unknown): Prisma.InputJsonValue {
     return value as Prisma.InputJsonValue;
+  }
+
+  private async liveCustody(tokenMint: string, expectedBackingAmount: string, allowNetwork: boolean) {
+    if (!allowNetwork || !this.solana || (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") !== "devnet") {
+      return {
+        verificationAvailable: false,
+        balance: null as string | null,
+        addresses: null as any,
+        issues: ["Live reserve custody verification is unavailable in this execution context."]
+      };
+    }
+    try {
+      return await this.solana.verifyReserveCustody({ tokenMint, expectedBackingAmount });
+    } catch (error) {
+      return {
+        verificationAvailable: false,
+        balance: null as string | null,
+        addresses: null as any,
+        issues: [`Live reserve custody verification failed: ${error instanceof Error ? error.message : String(error)}`]
+      };
+    }
   }
 }

@@ -45,6 +45,12 @@ const executionSchema = z.object({
   idempotencyKey: z.string().min(8).optional()
 });
 
+const submitLaunchSchema = z.object({
+  txSignature: z.string().optional(),
+  signedTransaction: z.string().optional(),
+  signedTransactionBase64: z.string().optional()
+});
+
 @Controller()
 export class CommunityProtocolController {
   constructor(
@@ -56,6 +62,19 @@ export class CommunityProtocolController {
   @UseGuards(WalletAuthGuard)
   createFromToken(@Body() body: unknown, @WalletAddress() walletAddress: string) {
     return this.communities.createFromToken({ ...createCommunitySchema.parse(body), walletAddress });
+  }
+
+  @Post("communities/:id/launch/build")
+  @UseGuards(WalletAuthGuard)
+  buildCommunityLaunch(@Param("id") id: string, @WalletAddress() walletAddress: string) {
+    return this.communities.buildCommunityLaunch(id, walletAddress);
+  }
+
+  @Post("communities/:id/launch/submit")
+  @UseGuards(WalletAuthGuard)
+  submitCommunityLaunch(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    const parsed = submitLaunchSchema.parse(body);
+    return this.communities.submitCommunityLaunch(id, { signedTransaction: parsed.signedTransaction ?? parsed.signedTransactionBase64, txSignature: parsed.txSignature }, walletAddress);
   }
 
   @Get("collections/:id/strategy")

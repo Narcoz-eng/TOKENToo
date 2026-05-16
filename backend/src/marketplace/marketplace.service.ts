@@ -127,6 +127,44 @@ export class MarketplaceEngineService {
     });
   }
 
+  async refreshOwnerSnapshots(input: { walletAddress: string; limit?: number }) {
+    if (!this.isAdmin(input.walletAddress)) throw new BadRequestException("Marketplace owner refresh requires a protocol admin wallet.");
+    const listings = await this.prisma.listing.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: { createdAt: "desc" },
+      take: Math.min(Math.max(input.limit ?? 50, 1), 200),
+      include: {
+        seller: true,
+        vaultNft: { include: { owner: true, collection: { include: { token: true } } } }
+      }
+    });
+    const refreshed = [];
+    for (const listing of listings) {
+      const proof = await this.protocol.refreshOwnerSnapshot(listing.vaultNft, listing.seller.walletAddress);
+      const staleSeller = proof.verificationAvailable && proof.currentOwner && proof.currentOwner !== listing.seller.walletAddress;
+      if (staleSeller) {
+        await this.prisma.listing.update({ where: { id: listing.id }, data: { status: "CANCELLED" } });
+      }
+      refreshed.push({
+        listingId: listing.id,
+        vaultNftId: listing.vaultNftId,
+        sellerWallet: listing.seller.walletAddress,
+        currentOwner: proof.currentOwner,
+        verificationAvailable: proof.verificationAvailable,
+        collectionMatches: proof.collectionMatches,
+        staleSeller,
+        listingStatus: staleSeller ? "CANCELLED" : listing.status,
+        issues: proof.issues
+      });
+    }
+    return {
+      ok: true,
+      checked: refreshed.length,
+      cancelled: refreshed.filter((item) => item.staleSeller).length,
+      refreshed
+    };
+  }
+
   createPurchaseIntent(input: { listingId: string; walletAddress: string; idempotencyKey?: string }): never {
     throw new NotImplementedException({
       code: "ACTION_NOT_IMPLEMENTED",
@@ -154,5 +192,9 @@ export class MarketplaceEngineService {
     if (score >= 75) return "SAFE";
     if (score >= 60) return "MEDIUM";
     return "HIGH_RISK";
+  }
+
+  private isAdmin(walletAddress: string) {
+    return new Set((process.env.PROTOCOL_ADMIN_WALLETS ?? process.env.ADMIN_WALLETS ?? "").split(/[,\s]+/).filter(Boolean)).has(walletAddress);
   }
 }

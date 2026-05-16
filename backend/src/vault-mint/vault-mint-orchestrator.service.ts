@@ -114,6 +114,17 @@ export class VaultMintOrchestratorService {
     if (tx.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this mint transaction.");
     if (!tx.metadataUri) throw new BadRequestException("Mint transaction has no uploaded metadata URI.");
     if (!["ASSET_UPLOADED", "TX_BUILT", "FAILED"].includes(tx.status)) throw new ConflictException(`Mint transaction cannot be built from ${tx.status}`);
+    const setup = await this.solana.verifyCommunityProfileInitialization({
+      walletAddress: tx.walletAddress,
+      tokenMint: tx.tokenMint,
+      collectionAssetAddress: tx.collection.collectionAssetAddress
+    });
+    if (setup.verificationAvailable && !setup.passed) {
+      throw new BadRequestException(`Collection protocol profile/reserve is not initialized on-chain: ${setup.issues.join(" ")}`);
+    }
+    if (!setup.verificationAvailable && this.productionMintRequested()) {
+      throw new BadRequestException("Production minting requires live collection profile and reserve custody verification.");
+    }
 
     const unsignedTransaction = await this.solana.buildVaultMintTransaction({
       transactionId: tx.id,
@@ -152,14 +163,17 @@ export class VaultMintOrchestratorService {
     if (!tx) throw new NotFoundException("Mint transaction not found");
     if (tx.walletAddress !== walletAddress) throw new ConflictException("Wallet does not own this mint transaction.");
     if (!["TX_BUILT", "SUBMITTED", "FAILED"].includes(tx.status)) throw new ConflictException(`Mint transaction cannot be submitted from ${tx.status}`);
+    const devnetProvider = (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "devnet";
+    if (devnetProvider && input.nftMint && tx.nftMint && input.nftMint !== tx.nftMint) throw new BadRequestException("Submitted nftMint does not match the built devnet transaction.");
+    if (devnetProvider && input.vaultPositionPda && tx.vaultPositionPda && input.vaultPositionPda !== tx.vaultPositionPda) throw new BadRequestException("Submitted vaultPositionPda does not match the built devnet transaction.");
 
     const result = await this.solana.submitAndConfirm({ transactionId: id, txSignature: input.txSignature ?? undefined, signedTransaction: input.signedTransaction, confirmMock: this.mockMintEnabled() ? input.confirmMock : false });
     const mockOutputRequested = !tx.nftMint || !tx.vaultPositionPda;
     if (result.confirmed && mockOutputRequested && !this.mockMintEnabled()) {
       throw new BadRequestException("Confirmed mint cannot finalize without real nftMint/coreAssetAddress and vaultPositionPda from the built transaction.");
     }
-    const finalizedNftMint = input.nftMint ?? tx.nftMint ?? (result.confirmed && this.mockMintEnabled() ? `mock_nft_${id.replace(/-/g, "").slice(0, 32)}` : undefined);
-    const finalizedVaultPosition = input.vaultPositionPda ?? tx.vaultPositionPda ?? (result.confirmed && this.mockMintEnabled() ? `mock_position_${id.replace(/-/g, "").slice(0, 32)}` : undefined);
+    const finalizedNftMint = devnetProvider ? tx.nftMint ?? undefined : input.nftMint ?? tx.nftMint ?? (result.confirmed && this.mockMintEnabled() ? `mock_nft_${id.replace(/-/g, "").slice(0, 32)}` : undefined);
+    const finalizedVaultPosition = devnetProvider ? tx.vaultPositionPda ?? undefined : input.vaultPositionPda ?? tx.vaultPositionPda ?? (result.confirmed && this.mockMintEnabled() ? `mock_position_${id.replace(/-/g, "").slice(0, 32)}` : undefined);
     if (result.confirmed && finalizedNftMint && finalizedVaultPosition && tx.collection.collectionAssetAddress) {
       const finalization = await this.solana.verifyMintFinalization({
         walletAddress: tx.walletAddress,

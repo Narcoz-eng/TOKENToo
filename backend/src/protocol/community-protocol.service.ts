@@ -21,6 +21,11 @@ type CreateCommunityInput = {
   name?: string;
 };
 
+type SubmitCommunityLaunchInput = {
+  signedTransaction?: string;
+  txSignature?: string;
+};
+
 @Injectable()
 export class CommunityProtocolService {
   constructor(
@@ -86,6 +91,7 @@ export class CommunityProtocolService {
     });
     const profile = this.identity.createCommunityProfile(scan);
     const slug = await this.uniqueSlug(normalized.slug ?? `${scan.symbol}-vaults`, scan.mint);
+    const reserveAddresses = this.reserveAddresses(token.mint, normalized.walletAddress);
     const collection = await this.prisma.$transaction(async (tx) => {
       const created = await tx.collection.create({
         data: {
@@ -106,14 +112,16 @@ export class CommunityProtocolService {
           launchStatus: "DRAFT",
           status: "ACTIVE",
           metadataUri: scan.metadataUri,
-          tokenVaultPda: this.pendingReservePda(token.id)
+          onchainProfilePda: reserveAddresses.collectionProfile,
+          feeVaultPda: reserveAddresses.feeVault,
+          tokenVaultPda: reserveAddresses.reserveVaultTokenAccount
         }
       });
       await tx.reserveVault.create({
         data: {
           collectionId: created.id,
           tokenMint: token.mint,
-          reserveVaultPda: created.tokenVaultPda ?? this.pendingReservePda(created.id),
+          reserveVaultPda: reserveAddresses.reserveVaultTokenAccount,
           totalLocked: "0",
           totalRedeemed: "0",
           totalStaked: "0",
@@ -122,7 +130,9 @@ export class CommunityProtocolService {
           status: "ACTIVE",
           verificationMetadata: this.json({
             source: "community-draft",
-            warning: "Reserve PDA is prepared but not production proof until the collection launch transaction is confirmed on-chain."
+            tokenVaultAuthority: reserveAddresses.tokenVaultAuthority,
+            tokenVaultStatePda: reserveAddresses.tokenVaultState,
+            warning: "Reserve custody account is deterministic but not production proof until the collection launch transaction is confirmed on-chain."
           })
         }
       });
@@ -159,6 +169,157 @@ export class CommunityProtocolService {
       token: scan,
       message: "Token community draft created. Launch remains blocked until production assets and on-chain collection setup are complete."
     };
+  }
+
+  async buildCommunityLaunch(idOrSlug: string, walletAddress: string) {
+    const collection = await this.collectionForLaunch(idOrSlug);
+    this.assertCreatorOrAdmin(collection, walletAddress);
+    if (collection.launchStatus === "CONFIRMED" && collection.collectionAssetAddress && collection.onchainProfilePda && collection.tokenVaultPda) {
+      return { ok: true, idempotent: true, collection: this.collectionDto(collection), launchUnsignedTransaction: collection.launchUnsignedTransaction };
+    }
+    const metadataUri = collection.collectionMetadataUri ?? collection.metadataUri ?? collection.token.metadataUri;
+    if (!metadataUri) throw new BadRequestException("Community launch requires pinned collection metadataUri before on-chain initialization.");
+    const launchTx = await this.solana.buildCommunityLaunchTransaction({
+      walletAddress,
+      tokenMint: collection.token.mint,
+      collectionName: collection.name,
+      metadataUri,
+      theme: collection.theme,
+      mascot: collection.mascot,
+      vibe: collection.vibe
+    });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.collection.update({
+        where: { id: collection.id },
+        data: {
+          collectionMetadataUri: metadataUri,
+          metadataUri,
+          collectionAssetAddress: launchTx.collectionAssetAddress,
+          onchainProfilePda: launchTx.onchainProfilePda,
+          feeVaultPda: launchTx.feeVaultPda,
+          tokenVaultPda: launchTx.reserveVaultTokenAccount,
+          launchUnsignedTransaction: this.json(launchTx),
+          launchStatus: launchTx.base64UnsignedTransaction ? "TX_BUILT" : "PENDING"
+        },
+        include: { token: true, reserveVault: true, vaultStrategy: true, creator: true }
+      });
+      await tx.reserveVault.upsert({
+        where: { collectionId: collection.id },
+        update: {
+          tokenMint: collection.token.mint,
+          reserveVaultPda: launchTx.reserveVaultTokenAccount,
+          status: "ACTIVE",
+          verificationMetadata: this.json({
+            source: "community-launch-transaction-built",
+            tokenVaultAuthority: launchTx.tokenVaultAuthority,
+            tokenVaultStatePda: launchTx.tokenVaultStatePda,
+            warning: "Reserve custody is not confirmed until the launch transaction is signed and verified."
+          })
+        },
+        create: {
+          collectionId: collection.id,
+          tokenMint: collection.token.mint,
+          reserveVaultPda: launchTx.reserveVaultTokenAccount,
+          totalLocked: "0",
+          totalRedeemed: "0",
+          totalStaked: "0",
+          availableBacking: "0",
+          reserveRatioBps: 10000,
+          status: "ACTIVE",
+          verificationMetadata: this.json({
+            source: "community-launch-transaction-built",
+            tokenVaultAuthority: launchTx.tokenVaultAuthority,
+            tokenVaultStatePda: launchTx.tokenVaultStatePda,
+            warning: "Reserve custody is not confirmed until the launch transaction is signed and verified."
+          })
+        }
+      });
+      return row;
+    });
+    return { ok: true, collection: this.collectionDto(updated), launchUnsignedTransaction: launchTx };
+  }
+
+  async submitCommunityLaunch(idOrSlug: string, input: SubmitCommunityLaunchInput, walletAddress: string) {
+    const collection = await this.collectionForLaunch(idOrSlug);
+    this.assertCreatorOrAdmin(collection, walletAddress);
+    const result = await this.solana.submitAndConfirm({
+      transactionId: collection.id,
+      signedTransaction: input.signedTransaction,
+      txSignature: input.txSignature
+    });
+    if (!result.confirmed) {
+      const updated = await this.prisma.collection.update({
+        where: { id: collection.id },
+        data: { launchStatus: result.status, launchTxSignature: result.txSignature },
+        include: { token: true, reserveVault: true, vaultStrategy: true, creator: true }
+      });
+      return { ok: result.status !== "FAILED", collection: this.collectionDto(updated), result };
+    }
+    const verification = await this.solana.verifyCommunityProfileInitialization({
+      walletAddress,
+      tokenMint: collection.token.mint,
+      collectionAssetAddress: collection.collectionAssetAddress
+    });
+    if (verification.verificationAvailable && !verification.passed) {
+      await this.prisma.collection.update({ where: { id: collection.id }, data: { launchStatus: "FAILED", launchTxSignature: result.txSignature } });
+      throw new BadRequestException(`Community launch transaction confirmed but protocol account verification failed: ${verification.issues.join(" ")}`);
+    }
+    const addresses = verification.addresses ?? this.solana.deriveCommunityAddresses({ tokenMint: collection.token.mint, walletAddress });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.collection.update({
+        where: { id: collection.id },
+        data: {
+          launchStatus: "CONFIRMED",
+          launchTxSignature: result.txSignature,
+          launchedAt: new Date(),
+          onchainProfilePda: addresses.collectionProfile,
+          feeVaultPda: addresses.feeVault,
+          tokenVaultPda: addresses.reserveVaultTokenAccount
+        },
+        include: { token: true, reserveVault: true, vaultStrategy: true, creator: true }
+      });
+      await tx.reserveVault.upsert({
+        where: { collectionId: collection.id },
+        update: {
+          tokenMint: collection.token.mint,
+          reserveVaultPda: addresses.reserveVaultTokenAccount,
+          availableBacking: verification.reserve?.balance ?? "0",
+          reserveRatioBps: 10000,
+          status: "ACTIVE",
+          lastOnChainVerifiedAt: verification.verificationAvailable ? new Date() : undefined,
+          verificationMetadata: this.json({
+            source: "community-launch-post-confirm",
+            txSignature: result.txSignature,
+            tokenVaultAuthority: addresses.tokenVaultAuthority,
+            tokenVaultStatePda: addresses.tokenVaultState,
+            collectionAssetExists: verification.collectionAssetExists,
+            issues: verification.issues
+          })
+        },
+        create: {
+          collectionId: collection.id,
+          tokenMint: collection.token.mint,
+          reserveVaultPda: addresses.reserveVaultTokenAccount,
+          totalLocked: "0",
+          totalRedeemed: "0",
+          totalStaked: "0",
+          availableBacking: verification.reserve?.balance ?? "0",
+          reserveRatioBps: 10000,
+          status: "ACTIVE",
+          lastOnChainVerifiedAt: verification.verificationAvailable ? new Date() : undefined,
+          verificationMetadata: this.json({
+            source: "community-launch-post-confirm",
+            txSignature: result.txSignature,
+            tokenVaultAuthority: addresses.tokenVaultAuthority,
+            tokenVaultStatePda: addresses.tokenVaultState,
+            collectionAssetExists: verification.collectionAssetExists,
+            issues: verification.issues
+          })
+        }
+      });
+      return row;
+    });
+    return { ok: true, collection: this.collectionDto(updated), result, verification };
   }
 
   private async verifyAccess(input: CreateCommunityInput, scan: TokenScan, requestHash: string) {
@@ -326,6 +487,20 @@ export class CommunityProtocolService {
     };
   }
 
+  private async collectionForLaunch(idOrSlug: string) {
+    const collection = await this.prisma.collection.findFirst({
+      where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
+      include: { token: true, reserveVault: true, vaultStrategy: true, creator: true }
+    });
+    if (!collection) throw new BadRequestException("Collection not found.");
+    return collection as any;
+  }
+
+  private assertCreatorOrAdmin(collection: any, walletAddress: string) {
+    if (collection.creator?.walletAddress === walletAddress || this.isAdmin(walletAddress)) return;
+    throw new ForbiddenException("Only the community creator or protocol admin can launch this community profile.");
+  }
+
   private normalize(input: CreateCommunityInput): CreateCommunityInput {
     if (!input.walletAddress?.trim()) throw new BadRequestException("walletAddress is required.");
     if (!input.tokenMint?.trim()) throw new BadRequestException("tokenMint is required.");
@@ -344,8 +519,18 @@ export class CommunityProtocolService {
     return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "community-vault";
   }
 
-  private pendingReservePda(seed: string) {
-    return `pending_reserve_${seed.replace(/-/g, "").slice(0, 32)}`;
+  private reserveAddresses(tokenMint: string, walletAddress?: string) {
+    try {
+      return this.solana.deriveCommunityAddresses({ tokenMint, walletAddress });
+    } catch {
+      return {
+        collectionProfile: `pending_profile_${tokenMint.slice(0, 32)}`,
+        feeVault: `pending_fee_${tokenMint.slice(0, 32)}`,
+        tokenVaultState: `pending_vault_state_${tokenMint.slice(0, 32)}`,
+        tokenVaultAuthority: `pending_vault_authority_${tokenMint.slice(0, 32)}`,
+        reserveVaultTokenAccount: `pending_reserve_${tokenMint.slice(0, 32)}`
+      };
+    }
   }
 
   private creationFeeLamports() {

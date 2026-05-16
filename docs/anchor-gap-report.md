@@ -6,11 +6,12 @@ Current file: `programs/vaultx/src/lib.rs`
 
 - `declare_id!`, `Anchor.toml`, and env now align to devnet program `8i9Xd9ikQSEdDstcV9L8ikru8nZFBsNWx2Y5TQpgAnU6`; the placeholder must remain rejected in all env files.
 - `deposit_and_mint_vault_nft` now transfers SPL tokens into PDA custody and creates `VaultPosition` state.
+- Backend launch builders now initialize the Anchor community profile, fee vault, token vault state, and PDA-owned SPL reserve token account on devnet before minting is allowed.
 - `deposit_and_mint_vault_nft` records the Metaplex Core asset address, but Core asset creation/collection verification happens in the backend-built transaction.
 - `redeem_vault_nft` now validates owner/unlock/not-staked/not-redeemed/collection/token vault state and transfers SPL tokens back from PDA custody.
 - `redeem_vault_nft` does not burn or invalidate the Metaplex Core asset by itself. The backend redeem builder adds the Metaplex Core burn instruction and the Anchor redeem instruction to the same wallet-signed transaction for devnet V1.
-- `redeem_vault_nft` does not yet parse Metaplex Core collection/owner state on-chain.
-- `stake_vault_nft` is explicitly blocked until holder ownership plus freeze/escrow/custody is implemented.
+- `redeem_vault_nft` does not yet parse Metaplex Core collection/owner state on-chain; the backend verifies Core owner/collection and decodes the Anchor `VaultPosition` PDA before building redeem.
+- `stake_vault_nft` is explicitly blocked until holder ownership plus freeze/escrow/custody is implemented, and the backend now skips staking state mutation unless a future audited staking adapter is implemented.
 - `claim_rewards` is explicitly blocked until reward calculation and fee-vault transfer are implemented.
 
 ## Required Implementation Checklist
@@ -62,4 +63,4 @@ Current file: `programs/vaultx/src/lib.rs`
 
 - `programs/vaultx/tests/vaultx.ts` now contains executable custody/redeem coverage, but it has not passed in this environment.
 - Cargo/Anchor tests could not run in this environment because the Rust/Anchor toolchain was not verified here.
-- Do not treat the Anchor program as production-ready until these tests pass against localnet and devnet.
+- Do not treat the Anchor program as production-ready until these tests pass against localnet and devnet. Backend devnet E2E now signs/submits launch, mint, redeem, and double-redeem checks when the required env and funded `ANCHOR_WALLET` are present.

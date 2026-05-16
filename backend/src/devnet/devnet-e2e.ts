@@ -1,6 +1,7 @@
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { loadLocalEnv } from "../env/load-local-env";
 import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
 import { validateDevnetEnv } from "./devnet-env";
 
@@ -13,11 +14,11 @@ const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
 async function main() {
+  loadLocalEnv();
   const rpcUrl = process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
   const programId = process.env.PROGRAM_ID;
   const tokenMint = process.env.DEVNET_TEST_TOKEN_MINT;
   const wallet = process.env.DEVNET_TEST_WALLET_PUBLIC_KEY;
-  const collectionAssetAddress = process.env.DEVNET_TEST_COLLECTION_ASSET;
 
   const missing = validateDevnetEnv();
   if (missing.length) {
@@ -25,7 +26,7 @@ async function main() {
       JSON.stringify(
         {
           status: "SKIPPED",
-          reason: "Devnet E2E requires a deployed program, funded wallet, test SPL token, and confirmed Core collection asset.",
+          reason: "Devnet E2E requires a deployed program, funded wallet, test SPL token, and final metadata storage env.",
           missing
         },
         null,
@@ -47,10 +48,11 @@ async function main() {
   const owner = new PublicKey(wallet!);
   const amount = "1";
 
-  const platform = await ensurePlatform(connection, payer, program);
-  const collectionProfile = await ensureCollectionProfile(connection, payer, program, mint);
+  const communityLaunch = await ensureCommunityLaunch(adapter, payer, mint);
+  const collectionAssetAddress = communityLaunch.collectionAssetAddress;
   const ownerTokenAccount = associatedTokenAddress(mint, owner);
-  const tokenVaultAuthority = PublicKey.findProgramAddressSync([Buffer.from(TOKEN_VAULT_AUTHORITY_SEED), collectionProfile.collectionProfile.toBuffer()], program)[0];
+  const collectionProfile = PublicKey.findProgramAddressSync([Buffer.from(COLLECTION_SEED), mint.toBuffer()], program)[0];
+  const tokenVaultAuthority = PublicKey.findProgramAddressSync([Buffer.from(TOKEN_VAULT_AUTHORITY_SEED), collectionProfile.toBuffer()], program)[0];
   const vaultTokenAccount = associatedTokenAddress(mint, tokenVaultAuthority);
   const preMintUserTokenBalance = await tokenBalance(connection, ownerTokenAccount);
   const preMintVaultTokenBalance = await tokenBalance(connection, vaultTokenAccount);
@@ -84,7 +86,7 @@ async function main() {
         tokenMint: mint.toBase58(),
         expectedAmount: amount,
         nftAssetAddress: mintTx.nftAssetAddress,
-        collectionAssetAddress: collectionAssetAddress!,
+        collectionAssetAddress,
         vaultPositionPda: mintTx.vaultPositionPda
       }),
     30,
@@ -97,7 +99,7 @@ async function main() {
     walletAddress: owner.toBase58(),
     tokenMint: mint.toBase58(),
     nftAssetAddress: mintTx.nftAssetAddress,
-    collectionAssetAddress: collectionAssetAddress!,
+    collectionAssetAddress,
     vaultPositionPda: mintTx.vaultPositionPda,
     lockedAmount: amount
   });
@@ -134,7 +136,7 @@ async function main() {
       walletAddress: owner.toBase58(),
       tokenMint: mint.toBase58(),
       nftAssetAddress: mintTx.nftAssetAddress,
-      collectionAssetAddress: collectionAssetAddress!,
+      collectionAssetAddress,
       vaultPositionPda: mintTx.vaultPositionPda,
       lockedAmount: amount
     });
@@ -151,8 +153,9 @@ async function main() {
     PROGRAM_ID: program.toBase58(),
     DEVNET_TEST_TOKEN_MINT: mint.toBase58(),
     DEVNET_TEST_COLLECTION_ASSET: collectionAssetAddress,
-    platformInitialized: platform.initialized,
-    collectionProfileInitialized: collectionProfile.initialized,
+    platformInitialized: communityLaunch.initializedPlatform,
+    collectionProfileInitialized: communityLaunch.initializedCollectionProfile,
+    reserveVaultTokenAccount: communityLaunch.reserveVaultTokenAccount,
     mintTxSignature: mintResult.txSignature,
     redeemTxSignature: redeemResult.txSignature,
     nftAssetAddress: mintTx.nftAssetAddress,
@@ -176,6 +179,39 @@ async function main() {
   };
 
   console.log(JSON.stringify(proof, null, 2));
+}
+
+async function ensureCommunityLaunch(adapter: SolanaTransactionAdapterService, payer: Keypair, mint: PublicKey) {
+  const launch = await adapter.buildCommunityLaunchTransaction({
+    walletAddress: payer.publicKey.toBase58(),
+    tokenMint: mint.toBase58(),
+    collectionName: "Phew.run Devnet E2E",
+    metadataUri: "ipfs://devnet-e2e-collection",
+    theme: "devnet",
+    mascot: "test",
+    vibe: "e2e"
+  });
+  if (!launch.base64UnsignedTransaction) throw new Error("Community launch builder did not return a signable devnet transaction.");
+  const signed = signBase64Transaction(launch.base64UnsignedTransaction, payer);
+  const result = await adapter.submitAndConfirm({ transactionId: "devnet-community-launch", signedTransaction: signed });
+  if (!result.confirmed || !result.txSignature) throw new Error(`Community launch transaction failed: ${result.message}`);
+  const verification = await retryPassed(
+    () =>
+      adapter.verifyCommunityProfileInitialization({
+        walletAddress: payer.publicKey.toBase58(),
+        tokenMint: mint.toBase58(),
+        collectionAssetAddress: launch.collectionAssetAddress
+      }),
+    30,
+    2000
+  );
+  return {
+    collectionAssetAddress: launch.collectionAssetAddress,
+    reserveVaultTokenAccount: launch.reserveVaultTokenAccount,
+    initializedPlatform: Boolean((launch.transactionSummary as any)?.initializedPlatform),
+    initializedCollectionProfile: Boolean((launch.transactionSummary as any)?.initializedCollectionProfile),
+    verification
+  };
 }
 
 function loadKeypair() {

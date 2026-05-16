@@ -7,7 +7,6 @@ export const requiredDevnetEnv = [
   { name: "SOLANA_TRANSACTION_PROVIDER", expected: "devnet", source: "Set SOLANA_TRANSACTION_PROVIDER=devnet." },
   { name: "DEVNET_TEST_TOKEN_MINT", source: "Create with `spl-token create-token --url devnet`." },
   { name: "DEVNET_TEST_WALLET_PUBLIC_KEY", source: "Use `solana address --keypair <wallet>` for the funded test wallet." },
-  { name: "DEVNET_TEST_COLLECTION_ASSET", source: "Build/sign/submit the Core collection launch transaction and use the confirmed collectionAssetAddress." },
   { name: "FINAL_ASSET_STORAGE_PROVIDER", expected: "pinata", source: "Set FINAL_ASSET_STORAGE_PROVIDER=pinata for immutable pinned IPFS." },
   { name: "PINATA_JWT", source: "Create a Pinata API JWT and add it to backend/Vercel env." },
   { name: "METAPLEX_NFT_STANDARD", expected: "METAPLEX_CORE", source: "Set METAPLEX_NFT_STANDARD=METAPLEX_CORE." }

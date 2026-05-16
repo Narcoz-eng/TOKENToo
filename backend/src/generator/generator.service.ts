@@ -669,21 +669,62 @@ export class GeneratorService {
         }
       }));
 
-    const launchTx = await this.solana.buildCollectionAssetTransaction({
+    const launchTx = await this.solana.buildCommunityLaunchTransaction({
       walletAddress,
-      name: profile.collection,
-      metadataUri
+      tokenMint: run.tokenMint,
+      collectionName: profile.collection,
+      metadataUri,
+      theme: profile.theme,
+      mascot: profile.mascot,
+      vibe: profile.artStyle
     });
 
-    return this.prisma.collection.update({
-      where: { id: collection.id },
-      data: {
-        collectionMetadataUri: metadataUri,
-        metadataUri,
-        collectionAssetAddress: launchTx.collectionAssetAddress,
-        launchUnsignedTransaction: this.json(launchTx),
-        launchStatus: launchTx.base64UnsignedTransaction ? "TX_BUILT" : "PENDING"
-      }
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.collection.update({
+        where: { id: collection.id },
+        data: {
+          collectionMetadataUri: metadataUri,
+          metadataUri,
+          collectionAssetAddress: launchTx.collectionAssetAddress,
+          onchainProfilePda: launchTx.onchainProfilePda,
+          feeVaultPda: launchTx.feeVaultPda,
+          tokenVaultPda: launchTx.reserveVaultTokenAccount,
+          launchUnsignedTransaction: this.json(launchTx),
+          launchStatus: launchTx.base64UnsignedTransaction ? "TX_BUILT" : "PENDING"
+        }
+      });
+      await tx.reserveVault.upsert({
+        where: { collectionId: collection.id },
+        update: {
+          tokenMint: run.tokenMint,
+          reserveVaultPda: launchTx.reserveVaultTokenAccount,
+          status: "ACTIVE",
+          verificationMetadata: this.json({
+            source: "launch-transaction-built",
+            tokenVaultAuthority: launchTx.tokenVaultAuthority,
+            tokenVaultStatePda: launchTx.tokenVaultStatePda,
+            warning: "Reserve custody is not confirmed until the launch transaction is signed and verified."
+          })
+        },
+        create: {
+          collectionId: collection.id,
+          tokenMint: run.tokenMint,
+          reserveVaultPda: launchTx.reserveVaultTokenAccount,
+          totalLocked: "0",
+          totalRedeemed: "0",
+          totalStaked: "0",
+          availableBacking: "0",
+          reserveRatioBps: 10000,
+          status: "ACTIVE",
+          verificationMetadata: this.json({
+            source: "launch-transaction-built",
+            tokenVaultAuthority: launchTx.tokenVaultAuthority,
+            tokenVaultStatePda: launchTx.tokenVaultStatePda,
+            warning: "Reserve custody is not confirmed until the launch transaction is signed and verified."
+          })
+        }
+      });
+      return updated;
     });
   }
 
@@ -698,13 +739,84 @@ export class GeneratorService {
       signedTransaction: input.signedTransaction,
       txSignature: input.txSignature
     });
-    return this.prisma.collection.update({
-      where: { id: collection.id },
-      data: {
-        launchStatus: result.confirmed ? "CONFIRMED" : result.status,
-        launchTxSignature: result.txSignature,
-        launchedAt: result.confirmed ? new Date() : collection.launchedAt
-      }
+    if (!result.confirmed) {
+      return this.prisma.collection.update({
+        where: { id: collection.id },
+        data: {
+          launchStatus: result.status,
+          launchTxSignature: result.txSignature
+        }
+      });
+    }
+
+    const verification = await this.solana.verifyCommunityProfileInitialization({
+      walletAddress: input.walletAddress,
+      tokenMint: run.tokenMint,
+      collectionAssetAddress: collection.collectionAssetAddress
+    });
+    if (verification.verificationAvailable && !verification.passed) {
+      await this.prisma.collection.update({
+        where: { id: collection.id },
+        data: {
+          launchStatus: "FAILED",
+          launchTxSignature: result.txSignature
+        }
+      });
+      throw new BadRequestException(`Collection launch transaction confirmed but protocol account verification failed: ${verification.issues.join(" ")}`);
+    }
+    const addresses = verification.addresses ?? this.solana.deriveCommunityAddresses({ tokenMint: run.tokenMint, walletAddress: input.walletAddress });
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.collection.update({
+        where: { id: collection.id },
+        data: {
+          launchStatus: "CONFIRMED",
+          launchTxSignature: result.txSignature,
+          launchedAt: new Date(),
+          onchainProfilePda: addresses.collectionProfile,
+          feeVaultPda: addresses.feeVault,
+          tokenVaultPda: addresses.reserveVaultTokenAccount
+        }
+      });
+      await tx.reserveVault.upsert({
+        where: { collectionId: collection.id },
+        update: {
+          tokenMint: run.tokenMint,
+          reserveVaultPda: addresses.reserveVaultTokenAccount,
+          availableBacking: verification.reserve?.balance ?? "0",
+          reserveRatioBps: 10000,
+          status: "ACTIVE",
+          lastOnChainVerifiedAt: verification.verificationAvailable ? new Date() : undefined,
+          verificationMetadata: this.json({
+            source: "launch-post-confirm",
+            txSignature: result.txSignature,
+            tokenVaultAuthority: addresses.tokenVaultAuthority,
+            tokenVaultStatePda: addresses.tokenVaultState,
+            collectionAssetExists: verification.collectionAssetExists,
+            issues: verification.issues
+          })
+        },
+        create: {
+          collectionId: collection.id,
+          tokenMint: run.tokenMint,
+          reserveVaultPda: addresses.reserveVaultTokenAccount,
+          totalLocked: "0",
+          totalRedeemed: "0",
+          totalStaked: "0",
+          availableBacking: verification.reserve?.balance ?? "0",
+          reserveRatioBps: 10000,
+          status: "ACTIVE",
+          lastOnChainVerifiedAt: verification.verificationAvailable ? new Date() : undefined,
+          verificationMetadata: this.json({
+            source: "launch-post-confirm",
+            txSignature: result.txSignature,
+            tokenVaultAuthority: addresses.tokenVaultAuthority,
+            tokenVaultStatePda: addresses.tokenVaultState,
+            collectionAssetExists: verification.collectionAssetExists,
+            issues: verification.issues
+          })
+        }
+      });
+      return updated;
     });
   }
 

@@ -332,7 +332,7 @@ export class StrategyEngineService {
   }
 
   private executionAdapterReady() {
-    return (process.env.STRATEGY_EXECUTION_PROVIDER ?? "disabled") !== "disabled" && (process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") !== "mock";
+    return false;
   }
 
   private normalizeExecutionInput(input: ExecutionInput): Required<ExecutionInput> {

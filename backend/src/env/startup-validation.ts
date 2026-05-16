@@ -93,7 +93,8 @@ export function validateStartupEnvironment() {
     if ((process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") === "pinata" && !process.env.PINATA_JWT) issues.push({ code: "PINATA_JWT_MISSING", severity: "warning", message: "PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata." });
     if ((process.env.METAPLEX_NFT_STANDARD ?? "METAPLEX_CORE") !== "METAPLEX_CORE") issues.push({ code: "NFT_STANDARD_UNSUPPORTED", severity: "warning", message: "METAPLEX_NFT_STANDARD must be METAPLEX_CORE until fallback minting is implemented." });
     if (!process.env.COMMUNITY_CREATION_FEE_WALLET && !process.env.PROTOCOL_TREASURY_WALLET) issues.push({ code: "COMMUNITY_CREATION_FEE_WALLET_MISSING", severity: "warning", message: "A treasury wallet is required to verify 1 SOL community creation access." });
-    if ((process.env.STRATEGY_EXECUTION_PROVIDER ?? "disabled") !== "disabled" && !process.env.STRATEGY_WORKER_SECRET) issues.push({ code: "STRATEGY_WORKER_SECRET_MISSING", severity: "fatal", message: "Production strategy execution requires STRATEGY_WORKER_SECRET." });
+    if ((process.env.STRATEGY_EXECUTION_PROVIDER ?? "disabled") !== "disabled") issues.push({ code: "STRATEGY_EXECUTION_PROVIDER_UNSUPPORTED", severity: "fatal", message: "Strategy execution providers are disabled until audited production routes exist; set STRATEGY_EXECUTION_PROVIDER=disabled." });
+    if ((process.env.STAKING_TRANSACTION_PROVIDER ?? "disabled") !== "disabled") issues.push({ code: "STAKING_PROVIDER_UNSUPPORTED", severity: "fatal", message: "Staking transaction providers are disabled until NFT custody/freeze routes are implemented; set STAKING_TRANSACTION_PROVIDER=disabled." });
   }
 
   const validation = {
