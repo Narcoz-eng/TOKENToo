@@ -239,6 +239,49 @@ export class SolanaTransactionAdapterService {
     };
   }
 
+  async verifySolPayment(input: { signature: string; payer: string; recipient: string; lamports: string }) {
+    const provider = process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock";
+    if (provider !== "devnet") {
+      return {
+        verificationAvailable: false,
+        verified: false,
+        signature: input.signature,
+        message: `Live SOL payment verification is unavailable with SOLANA_TRANSACTION_PROVIDER=${provider}.`,
+        issues: [`SOL payment verification requires SOLANA_TRANSACTION_PROVIDER=devnet and a confirmed signature.`]
+      };
+    }
+    const connection = this.connection();
+    const tx = await connection.getParsedTransaction(input.signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
+    if (!tx) {
+      return {
+        verificationAvailable: true,
+        verified: false,
+        signature: input.signature,
+        message: "Payment transaction was not found or is not confirmed.",
+        issues: ["Transaction signature not found at confirmed commitment."]
+      };
+    }
+    const transfer = tx.transaction.message.instructions.find((instruction: any) => {
+      const parsed = instruction.parsed;
+      return parsed?.type === "transfer" &&
+        parsed.info?.source === input.payer &&
+        parsed.info?.destination === input.recipient &&
+        BigInt(String(parsed.info?.lamports ?? 0)) >= BigInt(input.lamports);
+    }) as any;
+    const verified = Boolean(transfer);
+    return {
+      verificationAvailable: true,
+      verified,
+      signature: input.signature,
+      payer: input.payer,
+      recipient: input.recipient,
+      requiredLamports: input.lamports,
+      slot: tx.slot,
+      message: verified ? "Community creation fee payment verified on-chain." : "Payment transaction did not contain the required transfer.",
+      issues: verified ? [] : ["No matching SystemProgram transfer from payer to treasury for the required lamports."]
+    };
+  }
+
   async verifyMintFinalization(input: {
     walletAddress: string;
     tokenMint: string;

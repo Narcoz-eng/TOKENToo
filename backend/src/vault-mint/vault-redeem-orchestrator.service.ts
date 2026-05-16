@@ -48,6 +48,7 @@ export class VaultRedeemOrchestratorService {
       owner: walletAddress,
       collectionAssetAddress: nft.collection.collectionAssetAddress
     });
+    if (!verification.verificationAvailable && this.productionMode()) throw new BadRequestException("Production redeem build requires live NFT ownership and collection verification.");
     if (!verification.ownerMatches) throw new BadRequestException("Wallet does not own the Core asset.");
     if (!verification.collectionMatches) throw new BadRequestException("Core asset does not belong to the expected collection.");
 
@@ -138,5 +139,9 @@ export class VaultRedeemOrchestratorService {
 
   private record(value: unknown) {
     return (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
+  }
+
+  private productionMode() {
+    return (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") === "production";
   }
 }

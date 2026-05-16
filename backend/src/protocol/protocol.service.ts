@@ -15,7 +15,7 @@ export class ProtocolService {
   ) {}
 
   async health() {
-    const [collections, activeCommunities, vaults, reserveCount, insolvent, paused, sales, minted, staked, redeemed] = await Promise.all([
+    const [collections, activeCommunities, vaults, reserveCount, insolvent, paused, sales, minted, staked, redeemed, strategies] = await Promise.all([
       this.prisma.collection.count(),
       this.prisma.collection.count({ where: { status: "ACTIVE", launchStatus: "CONFIRMED" } }),
       this.prisma.vaultNFT.count(),
@@ -25,7 +25,8 @@ export class ProtocolService {
       this.prisma.sale.count(),
       this.prisma.mintTransaction.count({ where: { status: "CONFIRMED" } }),
       this.prisma.vaultNFT.count({ where: { status: "STAKED" } }),
-      this.prisma.vaultNFT.count({ where: { status: "REDEEMED" } })
+      this.prisma.vaultNFT.count({ where: { status: "REDEEMED" } }),
+      this.prisma.vaultStrategy.count({ where: { status: "ACTIVE" } })
     ]);
     return {
       ok: insolvent === 0,
@@ -40,7 +41,8 @@ export class ProtocolService {
         phewsMinted: minted,
         stakedVaults: staked,
         redeemedVaults: redeemed,
-        totalTrades: sales
+        totalTrades: sales,
+        activeStrategies: strategies
       },
       reserveHealth: {
         status: insolvent > 0 ? "INSOLVENT" : paused > 0 ? "DEGRADED" : "OK",
@@ -55,7 +57,7 @@ export class ProtocolService {
   async reserves() {
     const collections = await this.prisma.collection.findMany({
       orderBy: { createdAt: "desc" },
-      include: { token: true, reserveVault: true, vaultNfts: { select: { id: true, status: true, amount: true } } }
+      include: { token: true, reserveVault: true, vaultStrategy: true, vaultNfts: { select: { id: true, status: true, amount: true } } }
     });
     return {
       ok: true,
@@ -65,7 +67,7 @@ export class ProtocolService {
   }
 
   async collectionReserve(idOrSlug: string) {
-    const collection = await this.collection(idOrSlug, { token: true, reserveVault: true, vaultNfts: { select: { id: true, status: true, amount: true } } });
+    const collection = await this.collection(idOrSlug, { token: true, reserveVault: true, vaultStrategy: true, vaultNfts: { select: { id: true, status: true, amount: true } } });
     return {
       ok: true,
       productionReady: this.productionProofAvailable(),
@@ -74,7 +76,7 @@ export class ProtocolService {
   }
 
   async collectionVaults(idOrSlug: string) {
-    const collection = await this.collection(idOrSlug, { token: true, reserveVault: true });
+    const collection = await this.collection(idOrSlug, { token: true, reserveVault: true, vaultStrategy: true });
     const vaults = await this.prisma.vaultNFT.findMany({
       where: { collectionId: collection.id },
       orderBy: { createdAt: "desc" },
@@ -224,7 +226,7 @@ export class ProtocolService {
       include: {
         owner: true,
         vaultPosition: true,
-        collection: { include: { token: true, reserveVault: true } },
+        collection: { include: { token: true, reserveVault: true, vaultStrategy: true } },
         stakingPositions: { where: { status: "ACTIVE" }, take: 1 }
       }
     });
@@ -267,6 +269,7 @@ export class ProtocolService {
         reserveVaultStatus: refreshed.collection.reserveVault?.status ?? "UNINITIALIZED",
         productionReady: this.productionProofAvailable() && ownership.verificationAvailable && ownership.collectionMatches !== false
       },
+      strategy: this.strategySummary(refreshed.collection.vaultStrategy),
       issues,
       lastVerifiedAt: ownership.verificationAvailable ? new Date().toISOString() : refreshed.vaultPosition?.lastVerifiedAt?.toISOString() ?? null
     };
@@ -298,7 +301,7 @@ export class ProtocolService {
         owner: true,
         vaultPosition: true,
         mintTransaction: true,
-        collection: { include: { token: true, reserveVault: true } }
+        collection: { include: { token: true, reserveVault: true, vaultStrategy: true } }
       }
     });
     if (!nft) throw new NotFoundException("Vault NFT not found");
@@ -328,6 +331,7 @@ export class ProtocolService {
         source: "local-derived",
         warning: "Reserve row has not been initialized yet; values are derived from local VaultNFT records."
       },
+      strategy: this.strategySummary(collection.vaultStrategy),
       productionReady: this.productionProofAvailable() && Boolean(reserve?.lastOnChainVerifiedAt)
     };
   }
@@ -363,6 +367,26 @@ export class ProtocolService {
       totalStaked: totalStaked.toString(),
       availableBacking: availableBacking.toString(),
       reserveRatioBps: 10000
+    };
+  }
+
+  private strategySummary(strategy: any) {
+    if (!strategy) {
+      return {
+        enabled: false,
+        type: "PASSIVE",
+        status: "DRAFT",
+        approvedByCreator: false,
+        automaticExecution: false
+      };
+    }
+    return {
+      enabled: strategy.status === "ACTIVE" && strategy.type !== "PASSIVE",
+      type: strategy.type,
+      status: strategy.status,
+      approvedByCreator: strategy.approvedByCreator,
+      approvedAt: strategy.approvedAt?.toISOString?.() ?? null,
+      automaticExecution: false
     };
   }
 

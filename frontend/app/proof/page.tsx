@@ -34,6 +34,13 @@ type ProofResponse = {
       reserveVaultStatus?: string;
       productionReady?: boolean;
     };
+    strategy?: {
+      enabled: boolean;
+      type: string;
+      status: string;
+      approvedByCreator: boolean;
+      automaticExecution: boolean;
+    };
     issues: string[];
     lastVerifiedAt?: string | null;
   };
@@ -104,6 +111,8 @@ export default function ProofExplorerPage() {
                 <ProofRow label="Position PDA" value={proof.positionPda} />
                 <ProofRow label="Current owner" value={proof.currentOwner ?? "Live owner unavailable"} />
                 <ProofRow label="DB owner snapshot" value={proof.dbOwnerSnapshot ?? "No snapshot"} />
+                <ProofRow label="Strategy" value={proof.strategy ? `${proof.strategy.type} / ${proof.strategy.status}` : "PASSIVE / DRAFT"} />
+                <ProofRow label="Strategy approval" value={proof.strategy?.approvedByCreator ? "Approved" : "Not approved"} />
               </div>
             </SectionCard>
 
@@ -113,6 +122,7 @@ export default function ProofExplorerPage() {
                 <StatusLine label="Collection matches" ok={proof.verificationResult.collectionMatches !== false} />
                 <StatusLine label="Production proof" ok={Boolean(proof.verificationResult.productionReady)} />
                 <StatusLine label="Redeemable" ok={proof.redeemable && !proof.staked && proof.status !== "REDEEMED"} />
+                <StatusLine label="Strategy automatic execution" ok={proof.strategy?.automaticExecution === false} />
               </div>
               {proof.issues.length ? (
                 <div className="mt-4 rounded-lg border border-vault-gold/35 bg-vault-gold/10 p-4">

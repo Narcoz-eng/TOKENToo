@@ -35,6 +35,51 @@ enum VaultPositionStatus {
   CLOSED
 }
 
+enum CommunityCreationAccessMethod {
+  CREATION_FEE_SOL
+  WHALE_HOLDER
+  SUBSCRIPTION_STUDIO
+  ADMIN_GRANT
+}
+
+enum CommunityCreationAccessStatus {
+  PENDING
+  GRANTED
+  DENIED
+  EXPIRED
+}
+
+enum VaultStrategyType {
+  PASSIVE
+  LIQUIDITY
+  BUYBACK
+  BURN
+  HYBRID
+}
+
+enum VaultStrategyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  DISABLED
+}
+
+enum StrategyExecutionAction {
+  COLLECT_FEES
+  ADD_LIQUIDITY
+  BUYBACK
+  BURN
+  DISTRIBUTE_REWARDS
+}
+
+enum StrategyExecutionJobStatus {
+  PENDING
+  RUNNING
+  CONFIRMED
+  FAILED
+  SKIPPED
+}
+
 enum StakingStatus {
   ACTIVE
   UNSTAKED
@@ -575,6 +620,10 @@ model Collection {
   instantSellQuotes     InstantSellQuote[]
   reserveVault          ReserveVault?
   vaultPositions        VaultPosition[]
+  creationAccesses      CommunityCreationAccess[]
+  vaultStrategy         VaultStrategy?
+  strategyExecutionJobs StrategyExecutionJob[]
+  strategyEventLogs     StrategyEventLog[]
 
   @@index([status])
   @@index([communityLevel])
@@ -665,6 +714,93 @@ model VaultPosition {
   @@index([collectionId, status])
   @@index([ownerWalletSnapshot, status])
   @@index([tokenMint])
+}
+
+model CommunityCreationAccess {
+  id               String                        @id @default(uuid()) @db.Uuid
+  collectionId     String?                       @db.Uuid
+  walletAddress    String
+  tokenMint        String
+  method           CommunityCreationAccessMethod
+  status           CommunityCreationAccessStatus @default(PENDING)
+  requiredLamports Decimal?                      @db.Decimal(20, 0)
+  paymentSignature String?
+  idempotencyKey   String?                       @unique
+  requestHash      String?
+  verifiedAt       DateTime?
+  expiresAt        DateTime?
+  metadata         Json                          @default("{}")
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+  collection       Collection?                   @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  @@index([walletAddress, tokenMint, status])
+  @@index([collectionId])
+  @@index([method, status])
+}
+
+model VaultStrategy {
+  id                String              @id @default(uuid()) @db.Uuid
+  collectionId      String              @unique @db.Uuid
+  type              VaultStrategyType   @default(PASSIVE)
+  status            VaultStrategyStatus @default(DRAFT)
+  feeAllocationBps  Json                @default("{\"treasury\":0,\"buyback\":0,\"liquidity\":0,\"rewards\":0,\"safetyReserve\":10000}")
+  executionConfig   Json                @default("{\"intervalSeconds\":86400,\"maxSlippageBps\":50,\"maxSpendPerExecution\":\"0\",\"maxDailySpend\":\"0\",\"minReserveRatioBps\":10000,\"minLiquidityUsd\":0,\"emergencyPauseThreshold\":9000}")
+  approvedByCreator Boolean             @default(false)
+  approvedAt        DateTime?
+  metadata          Json                @default("{}")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  collection        Collection          @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  jobs              StrategyExecutionJob[]
+  events            StrategyEventLog[]
+
+  @@index([type, status])
+  @@index([approvedByCreator])
+}
+
+model StrategyExecutionJob {
+  id               String                     @id @default(uuid()) @db.Uuid
+  strategyId       String                     @db.Uuid
+  collectionId     String                     @db.Uuid
+  action           StrategyExecutionAction
+  status           StrategyExecutionJobStatus @default(PENDING)
+  inputAmount      Decimal?                   @db.Decimal(38, 0)
+  outputAmount     Decimal?                   @db.Decimal(38, 0)
+  txSignature      String?
+  errorCode        String?
+  errorMessage     String?
+  idempotencyKey   String?                    @unique
+  requestHash      String?
+  createdAt        DateTime                   @default(now())
+  executedAt       DateTime?
+  strategy         VaultStrategy              @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  collection       Collection                 @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([strategyId, status])
+  @@index([collectionId, createdAt])
+  @@index([action, status])
+}
+
+model StrategyEventLog {
+  id            String         @id @default(uuid()) @db.Uuid
+  collectionId  String         @db.Uuid
+  strategyId    String?        @db.Uuid
+  eventType     String
+  txSignature   String?
+  tokenMint     String
+  amountIn      Decimal?       @db.Decimal(38, 0)
+  amountOut     Decimal?       @db.Decimal(38, 0)
+  slippageBps   Int?
+  beforeState   Json           @default("{}")
+  afterState    Json           @default("{}")
+  createdAt     DateTime       @default(now())
+  collection    Collection     @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  strategy      VaultStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+
+  @@index([collectionId, createdAt])
+  @@index([strategyId, createdAt])
+  @@index([eventType])
 }
 
 model TraitPack {

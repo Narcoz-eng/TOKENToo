@@ -490,6 +490,16 @@ function CollectionDetailView({ data }: { data: ProductData }) {
               <Link href={`/collections/${collection.id}`} className="inline-flex h-10 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">Collection Proof</Link>
             </div>
           </SectionCard>
+          <SectionCard title="Strategy">
+            <div className="space-y-3">
+              <MiniStat label="Type" value={collection.strategy?.type ?? "PASSIVE"} />
+              <MiniStat label="Status" value={collection.strategy?.status ?? "DRAFT"} />
+              <MiniStat label="Approved" value={collection.strategy?.approvedByCreator ? "Yes" : "No"} />
+              <p className="rounded-md border border-vault-line bg-black/25 p-3 text-xs font-bold text-slate-400">
+                Strategies are optional and deterministic. Execution is blocked unless approved, within limits, and backed by strategy treasury rather than locked reserves.
+              </p>
+            </div>
+          </SectionCard>
           <SectionCard id="traits" title="Trait Language">
             <div className="space-y-3">
               {Object.entries(collection.traitLayers).map(([category, values]) => (

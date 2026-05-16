@@ -18,7 +18,7 @@ async function bootstrap() {
     bootStage = "validate_env";
     validateStartupEnvironment();
     bootStage = "record_modules";
-    recordStartupModules(["AuthModule", "GeneratorModule", "VaultMintModule", "ProductDataModule", "ProtocolController", "SystemController"]);
+    recordStartupModules(["AuthModule", "GeneratorModule", "VaultMintModule", "ProductDataModule", "ProtocolController", "CommunityProtocolController", "StrategyEngineService", "SystemController"]);
     bootStage = "create_nest_app";
     const app = await NestFactory.create(AppModule, {
       logger: process.env.PHEW_SILENT_LOGS === "true" ? false : undefined

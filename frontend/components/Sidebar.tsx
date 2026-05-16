@@ -32,7 +32,8 @@ const navItems = [
   { href: "/profile", label: "Profile", icon: Users, key: "profile" },
   { href: "/mint", label: "Mint Vault", icon: LockKeyhole, key: "mint" },
   { href: "/instant-sell", label: "Instant Sell", icon: Zap, key: "instant-sell" },
-  { href: "/create-collection", label: "Create Collection", icon: PlusCircle, key: "create" },
+  { href: "/create-community", label: "Create Community", icon: PlusCircle, key: "create-community" },
+  { href: "/create-collection", label: "Studio", icon: PlusCircle, key: "create" },
   { href: "/admin/risk", label: "Risk Admin", icon: ShieldAlert, key: "risk" }
 ];
 
@@ -98,7 +99,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
               <SidebarMetric label="Vaults" value={totalVaults} />
               <SidebarMetric label="Factions" value={communities} />
             </div>
-            <Link href="/create-collection" className="phew-button phew-button-primary relative mt-4 flex h-10 items-center justify-center rounded-md text-sm font-black text-black">
+            <Link href="/create-community" className="phew-button phew-button-primary relative mt-4 flex h-10 items-center justify-center rounded-md text-sm font-black text-black">
               Create
             </Link>
           </div>

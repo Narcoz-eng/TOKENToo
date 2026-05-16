@@ -38,6 +38,14 @@ export type VaultCollection = {
   reserveVaultPda?: string | null;
   collectionAssetAddress?: string | null;
   launchStatus?: string;
+  strategy?: {
+    enabled: boolean;
+    type: "PASSIVE" | "LIQUIDITY" | "BUYBACK" | "BURN" | "HYBRID";
+    status: "DRAFT" | "ACTIVE" | "PAUSED" | "DISABLED";
+    approvedByCreator: boolean;
+    approvedAt?: string | null;
+    automaticExecution: boolean;
+  };
   sales?: number;
   qualityTier: "Basic" | "Premium" | "Legendary-ready";
   instantSellEnabled: boolean;

@@ -21,6 +21,9 @@ export function validateStartupEnvironment() {
   process.env.DEV_DISABLE_PAID_AI ??= appEnv === "production" ? "false" : "true";
   process.env.ENABLE_STUDIO_IMAGE_GENERATION ??= process.env.ENABLE_AI_IMAGE_GENERATION ?? "false";
   process.env.ENABLE_AI_IMAGE_GENERATION ??= "false";
+  process.env.COMMUNITY_CREATION_FEE_LAMPORTS ??= "1000000000";
+  process.env.COMMUNITY_CREATION_WHALE_MIN_RAW ??= "1";
+  process.env.STRATEGY_EXECUTION_PROVIDER ??= "disabled";
   process.env.REQUIRED_LAUNCH_ASSET_STATUS ??= appEnv === "production" ? "ARTIST_APPROVED" : "CURATED_LAYER_READY";
   const helius = normalizeHeliusConfig();
   const database = databaseUrlDiagnostics();
@@ -74,8 +77,8 @@ export function validateStartupEnvironment() {
   }
 
   if (appEnv === "production") {
-    if ((process.env.ENABLE_MOCK_MINT ?? "false") === "true") issues.push({ code: "MOCK_MINT_ENABLED", severity: "warning", message: "ENABLE_MOCK_MINT should be false in production." });
-    if ((process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "mock") issues.push({ code: "MOCK_SOLANA_PROVIDER", severity: "warning", message: "SOLANA_TRANSACTION_PROVIDER=mock disables production transactions." });
+    if ((process.env.ENABLE_MOCK_MINT ?? "false") === "true") issues.push({ code: "MOCK_MINT_ENABLED", severity: "fatal", message: "ENABLE_MOCK_MINT must be false in production." });
+    if ((process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock") === "mock") issues.push({ code: "MOCK_SOLANA_PROVIDER", severity: "fatal", message: "SOLANA_TRANSACTION_PROVIDER=mock is blocked in production." });
     if ((process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") === "mock") issues.push({ code: "MOCK_FINAL_STORAGE", severity: "warning", message: "FINAL_ASSET_STORAGE_PROVIDER=mock blocks public production launch." });
     if (!process.env.FINAL_RENDER_STORAGE_ROOT) issues.push({ code: "FINAL_RENDER_CACHE_MISSING", severity: "warning", message: "FINAL_RENDER_STORAGE_ROOT is required so public minting can reference cached/pre-generated final NFT renders." });
     if (!(process.env.CURATED_LAYER_PACK_MANIFEST_URI || process.env.CURATED_LAYER_PACK_ROOT || process.env.APPROVED_LAYER_PACK_ID)) {
@@ -89,6 +92,8 @@ export function validateStartupEnvironment() {
     if ((process.env.LEGENDARY_ASSET_PROVIDER ?? "mock") === "mock") issues.push({ code: "LEGENDARY_PROVIDER_MOCK", severity: "warning", message: "LEGENDARY_ASSET_PROVIDER=mock blocks production art launch." });
     if ((process.env.FINAL_ASSET_STORAGE_PROVIDER ?? "mock") === "pinata" && !process.env.PINATA_JWT) issues.push({ code: "PINATA_JWT_MISSING", severity: "warning", message: "PINATA_JWT is required for FINAL_ASSET_STORAGE_PROVIDER=pinata." });
     if ((process.env.METAPLEX_NFT_STANDARD ?? "METAPLEX_CORE") !== "METAPLEX_CORE") issues.push({ code: "NFT_STANDARD_UNSUPPORTED", severity: "warning", message: "METAPLEX_NFT_STANDARD must be METAPLEX_CORE until fallback minting is implemented." });
+    if (!process.env.COMMUNITY_CREATION_FEE_WALLET && !process.env.PROTOCOL_TREASURY_WALLET) issues.push({ code: "COMMUNITY_CREATION_FEE_WALLET_MISSING", severity: "warning", message: "A treasury wallet is required to verify 1 SOL community creation access." });
+    if ((process.env.STRATEGY_EXECUTION_PROVIDER ?? "disabled") !== "disabled" && !process.env.STRATEGY_WORKER_SECRET) issues.push({ code: "STRATEGY_WORKER_SECRET_MISSING", severity: "fatal", message: "Production strategy execution requires STRATEGY_WORKER_SECRET." });
   }
 
   const validation = {

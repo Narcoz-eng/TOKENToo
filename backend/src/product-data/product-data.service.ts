@@ -113,6 +113,7 @@ export class ProductDataService {
         include: {
           token: true,
           reserveVault: true,
+          vaultStrategy: true,
           vaultNfts: { take: 4, orderBy: { createdAt: "desc" } },
           _count: { select: { vaultNfts: true, sales: true } }
         }
@@ -131,6 +132,7 @@ export class ProductDataService {
           include: {
             token: true,
             reserveVault: true,
+            vaultStrategy: true,
             vaultNfts: { orderBy: { createdAt: "desc" }, take: 12 },
             raidRooms: { orderBy: { createdAt: "desc" }, take: 8, include: { missions: true, participations: true } },
             listings: { where: { status: "ACTIVE" }, take: 12, include: { vaultNft: true } }
@@ -257,7 +259,7 @@ export class ProductDataService {
 
   async vaultNfts() {
     return this.safeRead("vault NFTs", [], async () => {
-      const records = await this.prisma.vaultNFT.findMany({ orderBy: { createdAt: "desc" }, take: 80, include: { collection: { include: { token: true, reserveVault: true } } } });
+      const records = await this.prisma.vaultNFT.findMany({ orderBy: { createdAt: "desc" }, take: 80, include: { collection: { include: { token: true, reserveVault: true, vaultStrategy: true } } } });
       return records.map((nft) => this.nftDto(nft, nft.collectionId));
     });
   }
@@ -559,6 +561,7 @@ export class ProductDataService {
       reserveVaultPda: reserve?.reserveVaultPda ?? collection.tokenVaultPda ?? null,
       collectionAssetAddress: collection.collectionAssetAddress ?? null,
       launchStatus: collection.launchStatus ?? "DRAFT",
+      strategy: this.strategyDto(collection.vaultStrategy),
       sales: Number(collection._count?.sales ?? 0),
       qualityTier: collection.identityLockedAt ? "Premium" : "Basic",
       instantSellEnabled: !collection.instantSellDisabled && !collection.emergencyFlag && riskScore >= 60,
@@ -648,6 +651,26 @@ export class ProductDataService {
       riskTier: listing.riskTier,
       status: listing.status,
       unlocksAt: listing.unlocksAtSnapshot?.toISOString?.() ?? listing.vaultNft?.unlocksAt?.toISOString?.()
+    };
+  }
+
+  private strategyDto(strategy: any) {
+    if (!strategy) {
+      return {
+        enabled: false,
+        type: "PASSIVE",
+        status: "DRAFT",
+        approvedByCreator: false,
+        automaticExecution: false
+      };
+    }
+    return {
+      enabled: strategy.status === "ACTIVE" && strategy.type !== "PASSIVE",
+      type: strategy.type,
+      status: strategy.status,
+      approvedByCreator: strategy.approvedByCreator,
+      approvedAt: strategy.approvedAt?.toISOString?.() ?? null,
+      automaticExecution: false
     };
   }
 
