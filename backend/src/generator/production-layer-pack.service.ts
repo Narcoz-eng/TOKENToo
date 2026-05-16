@@ -23,6 +23,7 @@ export class ProductionLayerPackService {
     if (!this.permanentStorageAvailable() || !this.renderRoot()) return "WIREFRAME";
     if (!this.approvedLayerManifestStatus(pack).approved) return style.productionAssetStatus === "AI_CONCEPT" ? "AI_CONCEPT" : "WIREFRAME";
     if (!this.layerCoverageValid(pack)) return "WIREFRAME";
+    if (this.finalProductionRequested() && this.finalManifestPolicyStatus(pack).issues.length) return "WIREFRAME";
     if ((process.env.FINAL_PRODUCTION_ASSETS_APPROVED ?? "false") === "true") return "FINAL_PRODUCTION";
     if (providers.every((provider) => provider === "handmade") || (process.env.ARTIST_APPROVED_ASSETS ?? "false") === "true" || this.aiAssistedFinalApproved()) return "ARTIST_APPROVED";
     return "CURATED_LAYER_READY";
@@ -40,7 +41,20 @@ export class ProductionLayerPackService {
     if (!this.renderRoot()) issues.push("FINAL_RENDER_STORAGE_ROOT is required so minting can reference cached or pre-generated render outputs.");
     if (!this.permanentStorageAvailable()) issues.push("Permanent storage is required for production NFT assets.");
     if (!this.layerCoverageValid(pack)) issues.push("Curated layer pack does not cover the required deterministic trait categories.");
+    if (this.finalProductionRequested() || required === "FINAL_PRODUCTION") issues.push(...this.finalManifestPolicyStatus(pack).issues);
     return [...new Set(issues)];
+  }
+
+  finalManifestPolicyStatus(pack: TraitPackPlan) {
+    const manifest = this.layerManifestJson();
+    const issues: string[] = [];
+    if (this.finalAssetProviderUsesAi()) issues.push("Final 10k generation cannot use AI image providers; use approved transparent layers plus deterministic renderer only.");
+    if (!this.approvedTraitManifestConfigured(manifest)) issues.push("Approved trait manifest is required: set APPROVED_TRAIT_MANIFEST_URI or APPROVED_TRAIT_MANIFEST_HASH, or include an approved traitManifest in layer-manifest.json.");
+    if (!this.provenanceConfigured(manifest)) issues.push("Metadata/provenance hash is required before FINAL_PRODUCTION: set FINAL_ASSET_PROVENANCE_HASH or include provenanceHash in layer-manifest.json.");
+    if (!this.deterministicRendererConfigured(manifest)) issues.push("Deterministic final renderer version is required: set FINAL_RENDERER_VERSION or include rendererVersion in layer-manifest.json.");
+    if (pack.collectionSize !== 10000) issues.push("Final production generation requires a deterministic 10k trait manifest.");
+    if (this.manifestDeclaresAiFinalGeneration(manifest)) issues.push("Layer manifest declares AI use during final generation; final collection generation must be deterministic and non-AI.");
+    return { approved: issues.length === 0, issues };
   }
 
   requiredLaunchStatus(): ProductionAssetStatus {
@@ -152,6 +166,53 @@ export class ProductionLayerPackService {
 
   private aiAssistedFinalApproved() {
     return (process.env.AI_ASSISTED_FINAL_ASSETS_APPROVED ?? "false") === "true";
+  }
+
+  private finalProductionRequested() {
+    return (
+      (process.env.FINAL_PRODUCTION_ASSETS_APPROVED ?? "false") === "true" ||
+      this.requiredLaunchStatus() === "FINAL_PRODUCTION" ||
+      (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") === "production"
+    );
+  }
+
+  private finalAssetProviderUsesAi() {
+    const providers = [this.provider(process.env.DESIGN_MODEL_PROVIDER), this.provider(process.env.LAYER_PACK_PROVIDER), this.provider(process.env.LEGENDARY_ASSET_PROVIDER)];
+    return providers.some((provider) => provider === "ai");
+  }
+
+  private layerManifestJson() {
+    const root = process.env.CURATED_LAYER_PACK_ROOT?.trim();
+    if (!root) return {};
+    const manifestPath = resolve(root, "layer-manifest.json");
+    if (!existsSync(manifestPath)) return {};
+    return this.safeJson(readFileSync(manifestPath, "utf8"));
+  }
+
+  private approvedTraitManifestConfigured(manifest: unknown) {
+    if (process.env.APPROVED_TRAIT_MANIFEST_URI || process.env.APPROVED_TRAIT_MANIFEST_HASH) return true;
+    const record = manifest && typeof manifest === "object" ? manifest as Record<string, unknown> : {};
+    const traitManifest = record.traitManifest && typeof record.traitManifest === "object" ? record.traitManifest as Record<string, unknown> : {};
+    return traitManifest.approved === true && Boolean(traitManifest.uri || traitManifest.hash || record.approvedTraitManifestHash);
+  }
+
+  private provenanceConfigured(manifest: unknown) {
+    if (process.env.FINAL_ASSET_PROVENANCE_HASH) return true;
+    const record = manifest && typeof manifest === "object" ? manifest as Record<string, unknown> : {};
+    const metadataProvenance = record.metadataProvenance && typeof record.metadataProvenance === "object" ? record.metadataProvenance as Record<string, unknown> : {};
+    return Boolean(record.provenanceHash || metadataProvenance.hash);
+  }
+
+  private deterministicRendererConfigured(manifest: unknown) {
+    if (process.env.FINAL_RENDERER_VERSION) return true;
+    const record = manifest && typeof manifest === "object" ? manifest as Record<string, unknown> : {};
+    return Boolean(record.rendererVersion || record.deterministicRendererVersion);
+  }
+
+  private manifestDeclaresAiFinalGeneration(manifest: unknown) {
+    const record = manifest && typeof manifest === "object" ? manifest as Record<string, unknown> : {};
+    const finalGeneration = record.finalGeneration && typeof record.finalGeneration === "object" ? record.finalGeneration as Record<string, unknown> : {};
+    return record.aiDuringFinalGeneration === true || finalGeneration.usesAi === true || finalGeneration.provider === "ai";
   }
 
   private provider(value?: string): AssetProviderKind {

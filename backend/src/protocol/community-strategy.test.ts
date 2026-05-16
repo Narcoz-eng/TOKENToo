@@ -12,6 +12,8 @@ async function main() {
   await accessDeniedTest();
   await paidCreationFeeAccessTest();
   await whaleCreationAccessTest();
+  await subscriptionCreationAccessTest();
+  await creatorAccessPassAdminGrantTest();
   await strategySafetyTest();
   await mockModeBlockedInProductionTest();
   console.log("PASS token CA community creation and duplicate handling");
@@ -67,6 +69,7 @@ async function paidCreationFeeAccessTest() {
     })
   );
   assert(result.access?.method === "CREATION_FEE_SOL", "Verified 1 SOL payment should grant creation access.");
+  assert([...db.communityCreationPayment.rows.values()].some((row) => row.status === "VERIFIED" && row.signature === "sig-paid"), "Verified 1 SOL payment must be stored in CommunityCreationPayment.");
 }
 
 async function whaleCreationAccessTest() {
@@ -78,6 +81,43 @@ async function whaleCreationAccessTest() {
     accessMethod: "WHALE_HOLDER"
   });
   assert(result.access?.method === "WHALE_HOLDER", "Whale token balance verification should grant free creation access.");
+  assert([...db.whaleGateVerification.rows.values()].some((row) => row.status === "VERIFIED" && row.walletAddress === "whale-wallet"), "Whale gate proof must be stored in WhaleGateVerification.");
+}
+
+async function subscriptionCreationAccessTest() {
+  const db = fakeProtocolDb();
+  db.studioSubscription.rows.set("sub-wallet:STUDIO", {
+    id: "subscription-1",
+    walletAddress: "sub-wallet",
+    tier: "STUDIO",
+    status: "ACTIVE",
+    createdAt: new Date()
+  });
+  const service = communityService(db, solana({}));
+  const result = await service.createFromToken({
+    tokenMint: "SubMint11111111111111111111111111111111111",
+    walletAddress: "sub-wallet",
+    accessMethod: "SUBSCRIPTION_STUDIO"
+  });
+  assert(result.access?.method === "SUBSCRIPTION_STUDIO", "Active StudioSubscription should grant creation access.");
+}
+
+async function creatorAccessPassAdminGrantTest() {
+  const db = fakeProtocolDb();
+  db.creatorAccessPass.rows.set("admin-pass", {
+    id: "admin-pass",
+    walletAddress: "pass-admin-wallet",
+    type: "ADMIN_GRANT",
+    status: "ACTIVE",
+    createdAt: new Date()
+  });
+  const service = communityService(db, solana({}));
+  const result = await service.createFromToken({
+    tokenMint: "PassMint1111111111111111111111111111111111",
+    walletAddress: "pass-admin-wallet",
+    accessMethod: "ADMIN_GRANT"
+  });
+  assert(result.access?.method === "ADMIN_GRANT", "Active CreatorAccessPass admin grant should grant creation access.");
 }
 
 async function strategySafetyTest() {
@@ -175,6 +215,11 @@ function fakeProtocolDb() {
   const tokenRows = new Map<string, any>();
   const collectionRows = new Map<string, any>();
   const accessRows = new Map<string, any>();
+  const tokenCommunityRows = new Map<string, any>();
+  const paymentRows = new Map<string, any>();
+  const whaleRows = new Map<string, any>();
+  const subscriptionRows = new Map<string, any>();
+  const passRows = new Map<string, any>();
   const strategyRows = new Map<string, any>();
   const bucketRows = new Map<string, any>();
   const jobRows = new Map<string, any>();
@@ -208,6 +253,15 @@ function fakeProtocolDb() {
         return collectionRows.get(data.collectionId).reserveVault;
       }
     },
+    tokenCommunity: {
+      rows: tokenCommunityRows,
+      upsert: async ({ where, update, create }: any) => {
+        const existing = [...tokenCommunityRows.values()].find((row) => row.tokenId === where.tokenId);
+        const row = { ...(existing ?? { id: `community-${tokenCommunityRows.size + 1}`, createdAt: new Date(), ...create }), ...update, updatedAt: new Date() };
+        tokenCommunityRows.set(row.id, row);
+        return row;
+      }
+    },
     communityCreationAccess: {
       rows: accessRows,
       findUnique: async ({ where }: any) => [...accessRows.values()].find((row) => row.idempotencyKey === where.idempotencyKey) ?? null,
@@ -223,6 +277,43 @@ function fakeProtocolDb() {
         accessRows.set(row.id, row);
         return row;
       }
+    },
+    communityCreationPayment: {
+      rows: paymentRows,
+      create: async ({ data }: any) => {
+        const row = { id: `payment-${paymentRows.size + 1}`, createdAt: new Date(), ...data };
+        paymentRows.set(row.id, row);
+        return row;
+      },
+      upsert: async ({ where, update, create }: any) => {
+        const existing = [...paymentRows.values()].find((row) => row.accessId === where.accessId);
+        const row = { ...(existing ?? { id: `payment-${paymentRows.size + 1}`, createdAt: new Date(), ...create }), ...update, updatedAt: new Date() };
+        paymentRows.set(row.id, row);
+        return row;
+      }
+    },
+    whaleGateVerification: {
+      rows: whaleRows,
+      create: async ({ data }: any) => {
+        const row = { id: `whale-${whaleRows.size + 1}`, createdAt: new Date(), ...data };
+        whaleRows.set(row.id, row);
+        return row;
+      },
+      upsert: async ({ where, update, create }: any) => {
+        const existing = [...whaleRows.values()].find((row) => row.accessId === where.accessId);
+        const row = { ...(existing ?? { id: `whale-${whaleRows.size + 1}`, createdAt: new Date(), ...create }), ...update, updatedAt: new Date() };
+        whaleRows.set(row.id, row);
+        return row;
+      }
+    },
+    studioSubscription: {
+      rows: subscriptionRows,
+      findFirst: async ({ where }: any) => [...subscriptionRows.values()].find((row) => row.walletAddress === where.walletAddress && row.status === where.status) ?? null
+    },
+    creatorAccessPass: {
+      rows: passRows,
+      findFirst: async ({ where }: any) =>
+        [...passRows.values()].find((row) => row.walletAddress === where.walletAddress && row.status === where.status && (!where.type?.in || where.type.in.includes(row.type))) ?? null
     },
     vaultStrategy: {
       rows: strategyRows,
@@ -278,7 +369,10 @@ function fakeProtocolDb() {
         }
       },
       reserveVault: db.reserveVault,
-      communityCreationAccess: db.communityCreationAccess
+      communityCreationAccess: db.communityCreationAccess,
+      tokenCommunity: db.tokenCommunity,
+      communityCreationPayment: db.communityCreationPayment,
+      whaleGateVerification: db.whaleGateVerification
     }),
     seedCollection: (id: string, creatorWallet: string) => {
       const row = {

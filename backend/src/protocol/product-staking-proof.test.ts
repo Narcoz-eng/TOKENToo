@@ -10,9 +10,11 @@ function assert(condition: unknown, message: string): asserts condition {
 async function main() {
   await mintEligibilityGateTest();
   await stakingEligibilityAndMutationTest();
+  await productionStakingFailClosedTest();
   await proofOwnerRefreshSnapshotTest();
   console.log("PASS product mint eligibility gates");
   console.log("PASS staking eligibility and mutation path");
+  console.log("PASS production staking fail-closed path");
   console.log("PASS proof owner refresh stays coherent");
 }
 
@@ -27,6 +29,31 @@ async function mintEligibilityGateTest() {
   assert(loosePremium?.qualityTier === "Premium", "Fixture should prove qualityTier alone is too loose.");
   assert(loosePremium?.mintEligible === false, "Identity lock without approved profile gates must not be mint eligible.");
   assert(eligible?.mintEligible === true, "Confirmed launch plus approved profile gates should be mint eligible.");
+}
+
+async function productionStakingFailClosedTest() {
+  const db = stakingDb();
+  const staking = new StakingService(
+    db as any,
+    { assertCurrentOwner: async () => ({ verificationAvailable: false, issues: [] }) } as any,
+    { syncVaultPosition: async () => ({}) } as any
+  );
+  const previous = snapshotEnv(["ENABLE_LOCAL_STAKING_ACCOUNTING", "ENABLE_PRODUCTION_STAKING", "APP_ENV", "NODE_ENV"]);
+  try {
+    process.env.ENABLE_LOCAL_STAKING_ACCOUNTING = "true";
+    process.env.ENABLE_PRODUCTION_STAKING = "true";
+    process.env.APP_ENV = "production";
+    process.env.NODE_ENV = "production";
+    let rejected = false;
+    try {
+      await staking.createStakeIntent({ walletAddress: "owner-wallet", vaultNftId: "vault-live", idempotencyKey: "stake-production" });
+    } catch (error) {
+      rejected = error instanceof BadRequestException && /VaultPosition PDA|Production staking/i.test(error.message);
+    }
+    assert(rejected, "Production staking must fail closed without live custody/VaultPosition verification.");
+  } finally {
+    restoreEnv(previous);
+  }
 }
 
 async function stakingEligibilityAndMutationTest() {

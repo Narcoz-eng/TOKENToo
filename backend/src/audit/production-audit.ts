@@ -113,34 +113,58 @@ function protocolHonestyCheck(root: string, issues: string[]) {
   const mintSource = readFileSync(resolve(root, "backend/src/vault-mint/vault-mint-orchestrator.service.ts"), "utf8");
   const redeemSource = readFileSync(resolve(root, "backend/src/vault-mint/vault-redeem-orchestrator.service.ts"), "utf8");
   const protocolSource = readFileSync(resolve(root, "backend/src/protocol/protocol.service.ts"), "utf8");
+  const communitySource = readFileSync(resolve(root, "backend/src/protocol/community-protocol.service.ts"), "utf8");
+  const stakingSource = readFileSync(resolve(root, "backend/src/staking/staking.service.ts"), "utf8");
+  const productionLayerSource = readFileSync(resolve(root, "backend/src/generator/production-layer-pack.service.ts"), "utf8");
   const generatorSource = readFileSync(resolve(root, "backend/src/generator/generator.service.ts"), "utf8");
   const startupSource = readFileSync(resolve(root, "backend/src/env/startup-validation.ts"), "utf8");
   const providerGuardSource = readFileSync(resolve(root, "backend/src/generator/provider-abstractions.ts"), "utf8");
+  const schemaSource = readFileSync(resolve(root, "backend/prisma/schema.prisma"), "utf8");
 
   const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development";
-  const productionLike = appEnv === "production" || process.env.ENABLE_PRODUCTION_MINT === "true";
+  const productionLike = appEnv === "production" || process.env.ENABLE_PRODUCTION_MINT === "true" || process.env.ENABLE_PRODUCTION_STAKING === "true" || process.env.FINAL_PRODUCTION_ASSETS_APPROVED === "true";
   const liveSolana = process.env.SOLANA_TRANSACTION_PROVIDER === "devnet";
-  const immutableStorage = (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock") !== "mock";
+  const storageProvider = process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock";
+  const immutableStorage = ["pinata", "arweave", "irys"].includes(storageProvider);
   const paidAiRequested = (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" || (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") === "true";
   const paidAiExplicit = (process.env.PAID_AI_GENERATION_ENABLED ?? "false") === "true";
+  const finalProductionRequested = process.env.FINAL_PRODUCTION_ASSETS_APPROVED === "true" || process.env.REQUIRED_LAUNCH_ASSET_STATUS === "FINAL_PRODUCTION" || appEnv === "production";
 
+  for (const model of ["model TokenCommunity", "model CommunityCreationPayment", "model WhaleGateVerification", "model StudioSubscription", "model CreatorAccessPass"]) {
+    requireCheck(schemaSource.includes(model), `${model.replace("model ", "")} is missing from Prisma schema. Access/payment/permission state cannot be loose metadata.`, issues);
+  }
+  requireCheck(communitySource.includes("communityCreationPayment") && communitySource.includes("whaleGateVerification"), "Community access flow must write dedicated payment and whale verification records.", issues);
+  requireCheck(communitySource.includes("studioSubscription") && communitySource.includes("creatorAccessPass") && communitySource.includes("active CreatorAccessPass"), "Subscription/admin community access must use dedicated StudioSubscription/CreatorAccessPass rows.", issues);
   requireCheck(adapterSource.includes("verifySolPayment") && adapterSource.includes("getParsedTransaction"), "Solana adapter must verify 1 SOL creation payments from live transactions.", issues);
   requireCheck(adapterSource.includes("verifyWalletTokenBalance") && adapterSource.includes("tokenBalance"), "Solana adapter must verify whale/token balances from live token accounts.", issues);
   requireCheck(adapterSource.includes("getCoreAssetProof") && protocolSource.includes("assertCurrentOwner"), "Redeem/proof flow must verify live NFT ownership before trusting DB owner snapshots.", issues);
   requireCheck(adapterSource.includes("verifyReserveCustody") && adapterSource.includes("expectedBackingAmount"), "Reserve proof must compare expected backing against live reserve custody.", issues);
+  requireCheck(stakingSource.includes("verifyVaultPositionPda") && stakingSource.includes("Production staking requires live VaultPosition PDA verification"), "Staking must verify live VaultPosition PDA state and fail closed in production.", issues);
+  requireCheck(stakingSource.includes("Production staking requires an audited on-chain custody/freeze adapter") && stakingSource.includes("local staking mutation is forbidden"), "Production staking must not mutate local DB state without audited custody/freeze routes.", issues);
   requireCheck(mintSource.includes("Production minting requires live wallet token balance verification"), "Production mint path must fail closed without live token balance verification.", issues);
   requireCheck(mintSource.includes("FINAL_ASSET_STORAGE_PROVIDER is immutable storage"), "Production mint path must require immutable final asset storage.", issues);
   requireCheck(redeemSource.includes("Production redeem build requires live NFT ownership"), "Production redeem path must fail closed without live NFT owner verification.", issues);
   requireCheck(generatorSource.includes("AI studio previews are art direction only") && generatorSource.includes("wireframes cannot launch"), "Studio launch readiness must block wireframes and AI concepts from mintable production launch.", issues);
+  requireCheck(productionLayerSource.includes("finalManifestPolicyStatus") && productionLayerSource.includes("Final 10k generation cannot use AI image providers"), "Final asset policy must require approved manifests, provenance, deterministic rendering, and no AI in final 10k generation.", issues);
   requireCheck(startupSource.includes("local-component") && startupSource.includes("deterministic-render"), "Startup defaults must keep Studio on local/free component rendering.", issues);
   requireCheck(providerGuardSource.includes("PAID_AI_GENERATION_ENABLED") && providerGuardSource.includes("explicitUserAction"), "Paid AI provider calls must be globally disabled unless explicitly enabled by user action.", issues);
 
   if (productionLike) {
     requireCheck(liveSolana, "Production-like minting requires SOLANA_TRANSACTION_PROVIDER=devnet; mock transaction provider is forbidden.", issues);
     requireCheck((process.env.ENABLE_MOCK_MINT ?? "false") !== "true", "Production-like minting forbids ENABLE_MOCK_MINT=true.", issues);
+    requireCheck((process.env.ENABLE_LOCAL_STAKING_ACCOUNTING ?? "false") !== "true", "Production-like execution forbids ENABLE_LOCAL_STAKING_ACCOUNTING=true.", issues);
+    requireCheck((process.env.ENABLE_PRODUCTION_STAKING ?? "false") !== "true", "Production staking cannot be enabled until an audited on-chain custody/freeze adapter is implemented.", issues);
     requireCheck(Boolean(process.env.COMMUNITY_CREATION_FEE_WALLET ?? process.env.PROTOCOL_TREASURY_WALLET), "Production community payment verification requires COMMUNITY_CREATION_FEE_WALLET or PROTOCOL_TREASURY_WALLET.", issues);
-    requireCheck(immutableStorage, "Production minting requires immutable storage; FINAL_ASSET_STORAGE_PROVIDER/ASSET_STORAGE_PROVIDER cannot be mock.", issues);
+    requireCheck(immutableStorage, "Production minting requires immutable storage; FINAL_ASSET_STORAGE_PROVIDER/ASSET_STORAGE_PROVIDER must be pinata, arweave, or irys.", issues);
     requireCheck(!paidAiRequested || paidAiExplicit, "Paid AI generation was requested without PAID_AI_GENERATION_ENABLED=true.", issues);
+  }
+  if (finalProductionRequested) {
+    requireCheck(Boolean(process.env.APPROVED_TRAIT_MANIFEST_URI || process.env.APPROVED_TRAIT_MANIFEST_HASH), "FINAL_PRODUCTION requires an approved trait manifest URI/hash.", issues);
+    requireCheck(Boolean(process.env.FINAL_ASSET_PROVENANCE_HASH), "FINAL_PRODUCTION requires metadata/provenance hash.", issues);
+    requireCheck(Boolean(process.env.FINAL_RENDERER_VERSION), "FINAL_PRODUCTION requires deterministic renderer version.", issues);
+    requireCheck(!["ai", "openai", "imagen", "gemini", "stability", "flux", "bfl"].includes((process.env.DESIGN_MODEL_PROVIDER ?? "").toLowerCase()), "FINAL_PRODUCTION cannot use an AI design provider for final 10k generation.", issues);
+    requireCheck(!["ai", "openai", "imagen", "gemini", "stability", "flux", "bfl"].includes((process.env.LAYER_PACK_PROVIDER ?? "").toLowerCase()), "FINAL_PRODUCTION cannot use an AI layer-pack provider for final 10k generation.", issues);
+    requireCheck(!["ai", "openai", "imagen", "gemini", "stability", "flux", "bfl"].includes((process.env.LEGENDARY_ASSET_PROVIDER ?? "").toLowerCase()), "FINAL_PRODUCTION cannot use an AI legendary asset provider for final 10k generation.", issues);
   }
 
   return {
@@ -148,9 +172,11 @@ function protocolHonestyCheck(root: string, issues: string[]) {
     productionLike,
     solanaTransactionProvider: process.env.SOLANA_TRANSACTION_PROVIDER ?? null,
     mockMintEnabled: process.env.ENABLE_MOCK_MINT ?? null,
+    storageProvider,
     immutableStorage,
     paidAiRequested,
     paidAiExplicit,
+    finalProductionRequested,
     localStudioDefaults: {
       studioProvider: process.env.STUDIO_PROVIDER ?? "local-component",
       studioImageProvider: process.env.STUDIO_IMAGE_PROVIDER ?? "deterministic-render"

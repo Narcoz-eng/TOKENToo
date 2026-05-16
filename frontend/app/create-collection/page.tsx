@@ -315,7 +315,7 @@ export default function CreateCollectionPage() {
       return;
     }
     let cancelled = false;
-    apiFetch<{ ok: true } & ConceptRequestSummary>("/generator/ai-concept/validate-request", {
+    apiFetch<{ ok: true } & ConceptRequestSummary>("/studio/preview/premium-estimate", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(previewPayload()),
@@ -370,7 +370,7 @@ export default function CreateCollectionPage() {
 
   async function generatePreview() {
     await action(async () => {
-      const data = await apiFetch<PreviewOnlyResponse>("/generator/preview", {
+      const data = await apiFetch<PreviewOnlyResponse>("/studio/preview/free", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(previewPayload()),

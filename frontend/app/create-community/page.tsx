@@ -110,6 +110,19 @@ type ReserveResponse = {
   reserve?: ReserveProof;
 };
 
+type LaunchStatusResponse = LaunchResponse & {
+  launch?: {
+    status?: string;
+    txSignature?: string | null;
+    collectionAssetAddress?: string | null;
+    onchainProfilePda?: string | null;
+    feeVaultPda?: string | null;
+    tokenVaultPda?: string | null;
+    launchedAt?: string | null;
+    productionReady?: boolean;
+  };
+};
+
 const accessMethods: Array<{ value: AccessMethod; label: string; help: string }> = [
   { value: "CREATION_FEE_SOL", label: "1 SOL fee", help: "Submit a confirmed transfer signature to the protocol treasury." },
   { value: "WHALE_HOLDER", label: "Whale gate", help: "Backend verifies the connected wallet holds the configured raw threshold." },
@@ -127,8 +140,10 @@ export default function CreateCommunityPage() {
   const [community, setCommunity] = useState<CreateCommunityResponse | null>(null);
   const [launchBuild, setLaunchBuild] = useState<LaunchResponse | null>(null);
   const [launchSubmit, setLaunchSubmit] = useState<LaunchResponse | null>(null);
+  const [launchStatus, setLaunchStatus] = useState<LaunchStatusResponse | null>(null);
+  const [accessResult, setAccessResult] = useState<CreateCommunityResponse | null>(null);
   const [reserve, setReserve] = useState<ReserveProof | null>(null);
-  const [activeAction, setActiveAction] = useState<"scan" | "create" | "build" | "submit" | null>(null);
+  const [activeAction, setActiveAction] = useState<"scan" | "create" | "payment" | "whale" | "build" | "submit" | "status" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const collection = launchSubmit?.collection ?? launchBuild?.collection ?? community?.collection ?? null;
@@ -162,9 +177,11 @@ export default function CreateCommunityPage() {
     if (!mint) return setError("Scan or enter a Solana token mint first.");
     setActiveAction("create");
     setError(null);
-    setLaunchBuild(null);
-    setLaunchSubmit(null);
-    setReserve(null);
+      setLaunchBuild(null);
+      setLaunchSubmit(null);
+      setLaunchStatus(null);
+      setAccessResult(null);
+      setReserve(null);
     try {
       const response = await wallet.authFetch<CreateCommunityResponse>("/communities/from-token", {
         method: "POST",
@@ -180,6 +197,43 @@ export default function CreateCommunityPage() {
       if (response.collection?.id) await loadReserve(response.collection.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Community creation failed");
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
+  async function verifyPayment() {
+    if (!collection?.id) return setError("Create or load a community draft before verifying payment access.");
+    if (!paymentSignature.trim()) return setError("Enter a confirmed payment signature first.");
+    setActiveAction("payment");
+    setError(null);
+    try {
+      const response = await wallet.authFetch<CreateCommunityResponse>(`/communities/${encodeURIComponent(collection.id)}/access/payment`, {
+        method: "POST",
+        body: JSON.stringify({ paymentSignature: paymentSignature.trim(), idempotencyKey: `payment:${collection.id}:${wallet.address ?? "wallet"}:${paymentSignature.trim()}` })
+      });
+      setAccessResult(response);
+      if (response.collection?.id) await loadReserve(response.collection.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Payment verification failed");
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
+  async function verifyWhale() {
+    if (!collection?.id) return setError("Create or load a community draft before verifying whale access.");
+    setActiveAction("whale");
+    setError(null);
+    try {
+      const response = await wallet.authFetch<CreateCommunityResponse>(`/communities/${encodeURIComponent(collection.id)}/access/verify-whale`, {
+        method: "POST",
+        body: JSON.stringify({ idempotencyKey: `whale:${collection.id}:${wallet.address ?? "wallet"}` })
+      });
+      setAccessResult(response);
+      if (response.collection?.id) await loadReserve(response.collection.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Whale verification failed");
     } finally {
       setActiveAction(null);
     }
@@ -214,9 +268,25 @@ export default function CreateCommunityPage() {
         body: JSON.stringify(txSignature ? { txSignature } : { signedTransactionBase64 })
       });
       setLaunchSubmit(response);
+      setLaunchStatus(null);
       if (response.collection?.id) await loadReserve(response.collection.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Community launch submit failed");
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
+  async function refreshLaunchStatus() {
+    if (!collection?.id) return setError("Create or load a community draft before checking launch status.");
+    setActiveAction("status");
+    setError(null);
+    try {
+      const response = await apiFetch<LaunchStatusResponse>(`/communities/${encodeURIComponent(collection.id)}/launch/status`, { cache: "no-store" });
+      setLaunchStatus(response);
+      if (response.collection?.id) await loadReserve(response.collection.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Launch status refresh failed");
     } finally {
       setActiveAction(null);
     }
@@ -304,6 +374,19 @@ export default function CreateCommunityPage() {
                 {activeAction === "create" ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
                 Create Draft
               </button>
+              {collection ? (
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button onClick={verifyPayment} disabled={activeAction === "payment" || !paymentSignature.trim()} className="inline-flex h-10 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
+                    {activeAction === "payment" ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
+                    Verify Payment
+                  </button>
+                  <button onClick={verifyWhale} disabled={activeAction === "whale"} className="inline-flex h-10 items-center gap-2 rounded-md border border-vault-cyan/45 bg-vault-cyan/10 px-4 text-sm font-bold text-vault-cyan">
+                    {activeAction === "whale" ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                    Verify Whale
+                  </button>
+                </div>
+              ) : null}
+              {accessResult?.access ? <p className="mt-3 rounded-md border border-vault-green/25 bg-vault-green/10 p-3 text-sm text-vault-green">{accessResult.access.method} {accessResult.access.status}</p> : null}
             </SectionCard>
 
             {collection ? (
@@ -327,6 +410,10 @@ export default function CreateCommunityPage() {
                     {activeAction === "submit" ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
                     Sign + Submit Launch
                   </button>
+                  <button onClick={refreshLaunchStatus} disabled={activeAction === "status"} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-300">
+                    {activeAction === "status" ? <Loader2 className="size-4 animate-spin" /> : <RadioTower className="size-4" />}
+                    Refresh Status
+                  </button>
                 </div>
                 {launchTx?.base64UnsignedTransaction ? <p className="mt-3 break-all rounded-md border border-vault-line bg-black/25 p-3 font-mono text-xs text-slate-400">Unsigned launch tx: {short(launchTx.base64UnsignedTransaction, 80)}</p> : null}
                 {launchSubmit?.result?.txSignature ? (
@@ -344,9 +431,11 @@ export default function CreateCommunityPage() {
                 <StatusLine label="Token scan" ok={Boolean(scan)} />
                 <StatusLine label="Access grant" ok={Boolean(community?.ok)} />
                 <StatusLine label="Launch tx built" ok={Boolean(launchTx?.base64UnsignedTransaction || launchBuild?.idempotent)} />
+                <StatusLine label="Launch status checked" ok={Boolean(launchStatus)} />
                 <StatusLine label="Reserve verified" ok={Boolean(reserve?.lastOnChainVerifiedAt || launchSubmit?.verification?.passed)} />
               </div>
               {community?.message ? <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-300">{community.message}</p> : null}
+              {launchStatus?.launch ? <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-300">Launch status: {launchStatus.launch.status ?? "N/A"}{launchStatus.launch.productionReady ? " · production ready" : ""}</p> : null}
             </SectionCard>
 
             <SectionCard title="Verified Reserve">

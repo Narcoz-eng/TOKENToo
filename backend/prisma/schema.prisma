@@ -49,6 +49,42 @@ enum CommunityCreationAccessStatus {
   EXPIRED
 }
 
+enum CommunityPaymentStatus {
+  PENDING
+  VERIFIED
+  DENIED
+  UNAVAILABLE
+  EXPIRED
+}
+
+enum WhaleGateVerificationStatus {
+  PENDING
+  VERIFIED
+  DENIED
+  UNAVAILABLE
+  EXPIRED
+}
+
+enum StudioSubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  EXPIRED
+  CANCELED
+}
+
+enum CreatorAccessPassStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum CreatorAccessPassType {
+  STUDIO_SUBSCRIPTION
+  ADMIN_GRANT
+  CREATOR_PASS
+  ALLOWLIST
+}
+
 enum VaultStrategyType {
   PASSIVE
   LIQUIDITY
@@ -244,6 +280,9 @@ model User {
   sales              Sale[]              @relation("SellerSales")
   raidClaims         RaidClaim[]
   missionCooldowns   MissionCooldown[]
+  tokenCommunities   TokenCommunity[]    @relation("TokenCommunityCreator")
+  studioSubscriptions StudioSubscription[]
+  creatorAccessPasses CreatorAccessPass[]
 }
 
 model PlatformConfig {
@@ -271,9 +310,12 @@ model Token {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   collection         Collection?
+  tokenCommunity     TokenCommunity?
   vaultNfts          VaultNFT[]
   riskSnapshots      RiskScoreSnapshot[]
   metadataRecords    TokenMetadataRecord[]
+  communityCreationPayments CommunityCreationPayment[]
+  whaleGateVerifications WhaleGateVerification[]
 
   @@index([symbol])
   @@index([riskScore])
@@ -621,6 +663,10 @@ model Collection {
   reserveVault          ReserveVault?
   vaultPositions        VaultPosition[]
   creationAccesses      CommunityCreationAccess[]
+  tokenCommunity        TokenCommunity?
+  communityCreationPayments CommunityCreationPayment[]
+  whaleGateVerifications WhaleGateVerification[]
+  creatorAccessPasses   CreatorAccessPass[]
   vaultStrategy         VaultStrategy?
   strategyExecutionJobs StrategyExecutionJob[]
   strategyEventLogs     StrategyEventLog[]
@@ -733,10 +779,145 @@ model CommunityCreationAccess {
   createdAt        DateTime                      @default(now())
   updatedAt        DateTime                      @updatedAt
   collection       Collection?                   @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  payment          CommunityCreationPayment?
+  whaleVerification WhaleGateVerification?
 
   @@index([walletAddress, tokenMint, status])
   @@index([collectionId])
   @@index([method, status])
+}
+
+model TokenCommunity {
+  id                      String                      @id @default(uuid()) @db.Uuid
+  tokenId                 String                      @unique @db.Uuid
+  collectionId            String?                     @unique @db.Uuid
+  creatorUserId           String?                     @db.Uuid
+  tokenMint               String                      @unique
+  slug                    String                      @unique
+  name                    String
+  status                  CollectionStatus            @default(ACTIVE)
+  launchStatus            String                      @default("DRAFT")
+  metadata                Json                        @default("{}")
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+  token                   Token                       @relation(fields: [tokenId], references: [id], onDelete: Restrict)
+  collection              Collection?                 @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  creator                 User?                       @relation("TokenCommunityCreator", fields: [creatorUserId], references: [id], onDelete: SetNull)
+  payments                CommunityCreationPayment[]
+  whaleVerifications      WhaleGateVerification[]
+  creatorAccessPasses     CreatorAccessPass[]
+
+  @@index([status])
+  @@index([launchStatus])
+  @@index([creatorUserId])
+}
+
+model CommunityCreationPayment {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  communityId           String?                @db.Uuid
+  collectionId          String?                @db.Uuid
+  accessId              String?                @unique @db.Uuid
+  tokenId               String?                @db.Uuid
+  tokenMint             String
+  walletAddress         String
+  payer                 String?
+  recipient             String
+  requiredLamports      Decimal                @db.Decimal(20, 0)
+  paidLamports          Decimal?               @db.Decimal(20, 0)
+  signature             String?                @unique
+  status                CommunityPaymentStatus @default(PENDING)
+  verificationAvailable Boolean                @default(false)
+  verifiedAt            DateTime?
+  expiresAt             DateTime?
+  idempotencyKey        String?                @unique
+  requestHash           String?
+  metadata              Json                   @default("{}")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  community             TokenCommunity?        @relation(fields: [communityId], references: [id], onDelete: SetNull)
+  collection            Collection?            @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  access                CommunityCreationAccess? @relation(fields: [accessId], references: [id], onDelete: SetNull)
+  token                 Token?                 @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+
+  @@index([walletAddress, tokenMint, status])
+  @@index([collectionId, status])
+  @@index([communityId, status])
+  @@index([status, createdAt])
+}
+
+model WhaleGateVerification {
+  id                    String                      @id @default(uuid()) @db.Uuid
+  communityId           String?                     @db.Uuid
+  collectionId          String?                     @db.Uuid
+  accessId              String?                     @unique @db.Uuid
+  tokenId               String?                     @db.Uuid
+  tokenMint             String
+  walletAddress         String
+  requiredAmount        Decimal                     @db.Decimal(38, 0)
+  observedBalance       Decimal?                    @db.Decimal(38, 0)
+  tokenAccount          String?
+  status                WhaleGateVerificationStatus @default(PENDING)
+  verificationAvailable Boolean                     @default(false)
+  verifiedAt            DateTime?
+  expiresAt             DateTime?
+  idempotencyKey        String?                     @unique
+  requestHash           String?
+  metadata              Json                        @default("{}")
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  community             TokenCommunity?             @relation(fields: [communityId], references: [id], onDelete: SetNull)
+  collection            Collection?                 @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  access                CommunityCreationAccess?    @relation(fields: [accessId], references: [id], onDelete: SetNull)
+  token                 Token?                      @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+
+  @@index([walletAddress, tokenMint, status])
+  @@index([collectionId, status])
+  @@index([communityId, status])
+  @@index([status, createdAt])
+}
+
+model StudioSubscription {
+  id            String                   @id @default(uuid()) @db.Uuid
+  userId        String?                  @db.Uuid
+  walletAddress String
+  tier          String                   @default("STUDIO")
+  status        StudioSubscriptionStatus @default(ACTIVE)
+  source        String                   @default("manual")
+  startsAt      DateTime                 @default(now())
+  expiresAt     DateTime?
+  metadata      Json                     @default("{}")
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  user          User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([walletAddress, tier])
+  @@index([walletAddress, status])
+  @@index([status, expiresAt])
+}
+
+model CreatorAccessPass {
+  id              String                  @id @default(uuid()) @db.Uuid
+  userId          String?                 @db.Uuid
+  collectionId    String?                 @db.Uuid
+  communityId     String?                 @db.Uuid
+  walletAddress   String
+  type            CreatorAccessPassType   @default(CREATOR_PASS)
+  status          CreatorAccessPassStatus @default(ACTIVE)
+  source          String                  @default("manual")
+  grantedByWallet String?
+  expiresAt       DateTime?
+  idempotencyKey  String?                 @unique
+  metadata        Json                    @default("{}")
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  user            User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  collection      Collection?             @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  community       TokenCommunity?         @relation(fields: [communityId], references: [id], onDelete: SetNull)
+
+  @@index([walletAddress, status, type])
+  @@index([collectionId, status])
+  @@index([communityId, status])
+  @@index([expiresAt])
 }
 
 model VaultStrategy {

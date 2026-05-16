@@ -54,6 +54,7 @@ export class CommunityProtocolService {
       include: { token: true, reserveVault: true, vaultStrategy: true, creator: true }
     });
     if (existing) {
+      await this.ensureTokenCommunity({ token, collection: existing });
       await this.strategies.ensureDefaultStrategy(existing.id);
       return {
         ok: true,
@@ -71,6 +72,7 @@ export class CommunityProtocolService {
         input: normalized,
         method: access.method,
         status: access.status,
+        tokenId: token.id,
         requestHash,
         requiredLamports: this.creationFeeLamports(),
         metadata: access.metadata
@@ -136,7 +138,8 @@ export class CommunityProtocolService {
           })
         }
       });
-      await tx.communityCreationAccess.create({
+      const community = await this.ensureTokenCommunity({ token, collection: created, client: tx, metadata: { source: "community-create-from-token" } });
+      const accessRow = await tx.communityCreationAccess.create({
         data: {
           collectionId: created.id,
           walletAddress: normalized.walletAddress,
@@ -150,6 +153,18 @@ export class CommunityProtocolService {
           verifiedAt: new Date(),
           metadata: this.json(access.metadata)
         }
+      });
+      await this.recordDedicatedAccessProof(tx, {
+        access: accessRow,
+        input: normalized,
+        method: access.method,
+        status: "GRANTED",
+        collectionId: created.id,
+        communityId: community?.id,
+        tokenId: token.id,
+        requestHash,
+        requiredLamports: this.creationFeeLamports(),
+        metadata: access.metadata
       });
       return created;
     });
@@ -203,6 +218,7 @@ export class CommunityProtocolService {
         },
         include: { token: true, reserveVault: true, vaultStrategy: true, creator: true }
       });
+      await this.ensureTokenCommunity({ token: collection.token, collection: row, client: tx, metadata: { source: "community-launch-built" } });
       await tx.reserveVault.upsert({
         where: { collectionId: collection.id },
         update: {
@@ -255,6 +271,7 @@ export class CommunityProtocolService {
       method: "CREATION_FEE_SOL",
       status: access.granted ? "GRANTED" : access.status,
       collectionId: collection.id,
+      tokenId: collection.token.id,
       requestHash,
       requiredLamports: this.creationFeeLamports(),
       metadata: access.metadata
@@ -291,6 +308,7 @@ export class CommunityProtocolService {
       method: "WHALE_HOLDER",
       status: access.granted ? "GRANTED" : access.status,
       collectionId: collection.id,
+      tokenId: collection.token.id,
       requestHash,
       metadata: access.metadata
     });
@@ -345,6 +363,7 @@ export class CommunityProtocolService {
         },
         include: { token: true, reserveVault: true, vaultStrategy: true, creator: true }
       });
+      await this.ensureTokenCommunity({ token: collection.token, collection: row, client: tx, metadata: { source: "community-launch-confirmed" } });
       await tx.reserveVault.upsert({
         where: { collectionId: collection.id },
         update: {
@@ -478,22 +497,63 @@ export class CommunityProtocolService {
     return { granted: true as const, method: "WHALE_HOLDER" as const, status: "GRANTED" as const, metadata: { thresholdRaw: threshold, balance: proof.balance, tokenAccount: proof.tokenAccount } };
   }
 
-  private verifySubscription(input: CreateCommunityInput) {
-    const wallets = this.envWalletSet("STUDIO_SUBSCRIPTION_WALLETS", "PHEW_STUDIO_SUBSCRIPTION_WALLETS");
-    if (!wallets.has(input.walletAddress)) return this.denied("SUBSCRIPTION_REQUIRED", "Subscription Studio Mode access was not found for this wallet.", "DENIED", "SUBSCRIPTION_STUDIO", {});
-    return { granted: true as const, method: "SUBSCRIPTION_STUDIO" as const, status: "GRANTED" as const, metadata: { source: "configured-subscription-registry" } };
+  private async verifySubscription(input: CreateCommunityInput) {
+    const now = new Date();
+    const subscription = await this.prisma.studioSubscription.findFirst({
+      where: {
+        walletAddress: input.walletAddress,
+        status: "ACTIVE",
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    if (subscription) {
+      return { granted: true as const, method: "SUBSCRIPTION_STUDIO" as const, status: "GRANTED" as const, metadata: { source: "studio-subscription", subscriptionId: subscription.id, tier: subscription.tier } };
+    }
+    const pass = await this.prisma.creatorAccessPass.findFirst({
+      where: {
+        walletAddress: input.walletAddress,
+        status: "ACTIVE",
+        type: { in: ["STUDIO_SUBSCRIPTION", "CREATOR_PASS", "ALLOWLIST"] },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    if (pass) {
+      return { granted: true as const, method: "SUBSCRIPTION_STUDIO" as const, status: "GRANTED" as const, metadata: { source: "creator-access-pass", passId: pass.id, type: pass.type } };
+    }
+    if (this.accessEnvFallbackAllowed()) {
+      const wallets = this.envWalletSet("STUDIO_SUBSCRIPTION_WALLETS", "PHEW_STUDIO_SUBSCRIPTION_WALLETS");
+      if (wallets.has(input.walletAddress)) return { granted: true as const, method: "SUBSCRIPTION_STUDIO" as const, status: "GRANTED" as const, metadata: { source: "dev-env-subscription-registry" } };
+    }
+    return this.denied("SUBSCRIPTION_REQUIRED", "Subscription Studio Mode access was not found for this wallet.", "DENIED", "SUBSCRIPTION_STUDIO", {});
   }
 
-  private verifyAdminGrant(input: CreateCommunityInput) {
-    if (!this.isAdmin(input.walletAddress)) return this.denied("ADMIN_GRANT_REQUIRED", "Admin grant requires a configured protocol admin wallet.", "DENIED", "ADMIN_GRANT", {});
-    return { granted: true as const, method: "ADMIN_GRANT" as const, status: "GRANTED" as const, metadata: { source: "protocol-admin-wallet" } };
+  private async verifyAdminGrant(input: CreateCommunityInput) {
+    const now = new Date();
+    const pass = await this.prisma.creatorAccessPass.findFirst({
+      where: {
+        walletAddress: input.walletAddress,
+        status: "ACTIVE",
+        type: { in: ["ADMIN_GRANT", "ALLOWLIST"] },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    if (pass) {
+      return { granted: true as const, method: "ADMIN_GRANT" as const, status: "GRANTED" as const, metadata: { source: "creator-access-pass", passId: pass.id, type: pass.type } };
+    }
+    if (this.accessEnvFallbackAllowed() && this.isAdmin(input.walletAddress)) {
+      return { granted: true as const, method: "ADMIN_GRANT" as const, status: "GRANTED" as const, metadata: { source: "dev-protocol-admin-wallet" } };
+    }
+    return this.denied("ADMIN_GRANT_REQUIRED", "Admin grant requires an active CreatorAccessPass.", "DENIED", "ADMIN_GRANT", {});
   }
 
   private denied(code: string, message: string, status: "PENDING" | "DENIED", method: AccessMethod, metadata: Record<string, unknown>) {
     return { granted: false as const, code, message, status, method, metadata };
   }
 
-  private async recordAccess(input: { input: CreateCommunityInput; method: AccessMethod; status: "PENDING" | "DENIED" | "GRANTED"; requestHash: string; requiredLamports?: string; metadata: Record<string, unknown>; collectionId?: string }) {
+  private async recordAccess(input: { input: CreateCommunityInput; method: AccessMethod; status: "PENDING" | "DENIED" | "GRANTED"; requestHash: string; requiredLamports?: string; metadata: Record<string, unknown>; collectionId?: string; tokenId?: string; communityId?: string }) {
     const data = {
       collectionId: input.collectionId,
       walletAddress: input.input.walletAddress,
@@ -507,14 +567,123 @@ export class CommunityProtocolService {
       verifiedAt: input.status === "GRANTED" ? new Date() : undefined,
       metadata: this.json(input.metadata)
     };
+    let accessRow: any;
     if (input.input.idempotencyKey) {
-      return this.prisma.communityCreationAccess.upsert({
+      accessRow = await this.prisma.communityCreationAccess.upsert({
         where: { idempotencyKey: input.input.idempotencyKey },
         update: data,
         create: data
       });
+    } else {
+      accessRow = await this.prisma.communityCreationAccess.create({ data });
     }
-    return this.prisma.communityCreationAccess.create({ data });
+    await this.recordDedicatedAccessProof(this.prisma, {
+      access: accessRow,
+      input: input.input,
+      method: input.method,
+      status: input.status,
+      collectionId: input.collectionId,
+      communityId: input.communityId,
+      tokenId: input.tokenId,
+      requestHash: input.requestHash,
+      requiredLamports: input.requiredLamports,
+      metadata: input.metadata
+    });
+    return accessRow;
+  }
+
+  private async ensureTokenCommunity(input: { token: any; collection?: any; client?: any; metadata?: Record<string, unknown> }) {
+    const client = input.client ?? this.prisma;
+    if (!client.tokenCommunity?.upsert) return null;
+    const collection = input.collection;
+    const slug = collection?.slug ?? this.slug(`${input.token.symbol ?? "token"}-vaults-${String(input.token.mint ?? "").slice(-6)}`);
+    const name = collection?.name ?? `${input.token.symbol ?? "Token"} Vaults`;
+    return client.tokenCommunity.upsert({
+      where: { tokenId: input.token.id },
+      update: {
+        collectionId: collection?.id,
+        creatorUserId: collection?.creatorUserId,
+        tokenMint: input.token.mint,
+        slug,
+        name,
+        status: collection?.status ?? "ACTIVE",
+        launchStatus: collection?.launchStatus ?? "DRAFT",
+        metadata: this.json(input.metadata ?? { source: "community-sync" })
+      },
+      create: {
+        tokenId: input.token.id,
+        collectionId: collection?.id,
+        creatorUserId: collection?.creatorUserId,
+        tokenMint: input.token.mint,
+        slug,
+        name,
+        status: collection?.status ?? "ACTIVE",
+        launchStatus: collection?.launchStatus ?? "DRAFT",
+        metadata: this.json(input.metadata ?? { source: "community-sync" })
+      }
+    });
+  }
+
+  private async recordDedicatedAccessProof(client: any, input: {
+    access: any;
+    input: CreateCommunityInput;
+    method: AccessMethod;
+    status: "PENDING" | "DENIED" | "GRANTED";
+    requestHash: string;
+    requiredLamports?: string;
+    metadata: Record<string, unknown>;
+    collectionId?: string;
+    communityId?: string;
+    tokenId?: string;
+  }) {
+    if (input.method === "CREATION_FEE_SOL") {
+      if (!client.communityCreationPayment?.upsert) return;
+      const data = {
+        communityId: input.communityId,
+        collectionId: input.collectionId,
+        accessId: input.access?.id,
+        tokenId: input.tokenId,
+        tokenMint: input.input.tokenMint,
+        walletAddress: input.input.walletAddress,
+        payer: this.metadataString(input.metadata, "payer") ?? input.input.walletAddress,
+        recipient: this.metadataString(input.metadata, "recipient") ?? this.creationFeeWallet() ?? "UNCONFIGURED",
+        requiredLamports: input.requiredLamports ?? this.creationFeeLamports(),
+        paidLamports: input.status === "GRANTED" ? this.metadataString(input.metadata, "requiredLamports") ?? input.requiredLamports ?? this.creationFeeLamports() : this.metadataString(input.metadata, "paidLamports"),
+        signature: input.input.paymentSignature,
+        status: this.paymentStatus(input.status, input.metadata),
+        verificationAvailable: this.metadataBoolean(input.metadata, "verificationAvailable") ?? input.status === "GRANTED",
+        verifiedAt: input.status === "GRANTED" ? new Date() : undefined,
+        expiresAt: input.access?.expiresAt,
+        idempotencyKey: input.input.idempotencyKey,
+        requestHash: input.requestHash,
+        metadata: this.json(input.metadata)
+      };
+      if (!input.access?.id) return client.communityCreationPayment.create?.({ data });
+      return client.communityCreationPayment.upsert({ where: { accessId: input.access.id }, update: data, create: data });
+    }
+    if (input.method === "WHALE_HOLDER") {
+      if (!client.whaleGateVerification?.upsert) return;
+      const data = {
+        communityId: input.communityId,
+        collectionId: input.collectionId,
+        accessId: input.access?.id,
+        tokenId: input.tokenId,
+        tokenMint: input.input.tokenMint,
+        walletAddress: input.input.walletAddress,
+        requiredAmount: this.metadataString(input.metadata, "thresholdRaw") ?? this.whaleThresholdRaw(),
+        observedBalance: this.metadataString(input.metadata, "balance"),
+        tokenAccount: this.metadataString(input.metadata, "tokenAccount"),
+        status: this.whaleStatus(input.status, input.metadata),
+        verificationAvailable: this.metadataBoolean(input.metadata, "verificationAvailable") ?? input.status === "GRANTED",
+        verifiedAt: input.status === "GRANTED" ? new Date() : undefined,
+        expiresAt: input.access?.expiresAt,
+        idempotencyKey: input.input.idempotencyKey,
+        requestHash: input.requestHash,
+        metadata: this.json(input.metadata)
+      };
+      if (!input.access?.id) return client.whaleGateVerification.create?.({ data });
+      return client.whaleGateVerification.upsert({ where: { accessId: input.access.id }, update: data, create: data });
+    }
   }
 
   private async upsertToken(scan: TokenScan) {
@@ -637,8 +806,41 @@ export class CommunityProtocolService {
     return this.envWalletSet("PROTOCOL_ADMIN_WALLETS", "ADMIN_WALLETS").has(wallet);
   }
 
+  private accessEnvFallbackAllowed() {
+    return (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") !== "production";
+  }
+
   private envWalletSet(...keys: string[]) {
     return new Set(keys.flatMap((key) => (process.env[key] ?? "").split(/[,\s]+/).map((value) => value.trim()).filter(Boolean)));
+  }
+
+  private paymentStatus(status: "PENDING" | "DENIED" | "GRANTED", metadata: Record<string, unknown>) {
+    if (status === "GRANTED") return "VERIFIED";
+    if (status === "PENDING" && this.metadataBoolean(metadata, "verificationAvailable") === false) return "UNAVAILABLE";
+    if (status === "PENDING") return "PENDING";
+    if (this.metadataBoolean(metadata, "verificationAvailable") === false) return "UNAVAILABLE";
+    return "DENIED";
+  }
+
+  private whaleStatus(status: "PENDING" | "DENIED" | "GRANTED", metadata: Record<string, unknown>) {
+    if (status === "GRANTED") return "VERIFIED";
+    if (status === "PENDING" && this.metadataBoolean(metadata, "verificationAvailable") === false) return "UNAVAILABLE";
+    if (status === "PENDING") return "PENDING";
+    if (this.metadataBoolean(metadata, "verificationAvailable") === false) return "UNAVAILABLE";
+    return "DENIED";
+  }
+
+  private metadataString(metadata: Record<string, unknown>, key: string) {
+    const value = metadata[key];
+    if (value === undefined || value === null || value === "") return undefined;
+    return String(value);
+  }
+
+  private metadataBoolean(metadata: Record<string, unknown>, key: string) {
+    const value = metadata[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string" && (value === "true" || value === "false")) return value === "true";
+    return undefined;
   }
 
   private hash(value: unknown) {

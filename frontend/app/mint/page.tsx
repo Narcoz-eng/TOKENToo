@@ -74,7 +74,7 @@ export default function MintPage() {
     setTxStatus("validating");
     setError(null);
     try {
-      const data = await wallet.authFetch<MintTransaction>("/vault/mint/intents", {
+      const data = await wallet.authFetch<MintTransaction>("/vaults/mint/intent", {
         method: "POST",
         body: JSON.stringify({
           idempotencyKey: `${wallet.address}:${collection.dbId ?? collection.id}:${normalizedAmount}:${lockDurationDays}`,
@@ -101,7 +101,10 @@ export default function MintPage() {
     setTxStatus("pending");
     setError(null);
     try {
-      const data = await wallet.authFetch<MintTransaction>(`/vault/mint/transactions/${mintState.id}/build`, { method: "POST" });
+      const data = await wallet.authFetch<MintTransaction>("/vaults/mint/build", {
+        method: "POST",
+        body: JSON.stringify({ mintTransactionId: mintState.id })
+      });
       setMintState(data);
       setTxStatus("idle");
     } catch (err) {
@@ -123,9 +126,9 @@ export default function MintPage() {
     try {
       const signedTransactionBase64 = await wallet.signTransactionBase64(base64);
       setTxStatus("pending");
-      const data = await wallet.authFetch<MintTransaction>(`/vault/mint/transactions/${mintState.id}/submit`, {
+      const data = await wallet.authFetch<MintTransaction>("/vaults/mint/submit", {
         method: "POST",
-        body: JSON.stringify({ signedTransactionBase64 })
+        body: JSON.stringify({ mintTransactionId: mintState.id, signedTransactionBase64 })
       });
       setMintState(data);
       setTxStatus(data.status === "CONFIRMED" ? "confirmed" : "pending");

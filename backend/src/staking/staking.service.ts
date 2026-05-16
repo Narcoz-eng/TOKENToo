@@ -1,14 +1,16 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { PrismaService } from "../db/prisma.service";
 import { ProtocolAccountingService } from "../protocol/protocol-accounting.service";
 import { ProtocolService } from "../protocol/protocol.service";
+import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
 
 @Injectable()
 export class StakingService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ProtocolService) private readonly protocol: ProtocolService,
-    @Inject(ProtocolAccountingService) private readonly accounting: ProtocolAccountingService
+    @Inject(ProtocolAccountingService) private readonly accounting: ProtocolAccountingService,
+    @Optional() @Inject(SolanaTransactionAdapterService) private readonly solana?: SolanaTransactionAdapterService
   ) {}
 
   async createStakeIntent(input: { walletAddress: string; vaultNftId: string; idempotencyKey?: string }) {
@@ -29,13 +31,18 @@ export class StakingService {
       };
     }
     const ownership = await this.protocol.assertCurrentOwner({ nft, walletAddress: input.walletAddress });
+    const positionProof = await this.verifyVaultPosition(nft, input.walletAddress, { expectedRedeemed: false, expectedStaked: false });
     if (!this.localStakingAccountingEnabled() && !this.productionStakingAdapterAvailable()) {
+      if (this.productionStakingRequired()) {
+        throw new BadRequestException("Production staking requires an audited on-chain custody/freeze adapter; local staking mutation is forbidden.");
+      }
       return {
         ok: true,
         action: "STAKE_VAULT",
         status: "SKIPPED",
         idempotencyKey: input.idempotencyKey,
         verification: ownership,
+        vaultPositionVerification: positionProof,
         productionReady: false,
         message: "Staking transaction adapter is not implemented; no local staking state was mutated."
       };
@@ -73,7 +80,8 @@ export class StakingService {
       idempotencyKey: input.idempotencyKey,
       position,
       verification: ownership,
-      productionReady: ownership.verificationAvailable && this.productionStakingAdapterAvailable(),
+      vaultPositionVerification: positionProof,
+      productionReady: ownership.verificationAvailable && positionProof.verificationAvailable && this.productionStakingAdapterAvailable(),
       message: ownership.verificationAvailable ? "Vault NFT owner verified and staked in protocol accounting." : "Dev/mock staking recorded with DB owner fallback; not production-ready proof."
     };
   }
@@ -89,13 +97,18 @@ export class StakingService {
       return { ok: true, idempotent: true, action: "UNSTAKE_VAULT", position, message: "Staking position is already inactive." };
     }
     const ownership = await this.protocol.assertCurrentOwner({ nft: position.vaultNft, walletAddress: input.walletAddress });
+    const positionProof = await this.verifyVaultPosition(position.vaultNft, input.walletAddress, { expectedRedeemed: false, expectedStaked: true });
     if (!this.localStakingAccountingEnabled() && !this.productionStakingAdapterAvailable()) {
+      if (this.productionStakingRequired()) {
+        throw new BadRequestException("Production unstake requires an audited on-chain custody/freeze adapter; local staking mutation is forbidden.");
+      }
       return {
         ok: true,
         action: "UNSTAKE_VAULT",
         status: "SKIPPED",
         idempotencyKey: input.idempotencyKey,
         verification: ownership,
+        vaultPositionVerification: positionProof,
         message: "Unstake transaction adapter is not implemented; no local staking state was mutated."
       };
     }
@@ -123,6 +136,7 @@ export class StakingService {
       position: updated,
       vaultStatus: nextStatus,
       verification: ownership,
+      vaultPositionVerification: positionProof,
       message: "Vault NFT unstaked; backing remains locked until redeem."
     };
   }
@@ -136,7 +150,11 @@ export class StakingService {
     if (position.user.walletAddress !== input.walletAddress) throw new ConflictException("Wallet does not own this staking position.");
     if (position.status !== "ACTIVE") throw new BadRequestException("Only active staking positions can claim rewards.");
     const ownership = await this.protocol.assertCurrentOwner({ nft: position.vaultNft, walletAddress: input.walletAddress });
+    const positionProof = await this.verifyVaultPosition(position.vaultNft, input.walletAddress, { expectedRedeemed: false, expectedStaked: true });
     if (!this.productionStakingAdapterAvailable()) {
+      if (this.productionStakingRequired()) {
+        throw new BadRequestException("Production reward claims require an audited reward payout adapter; no reward payout is faked.");
+      }
       return {
         ok: true,
         action: "CLAIM_REWARDS",
@@ -146,6 +164,7 @@ export class StakingService {
         rewardsAccruedSol: position.rewardsAccruedSol.toString(),
         xpAccrued: position.xpAccrued,
         verification: ownership,
+        vaultPositionVerification: positionProof,
         payoutStatus: "SKIPPED_NO_ADAPTER",
         message: "Rewards payout adapter is not implemented; accrued accounting is reported but no payout is faked."
       };
@@ -158,6 +177,7 @@ export class StakingService {
       rewardsAccruedSol: position.rewardsAccruedSol.toString(),
       xpAccrued: position.xpAccrued,
       verification: ownership,
+      vaultPositionVerification: positionProof,
       payoutStatus: "ACCOUNTED_NOT_PAID",
       message: "Reward claim is idempotent and reports accrued accounting only until a rewards payout adapter is wired."
     };
@@ -169,6 +189,10 @@ export class StakingService {
 
   private productionStakingAdapterAvailable() {
     return (process.env.STAKING_TRANSACTION_PROVIDER ?? "disabled") !== "disabled" && false;
+  }
+
+  private productionStakingRequired() {
+    return (process.env.ENABLE_PRODUCTION_STAKING ?? "false") === "true" || (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") === "production";
   }
 
   private localStakingAccountingEnabled() {
@@ -187,5 +211,35 @@ export class StakingService {
       Boolean(nft.collection?.collectionAssetAddress) &&
       (nft.collection?.reserveVault?.status ?? "ACTIVE") === "ACTIVE"
     );
+  }
+
+  private async verifyVaultPosition(nft: any, walletAddress: string, expectations: { expectedRedeemed: boolean; expectedStaked: boolean }) {
+    if (!this.solana?.verifyVaultPositionPda) {
+      const unavailable = {
+        verificationAvailable: false,
+        passed: false,
+        issues: ["Vault position PDA verification adapter is unavailable."]
+      };
+      if (this.productionStakingRequired()) {
+        throw new BadRequestException("Production staking requires live VaultPosition PDA verification.");
+      }
+      return unavailable;
+    }
+    const proof = await this.solana.verifyVaultPositionPda({
+      walletAddress,
+      tokenMint: nft.collection?.token?.mint ?? nft.token?.mint,
+      nftAssetAddress: nft.mint,
+      vaultPositionPda: nft.positionPda,
+      expectedAmount: String(nft.amount),
+      expectedRedeemed: expectations.expectedRedeemed,
+      expectedStaked: expectations.expectedStaked
+    });
+    if (proof.verificationAvailable && !proof.passed) {
+      throw new BadRequestException(`Vault position verification failed: ${proof.issues.join(" ")}`);
+    }
+    if (!proof.verificationAvailable && this.productionStakingRequired()) {
+      throw new BadRequestException(`Production staking requires live VaultPosition PDA verification: ${proof.issues.join(" ")}`);
+    }
+    return proof;
   }
 }

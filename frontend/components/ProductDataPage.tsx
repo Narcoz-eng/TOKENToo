@@ -611,14 +611,17 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
   const eligibleVaults = data.eligibleVaults ?? [];
   const [selectedVaultId, setSelectedVaultId] = useState("");
   const selectedVault = eligibleVaults.find((vault) => vault.id === selectedVaultId) ?? eligibleVaults[0] ?? null;
-  const firstPosition = getPositionId(activePositions[0]);
+  const firstActivePosition = activePositions[0];
+  const firstPosition = getPositionId(firstActivePosition);
+  const firstPositionMint = positionText(firstActivePosition, "vaultNft.mint");
 
   async function stakeVault(): Promise<{ message?: string }> {
     if (!wallet.connected) throw new Error("Connect and authenticate your wallet before staking.");
     if (!selectedVault) throw new Error("No real eligible owned Vault NFT is available to stake.");
-    const response = await wallet.authFetch<StakingIntentResponse>("/staking/stake/intents", {
+    if (!selectedVault.mint) throw new Error("Selected Vault NFT is missing a mint address.");
+    const response = await wallet.authFetch<StakingIntentResponse>(`/vaults/${encodeURIComponent(selectedVault.mint)}/stake`, {
       method: "POST",
-      body: JSON.stringify({ vaultNftId: selectedVault.id, idempotencyKey: `${wallet.address}:stake:${selectedVault.id}` })
+      body: JSON.stringify({ idempotencyKey: `${wallet.address}:stake:${selectedVault.mint}` })
     });
     if (response.status === "SKIPPED") throw new Error(response.message ?? "Staking adapter unavailable; no stake was recorded.");
     reload();
@@ -628,7 +631,8 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
   async function unstakeVault() {
     if (!wallet.connected) throw new Error("Connect and authenticate your wallet before unstaking.");
     if (!firstPosition) throw new Error("No staking position is available to unstake.");
-    const response = await wallet.authFetch<StakingIntentResponse>("/staking/unstake/intents", {
+    if (!firstPositionMint) throw new Error("Active staking position is missing a Vault NFT mint.");
+    const response = await wallet.authFetch<StakingIntentResponse>(`/vaults/${encodeURIComponent(firstPositionMint)}/unstake`, {
       method: "POST",
       body: JSON.stringify({ stakingPositionId: firstPosition, idempotencyKey: `${wallet.address}:unstake:${firstPosition}` })
     });
