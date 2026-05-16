@@ -13,6 +13,7 @@ import { unwrapApiData } from "@/lib/api";
 import type { VaultCollection } from "@/lib/types";
 import { AnimatedButton } from "@/components/AnimatedButton";
 import { brandAssets } from "@/lib/brand-assets";
+import { MintMomentAnimation, type PhewMomentState } from "@/components/phew-moment-animations";
 import { TransactionStatus, type TxStatus } from "@/components/TransactionStatus";
 import { cn } from "@/lib/utils";
 
@@ -178,11 +179,14 @@ export default function MintPage() {
                   </p>
                   <div className="mt-6 grid gap-3 md:grid-cols-3">
                     <HeroMetric label="Selected community" value={collection.symbol} />
-                    <HeroMetric label="Collection asset" value={collection.collectionAssetAddress ? short(collection.collectionAssetAddress) : "Missing"} />
-                    <HeroMetric label="Reserve PDA" value={collection.reserveVaultPda ? short(collection.reserveVaultPda) : "Missing"} />
+                    <HeroMetric label="Collection asset" value={collection.collectionAssetAddress ? short(collection.collectionAssetAddress) : "N/A"} />
+                    <HeroMetric label="Reserve PDA" value={collection.reserveVaultPda ? short(collection.reserveVaultPda) : "N/A"} />
                   </div>
                 </div>
-                <ProjectedVaultCard image={finalImage} collection={collection} amount={amount} lockDurationDays={lockDurationDays} txStatus={txStatus} />
+                <div className="space-y-4">
+                  <MintMomentAnimation state={momentState(txStatus)} collectionImage={finalImage} tokenSymbol={collection.symbol} />
+                  <ProjectedVaultCard image={finalImage} collection={collection} amount={amount} lockDurationDays={lockDurationDays} txStatus={txStatus} />
+                </div>
               </div>
             </section>
 
@@ -298,8 +302,8 @@ export default function MintPage() {
                   <h2 className="text-2xl font-black">{collection.name}</h2>
                   <p className="mt-2 break-words text-sm text-slate-400">{collection.tokenMint}</p>
                   <div className="mt-4 space-y-3">
-                    <PreviewRow label="Launch status" value={collection.launchStatus ?? "Unknown"} />
-                    <PreviewRow label="Reserve health" value={collection.reserveHealth ?? "Unknown"} />
+                    <PreviewRow label="Launch status" value={collection.launchStatus ?? "N/A"} />
+                    <PreviewRow label="Reserve health" value={collection.reserveHealth ?? "N/A"} />
                     <PreviewRow label="Available backing" value={collection.availableBacking ?? "0"} />
                   </div>
                 </SectionCard>
@@ -386,6 +390,13 @@ function mintStatusLabel(status: TxStatus, backendStatus?: string) {
   return labels[status];
 }
 
+function momentState(status: TxStatus): PhewMomentState {
+  if (status === "validating" || status === "signing" || status === "pending") return "loading";
+  if (status === "confirmed") return "success";
+  if (status === "failed") return "error";
+  return "idle";
+}
+
 function clampAmount(value: string) {
   const numeric = Number(value.replace(/,/g, "").trim());
   if (!Number.isFinite(numeric)) return amountSlider.min;
@@ -393,7 +404,7 @@ function clampAmount(value: string) {
 }
 
 function short(value?: string | null, size = 8) {
-  if (!value) return "Not available";
+  if (!value) return "N/A";
   if (value.length <= size * 2 + 3) return value;
   return `${value.slice(0, size)}...${value.slice(-size)}`;
 }

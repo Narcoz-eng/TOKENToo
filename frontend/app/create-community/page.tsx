@@ -8,6 +8,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { brandAssets } from "@/lib/brand-assets";
+import { CommunityLaunchAnimation } from "@/components/phew-moment-animations";
 import { cn } from "@/lib/utils";
 
 type AccessMethod = "CREATION_FEE_SOL" | "WHALE_HOLDER" | "SUBSCRIPTION_STUDIO" | "ADMIN_GRANT";
@@ -151,6 +152,7 @@ export default function CreateCommunityPage() {
   const collectionAsset = launchSubmit?.verification?.addresses?.collectionAsset ?? launchTx?.collectionAssetAddress ?? null;
   const canLaunch = Boolean(collection?.id);
   const canSubmitLaunch = Boolean(launchTx?.base64UnsignedTransaction || externalLaunchSignature.trim());
+  const launchMomentState = error ? "error" : activeAction ? "loading" : launchSubmit?.result?.confirmed || launchStatus?.launch?.status === "CONFIRMED" ? "success" : "idle";
 
   const accessHelp = useMemo(() => accessMethods.find((method) => method.value === accessMethod)?.help, [accessMethod]);
 
@@ -303,7 +305,7 @@ export default function CreateCommunityPage() {
         <section className="phew-panel relative overflow-hidden rounded-lg p-6">
           <img src={brandAssets.launchHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/42" />
-          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center">
+          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center">
             <div>
               <StatusPill accent="green">Create Community</StatusPill>
               <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Scan a token CA, pass access, initialize the devnet reserve.</h1>
@@ -311,7 +313,7 @@ export default function CreateCommunityPage() {
                 This page writes only through the protocol backend. Launch proof comes from the collection asset, reserve PDA, and post-submit verification returned by devnet routes.
               </p>
             </div>
-            <img src={brandAssets.logo} alt="Phew Run" className="hidden w-full rounded-lg border border-vault-green/25 object-cover shadow-green lg:block" />
+            <CommunityLaunchAnimation state={launchMomentState} collectionImage={scan?.imageUri ?? brandAssets.logo} tokenSymbol={scan?.symbol ?? "PHEW"} />
           </div>
         </section>
 
@@ -336,8 +338,8 @@ export default function CreateCommunityPage() {
                   <Fact label="Symbol" value={scan.symbol} />
                   <Fact label="Mint" value={short(scan.mint)} />
                   <Fact label="Risk score" value={formatNumber(scan.riskScore)} />
-                  <Fact label="Metadata URI" value={scan.metadataUri ? short(scan.metadataUri, 18) : "Not available"} />
-                  <Fact label="Provider" value={scan.provider ?? "Not available"} />
+                  <Fact label="Metadata URI" value={scan.metadataUri ? short(scan.metadataUri, 18) : "N/A"} />
+                  <Fact label="Provider" value={scan.provider ?? "N/A"} />
                   <Fact label="Indexed" value={scan.indexed ? "Yes" : "No"} />
                   <Fact label="Holders" value={formatNumber(scan.holders)} />
                 </div>
@@ -441,12 +443,12 @@ export default function CreateCommunityPage() {
             <SectionCard title="Verified Reserve">
               {reserve ? (
                 <div className="space-y-3">
-                  <Fact label="Reserve PDA" value={reserve.reserveVaultPda ?? "Unavailable"} />
+                  <Fact label="Reserve PDA" value={reserve.reserveVaultPda ?? "N/A"} />
                   <Fact label="Token mint" value={short(reserve.tokenMint)} />
                   <Fact label="Available backing" value={`${reserve.availableBacking} ${reserve.tokenSymbol}`} />
                   <Fact label="Total locked" value={`${reserve.totalLocked} ${reserve.tokenSymbol}`} />
                   <Fact label="Status" value={reserve.status} />
-                  <Fact label="On-chain verified" value={reserve.lastOnChainVerifiedAt ?? "Not yet"} />
+                  <Fact label="On-chain verified" value={reserve.lastOnChainVerifiedAt ?? "N/A"} />
                 </div>
               ) : (
                 <p className="text-sm text-slate-400">Reserve proof appears after a community draft exists and after launch submit refreshes the collection reserve.</p>
@@ -459,7 +461,7 @@ export default function CreateCommunityPage() {
                   <StatusLine label="Verification available" ok={Boolean(launchSubmit.verification.verificationAvailable)} />
                   <StatusLine label="Verification passed" ok={Boolean(launchSubmit.verification.passed)} />
                   <StatusLine label="Collection asset exists" ok={Boolean(launchSubmit.verification.collectionAssetExists)} />
-                  <Fact label="Reserve balance" value={launchSubmit.verification.reserve?.balance ?? "Not available"} />
+                  <Fact label="Reserve balance" value={launchSubmit.verification.reserve?.balance ?? "N/A"} />
                 </div>
                 {launchSubmit.verification.issues?.length ? <p className="mt-4 text-sm text-vault-gold">{launchSubmit.verification.issues.join("; ")}</p> : null}
               </SectionCard>
@@ -492,11 +494,11 @@ function StatusLine({ label, ok }: { label: string; ok: boolean }) {
 }
 
 function short(value?: string | null, size = 10) {
-  if (!value) return "Not available";
+  if (!value) return "N/A";
   if (value.length <= size * 2 + 3) return value;
   return `${value.slice(0, size)}...${value.slice(-size)}`;
 }
 
 function formatNumber(value: unknown) {
-  return typeof value === "number" ? value.toLocaleString() : "Not available";
+  return typeof value === "number" ? value.toLocaleString() : "N/A";
 }

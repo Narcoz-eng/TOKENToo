@@ -1,0 +1,22 @@
+{
+  "purpose": "Generated visual references for the coded Phew Run frontend redesign. These PNGs are not used as page UI.",
+  "pages": {
+    "/home": "/design-reference/phew-redesign/home.png",
+    "/create-community": "/design-reference/phew-redesign/create-community.png",
+    "/create-collection": "/design-reference/phew-redesign/create-collection-studio.png",
+    "/mint": "/design-reference/phew-redesign/mint.png",
+    "/vaults/:mint/proof": "/design-reference/phew-redesign/proof.png",
+    "/staking": "/design-reference/phew-redesign/staking.png",
+    "/redeem": "/design-reference/phew-redesign/redeem.png",
+    "/collections": "/design-reference/phew-redesign/collections.png",
+    "/collections/:id": "/design-reference/phew-redesign/collection-detail.png",
+    "/marketplace": "/design-reference/phew-redesign/marketplace.png",
+    "/profile": "/design-reference/phew-redesign/profile.png",
+    "/admin/setup": "/design-reference/phew-redesign/admin-setup.png",
+    "/admin/risk": "/design-reference/phew-redesign/admin-risk.png"
+  },
+  "animations": {
+    "stake": "/design-reference/phew-redesign/animations-stake.png",
+    "redeem": "/design-reference/phew-redesign/animations-redeem.png"
+  }
+}

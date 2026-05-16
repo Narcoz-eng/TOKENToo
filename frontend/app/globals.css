@@ -263,6 +263,171 @@ select {
   box-shadow: inset 0 0 0 1px rgba(244, 197, 66, 0.36), 0 0 46px rgba(244, 197, 66, 0.18);
 }
 
+.phew-storyboard {
+  position: relative;
+}
+
+.phew-story-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid rgba(110, 255, 222, 0.16);
+  background:
+    radial-gradient(circle at 78% 20%, rgba(186, 255, 0, 0.1), transparent 30%),
+    linear-gradient(180deg, rgba(5, 13, 12, 0.95), rgba(0, 0, 0, 0.96));
+  padding: 1.25rem;
+  min-height: 320px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 42px rgba(0, 0, 0, 0.26);
+}
+
+.phew-story-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, rgba(186, 255, 0, 0.12), transparent),
+    repeating-linear-gradient(180deg, transparent 0 9px, rgba(186, 255, 0, 0.025) 10px 11px);
+  opacity: 0.24;
+}
+
+.phew-story-panel-active {
+  border-color: rgba(186, 255, 0, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(186, 255, 0, 0.18), 0 0 38px rgba(186, 255, 0, 0.14), 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+.phew-story-panel-complete {
+  border-color: rgba(186, 255, 0, 0.34);
+}
+
+.phew-story-panel-error {
+  border-color: rgba(255, 79, 79, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 79, 79, 0.18), 0 0 30px rgba(255, 79, 79, 0.12);
+}
+
+.phew-moment-stage {
+  position: relative;
+  width: min(100%, 280px);
+  height: 150px;
+  isolation: isolate;
+}
+
+.phew-stage-ring {
+  position: absolute;
+  left: 50%;
+  bottom: 0.25rem;
+  width: 72%;
+  height: 28px;
+  transform: translateX(-50%);
+  border: 2px solid rgba(186, 255, 0, 0.55);
+  border-radius: 999px;
+  box-shadow: 0 0 28px rgba(186, 255, 0, 0.26), inset 0 0 18px rgba(186, 255, 0, 0.18);
+  opacity: 0.72;
+}
+
+.phew-story-mascot {
+  position: absolute;
+  left: 0.25rem;
+  bottom: 1.3rem;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(186, 255, 0, 0.28));
+  z-index: 3;
+  animation: phew-mascot-step 2.2s ease-in-out infinite;
+}
+
+.phew-story-nft {
+  position: absolute;
+  left: 50%;
+  bottom: 1.45rem;
+  width: 72px;
+  height: 96px;
+  transform: translateX(-50%) rotate(-2deg);
+  border: 1px solid rgba(186, 255, 0, 0.58);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.78);
+  box-shadow: 0 0 26px rgba(186, 255, 0, 0.22), inset 0 0 18px rgba(186, 255, 0, 0.08);
+  padding: 4px;
+  z-index: 4;
+  animation: phew-nft-float 2.5s ease-in-out infinite;
+}
+
+.phew-story-object {
+  position: absolute;
+  right: 0.35rem;
+  bottom: 2rem;
+  display: grid;
+  width: 76px;
+  height: 76px;
+  place-items: center;
+  border: 1px solid rgba(110, 255, 222, 0.22);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 0 28px rgba(186, 255, 0, 0.08);
+  z-index: 2;
+}
+
+.phew-story-object[data-kind="lock"],
+.phew-story-object[data-kind="redeem"] {
+  border-color: rgba(186, 255, 0, 0.35);
+}
+
+.phew-stage-beam {
+  position: absolute;
+  left: 86px;
+  right: 78px;
+  bottom: 66px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(186, 255, 0, 0.88), transparent);
+  box-shadow: 0 0 18px rgba(186, 255, 0, 0.52);
+  transform-origin: left center;
+  animation: phew-stage-beam 1.65s ease-in-out infinite;
+  z-index: 1;
+}
+
+.phew-moment-stage[data-kind="success"] .phew-stage-beam,
+.phew-moment-stage[data-kind="reward"] .phew-stage-beam {
+  left: 35%;
+  right: 35%;
+  bottom: 82px;
+  height: 3px;
+}
+
+.phew-moment-stage-active .phew-story-nft,
+.phew-moment-stage-complete .phew-story-nft {
+  border-color: rgba(186, 255, 0, 0.85);
+  box-shadow: 0 0 32px rgba(186, 255, 0, 0.32), inset 0 0 22px rgba(186, 255, 0, 0.12);
+}
+
+.phew-reduced-motion .phew-story-mascot,
+.phew-reduced-motion .phew-story-nft,
+.phew-reduced-motion .phew-stage-beam,
+.phew-reduced-motion .phew-motion-image,
+.phew-reduced-motion .phew-aura-pulse,
+.phew-reduced-motion .phew-glow-trail::before,
+.phew-reduced-motion .phew-particle,
+.phew-reduced-motion .phew-card-core,
+.phew-reduced-motion .phew-loader-ring,
+.phew-reduced-motion .phew-loading-stage::before {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phew-story-mascot,
+  .phew-story-nft,
+  .phew-stage-beam,
+  .phew-motion-image,
+  .phew-aura-pulse,
+  .phew-glow-trail::before,
+  .phew-particle,
+  .phew-card-core,
+  .phew-loader-ring,
+  .phew-loading-stage::before {
+    animation: none !important;
+  }
+}
+
 @keyframes phew-shimmer {
   0% { background-position: 160% 0; }
   100% { background-position: -60% 0; }
@@ -324,4 +489,19 @@ select {
 @keyframes phew-redeem-card {
   0% { filter: blur(0); opacity: 1; }
   65%, 100% { filter: blur(8px); opacity: 0.25; transform: translate(-50%, -50%) scale(0.86); }
+}
+
+@keyframes phew-mascot-step {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-3deg); }
+  50% { transform: translate3d(9px, -5px, 0) rotate(2deg); }
+}
+
+@keyframes phew-nft-float {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-2deg); }
+  50% { transform: translateX(-50%) translateY(-8px) rotate(2deg); }
+}
+
+@keyframes phew-stage-beam {
+  0%, 100% { opacity: 0.28; transform: scaleX(0.42); }
+  50% { opacity: 1; transform: scaleX(1); }
 }

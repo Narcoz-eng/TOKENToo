@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { LockKeyhole, Sparkles, UnlockKeyhole } from "lucide-react";
 import { AnimatedButton } from "./AnimatedButton";
-import { RewardBurstAnimation, StakeAnimation, UnstakeAnimation } from "./animations";
+import { RewardClaimAnimation, StakeMomentAnimation, UnstakeMomentAnimation, type PhewMomentState } from "./phew-moment-animations";
 import { ProgressBar } from "./ProgressBar";
 import { TransactionStatus, type TxStatus } from "./TransactionStatus";
 
@@ -13,16 +13,16 @@ async function defaultUnavailable(): Promise<FlowResult> {
   throw new Error("This transaction endpoint is not configured yet.");
 }
 
-export function StakeFlow({ onStake = defaultUnavailable }: { onStake?: () => Promise<FlowResult> }) {
-  return <BaseFlow title="Stake vault" idleLabel="Ready to bind" pendingLabel="Binding NFT to vault frame" successLabel="Stake confirmed" buttonLabel="Stake" icon={LockKeyhole} animation="stake" onRun={onStake} />;
+export function StakeFlow({ onStake = defaultUnavailable, collectionImage, tokenSymbol }: { onStake?: () => Promise<FlowResult>; collectionImage?: string | null; tokenSymbol?: string | null }) {
+  return <BaseFlow title="Stake vault" idleLabel="Ready to stake an eligible wallet NFT" pendingLabel="Submitting stake request" successLabel="Stake confirmed" buttonLabel="Stake" icon={LockKeyhole} animation="stake" onRun={onStake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
 }
 
-export function UnstakeFlow({ onUnstake = defaultUnavailable }: { onUnstake?: () => Promise<FlowResult> }) {
-  return <BaseFlow title="Unstake vault" idleLabel="Ready to unlock" pendingLabel="Opening vault energy ring" successLabel="Unstake confirmed" buttonLabel="Unstake" icon={UnlockKeyhole} animation="unstake" onRun={onUnstake} />;
+export function UnstakeFlow({ onUnstake = defaultUnavailable, collectionImage, tokenSymbol }: { onUnstake?: () => Promise<FlowResult>; collectionImage?: string | null; tokenSymbol?: string | null }) {
+  return <BaseFlow title="Unstake vault" idleLabel="Ready to unstake an active position" pendingLabel="Submitting unstake request" successLabel="Unstake confirmed" buttonLabel="Unstake" icon={UnlockKeyhole} animation="unstake" onRun={onUnstake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
 }
 
-export function ClaimRewardsFlow({ onClaim = defaultUnavailable }: { onClaim?: () => Promise<FlowResult> }) {
-  return <BaseFlow title="Claim rewards" idleLabel="Rewards available when API reports them" pendingLabel="Claiming rewards" successLabel="Rewards claimed" buttonLabel="Claim" icon={Sparkles} animation="claim" onRun={onClaim} />;
+export function ClaimRewardsFlow({ onClaim = defaultUnavailable, collectionImage, tokenSymbol }: { onClaim?: () => Promise<FlowResult>; collectionImage?: string | null; tokenSymbol?: string | null }) {
+  return <BaseFlow title="Claim rewards" idleLabel="Rewards available when API reports them" pendingLabel="Claiming rewards" successLabel="Rewards claimed" buttonLabel="Claim" icon={Sparkles} animation="claim" onRun={onClaim} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
 }
 
 function BaseFlow({
@@ -33,7 +33,9 @@ function BaseFlow({
   buttonLabel,
   icon,
   animation,
-  onRun
+  onRun,
+  collectionImage,
+  tokenSymbol
 }: {
   title: string;
   idleLabel: string;
@@ -43,6 +45,8 @@ function BaseFlow({
   icon: typeof LockKeyhole;
   animation: "stake" | "unstake" | "claim";
   onRun: () => Promise<FlowResult>;
+  collectionImage?: string | null;
+  tokenSymbol?: string | null;
 }) {
   const [status, setStatus] = useState<TxStatus>("idle");
   const [detail, setDetail] = useState<string | null>(null);
@@ -63,9 +67,9 @@ function BaseFlow({
   return (
     <div className="space-y-3">
       <p className="text-sm font-black uppercase text-white">{title}</p>
-      {animation === "stake" ? <StakeAnimation active={status === "pending"} rarity="Epic" label={status === "pending" ? "Lock-in" : "Stake"} /> : null}
-      {animation === "unstake" ? <UnstakeAnimation active={status === "pending"} rarity="Rare" label={status === "pending" ? "Unlock" : "Unstake"} /> : null}
-      {animation === "claim" ? <RewardBurstAnimation active={status === "pending" || status === "confirmed"} rarity="Rare" label={status === "confirmed" ? "Claimed" : "Rewards"} /> : null}
+      {animation === "stake" ? <StakeMomentAnimation state={momentState(status)} collectionImage={collectionImage} tokenSymbol={tokenSymbol} /> : null}
+      {animation === "unstake" ? <UnstakeMomentAnimation state={momentState(status)} collectionImage={collectionImage} tokenSymbol={tokenSymbol} /> : null}
+      {animation === "claim" ? <RewardClaimAnimation state={momentState(status)} collectionImage={collectionImage} tokenSymbol={tokenSymbol} /> : null}
       {status === "pending" ? <ProgressBar value={62} label={pendingLabel} /> : null}
       <TransactionStatus status={status} label={status === "pending" ? pendingLabel : status === "confirmed" ? successLabel : status === "failed" ? "Action failed" : idleLabel} detail={detail} />
       <AnimatedButton tone="outline" icon={icon} loading={status === "pending"} success={status === "confirmed"} onClick={run}>
@@ -73,4 +77,11 @@ function BaseFlow({
       </AnimatedButton>
     </div>
   );
+}
+
+function momentState(status: TxStatus): PhewMomentState {
+  if (status === "pending" || status === "validating" || status === "signing") return "loading";
+  if (status === "confirmed") return "success";
+  if (status === "failed") return "error";
+  return "idle";
 }

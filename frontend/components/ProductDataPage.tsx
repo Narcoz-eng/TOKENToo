@@ -34,7 +34,7 @@ import { StatCard } from "./StatCard";
 import { apiWarnings, unwrapApiData } from "@/lib/api";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
-import { RewardBurstAnimation, StakeAnimation } from "./animations";
+import { RewardClaimAnimation, StakeMomentAnimation } from "./phew-moment-animations";
 import { brandAssets } from "@/lib/brand-assets";
 import { CollectionGrid } from "./CollectionGrid";
 import { MetricGrid, PageLayout } from "./PageLayout";
@@ -288,7 +288,7 @@ function HomeDashboardView({ data }: { data: ProductData }) {
         <StatCard icon={Users} label="Active Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} accent="green" />
         <StatCard icon={LockKeyhole} label="Phews Minted" value={formatMetric(stats.phewsMinted ?? stats.nfts)} accent="cyan" />
         <StatCard icon={WalletCards} label="Total Trades" value={formatMetric(stats.totalTrades)} accent="purple" />
-        <StatCard icon={Shield} label="Reserve Health" value={protocolState.data?.reserveHealth?.status ?? "Not available"} accent={protocolState.data?.ok ? "green" : "gold"} />
+        <StatCard icon={Shield} label="Reserve Health" value={protocolState.data?.reserveHealth?.status ?? "N/A"} accent={protocolState.data?.ok ? "green" : "gold"} />
       </MetricGrid>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
@@ -536,7 +536,7 @@ function CollectionDetailView({ data }: { data: ProductData }) {
             </div>
           </SectionCard>
           <SectionCard title="Staking Chamber">
-            <StakeAnimation rarity="Epic" label="Stake preview" />
+            <StakeMomentAnimation state="idle" collectionImage={nfts[0]?.image ?? collection.image} tokenSymbol={collection.symbol} />
           </SectionCard>
         </aside>
       </div>
@@ -596,7 +596,7 @@ function RaidsView({ data }: { data: ProductData }) {
       </div>
       <aside className="space-y-5">
         <SectionCard title="Reward Panel">
-          <RewardBurstAnimation rarity="Legendary" label="Raid rewards" />
+          <RewardClaimAnimation state="idle" tokenSymbol="RAID" />
           <p className="mt-4 text-sm text-slate-300">Rewards and contributor rows appear from real raid mission and claim data. Join actions stay pending or error until a supported backend route confirms them.</p>
         </SectionCard>
       </aside>
@@ -606,11 +606,13 @@ function RaidsView({ data }: { data: ProductData }) {
 
 function StakingView({ data, reload }: { data: ProductData; reload: () => void }) {
   const wallet = useWalletAuth();
+  const collections = data.collections ?? [];
   const positions = data.positions ?? [];
   const activePositions = positions.filter((position) => (positionText(position, "status") || "ACTIVE") === "ACTIVE");
   const eligibleVaults = data.eligibleVaults ?? [];
   const [selectedVaultId, setSelectedVaultId] = useState("");
   const selectedVault = eligibleVaults.find((vault) => vault.id === selectedVaultId) ?? eligibleVaults[0] ?? null;
+  const selectedCollection = selectedVault ? collections.find((collection) => collection.id === selectedVault.collectionId || collection.dbId === selectedVault.collectionId) : null;
   const firstActivePosition = activePositions[0];
   const firstPosition = getPositionId(firstActivePosition);
   const firstPositionMint = positionText(firstActivePosition, "vaultNft.mint");
@@ -675,7 +677,7 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
                     <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
                       <MiniMetric label="Locked" value={vault.lockedAmount} />
                       <MiniMetric label="Unlock" value={vault.unlockDate} />
-                      <MiniMetric label="Position" value={vault.mint ? "Verified mint" : "Unavailable"} />
+                      <MiniMetric label="Position" value={vault.mint ? "Verified mint" : "N/A"} />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-3">
                       <button type="button" onClick={() => setSelectedVaultId(vault.id)} className="inline-flex h-9 items-center rounded-md border border-vault-green/45 bg-vault-green/10 px-3 text-sm font-bold text-vault-green">
@@ -706,7 +708,7 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
                   <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
                     <MiniMetric label="Rewards" value={`${positionText(position, "rewardsAccruedSol") || "0"} SOL`} />
                     <MiniMetric label="XP" value={positionText(position, "xpAccrued") || "0"} />
-                    <MiniMetric label="Staked at" value={positionText(position, "stakedAt") || "Not available"} />
+                    <MiniMetric label="Staked at" value={positionText(position, "stakedAt") || "N/A"} />
                   </div>
                 </div>
               ))}
@@ -718,9 +720,9 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
       </div>
       <SectionCard title="Transaction Flows">
         <div className="space-y-5">
-          <StakeFlow onStake={stakeVault} />
-          <UnstakeFlow onUnstake={unstakeVault} />
-          <ClaimRewardsFlow onClaim={claimRewards} />
+          <StakeFlow onStake={stakeVault} collectionImage={selectedVault?.image} tokenSymbol={selectedCollection?.symbol ?? selectedVault?.tier} />
+          <UnstakeFlow onUnstake={unstakeVault} collectionImage={selectedVault?.image} tokenSymbol={selectedCollection?.symbol ?? selectedVault?.tier} />
+          <ClaimRewardsFlow onClaim={claimRewards} collectionImage={selectedVault?.image} tokenSymbol={selectedCollection?.symbol ?? selectedVault?.tier} />
         </div>
       </SectionCard>
     </div>
@@ -788,7 +790,7 @@ function RiskAdminView({ data }: { data: ProductData }) {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-bold">{collection.name}</p>
-                    <p className="text-sm text-slate-400">{collection.tokenMint || "Mint unavailable"}</p>
+                    <p className="text-sm text-slate-400">{collection.tokenMint || "N/A"}</p>
                   </div>
                   <StatusPill accent={collection.instantSellEnabled ? "green" : "gold"}>{collection.instantSellEnabled ? "Eligible" : "Gated"}</StatusPill>
                 </div>
@@ -854,19 +856,19 @@ function EmptyBlock({ title, body }: { title: string; body: string }) {
 }
 
 function formatMetric(value: unknown) {
-  return typeof value === "number" ? value.toLocaleString() : "Not available";
+  return typeof value === "number" ? value.toLocaleString() : "N/A";
 }
 
 function formatCurrency(value: unknown) {
-  return typeof value === "number" ? `$${value.toLocaleString()}` : "Not available";
+  return typeof value === "number" ? `$${value.toLocaleString()}` : "N/A";
 }
 
 function formatSol(value: unknown) {
-  return typeof value === "number" ? `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })} SOL` : "Not available";
+  return typeof value === "number" ? `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })} SOL` : "N/A";
 }
 
 function formatTokenAmount(value: unknown) {
-  if (typeof value !== "string" || !/^\d+$/.test(value)) return "Not available";
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return "N/A";
   if (value === "0") return "0";
   const trimmed = value.length > 9 ? `${value.slice(0, -9)}.${value.slice(-9, -6)}` : `0.${value.padStart(9, "0").slice(0, 3)}`;
   return trimmed.replace(/\.?0+$/, "");

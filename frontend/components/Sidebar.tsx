@@ -12,8 +12,10 @@ import {
   PlusCircle,
   Search,
   ShieldAlert,
+  SlidersHorizontal,
   Swords,
   Trophy,
+  Undo2,
   Users,
   WalletCards,
   Zap
@@ -27,6 +29,7 @@ const navItems = [
   { href: "/collections", label: "Collections", icon: Boxes, key: "collections" },
   { href: "/raids", label: "Raids", icon: Swords, key: "raids" },
   { href: "/staking", label: "Staking", icon: Coins, key: "staking" },
+  { href: "/redeem", label: "Redeem", icon: Undo2, key: "redeem" },
   { href: "/marketplace", label: "Marketplace", icon: WalletCards, key: "marketplace" },
   { href: "/proof", label: "Proof Explorer", icon: FileSearch, key: "proof" },
   { href: "/profile", label: "Profile", icon: Users, key: "profile" },
@@ -34,6 +37,7 @@ const navItems = [
   { href: "/instant-sell", label: "Instant Sell", icon: Zap, key: "instant-sell" },
   { href: "/create-community", label: "Create Community", icon: PlusCircle, key: "create-community" },
   { href: "/create-collection", label: "Studio", icon: PlusCircle, key: "create" },
+  { href: "/admin/setup", label: "Admin Setup", icon: SlidersHorizontal, key: "setup" },
   { href: "/admin/risk", label: "Risk Admin", icon: ShieldAlert, key: "risk" }
 ];
 
@@ -88,7 +92,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
               </div>
               <div className="min-w-0 text-sm">
                 <p className="truncate">{wallet.connected ? wallet.label : "Wallet disconnected"}</p>
-                <p className="truncate text-slate-400">{wallet.connected && wallet.balanceSol !== null ? `${wallet.balanceSol.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL` : wallet.connected ? "Balance unavailable" : "Connect to view balance"}</p>
+                <p className="truncate text-slate-400">{wallet.connected && wallet.balanceSol !== null ? `${wallet.balanceSol.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL` : wallet.connected ? "Balance N/A" : "Connect to view balance"}</p>
               </div>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { brandAssets } from "@/lib/brand-assets";
+import { ProofVerifiedAnimation } from "@/components/phew-moment-animations";
 
 type ProofResponse = {
   ok?: boolean;
@@ -109,13 +110,13 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
             <SectionCard title="Vault Proof">
               <div className="grid gap-3 md:grid-cols-2">
                 <ProofRow label="NFT mint" value={proof.nftMint} />
-                <ProofRow label="Owner" value={proof.currentOwner ?? proof.dbOwnerSnapshot ?? "Owner unavailable"} />
+                <ProofRow label="Owner" value={proof.currentOwner ?? proof.dbOwnerSnapshot ?? "N/A"} />
                 <ProofRow label="Locked amount" value={`${proof.lockedAmount} ${proof.tokenSymbol}`} />
-                <ProofRow label="Reserve PDA" value={proof.reserveVaultPda ?? "Unavailable"} />
+                <ProofRow label="Reserve PDA" value={proof.reserveVaultPda ?? "N/A"} />
                 <ProofRow label="Redeemability" value={proof.redeemable && !proof.staked && proof.status !== "REDEEMED" ? "Redeemable" : "Not redeemable"} />
                 <ProofRow label="Stake status" value={proof.staked ? "Staked" : "Not staked"} />
                 <ProofRow label="Collection" value={proof.collectionName} />
-                <ProofRow label="Collection asset" value={proof.collectionAsset ?? "Unavailable"} />
+                <ProofRow label="Collection asset" value={proof.collectionAsset ?? "N/A"} />
                 <ProofRow label="Token mint" value={proof.tokenMint} />
                 <ProofRow label="Position PDA" value={proof.positionPda} />
                 <ProofRow label="Unlocks at" value={proof.unlocksAt} />
@@ -124,6 +125,7 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
             </SectionCard>
 
             <SectionCard title="Verification">
+              <ProofVerifiedAnimation state={proof.issues.length ? "error" : "success"} tokenSymbol={proof.tokenSymbol} />
               <div className="space-y-3">
                 <StatusLine label="Live owner proof" ok={proof.verificationResult.ownerVerificationAvailable} />
                 <StatusLine label="Owner matches DB" ok={proof.verificationResult.ownerMatchesDb !== false} />
@@ -134,7 +136,7 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
               <div className="mt-4 grid gap-3">
                 <ProofRow label="Vault status" value={proof.status} />
                 <ProofRow label="Strategy" value={proof.strategy ? `${proof.strategy.type} / ${proof.strategy.status}` : "PASSIVE / DRAFT"} />
-                <ProofRow label="Last verified" value={proof.lastVerifiedAt ?? "Not available"} />
+                <ProofRow label="Last verified" value={proof.lastVerifiedAt ?? "N/A"} />
               </div>
               {proof.issues.length ? (
                 <div className="mt-4 rounded-lg border border-vault-gold/35 bg-vault-gold/10 p-4">

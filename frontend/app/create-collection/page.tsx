@@ -12,6 +12,7 @@ import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { ArtTeamProfile, CollectionGeneratorPreview, ConceptRequestSummary, CuratedLayerPackSummary, StudioPreviewAsset, StudioWorkflowState, StyleBiblePlan, StudioExportPlan } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
+import { StudioBibleAnimation } from "@/components/phew-moment-animations";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { hasRealStudioBibleAssets, isRealStudioBibleAsset, isStudioPreviewRequired, realStudioBibleAssetsFromPreview, studioAssetProvider, studioBibleAssetTypes, studioDisplayAssetTypeSet, studioPreviewStatusLabel } from "@/lib/studio-readiness";
 import { cn } from "@/lib/utils";
@@ -548,6 +549,8 @@ export default function CreateCollectionPage() {
     };
   }
 
+  const studioMomentState = error ? "error" : loading ? "loading" : hasAllStudioBibleAssets(studioPreview) ? "success" : "idle";
+
   return (
     <AppShell active="create">
       <div className="space-y-6">
@@ -555,18 +558,21 @@ export default function CreateCollectionPage() {
           <img src={brandAssets.launchHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-48" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/88 to-[#020806]/28" />
           <div className="absolute inset-0 grid-mask opacity-25" />
-          <div className="relative max-w-5xl">
-            <p className="text-sm font-black uppercase text-vault-green">Create Community</p>
-            <h1 className="mt-2 text-4xl font-black leading-tight lg:text-5xl">Create Community</h1>
-            <p className="mt-3 max-w-2xl text-base text-slate-300">Launch a token-backed faction with vault NFTs, raids, and staking.</p>
-            <div className="mt-8 grid gap-2 md:grid-cols-5">
-              {steps.map((step, index) => (
-                <div key={step} className={cn("rounded-md border px-3 py-3 text-sm font-black transition", index <= activeStep ? "border-vault-green/70 bg-vault-green/14 text-vault-green shadow-green" : "border-vault-line bg-black/35 text-slate-500")}>
-                  <span className="mr-2 text-xs">{String(index + 1).padStart(2, "0")}</span>
-                  {step}
-                </div>
-              ))}
+          <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
+            <div className="max-w-5xl">
+              <p className="text-sm font-black uppercase text-vault-green">Studio Mode</p>
+              <h1 className="mt-2 text-4xl font-black leading-tight lg:text-5xl">Create Collection</h1>
+              <p className="mt-3 max-w-2xl text-base text-slate-300">Launch a token-backed faction with vault NFTs, raids, staking, and explicit Studio Bible generation controls.</p>
+              <div className="mt-8 grid gap-2 md:grid-cols-5">
+                {steps.map((step, index) => (
+                  <div key={step} className={cn("rounded-md border px-3 py-3 text-sm font-black transition", index <= activeStep ? "border-vault-green/70 bg-vault-green/14 text-vault-green shadow-green" : "border-vault-line bg-black/35 text-slate-500")}>
+                    <span className="mr-2 text-xs">{String(index + 1).padStart(2, "0")}</span>
+                    {step}
+                  </div>
+                ))}
+              </div>
             </div>
+            <StudioBibleAnimation state={studioMomentState} collectionImage={studioPreview.avatar} tokenSymbol={tokenSymbol || scan?.symbol || "PHEW"} />
           </div>
         </section>
 
@@ -1448,9 +1454,9 @@ function ResolvedTokenCard({ scan, showDiagnostics }: { scan: TokenScan; showDia
       </div>
       <div className="mt-4 grid gap-2 text-xs text-slate-300">
         <TokenFact label="Mint" value={short(scan.mint)} />
-        <TokenFact label="Metadata URI" value={scan.metadataUri || "Missing"} />
+        <TokenFact label="Metadata URI" value={scan.metadataUri || "N/A"} />
         <TokenFact label="Decimals" value={String(scan.decimals)} />
-        <TokenFact label="Supply" value={scan.supply || "Unavailable"} />
+        <TokenFact label="Supply" value={scan.supply || "N/A"} />
       </div>
       {showDiagnostics && scan.riskNotes.length ? (
         <div className="mt-4 flex flex-wrap gap-2">
