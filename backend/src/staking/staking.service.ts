@@ -14,10 +14,11 @@ export class StakingService {
   async createStakeIntent(input: { walletAddress: string; vaultNftId: string; idempotencyKey?: string }) {
     const nft = await this.prisma.vaultNFT.findUnique({
       where: { id: input.vaultNftId },
-      include: { owner: true, collection: { include: { token: true } }, stakingPositions: { where: { status: "ACTIVE" }, take: 1 } }
+      include: { owner: true, collection: { include: { token: true, reserveVault: true } }, stakingPositions: { where: { status: "ACTIVE" }, take: 1 } }
     });
     if (!nft) throw new NotFoundException("Vault NFT not found");
     if (nft.status === "REDEEMED" || nft.redeemedAt) throw new BadRequestException("Redeemed Vault NFTs cannot be staked.");
+    if (!this.hasStakeableProof(nft)) throw new BadRequestException("Only confirmed live Vault NFTs can be staked.");
     if (nft.status === "STAKED" || nft.stakingPositions.length) {
       return {
         ok: true,
@@ -172,5 +173,19 @@ export class StakingService {
 
   private localStakingAccountingEnabled() {
     return (process.env.ENABLE_LOCAL_STAKING_ACCOUNTING ?? "false") === "true" && (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development") !== "production";
+  }
+
+  private hasStakeableProof(nft: any) {
+    const mint = String(nft.mint ?? "");
+    const positionPda = String(nft.positionPda ?? "");
+    return (
+      !mint.startsWith("pending_") &&
+      !mint.startsWith("mock_") &&
+      !positionPda.startsWith("pending_") &&
+      !positionPda.startsWith("mock_") &&
+      nft.collection?.launchStatus === "CONFIRMED" &&
+      Boolean(nft.collection?.collectionAssetAddress) &&
+      (nft.collection?.reserveVault?.status ?? "ACTIVE") === "ACTIVE"
+    );
   }
 }

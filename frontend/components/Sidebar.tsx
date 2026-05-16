@@ -46,9 +46,9 @@ type SidebarStats = {
 
 export function Sidebar({ active, stats }: { active: string; stats?: SidebarStats }) {
   const wallet = useWalletDisplay();
-  const communities = typeof stats?.collections === "number" ? stats.collections.toLocaleString() : "0";
-  const totalVaults = typeof stats?.totalVaults === "number" ? stats.totalVaults.toLocaleString() : typeof stats?.nfts === "number" ? stats.nfts.toLocaleString() : "—";
-  const tvl = typeof stats?.tvlUsd === "number" ? `$${stats.tvlUsd.toLocaleString()}` : "—";
+  const communities = typeof stats?.collections === "number" ? stats.collections.toLocaleString() : "N/A";
+  const totalVaults = typeof stats?.totalVaults === "number" ? stats.totalVaults.toLocaleString() : typeof stats?.nfts === "number" ? stats.nfts.toLocaleString() : "N/A";
+  const tvl = typeof stats?.tvlUsd === "number" ? `$${stats.tvlUsd.toLocaleString()}` : "N/A";
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-vault-cyan/15 bg-[#020806]/96 shadow-[18px_0_60px_rgba(0,0,0,0.4)] backdrop-blur-xl lg:block">
@@ -93,7 +93,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
             </div>
           </div>
           <div className="relative overflow-hidden rounded-lg border border-vault-cyan/15 bg-black/35 p-3">
-            <p className="relative text-xs font-black uppercase text-slate-400">Faction Stats</p>
+            <p className="relative text-xs font-black uppercase text-slate-400">Protocol Stats</p>
             <div className="relative mt-3 grid grid-cols-3 gap-2 text-sm">
               <SidebarMetric label="TVL" value={tvl} />
               <SidebarMetric label="Vaults" value={totalVaults} />

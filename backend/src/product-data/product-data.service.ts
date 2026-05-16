@@ -59,7 +59,7 @@ export class ProductDataService {
   }
 
   async publicStaking(walletAddress?: string) {
-    return this.publicRead(() => this.staking(walletAddress), { walletRequired: true, walletAddress, positions: [] });
+    return this.publicRead(() => this.staking(walletAddress), { walletRequired: true, walletAddress, positions: [], eligibleVaults: [], collections: [] });
   }
 
   async publicProfile(walletAddress?: string) {
@@ -230,12 +230,37 @@ export class ProductDataService {
   }
 
   async staking(walletAddress?: string) {
-    return this.safeRead("staking", { walletRequired: true, walletAddress, positions: [] }, async () => {
+    return this.safeRead("staking", { walletRequired: true, walletAddress, positions: [], eligibleVaults: [], collections: [] }, async () => {
       const user = walletAddress ? await this.prisma.user.findUnique({ where: { walletAddress } }) : null;
-      const positions = user
-        ? await this.prisma.stakingPosition.findMany({ where: { userId: user.id }, include: { vaultNft: true, collection: true }, orderBy: { stakedAt: "desc" } })
-        : [];
-      return { walletRequired: true, walletAddress, positions };
+      const [positions, ownedVaults] = user
+        ? await Promise.all([
+            this.prisma.stakingPosition.findMany({
+              where: { userId: user.id },
+              include: { vaultNft: true, collection: { include: { token: true, reserveVault: true, vaultStrategy: true } } },
+              orderBy: { stakedAt: "desc" }
+            }),
+            this.prisma.vaultNFT.findMany({
+              where: { ownerUserId: user.id, redeemedAt: null, status: { in: ["LOCKED", "REDEEMABLE"] } },
+              include: {
+                collection: { include: { token: true, reserveVault: true, vaultStrategy: true } },
+                stakingPositions: { where: { status: "ACTIVE" }, take: 1 },
+                vaultPosition: true
+              },
+              orderBy: { createdAt: "desc" }
+            })
+          ])
+        : [[], []];
+      const eligibleVaults = ownedVaults.filter((nft) => this.isStakeEligibleVault(nft));
+      const collections = new Map<string, any>();
+      for (const position of positions) collections.set(position.collection.id, position.collection);
+      for (const vault of eligibleVaults) collections.set(vault.collection.id, vault.collection);
+      return {
+        walletRequired: true,
+        walletAddress,
+        positions,
+        eligibleVaults: eligibleVaults.map((nft) => this.nftDto(nft, nft.collectionId)),
+        collections: [...collections.values()].map((collection) => this.collectionDto(collection))
+      };
     });
   }
 
@@ -523,6 +548,9 @@ export class ProductDataService {
     const vaultCount = Number(collection._count?.vaultNfts ?? collection.vaultNfts?.length ?? 0);
     const reserveRatioBps = Number(reserve?.reserveRatioBps ?? (collection.emergencyFlag ? 0 : 10000));
     const reserveHealth = collection.emergencyFlag || reserve?.status === "EMERGENCY" ? "EMERGENCY" : reserve?.status === "INSOLVENT" || reserveRatioBps < 10000 ? "AT_RISK" : reserve?.status === "PAUSED" ? "PAUSED" : "HEALTHY";
+    const launchGatePassed = collection.launchStatus === "CONFIRMED" && Boolean(collection.collectionAssetAddress) && Boolean(reserve?.reserveVaultPda ?? collection.tokenVaultPda);
+    const profileGatePassed = Boolean(collection.identityLockedAt && collection.approvedGenerationRunId && collection.styleProfileVersion);
+    const mintEligible = launchGatePassed && profileGatePassed && collection.status === "ACTIVE" && !collection.emergencyFlag && !collection.instantSellDisabled;
     return {
       id: collection.slug ?? collection.id,
       dbId: collection.id,
@@ -561,6 +589,9 @@ export class ProductDataService {
       reserveVaultPda: reserve?.reserveVaultPda ?? collection.tokenVaultPda ?? null,
       collectionAssetAddress: collection.collectionAssetAddress ?? null,
       launchStatus: collection.launchStatus ?? "DRAFT",
+      launchGatePassed,
+      profileGatePassed,
+      mintEligible,
       strategy: this.strategyDto(collection.vaultStrategy),
       sales: Number(collection._count?.sales ?? 0),
       qualityTier: collection.identityLockedAt ? "Premium" : "Basic",
@@ -620,6 +651,23 @@ export class ProductDataService {
       metadataUri: nft.metadataUri,
       mint: nft.mint
     };
+  }
+
+  private isStakeEligibleVault(nft: any) {
+    const mint = String(nft.mint ?? "");
+    const positionPda = String(nft.positionPda ?? "");
+    const collection = nft.collection ?? {};
+    const reserve = collection.reserveVault;
+    return (
+      !nft.stakingPositions?.length &&
+      !mint.startsWith("pending_") &&
+      !mint.startsWith("mock_") &&
+      !positionPda.startsWith("pending_") &&
+      !positionPda.startsWith("mock_") &&
+      collection.launchStatus === "CONFIRMED" &&
+      Boolean(collection.collectionAssetAddress) &&
+      (reserve?.status ?? "ACTIVE") === "ACTIVE"
+    );
   }
 
   private raidDto(raid: any) {

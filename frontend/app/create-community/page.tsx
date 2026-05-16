@@ -1,34 +1,119 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, RadioTower, ShieldCheck } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckCircle2, ExternalLink, Loader2, RadioTower, ScanSearch, ShieldCheck, WalletCards } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
+import { apiFetch, unwrapApiData } from "@/lib/api";
+import { brandAssets } from "@/lib/brand-assets";
+import { cn } from "@/lib/utils";
 
 type AccessMethod = "CREATION_FEE_SOL" | "WHALE_HOLDER" | "SUBSCRIPTION_STUDIO" | "ADMIN_GRANT";
+
+type TokenScan = {
+  mint: string;
+  symbol: string;
+  name: string;
+  description?: string;
+  decimals?: number;
+  supply?: string | number;
+  imageUri?: string;
+  metadataUri?: string;
+  provider?: string;
+  indexed?: boolean;
+  liquidityUsd?: number;
+  marketCapUsd?: number;
+  holders?: number;
+  riskScore?: number;
+  riskNotes?: string[];
+  reasons?: string[];
+  persistenceWarning?: string;
+};
+
+type CommunitySummary = {
+  id: string;
+  slug: string;
+  name: string;
+  tokenMint: string;
+  creatorWallet?: string;
+  launchStatus: string;
+  riskStatus?: string;
+  reserveVaultPda?: string | null;
+  strategy?: { type: string; status: string; approvedByCreator: boolean };
+};
 
 type CreateCommunityResponse = {
   ok?: boolean;
   reused?: boolean;
-  access?: { method: string; status: string };
-  collection?: {
-    id: string;
-    slug: string;
-    name: string;
-    tokenMint: string;
-    launchStatus: string;
-    reserveVaultPda?: string | null;
-    strategy?: { type: string; status: string; approvedByCreator: boolean };
-  };
+  accessRequired?: boolean;
+  access?: { method: string; status: string; metadata?: Record<string, unknown> };
+  collection?: CommunitySummary;
+  token?: TokenScan;
   message?: string;
 };
 
+type LaunchUnsignedTransaction = {
+  base64UnsignedTransaction?: string | null;
+  collectionAssetAddress?: string | null;
+  onchainProfilePda?: string | null;
+  reserveVaultTokenAccount?: string | null;
+  tokenVaultAuthority?: string | null;
+  tokenVaultStatePda?: string | null;
+  feeVaultPda?: string | null;
+};
+
+type LaunchResponse = {
+  ok?: boolean;
+  idempotent?: boolean;
+  collection?: CommunitySummary;
+  launchUnsignedTransaction?: LaunchUnsignedTransaction | null;
+  result?: {
+    confirmed?: boolean;
+    status?: string;
+    txSignature?: string;
+    message?: string;
+  };
+  verification?: {
+    verificationAvailable?: boolean;
+    passed?: boolean;
+    collectionAssetExists?: boolean;
+    reserve?: { balance?: string };
+    addresses?: Record<string, string>;
+    issues?: string[];
+  };
+};
+
+type ReserveProof = {
+  collectionId: string;
+  collectionSlug?: string;
+  collectionName: string;
+  tokenMint: string;
+  tokenSymbol: string;
+  reserveVaultPda?: string | null;
+  feeVaultPda?: string | null;
+  totalLocked: string;
+  totalRedeemed: string;
+  totalStaked: string;
+  availableBacking: string;
+  reserveRatioBps: number;
+  status: string;
+  launchStatus: string;
+  lastOnChainVerifiedAt?: string | null;
+  productionReady?: boolean;
+};
+
+type ReserveResponse = {
+  ok?: boolean;
+  productionReady?: boolean;
+  reserve?: ReserveProof;
+};
+
 const accessMethods: Array<{ value: AccessMethod; label: string; help: string }> = [
-  { value: "CREATION_FEE_SOL", label: "Pay 1 SOL", help: "Requires a confirmed payment signature to the configured protocol treasury." },
-  { value: "WHALE_HOLDER", label: "Whale holder", help: "Verifies live token balance for this mint." },
-  { value: "SUBSCRIPTION_STUDIO", label: "Studio subscription", help: "Requires configured subscription access for the connected wallet." },
+  { value: "CREATION_FEE_SOL", label: "1 SOL fee", help: "Submit a confirmed transfer signature to the protocol treasury." },
+  { value: "WHALE_HOLDER", label: "Whale gate", help: "Backend verifies the connected wallet holds the configured raw threshold." },
+  { value: "SUBSCRIPTION_STUDIO", label: "Subscription", help: "Backend checks the configured subscription wallet registry." },
   { value: "ADMIN_GRANT", label: "Admin grant", help: "Protocol admin wallets only." }
 ];
 
@@ -37,106 +122,292 @@ export default function CreateCommunityPage() {
   const [tokenMint, setTokenMint] = useState("");
   const [accessMethod, setAccessMethod] = useState<AccessMethod>("CREATION_FEE_SOL");
   const [paymentSignature, setPaymentSignature] = useState("");
-  const [result, setResult] = useState<CreateCommunityResponse | null>(null);
+  const [externalLaunchSignature, setExternalLaunchSignature] = useState("");
+  const [scan, setScan] = useState<TokenScan | null>(null);
+  const [community, setCommunity] = useState<CreateCommunityResponse | null>(null);
+  const [launchBuild, setLaunchBuild] = useState<LaunchResponse | null>(null);
+  const [launchSubmit, setLaunchSubmit] = useState<LaunchResponse | null>(null);
+  const [reserve, setReserve] = useState<ReserveProof | null>(null);
+  const [activeAction, setActiveAction] = useState<"scan" | "create" | "build" | "submit" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+
+  const collection = launchSubmit?.collection ?? launchBuild?.collection ?? community?.collection ?? null;
+  const launchTx = launchBuild?.launchUnsignedTransaction ?? null;
+  const collectionAsset = launchSubmit?.verification?.addresses?.collectionAsset ?? launchTx?.collectionAssetAddress ?? null;
+  const canLaunch = Boolean(collection?.id);
+  const canSubmitLaunch = Boolean(launchTx?.base64UnsignedTransaction || externalLaunchSignature.trim());
+
+  const accessHelp = useMemo(() => accessMethods.find((method) => method.value === accessMethod)?.help, [accessMethod]);
+
+  async function scanToken() {
+    const mint = tokenMint.trim();
+    if (!mint) return setError("Enter a Solana token mint before scanning.");
+    setActiveAction("scan");
+    setError(null);
+    setScan(null);
+    try {
+      const response = await apiFetch<TokenScan>(`/tokens/${encodeURIComponent(mint)}/scan`, { timeoutMs: 30_000 });
+      const data = unwrapApiData(response) ?? response;
+      setScan(data);
+      setTokenMint(data.mint);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Token scan failed");
+    } finally {
+      setActiveAction(null);
+    }
+  }
 
   async function createCommunity() {
-    setLoading(true);
+    const mint = (scan?.mint ?? tokenMint).trim();
+    if (!mint) return setError("Scan or enter a Solana token mint first.");
+    setActiveAction("create");
     setError(null);
-    setResult(null);
+    setLaunchBuild(null);
+    setLaunchSubmit(null);
+    setReserve(null);
     try {
       const response = await wallet.authFetch<CreateCommunityResponse>("/communities/from-token", {
         method: "POST",
         body: JSON.stringify({
-          tokenMint,
+          tokenMint: mint,
           accessMethod,
-          paymentSignature: paymentSignature || undefined,
-          idempotencyKey: `community-${tokenMint.slice(0, 8)}-${wallet.address ?? "wallet"}`
+          paymentSignature: paymentSignature.trim() || undefined,
+          idempotencyKey: `community:${mint}:${wallet.address ?? "wallet"}:${accessMethod}`
         })
       });
-      setResult(response);
+      setCommunity(response);
+      if (response.token) setScan(response.token);
+      if (response.collection?.id) await loadReserve(response.collection.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Community creation failed");
     } finally {
-      setLoading(false);
+      setActiveAction(null);
     }
+  }
+
+  async function buildLaunch() {
+    if (!collection?.id) return setError("Create or load a community draft before launch build.");
+    setActiveAction("build");
+    setError(null);
+    try {
+      const response = await wallet.authFetch<LaunchResponse>(`/communities/${encodeURIComponent(collection.id)}/launch/build`, { method: "POST" });
+      setLaunchBuild(response);
+      if (response.collection?.id) await loadReserve(response.collection.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Community launch build failed");
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
+  async function submitLaunch() {
+    if (!collection?.id) return setError("Build a community launch transaction first.");
+    const txSignature = externalLaunchSignature.trim();
+    const base64 = launchTx?.base64UnsignedTransaction;
+    if (!txSignature && !base64) return setError("Launch submit requires a wallet-signed transaction or a confirmed devnet signature.");
+    setActiveAction("submit");
+    setError(null);
+    try {
+      const signedTransactionBase64 = txSignature ? undefined : await wallet.signTransactionBase64(base64 ?? "");
+      const response = await wallet.authFetch<LaunchResponse>(`/communities/${encodeURIComponent(collection.id)}/launch/submit`, {
+        method: "POST",
+        body: JSON.stringify(txSignature ? { txSignature } : { signedTransactionBase64 })
+      });
+      setLaunchSubmit(response);
+      if (response.collection?.id) await loadReserve(response.collection.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Community launch submit failed");
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
+  async function loadReserve(id: string) {
+    const response = await apiFetch<ReserveResponse>(`/collections/${encodeURIComponent(id)}/reserve`, { cache: "no-store" });
+    setReserve(response.reserve ?? null);
   }
 
   return (
     <AppShell active="create-community">
       <div className="space-y-6">
-        <section className="phew-panel rounded-lg p-6">
-          <StatusPill accent="green">Token Community</StatusPill>
-          <h1 className="mt-4 text-4xl font-black">Create a community from a token CA.</h1>
-          <p className="mt-3 max-w-3xl text-sm text-slate-300">
-            This creates a draft token-backed community, reserve config, and passive strategy. Launch and production minting remain gated by approved assets and real Solana verification.
-          </p>
+        <section className="phew-panel relative overflow-hidden rounded-lg p-6">
+          <img src={brandAssets.launchHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/42" />
+          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center">
+            <div>
+              <StatusPill accent="green">Create Community</StatusPill>
+              <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Scan a token CA, pass access, initialize the devnet reserve.</h1>
+              <p className="mt-3 max-w-3xl text-sm text-slate-300">
+                This page writes only through the protocol backend. Launch proof comes from the collection asset, reserve PDA, and post-submit verification returned by devnet routes.
+              </p>
+            </div>
+            <img src={brandAssets.logo} alt="Phew Run" className="hidden w-full rounded-lg border border-vault-green/25 object-cover shadow-green lg:block" />
+          </div>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <SectionCard title="Access Gate">
-            <div className="space-y-4">
-              <label className="block">
-                <span className="text-xs font-bold uppercase text-slate-500">Token CA / mint</span>
-                <input value={tokenMint} onChange={(event) => setTokenMint(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Solana token mint address" />
-              </label>
-              <label className="block">
-                <span className="text-xs font-bold uppercase text-slate-500">Creation access</span>
-                <select value={accessMethod} onChange={(event) => setAccessMethod(event.target.value as AccessMethod)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm">
-                  {accessMethods.map((method) => <option key={method.value} value={method.value}>{method.label}</option>)}
-                </select>
-              </label>
-              {accessMethod === "CREATION_FEE_SOL" ? (
+        {error ? <p className="rounded-md border border-vault-red/35 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</p> : null}
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <main className="space-y-6">
+            <SectionCard title="CA Scan">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_150px]">
                 <label className="block">
-                  <span className="text-xs font-bold uppercase text-slate-500">Payment signature</span>
-                  <input value={paymentSignature} onChange={(event) => setPaymentSignature(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Confirmed 1 SOL transfer signature" />
+                  <span className="text-xs font-bold uppercase text-slate-500">Token CA / mint</span>
+                  <input value={tokenMint} onChange={(event) => setTokenMint(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Solana token mint address" />
                 </label>
+                <button onClick={scanToken} disabled={activeAction === "scan" || !tokenMint.trim()} className="phew-button phew-button-primary mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
+                  {activeAction === "scan" ? <Loader2 className="size-4 animate-spin" /> : <ScanSearch className="size-4" />}
+                  Scan
+                </button>
+              </div>
+              {scan ? (
+                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Fact label="Name" value={scan.name} />
+                  <Fact label="Symbol" value={scan.symbol} />
+                  <Fact label="Mint" value={short(scan.mint)} />
+                  <Fact label="Risk score" value={formatNumber(scan.riskScore)} />
+                  <Fact label="Metadata URI" value={scan.metadataUri ? short(scan.metadataUri, 18) : "Not available"} />
+                  <Fact label="Provider" value={scan.provider ?? "Not available"} />
+                  <Fact label="Indexed" value={scan.indexed ? "Yes" : "No"} />
+                  <Fact label="Holders" value={formatNumber(scan.holders)} />
+                </div>
               ) : null}
-              <button onClick={createCommunity} disabled={loading || !tokenMint.trim()} className="phew-button phew-button-primary inline-flex h-12 items-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <RadioTower className="size-4" />}
+            </SectionCard>
+
+            <SectionCard title="Access Gate">
+              {!wallet.connected ? <p className="mb-4 rounded-md border border-vault-green/25 bg-vault-green/10 p-3 text-sm text-slate-300">Connect and authenticate a wallet before creation. The backend ties the access grant to that wallet.</p> : null}
+              <div className="grid gap-2 md:grid-cols-4">
+                {accessMethods.map((method) => (
+                  <button
+                    key={method.value}
+                    type="button"
+                    onClick={() => setAccessMethod(method.value)}
+                    className={cn(
+                      "rounded-md border p-3 text-left text-sm transition",
+                      accessMethod === method.value ? "border-vault-green bg-vault-green/12 text-white shadow-green" : "border-vault-line bg-black/25 text-slate-400 hover:border-vault-cyan/40"
+                    )}
+                  >
+                    <span className="block font-black">{method.label}</span>
+                    <span className="mt-1 block text-xs">{method.help}</span>
+                  </button>
+                ))}
+              </div>
+              {accessMethod === "CREATION_FEE_SOL" ? (
+                <label className="mt-4 block">
+                  <span className="text-xs font-bold uppercase text-slate-500">Confirmed 1 SOL payment signature</span>
+                  <input value={paymentSignature} onChange={(event) => setPaymentSignature(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Transfer signature verified by backend" />
+                </label>
+              ) : (
+                <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-400">{accessHelp}</p>
+              )}
+              <button onClick={createCommunity} disabled={activeAction === "create" || !tokenMint.trim()} className="phew-button phew-button-primary mt-5 inline-flex h-12 items-center gap-2 rounded-md px-5 text-sm font-black text-black">
+                {activeAction === "create" ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
                 Create Draft
               </button>
-              {error ? <p className="rounded-md border border-vault-red/35 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</p> : null}
-            </div>
-          </SectionCard>
+            </SectionCard>
 
-          <SectionCard title="Rules">
-            <div className="space-y-3 text-sm text-slate-300">
-              {accessMethods.map((method) => (
-                <div key={method.value} className="rounded-md border border-vault-line bg-black/25 p-3">
-                  <p className="font-black text-white">{method.label}</p>
-                  <p className="mt-1 text-xs text-slate-400">{method.help}</p>
+            {collection ? (
+              <SectionCard title="Launch Community">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Fact label="Collection" value={collection.name} />
+                  <Fact label="Launch status" value={collection.launchStatus} />
+                  <Fact label="Reserve PDA" value={collection.reserveVaultPda ?? reserve?.reserveVaultPda ?? "Pending"} />
+                  <Fact label="Collection asset" value={collectionAsset ? short(collectionAsset) : "Pending build"} />
                 </div>
-              ))}
-            </div>
-          </SectionCard>
-        </div>
+                <label className="mt-4 block">
+                  <span className="text-xs font-bold uppercase text-slate-500">External launch signature (optional)</span>
+                  <input value={externalLaunchSignature} onChange={(event) => setExternalLaunchSignature(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Use if the devnet transaction was signed elsewhere" />
+                </label>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button onClick={buildLaunch} disabled={activeAction === "build" || !canLaunch} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
+                    {activeAction === "build" ? <Loader2 className="size-4 animate-spin" /> : <RadioTower className="size-4" />}
+                    Build Launch Tx
+                  </button>
+                  <button onClick={submitLaunch} disabled={activeAction === "submit" || !canSubmitLaunch} className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-4 text-sm font-black text-black">
+                    {activeAction === "submit" ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                    Sign + Submit Launch
+                  </button>
+                </div>
+                {launchTx?.base64UnsignedTransaction ? <p className="mt-3 break-all rounded-md border border-vault-line bg-black/25 p-3 font-mono text-xs text-slate-400">Unsigned launch tx: {short(launchTx.base64UnsignedTransaction, 80)}</p> : null}
+                {launchSubmit?.result?.txSignature ? (
+                  <a href={`https://explorer.solana.com/tx/${launchSubmit.result.txSignature}?cluster=devnet`} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
+                    View launch transaction <ExternalLink className="size-4" />
+                  </a>
+                ) : null}
+              </SectionCard>
+            ) : null}
+          </main>
 
-        {result?.collection ? (
-          <SectionCard title="Community Draft">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <ResultTile label="Collection" value={result.collection.name} />
-              <ResultTile label="Launch status" value={result.collection.launchStatus} />
-              <ResultTile label="Reserve PDA" value={result.collection.reserveVaultPda ?? "Pending"} />
-              <ResultTile label="Strategy" value={`${result.collection.strategy?.type ?? "PASSIVE"} / ${result.collection.strategy?.status ?? "DRAFT"}`} />
-            </div>
-            <div className="mt-4 flex items-start gap-3 rounded-md border border-vault-green/30 bg-vault-green/10 p-4 text-sm text-slate-300">
-              <ShieldCheck className="size-5 shrink-0 text-vault-green" />
-              <p>{result.message ?? "Community draft created."}</p>
-            </div>
-          </SectionCard>
-        ) : null}
+          <aside className="space-y-6">
+            <SectionCard title="Current State">
+              <div className="space-y-3">
+                <StatusLine label="Token scan" ok={Boolean(scan)} />
+                <StatusLine label="Access grant" ok={Boolean(community?.ok)} />
+                <StatusLine label="Launch tx built" ok={Boolean(launchTx?.base64UnsignedTransaction || launchBuild?.idempotent)} />
+                <StatusLine label="Reserve verified" ok={Boolean(reserve?.lastOnChainVerifiedAt || launchSubmit?.verification?.passed)} />
+              </div>
+              {community?.message ? <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-300">{community.message}</p> : null}
+            </SectionCard>
+
+            <SectionCard title="Verified Reserve">
+              {reserve ? (
+                <div className="space-y-3">
+                  <Fact label="Reserve PDA" value={reserve.reserveVaultPda ?? "Unavailable"} />
+                  <Fact label="Token mint" value={short(reserve.tokenMint)} />
+                  <Fact label="Available backing" value={`${reserve.availableBacking} ${reserve.tokenSymbol}`} />
+                  <Fact label="Total locked" value={`${reserve.totalLocked} ${reserve.tokenSymbol}`} />
+                  <Fact label="Status" value={reserve.status} />
+                  <Fact label="On-chain verified" value={reserve.lastOnChainVerifiedAt ?? "Not yet"} />
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">Reserve proof appears after a community draft exists and after launch submit refreshes the collection reserve.</p>
+              )}
+            </SectionCard>
+
+            {launchSubmit?.verification ? (
+              <SectionCard title="Launch Verification">
+                <div className="space-y-3">
+                  <StatusLine label="Verification available" ok={Boolean(launchSubmit.verification.verificationAvailable)} />
+                  <StatusLine label="Verification passed" ok={Boolean(launchSubmit.verification.passed)} />
+                  <StatusLine label="Collection asset exists" ok={Boolean(launchSubmit.verification.collectionAssetExists)} />
+                  <Fact label="Reserve balance" value={launchSubmit.verification.reserve?.balance ?? "Not available"} />
+                </div>
+                {launchSubmit.verification.issues?.length ? <p className="mt-4 text-sm text-vault-gold">{launchSubmit.verification.issues.join("; ")}</p> : null}
+              </SectionCard>
+            ) : null}
+          </aside>
+        </div>
       </div>
     </AppShell>
   );
 }
 
-function ResultTile({ label, value }: { label: string; value: string }) {
+function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-vault-line bg-black/25 p-4">
+    <div className="min-w-0 border-b border-vault-line py-3 last:border-0">
       <p className="text-xs uppercase text-slate-500">{label}</p>
-      <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
+      <p className="mt-1 break-words text-sm font-bold text-white">{value}</p>
     </div>
   );
+}
+
+function StatusLine({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-vault-line py-3 text-sm last:border-0">
+      <span className="text-slate-300">{label}</span>
+      <span className={ok ? "text-vault-green" : "text-slate-500"}>
+        <CheckCircle2 className="inline size-4" /> {ok ? "Ready" : "Pending"}
+      </span>
+    </div>
+  );
+}
+
+function short(value?: string | null, size = 10) {
+  if (!value) return "Not available";
+  if (value.length <= size * 2 + 3) return value;
+  return `${value.slice(0, size)}...${value.slice(-size)}`;
+}
+
+function formatNumber(value: unknown) {
+  return typeof value === "number" ? value.toLocaleString() : "Not available";
 }

@@ -38,6 +38,9 @@ export type VaultCollection = {
   reserveVaultPda?: string | null;
   collectionAssetAddress?: string | null;
   launchStatus?: string;
+  launchGatePassed?: boolean;
+  profileGatePassed?: boolean;
+  mintEligible?: boolean;
   strategy?: {
     enabled: boolean;
     type: "PASSIVE" | "LIQUIDITY" | "BUYBACK" | "BURN" | "HYBRID";

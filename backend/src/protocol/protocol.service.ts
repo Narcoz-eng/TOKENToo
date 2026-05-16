@@ -232,7 +232,7 @@ export class ProtocolService {
     });
     if (!refreshed) throw new NotFoundException("Vault NFT not found");
     const ownership = await this.refreshOwnerSnapshot(refreshed);
-    const dbOwnerSnapshot = refreshed.owner?.walletAddress ?? refreshed.vaultPosition?.ownerWalletSnapshot ?? null;
+    const dbOwnerSnapshot = ownership.verificationAvailable && ownership.currentOwner ? ownership.currentOwner : refreshed.owner?.walletAddress ?? refreshed.vaultPosition?.ownerWalletSnapshot ?? null;
     const ownerMatchesDb = ownership.verificationAvailable && ownership.currentOwner && dbOwnerSnapshot ? ownership.currentOwner === dbOwnerSnapshot : null;
     const issues = [
       ...ownership.issues,
