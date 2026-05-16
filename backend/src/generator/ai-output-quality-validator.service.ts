@@ -23,7 +23,7 @@ export class AiOutputQualityValidatorService {
       for (const type of studioBibleTypes) {
         if (!studioBible.some((asset) => asset.type === type)) issues.push(`Fast Studio Preview is missing ${type.toLowerCase()} output.`);
       }
-      if (studioBible.some((asset) => asset.provider === "openai")) issues.push("OpenAI generated a Studio Bible sheet; Studio Bible assets must use Gemini-generated or cached Gemini sheet artwork.");
+      if (studioBible.some((asset) => ["openai", "gemini", "imagen"].includes(String(asset.provider)))) issues.push("Paid AI generated a Studio Bible sheet; default Studio Bible assets must come from local deterministic/component rendering or approved cache.");
       if (studioBible.some((asset) => asset.generationMetadata?.artDirectionOnly !== true || asset.metadata.artDirectionOnly !== true)) issues.push("Studio Bible sheets must be marked art direction only.");
       if (studioBible.some((asset) => asset.generationMetadata?.finalLayerAsset !== false || asset.metadata.finalLayerAsset !== false)) issues.push("Studio Bible sheets must not be marked as final layer assets.");
     }

@@ -28,6 +28,7 @@ import { ProtocolAccountingService } from "./protocol/protocol-accounting.servic
 import { CommunityProtocolController } from "./protocol/community-protocol.controller";
 import { CommunityProtocolService } from "./protocol/community-protocol.service";
 import { ProtocolController } from "./protocol/protocol.controller";
+import { VaultProtocolController } from "./protocol/vault-protocol.controller";
 import { ProtocolService } from "./protocol/protocol.service";
 import { StrategyExecutionGuard } from "./protocol/strategy-execution.guard";
 import { StrategyEngineService } from "./protocol/strategy-engine.service";
@@ -35,7 +36,7 @@ import { SolanaTransactionAdapterService } from "./vault-mint/solana-transaction
 
 @Module({
   imports: [AuthModule, GeneratorModule, VaultMintModule, ProductDataModule],
-  controllers: [AppController, MarketplaceController, RaidController, StakingController, SystemController, TokenMetadataController, ProtocolController, CommunityProtocolController],
+  controllers: [AppController, MarketplaceController, RaidController, StakingController, SystemController, TokenMetadataController, ProtocolController, CommunityProtocolController, VaultProtocolController],
   providers: [
     PrismaService,
     SolanaTransactionAdapterService,

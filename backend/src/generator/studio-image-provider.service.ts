@@ -4,7 +4,7 @@ import { GeminiStudioPromptError, GeminiStudioPromptProviderService, type Studio
 import { OpenAIImageProvider } from "./image-providers";
 import { ImagenStudioImageError, ImagenStudioImageProviderService, type ImagenStudioErrorCode } from "./imagen-studio-image-provider.service";
 import { DEFAULT_GEMINI_TEXT_MODEL, DEFAULT_IMAGEN_MODEL, IMAGEN_STUDIO_BIBLE_FALLBACK_CHAIN, normalizeGeminiTextModel, normalizeImagenModel, SUPPORTED_GEMINI_TEXT_MODELS, SUPPORTED_IMAGEN_MODELS } from "./imagen-models";
-import { SUPPORTED_OPENAI_IMAGE_MODELS } from "./openai-image-request";
+import { DEFAULT_OPENAI_IMAGE_MODEL, SUPPORTED_OPENAI_IMAGE_MODELS } from "./openai-image-request";
 import {
   markStudioModelDisabled,
   markStudioProviderUnavailable,
@@ -374,7 +374,7 @@ export class StudioImageProviderService {
       {
         provider: "openai",
         authPresent: Boolean(process.env.OPENAI_API_KEY),
-        selectedModel: this.openAIStudioModelChain()[0] ?? "gpt-image-1",
+        selectedModel: this.openAIStudioModelChain()[0] ?? DEFAULT_OPENAI_IMAGE_MODEL,
         supportedModels: [...SUPPORTED_OPENAI_IMAGE_MODELS],
         unsupportedModels: [],
         disabledModels: openaiCircuit.disabledModels,
@@ -945,8 +945,8 @@ export class StudioImageProviderService {
   ): StudioProviderDiagnostics {
     const circuit = decision.activeImageProvider ? studioCircuitSnapshot(decision.activeImageProvider, decision.activeImageProvider === "openai" ? SUPPORTED_OPENAI_IMAGE_MODELS : SUPPORTED_IMAGEN_MODELS) : undefined;
     return {
-      envStudioProvider: process.env.STUDIO_PROVIDER?.trim() || "gemini",
-      envStudioImageProvider: process.env.STUDIO_IMAGE_PROVIDER?.trim() || "imagen",
+      envStudioProvider: process.env.STUDIO_PROVIDER?.trim() || "local-component",
+      envStudioImageProvider: process.env.STUDIO_IMAGE_PROVIDER?.trim() || "deterministic-render",
       geminiApiKeyPresent: Boolean(this.geminiTextApiKey()),
       imagenApiKeyPresent: Boolean(this.imagenApiKey()),
       studioImageGenerationEnabled: this.studioImageGenerationEnabled(),
@@ -1048,7 +1048,7 @@ export class StudioImageProviderService {
   }
 
   private configuredStudioImageProvider(): ProviderDecision["provider"] {
-    const provider = (process.env.STUDIO_IMAGE_PROVIDER ?? process.env.STUDIO_PROVIDER ?? "imagen").trim().toLowerCase();
+    const provider = (process.env.STUDIO_IMAGE_PROVIDER ?? process.env.STUDIO_PROVIDER ?? "deterministic-render").trim().toLowerCase();
     if (provider === "openai") return "openai";
     if (provider === "deterministic-render" || provider === "deterministic") return "deterministic-render";
     return "imagen";
@@ -1094,9 +1094,9 @@ export class StudioImageProviderService {
   }
 
   private geminiTextPromptEnabled() {
-    const provider = (process.env.STUDIO_PROVIDER ?? "gemini").trim().toLowerCase();
+    const provider = (process.env.STUDIO_PROVIDER ?? "local-component").trim().toLowerCase();
     const explicitlyDisabled = (process.env.ENABLE_GEMINI_TEXT_PROMPTS ?? "true") === "false";
-    return this.paidAiAllowed() && !explicitlyDisabled && provider !== "deterministic" && provider !== "deterministic-render" && provider !== "openai";
+    return this.paidAiAllowed() && !explicitlyDisabled && provider !== "local-component" && provider !== "deterministic" && provider !== "deterministic-render" && provider !== "openai";
   }
 
   private geminiTextApiKey() {
@@ -1114,7 +1114,7 @@ export class StudioImageProviderService {
   private openAIStudioModelChain() {
     const configured = process.env.OPENAI_STUDIO_IMAGE_MODEL?.trim() || process.env.OPENAI_IMAGE_MODEL?.trim();
     const configuredModel = configured && (SUPPORTED_OPENAI_IMAGE_MODELS as readonly string[]).includes(configured) ? configured : undefined;
-    return [...new Set([configuredModel, ...SUPPORTED_OPENAI_IMAGE_MODELS].filter(Boolean) as string[])];
+    return [...new Set([configuredModel, DEFAULT_OPENAI_IMAGE_MODEL, ...SUPPORTED_OPENAI_IMAGE_MODELS].filter(Boolean) as string[])];
   }
 
   private estimatedImagenCostUsd() {

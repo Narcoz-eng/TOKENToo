@@ -8,8 +8,8 @@ export function validateStartupEnvironment() {
   const placeholderProgramId = "11111111111111111111111111111111";
   const strict = (process.env.STRICT_STARTUP_VALIDATION ?? "false") === "true";
   const issues: StartupCheck[] = [];
-  process.env.STUDIO_PROVIDER ??= "gemini";
-  process.env.STUDIO_IMAGE_PROVIDER ??= "imagen";
+  process.env.STUDIO_PROVIDER ??= "local-component";
+  process.env.STUDIO_IMAGE_PROVIDER ??= "deterministic-render";
   process.env.CINEMATIC_PROVIDER ??= "openai";
   process.env.GEMINI_IMAGE_MODEL ??= DEFAULT_IMAGEN_MODEL;
   process.env.IMAGEN_IMAGE_MODEL ??= process.env.GEMINI_IMAGE_MODEL ?? DEFAULT_IMAGEN_MODEL;
@@ -55,8 +55,8 @@ export function validateStartupEnvironment() {
     process.env.ENABLE_AI_IMAGE_GENERATION = "false";
     process.env.ENABLE_STUDIO_IMAGE_GENERATION = "false";
   }
-  if ((process.env.STUDIO_PROVIDER ?? "gemini").toLowerCase() === "openai" || (process.env.STUDIO_IMAGE_PROVIDER ?? "imagen").toLowerCase() === "openai") {
-    issues.push({ code: "STUDIO_PROVIDER_OPENAI", severity: appEnv === "production" ? "warning" : "info", message: "OpenAI is not allowed for Studio Bible generation; use Gemini for text planning and Imagen for Studio Bible sheets." });
+  if ((process.env.STUDIO_PROVIDER ?? "local-component").toLowerCase() === "openai" || (process.env.STUDIO_IMAGE_PROVIDER ?? "deterministic-render").toLowerCase() === "openai") {
+    issues.push({ code: "STUDIO_PROVIDER_OPENAI", severity: appEnv === "production" ? "warning" : "info", message: "OpenAI Studio provider is configured. It must remain explicit, cost-guarded, cached where possible, and must not be used for final collection generation." });
   }
   const imagenModel = normalizeImagenModel(process.env.IMAGEN_IMAGE_MODEL);
   if (imagenModel.ok) {
@@ -69,7 +69,7 @@ export function validateStartupEnvironment() {
       message: `Unsupported Imagen model "${imagenModel.rawModel}". Use one of: ${imagenModel.supportedModels.join(", ")}.`
     });
   }
-  if ((process.env.STUDIO_IMAGE_PROVIDER ?? "imagen").toLowerCase() === "imagen" && (process.env.IMAGEN_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY) && (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") !== "true" && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") !== "true") {
+  if ((process.env.STUDIO_IMAGE_PROVIDER ?? "deterministic-render").toLowerCase() === "imagen" && (process.env.IMAGEN_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY) && (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") !== "true" && (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") !== "true") {
     issues.push({ code: "IMAGEN_DISABLED", severity: appEnv === "production" ? "warning" : "info", message: "Imagen Studio Bible generation is configured but disabled. Set ENABLE_STUDIO_IMAGE_GENERATION=true or ENABLE_AI_IMAGE_GENERATION=true." });
   }
   if ((process.env.DEMO_CURATED_LAYER_PACK ?? "false") === "true" && appEnv === "production") {

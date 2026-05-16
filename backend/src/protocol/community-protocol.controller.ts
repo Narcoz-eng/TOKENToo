@@ -51,6 +51,15 @@ const submitLaunchSchema = z.object({
   signedTransactionBase64: z.string().optional()
 });
 
+const paymentAccessSchema = z.object({
+  paymentSignature: z.string().min(1),
+  idempotencyKey: z.string().min(8).optional()
+});
+
+const whaleAccessSchema = z.object({
+  idempotencyKey: z.string().min(8).optional()
+});
+
 @Controller()
 export class CommunityProtocolController {
   constructor(
@@ -70,6 +79,18 @@ export class CommunityProtocolController {
     return this.communities.buildCommunityLaunch(id, walletAddress);
   }
 
+  @Post("communities/:id/access/payment")
+  @UseGuards(WalletAuthGuard)
+  verifyPaymentAccess(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.communities.verifyPaymentAccess(id, { ...paymentAccessSchema.parse(body), walletAddress });
+  }
+
+  @Post("communities/:id/access/verify-whale")
+  @UseGuards(WalletAuthGuard)
+  verifyWhaleAccess(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
+    return this.communities.verifyWhaleAccess(id, { ...whaleAccessSchema.parse(body ?? {}), walletAddress });
+  }
+
   @Post("communities/:id/launch/submit")
   @UseGuards(WalletAuthGuard)
   submitCommunityLaunch(@Param("id") id: string, @Body() body: unknown, @WalletAddress() walletAddress: string) {
@@ -80,6 +101,11 @@ export class CommunityProtocolController {
   @Get("collections/:id/strategy")
   getStrategy(@Param("id") id: string) {
     return this.strategies.getStrategy(id);
+  }
+
+  @Get("communities/:id/launch/status")
+  launchStatus(@Param("id") id: string) {
+    return this.communities.launchStatus(id);
   }
 
   @Post("collections/:id/strategy")

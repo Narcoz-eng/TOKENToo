@@ -239,6 +239,73 @@ export class CommunityProtocolService {
     return { ok: true, collection: this.collectionDto(updated), launchUnsignedTransaction: launchTx };
   }
 
+  async verifyPaymentAccess(idOrSlug: string, input: { walletAddress: string; paymentSignature: string; idempotencyKey?: string }) {
+    const collection = await this.collectionForLaunch(idOrSlug);
+    const normalized = {
+      tokenMint: collection.token.mint,
+      walletAddress: input.walletAddress.trim(),
+      accessMethod: "CREATION_FEE_SOL" as const,
+      paymentSignature: input.paymentSignature.trim(),
+      idempotencyKey: input.idempotencyKey?.trim()
+    };
+    const requestHash = this.hash(normalized);
+    const access = await this.verifyCreationFee(normalized, requestHash);
+    await this.recordAccess({
+      input: normalized,
+      method: "CREATION_FEE_SOL",
+      status: access.granted ? "GRANTED" : access.status,
+      collectionId: collection.id,
+      requestHash,
+      requiredLamports: this.creationFeeLamports(),
+      metadata: access.metadata
+    });
+    if (!access.granted) {
+      throw new ForbiddenException({
+        code: access.code,
+        message: access.message,
+        accessStatus: access.status,
+        method: access.method,
+        metadata: access.metadata
+      });
+    }
+    return { ok: true, collection: this.collectionDto(collection), access: { method: "CREATION_FEE_SOL", status: "GRANTED", metadata: access.metadata } };
+  }
+
+  async verifyWhaleAccess(idOrSlug: string, input: { walletAddress: string; idempotencyKey?: string }) {
+    const collection = await this.collectionForLaunch(idOrSlug);
+    const normalized = {
+      tokenMint: collection.token.mint,
+      walletAddress: input.walletAddress.trim(),
+      accessMethod: "WHALE_HOLDER" as const,
+      idempotencyKey: input.idempotencyKey?.trim()
+    };
+    const requestHash = this.hash(normalized);
+    const scan = {
+      mint: collection.token.mint,
+      symbol: collection.token.symbol,
+      name: collection.token.name
+    } as TokenScan;
+    const access = await this.verifyWhaleGate(normalized, scan);
+    await this.recordAccess({
+      input: normalized,
+      method: "WHALE_HOLDER",
+      status: access.granted ? "GRANTED" : access.status,
+      collectionId: collection.id,
+      requestHash,
+      metadata: access.metadata
+    });
+    if (!access.granted) {
+      throw new ForbiddenException({
+        code: access.code,
+        message: access.message,
+        accessStatus: access.status,
+        method: access.method,
+        metadata: access.metadata
+      });
+    }
+    return { ok: true, collection: this.collectionDto(collection), access: { method: "WHALE_HOLDER", status: "GRANTED", metadata: access.metadata } };
+  }
+
   async submitCommunityLaunch(idOrSlug: string, input: SubmitCommunityLaunchInput, walletAddress: string) {
     const collection = await this.collectionForLaunch(idOrSlug);
     this.assertCreatorOrAdmin(collection, walletAddress);
@@ -320,6 +387,25 @@ export class CommunityProtocolService {
       return row;
     });
     return { ok: true, collection: this.collectionDto(updated), result, verification };
+  }
+
+  async launchStatus(idOrSlug: string) {
+    const collection = await this.collectionForLaunch(idOrSlug);
+    return {
+      ok: true,
+      collection: this.collectionDto(collection),
+      launch: {
+        status: collection.launchStatus,
+        txSignature: collection.launchTxSignature,
+        unsignedTransaction: collection.launchUnsignedTransaction,
+        collectionAssetAddress: collection.collectionAssetAddress,
+        onchainProfilePda: collection.onchainProfilePda,
+        feeVaultPda: collection.feeVaultPda,
+        tokenVaultPda: collection.tokenVaultPda,
+        launchedAt: collection.launchedAt?.toISOString?.() ?? null,
+        productionReady: collection.launchStatus === "CONFIRMED" && Boolean(collection.collectionAssetAddress && collection.onchainProfilePda && collection.tokenVaultPda)
+      }
+    };
   }
 
   private async verifyAccess(input: CreateCommunityInput, scan: TokenScan, requestHash: string) {
@@ -407,8 +493,9 @@ export class CommunityProtocolService {
     return { granted: false as const, code, message, status, method, metadata };
   }
 
-  private async recordAccess(input: { input: CreateCommunityInput; method: AccessMethod; status: "PENDING" | "DENIED"; requestHash: string; requiredLamports?: string; metadata: Record<string, unknown> }) {
+  private async recordAccess(input: { input: CreateCommunityInput; method: AccessMethod; status: "PENDING" | "DENIED" | "GRANTED"; requestHash: string; requiredLamports?: string; metadata: Record<string, unknown>; collectionId?: string }) {
     const data = {
+      collectionId: input.collectionId,
       walletAddress: input.input.walletAddress,
       tokenMint: input.input.tokenMint,
       method: input.method,
@@ -417,6 +504,7 @@ export class CommunityProtocolService {
       paymentSignature: input.input.paymentSignature,
       idempotencyKey: input.input.idempotencyKey,
       requestHash: input.requestHash,
+      verifiedAt: input.status === "GRANTED" ? new Date() : undefined,
       metadata: this.json(input.metadata)
     };
     if (input.input.idempotencyKey) {

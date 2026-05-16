@@ -13,6 +13,6 @@ import { ProtocolService } from "../protocol/protocol.service";
   imports: [AuthModule, GeneratorModule],
   controllers: [VaultMintController],
   providers: [PrismaService, SolanaTransactionAdapterService, ProtocolAccountingService, ProtocolService, VaultMintOrchestratorService, VaultRedeemOrchestratorService],
-  exports: [VaultMintOrchestratorService]
+  exports: [VaultMintOrchestratorService, VaultRedeemOrchestratorService]
 })
 export class VaultMintModule {}

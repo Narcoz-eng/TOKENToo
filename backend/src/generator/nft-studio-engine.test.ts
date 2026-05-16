@@ -222,16 +222,17 @@ async function main() {
   delete process.env.ENABLE_AI_IMAGE_GENERATION;
   delete process.env.PAID_AI_GENERATION_ENABLED;
   delete process.env.DEV_DISABLE_PAID_AI;
+  delete process.env.APP_ENV;
   delete process.env.IMAGEN_IMAGE_MODEL;
   delete process.env.GEMINI_IMAGE_MODEL;
   resetStudioProviderCircuitBreakers();
   const provider = new StudioImageProviderService();
   const summary = provider.validatePlan(baseStyle, bible, "test-mint");
-  assert(summary.provider === "imagen-unavailable", "Imagen should be the default Studio Bible image provider, with no fake sheet fallback when the key is missing");
-  assert(summary.providerFailureCode === "IMAGEN_KEY_MISSING", "Missing Imagen key should return the exact IMAGEN_KEY_MISSING code");
-  assert(summary.model === "imagen-4.0-fast-generate-001", "Studio Bible image model should default to Imagen 4 Fast, not gemini-2.5-flash-image");
-  assert(summary.imageCount === 0, "Missing Imagen key should not claim images were generated this run");
-  assert(summary.estimatedCostUsd === 0, "Missing Imagen key should not estimate paid preview cost");
+  assert(summary.provider === "deterministic-render", "Local deterministic rendering should be the default Studio Bible provider");
+  assert(summary.providerFailureCode === undefined, "Default local Studio preview should not report a paid-provider failure code");
+  assert(summary.model === "style-bible-engine", "Default Studio Bible image model should be the local style bible engine");
+  assert(summary.imageCount === 0, "Local default should not claim paid provider images were generated this run");
+  assert(summary.estimatedCostUsd === 0, "Local default should not estimate paid preview cost");
   const generated = await provider.generateStudioAssets({
     tokenMint: "test-mint",
     style: baseStyle,
@@ -240,10 +241,12 @@ async function main() {
     styleVersion: 1,
     rarityVersion: "preview"
   });
-  assert(generated.assets.length === 0, "Studio provider must not return deterministic template sheets when Imagen is unavailable");
+  assert(generated.assets.length > 0, "Default Studio provider should return local deterministic component-rendered sheets");
+  assert(generated.assets.every((asset) => asset.provider === "deterministic-render"), "Default Studio provider must not call paid providers");
   assert(generated.assets.every((asset) => asset.provider !== "openai"), "OpenAI must not generate default Studio Bible assets");
-  assert(generated.summary.providerFailureCode === "IMAGEN_KEY_MISSING", "Missing Imagen should be an honest no-sheet state with an exact code");
-  assert(generated.summary.costBreakdown.every((line) => line.generationType && typeof line.estimatedCostUsd === "number"), "Studio provider should return per-asset cost metadata when provider calls are attempted");
+  assert(generated.summary.provider === "deterministic-render", "Default generated Studio summary should report deterministic rendering");
+  assert(generated.summary.noBillableGenerationAttempted, "Default Studio generation must report no billable generation attempted");
+  assert(generated.summary.costBreakdown.every((line) => line.generationType && line.estimatedCostUsd === 0), "Default Studio provider should return zero-cost per-asset metadata");
   const cached = await provider.generateStudioAssets({
     tokenMint: "test-mint",
     style: baseStyle,
@@ -253,8 +256,8 @@ async function main() {
     rarityVersion: "preview",
     cachedAssets: generated.assets
   });
-  assert(cached.assets.length === 0, "No fake cached Studio Bible assets should exist when Imagen never generated sheets");
-  assert(cached.summary.estimatedCostUsd === 0, "Cached Studio Bible reuse should not estimate new provider cost");
+  assert(cached.assets.length === generated.assets.length, "Local deterministic Studio previews should be repeatable with no paid cache dependency");
+  assert(cached.summary.estimatedCostUsd === 0, "Repeated local Studio preview should not estimate new provider cost");
 
   process.env.STUDIO_PROVIDER = "gemini";
   process.env.GEMINI_API_KEY = "test-google-key";
@@ -396,7 +399,7 @@ async function main() {
   });
   assert(openAiEnabled.calls.length === 5, "OpenAI fallback should generate all five sheets only when explicitly enabled");
   assert(openAiFallback.summary.provider === "openai", "Explicit OpenAI fallback should report provider=openai");
-  assert(openAiFallback.summary.model === "gpt-image-1", "OpenAI fallback should use gpt-image-1 by default");
+  assert(openAiFallback.summary.model === "gpt-image-1.5", "OpenAI fallback should use the current default GPT image model");
   assert(hasAllRealStudioBibleAssets(openAiFallback.assets), "Explicit OpenAI fallback assets should count only when all five real sheets exist");
 
   process.env.GEMINI_API_KEY = "test-google-key";

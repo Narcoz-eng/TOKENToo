@@ -1,4 +1,4 @@
-export const DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-1";
+export const DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-1.5";
 export const DEFAULT_OPENAI_IMAGE_SIZE = "1024x1024";
 export const DEFAULT_OPENAI_IMAGE_QUALITY = "high";
 export const OPENAI_IMAGE_PROMPT_MAX_LENGTH = 32_000;
@@ -7,8 +7,8 @@ export const OPENAI_REFERENCE_IMAGE_URL_MAX_LENGTH = 20_971_520;
 export const OPENAI_IMAGE_GENERATION_ENDPOINT = "https://api.openai.com/v1/images/generations";
 export const OPENAI_IMAGE_EDIT_ENDPOINT = "https://api.openai.com/v1/images/edits";
 
-export const SUPPORTED_OPENAI_IMAGE_MODELS = ["gpt-image-1", "gpt-image-1-mini"] as const;
-export const SUPPORTED_OPENAI_IMAGE_SIZES = ["1024x1024", "1024x1536", "1536x1024"] as const;
+export const SUPPORTED_OPENAI_IMAGE_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"] as const;
+export const SUPPORTED_OPENAI_IMAGE_SIZES = ["auto", "1024x1024", "1024x1536", "1536x1024"] as const;
 export const SUPPORTED_OPENAI_IMAGE_QUALITIES = ["low", "medium", "high", "auto"] as const;
 export const SUPPORTED_REFERENCE_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 
@@ -257,8 +257,7 @@ function isSupportedReferenceMimeType(value: string) {
 }
 
 function isFlexibleSizeModel(model: string) {
-  void model;
-  return false;
+  return model === "gpt-image-2";
 }
 
 function isValidFlexibleImageSize(value: string) {
@@ -268,7 +267,9 @@ function isValidFlexibleImageSize(value: string) {
   const height = Number(match[2]);
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return false;
   if (width % 16 !== 0 || height % 16 !== 0) return false;
-  if (width > 3840 || height > 2160) return false;
+  if (Math.max(width, height) > 3840) return false;
+  const totalPixels = width * height;
+  if (totalPixels < 655_360 || totalPixels > 8_294_400) return false;
   const ratio = width / height;
   return ratio >= 1 / 3 && ratio <= 3;
 }

@@ -43,6 +43,15 @@ const tests: TestCase[] = [
     }
   },
   {
+    name: "current GPT image models accept documented size options",
+    run: () => {
+      const latestAuto = validationFor({ ...baseInput, model: "gpt-image-2", size: "auto" });
+      const latestFlexible = validationFor({ ...baseInput, model: "gpt-image-2", size: "2048x1152" });
+      assert(latestAuto.valid, `gpt-image-2 auto size should pass: ${latestAuto.issues.map((issue) => issue.message).join("; ")}`);
+      assert(latestFlexible.valid, `gpt-image-2 flexible size should pass: ${latestFlexible.issues.map((issue) => issue.message).join("; ")}`);
+    }
+  },
+  {
     name: "unsupported GPT image quality is rejected",
     run: () => {
       const validation = validationFor({ ...baseInput, quality: "hd" });

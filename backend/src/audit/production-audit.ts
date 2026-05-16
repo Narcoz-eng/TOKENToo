@@ -33,6 +33,7 @@ async function main() {
   checks.programIds = programIdCheck(root, issues);
   checks.rarity = rarityCheck(issues);
   checks.metadata = metadataCheck(issues);
+  checks.protocolHonesty = protocolHonestyCheck(root, issues);
 
   const prisma = new PrismaService();
   const capabilities = await new CapabilitiesService(prisma).status();
@@ -105,6 +106,56 @@ function metadataCheck(issues: string[]) {
   const attributes = new Map(sample.attributes.map((attribute) => [attribute.trait_type, attribute.value]));
   requireCheck(attributes.get("Base Character") === "Audit Base" && attributes.get("Rarity") === "Legendary", "Metadata attributes do not match rendered preview traits.", issues);
   return { name: sample.name, image: sample.image, rarity: attributes.get("Rarity") };
+}
+
+function protocolHonestyCheck(root: string, issues: string[]) {
+  const adapterSource = readFileSync(resolve(root, "backend/src/vault-mint/solana-transaction-adapter.service.ts"), "utf8");
+  const mintSource = readFileSync(resolve(root, "backend/src/vault-mint/vault-mint-orchestrator.service.ts"), "utf8");
+  const redeemSource = readFileSync(resolve(root, "backend/src/vault-mint/vault-redeem-orchestrator.service.ts"), "utf8");
+  const protocolSource = readFileSync(resolve(root, "backend/src/protocol/protocol.service.ts"), "utf8");
+  const generatorSource = readFileSync(resolve(root, "backend/src/generator/generator.service.ts"), "utf8");
+  const startupSource = readFileSync(resolve(root, "backend/src/env/startup-validation.ts"), "utf8");
+  const providerGuardSource = readFileSync(resolve(root, "backend/src/generator/provider-abstractions.ts"), "utf8");
+
+  const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development";
+  const productionLike = appEnv === "production" || process.env.ENABLE_PRODUCTION_MINT === "true";
+  const liveSolana = process.env.SOLANA_TRANSACTION_PROVIDER === "devnet";
+  const immutableStorage = (process.env.FINAL_ASSET_STORAGE_PROVIDER ?? process.env.ASSET_STORAGE_PROVIDER ?? "mock") !== "mock";
+  const paidAiRequested = (process.env.ENABLE_AI_IMAGE_GENERATION ?? "false") === "true" || (process.env.ENABLE_STUDIO_IMAGE_GENERATION ?? "false") === "true";
+  const paidAiExplicit = (process.env.PAID_AI_GENERATION_ENABLED ?? "false") === "true";
+
+  requireCheck(adapterSource.includes("verifySolPayment") && adapterSource.includes("getParsedTransaction"), "Solana adapter must verify 1 SOL creation payments from live transactions.", issues);
+  requireCheck(adapterSource.includes("verifyWalletTokenBalance") && adapterSource.includes("tokenBalance"), "Solana adapter must verify whale/token balances from live token accounts.", issues);
+  requireCheck(adapterSource.includes("getCoreAssetProof") && protocolSource.includes("assertCurrentOwner"), "Redeem/proof flow must verify live NFT ownership before trusting DB owner snapshots.", issues);
+  requireCheck(adapterSource.includes("verifyReserveCustody") && adapterSource.includes("expectedBackingAmount"), "Reserve proof must compare expected backing against live reserve custody.", issues);
+  requireCheck(mintSource.includes("Production minting requires live wallet token balance verification"), "Production mint path must fail closed without live token balance verification.", issues);
+  requireCheck(mintSource.includes("FINAL_ASSET_STORAGE_PROVIDER is immutable storage"), "Production mint path must require immutable final asset storage.", issues);
+  requireCheck(redeemSource.includes("Production redeem build requires live NFT ownership"), "Production redeem path must fail closed without live NFT owner verification.", issues);
+  requireCheck(generatorSource.includes("AI studio previews are art direction only") && generatorSource.includes("wireframes cannot launch"), "Studio launch readiness must block wireframes and AI concepts from mintable production launch.", issues);
+  requireCheck(startupSource.includes("local-component") && startupSource.includes("deterministic-render"), "Startup defaults must keep Studio on local/free component rendering.", issues);
+  requireCheck(providerGuardSource.includes("PAID_AI_GENERATION_ENABLED") && providerGuardSource.includes("explicitUserAction"), "Paid AI provider calls must be globally disabled unless explicitly enabled by user action.", issues);
+
+  if (productionLike) {
+    requireCheck(liveSolana, "Production-like minting requires SOLANA_TRANSACTION_PROVIDER=devnet; mock transaction provider is forbidden.", issues);
+    requireCheck((process.env.ENABLE_MOCK_MINT ?? "false") !== "true", "Production-like minting forbids ENABLE_MOCK_MINT=true.", issues);
+    requireCheck(Boolean(process.env.COMMUNITY_CREATION_FEE_WALLET ?? process.env.PROTOCOL_TREASURY_WALLET), "Production community payment verification requires COMMUNITY_CREATION_FEE_WALLET or PROTOCOL_TREASURY_WALLET.", issues);
+    requireCheck(immutableStorage, "Production minting requires immutable storage; FINAL_ASSET_STORAGE_PROVIDER/ASSET_STORAGE_PROVIDER cannot be mock.", issues);
+    requireCheck(!paidAiRequested || paidAiExplicit, "Paid AI generation was requested without PAID_AI_GENERATION_ENABLED=true.", issues);
+  }
+
+  return {
+    appEnv,
+    productionLike,
+    solanaTransactionProvider: process.env.SOLANA_TRANSACTION_PROVIDER ?? null,
+    mockMintEnabled: process.env.ENABLE_MOCK_MINT ?? null,
+    immutableStorage,
+    paidAiRequested,
+    paidAiExplicit,
+    localStudioDefaults: {
+      studioProvider: process.env.STUDIO_PROVIDER ?? "local-component",
+      studioImageProvider: process.env.STUDIO_IMAGE_PROVIDER ?? "deterministic-render"
+    }
+  };
 }
 
 function styleFixture(): GeneratedStyleProfile {

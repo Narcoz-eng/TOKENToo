@@ -300,6 +300,79 @@ export class GeneratorService {
     return run;
   }
 
+  async listProjectsForWallet(walletAddress: string) {
+    if (!walletAddress?.trim()) throw new BadRequestException("walletAddress is required.");
+    return this.prisma.generationRun.findMany({
+      where: {
+        OR: [{ creatorWallet: walletAddress }, { approvedByWallet: walletAddress }]
+      },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        styleProfiles: {
+          orderBy: { version: "desc" },
+          take: 1,
+          include: {
+            qualityReports: { orderBy: { createdAt: "desc" }, take: 1 },
+            distinctivenessReports: { orderBy: { createdAt: "desc" }, take: 1 }
+          }
+        },
+        curatedLayerPacks: {
+          orderBy: { createdAt: "desc" },
+          take: 1
+        }
+      }
+    });
+  }
+
+  async updateProject(id: string, input: { description?: string; hints?: Record<string, unknown>; selectedPreset?: string }, walletAddress: string) {
+    await requireDbForWrite(this.prisma);
+    const run = await this.getRunForWallet(id, walletAddress);
+    if (run.status === "APPROVED") throw new ConflictException("Approved Studio projects are immutable. Create a new project for further edits.");
+    const communityHints = this.record(run.communityHints);
+    return this.prisma.generationRun.update({
+      where: { id },
+      data: {
+        description: input.description?.trim() || undefined,
+        selectedPreset: input.selectedPreset?.trim() || undefined,
+        communityHints: input.hints ? this.json({ ...communityHints, ...input.hints }) : undefined
+      }
+    });
+  }
+
+  async approveTraits(id: string, walletAddress: string, note?: string) {
+    return this.studioAction(id, { action: "approve-trait-family", note, walletAddress });
+  }
+
+  async approveLayerPack(id: string, walletAddress: string) {
+    await requireDbForWrite(this.prisma);
+    const run = await this.getRunForWallet(id, walletAddress);
+    if (run.status === "APPROVED") throw new ConflictException("Approved Studio projects are immutable.");
+    const latest = run.styleProfiles[0];
+    if (!latest) throw new NotFoundException("Generation run has no style profile.");
+    const readiness = await this.curatedLayers.readinessForStyle(latest.id);
+    if (!readiness.approvalReady) {
+      throw new BadRequestException(`Layer pack is not approval-ready: ${readiness.errors.join(" ") || readiness.status}`);
+    }
+    const communityHints = this.record(run.communityHints);
+    const studioWorkflow = this.studioWorkflowState(communityHints.studioWorkflow);
+    const updatedWorkflow = {
+      ...studioWorkflow,
+      approvals: {
+        ...studioWorkflow.approvals,
+        layerPack: true
+      },
+      layerPackApproval: {
+        approvedAt: new Date().toISOString(),
+        readiness
+      }
+    };
+    await this.prisma.generationRun.update({
+      where: { id },
+      data: { communityHints: this.json({ ...communityHints, studioWorkflow: updatedWorkflow }) }
+    });
+    return { ok: true, projectId: id, layerPack: readiness, studioWorkflow: updatedWorkflow };
+  }
+
   async regenerateStyle(id: string, walletAddress?: string) {
     const run = await this.getRun(id);
     this.assertOwner(run, walletAddress);

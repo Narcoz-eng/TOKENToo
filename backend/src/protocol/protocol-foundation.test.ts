@@ -1,5 +1,6 @@
 import { ProtocolAccountingService } from "./protocol-accounting.service";
 import { ProtocolService } from "./protocol.service";
+import { ProviderCostGuard } from "../generator/provider-abstractions";
 import { StudioImageProviderService } from "../generator/studio-image-provider.service";
 import type { GeneratedStyleProfile, StyleBiblePlan } from "../generator/generator.types";
 
@@ -11,9 +12,11 @@ async function main() {
   await reserveIsolationTest();
   await liveOwnerTruthTest();
   await paidAiGuardTest();
+  providerCostGuardTest();
   console.log("PASS protocol reserve isolation");
   console.log("PASS protocol live owner truth");
   console.log("PASS no paid AI without explicit global guard");
+  console.log("PASS provider cost guard");
 }
 
 async function reserveIsolationTest() {
@@ -69,9 +72,10 @@ async function liveOwnerTruthTest() {
 }
 
 async function paidAiGuardTest() {
-  const previous = snapshotEnv(["GEMINI_API_KEY", "IMAGEN_API_KEY", "ENABLE_STUDIO_IMAGE_GENERATION", "ENABLE_AI_IMAGE_GENERATION", "ENABLE_GEMINI_TEXT_PROMPTS", "PAID_AI_GENERATION_ENABLED", "DEV_DISABLE_PAID_AI"]);
+  const previous = snapshotEnv(["GEMINI_API_KEY", "IMAGEN_API_KEY", "STUDIO_IMAGE_PROVIDER", "ENABLE_STUDIO_IMAGE_GENERATION", "ENABLE_AI_IMAGE_GENERATION", "ENABLE_GEMINI_TEXT_PROMPTS", "PAID_AI_GENERATION_ENABLED", "DEV_DISABLE_PAID_AI"]);
   try {
     process.env.GEMINI_API_KEY = "test-google-key";
+    process.env.STUDIO_IMAGE_PROVIDER = "imagen";
     process.env.ENABLE_STUDIO_IMAGE_GENERATION = "true";
     process.env.ENABLE_GEMINI_TEXT_PROMPTS = "false";
     process.env.PAID_AI_GENERATION_ENABLED = "false";
@@ -90,6 +94,27 @@ async function paidAiGuardTest() {
   } finally {
     restoreEnv(previous);
   }
+}
+
+function providerCostGuardTest() {
+  const guard = new ProviderCostGuard({
+    APP_ENV: "development",
+    PAID_AI_GENERATION_ENABLED: "false",
+    DEV_DISABLE_PAID_AI: "true"
+  });
+  const free = guard.decide({ provider: "local-component-preview", kind: "local_component_preview", estimatedCostUsd: 0 });
+  assert(free.allowed && free.noBillableGenerationAttempted, "local component previews must always be free and allowed");
+
+  const blocked = guard.decide({ provider: "imagen", kind: "premium_image", estimatedCostUsd: 0.04, explicitUserAction: true });
+  assert(!blocked.allowed, "paid provider calls must be blocked when the global paid AI guard is disabled");
+  assert(blocked.noBillableGenerationAttempted, "blocked paid calls must report no billable generation attempted");
+
+  const allowed = new ProviderCostGuard({
+    APP_ENV: "production",
+    PAID_AI_GENERATION_ENABLED: "true",
+    DEV_DISABLE_PAID_AI: "false"
+  }).decide({ provider: "imagen", kind: "premium_image", estimatedCostUsd: 0.04, explicitUserAction: true });
+  assert(allowed.allowed && !allowed.noBillableGenerationAttempted, "explicit paid provider calls should pass only after paid AI is enabled");
 }
 
 function fakeAccountingDb() {

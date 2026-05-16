@@ -17,6 +17,7 @@ import { GeminiStudioPromptProviderService } from "./gemini-studio-prompt-provid
 import { ImagenStudioImageProviderService } from "./imagen-studio-image-provider.service";
 import { GeneratorController } from "./generator.controller";
 import { GeneratorService } from "./generator.service";
+import { StudioController } from "./studio.controller";
 import { LogoAnalysisService } from "./logo-analysis.service";
 import { MetadataGeneratorService } from "./metadata-generator.service";
 import { QualityValidatorService } from "./quality-validator.service";
@@ -31,7 +32,7 @@ import { ProductionLayerPackService } from "./production-layer-pack.service";
 
 @Module({
   imports: [AuthModule],
-  controllers: [GeneratorController],
+  controllers: [GeneratorController, StudioController],
   providers: [
     PrismaService,
     GeneratorService,
