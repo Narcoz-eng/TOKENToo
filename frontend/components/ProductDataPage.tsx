@@ -554,7 +554,7 @@ function CollectionDetailView({ data }: { data: ProductData }) {
         <div className="relative grid gap-6 p-6 xl:grid-cols-[160px_minmax(0,1fr)_360px] xl:p-8">
           <div className="flex items-start gap-3 xl:block">
             <img src={collection.image} alt={collection.name} className="size-24 rounded-lg border border-vault-green/30 object-cover xl:size-36" />
-            <img src={brandAssets.mascot} alt="Phew mascot" className="size-20 rounded-lg border border-vault-line bg-black/40 object-contain p-2 xl:mt-4" />
+            <img src={brandAssets.nftSlot} alt="" className="size-20 rounded-lg border border-vault-line bg-black/40 object-contain p-2 xl:mt-4" />
           </div>
           <div>
             <div className="flex flex-wrap gap-2">
@@ -723,7 +723,7 @@ function CollectionUnavailableView() {
           <SectionCard title="Collection Overview">
             <div className="grid gap-4 md:grid-cols-[120px_minmax(0,1fr)] md:items-center">
               <div className="grid aspect-square place-items-center rounded-lg border border-dashed border-vault-green/35 bg-vault-green/5">
-                <img src={brandAssets.mascot} alt="" className="size-24 object-contain drop-shadow-[0_0_22px_rgba(186,255,0,0.24)]" />
+                <img src={brandAssets.nftSlot} alt="" className="size-24 object-contain drop-shadow-[0_0_22px_rgba(186,255,0,0.24)]" />
               </div>
               <div>
                 <div className="flex flex-wrap gap-2">

@@ -455,7 +455,7 @@ function ProjectedVaultCard({ image, collection, amount, lockDurationDays, txSta
           <img src={image} alt="" className="aspect-[4/5] w-full object-cover" />
         ) : (
           <div className="grid aspect-[4/5] w-full place-items-center border border-dashed border-vault-green/35 bg-[radial-gradient(circle_at_50%_28%,rgba(186,255,0,0.2),rgba(0,0,0,0.9)_62%)]">
-            <img src={brandAssets.mascot} alt="" className="size-28 object-contain drop-shadow-[0_0_22px_rgba(186,255,0,0.24)]" />
+            <img src={brandAssets.nftSlot} alt="" className="size-28 object-contain drop-shadow-[0_0_22px_rgba(186,255,0,0.24)]" />
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />

@@ -344,7 +344,7 @@ export default function CreateCommunityPage() {
               {scan ? (
                 <div className="mt-5 grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
                   <div className="rounded-lg border border-vault-line bg-black/25 p-4">
-                    <img src={scan.imageUri || brandAssets.mascot} alt="" className="mx-auto size-24 rounded-lg border border-vault-line bg-black/40 object-contain p-2" />
+                    <img src={scan.imageUri || brandAssets.nftSlot} alt="" className="mx-auto size-24 rounded-lg border border-vault-line bg-black/40 object-contain p-2" />
                     <p className="mt-4 text-center text-lg font-black text-white">{scan.name || "N/A"}</p>
                     <p className="text-center text-sm font-black text-vault-green">{scan.symbol || "N/A"}</p>
                   </div>
