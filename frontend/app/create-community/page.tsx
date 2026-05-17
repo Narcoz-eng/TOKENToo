@@ -8,7 +8,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { brandAssets } from "@/lib/brand-assets";
-import { CommunityLaunchAnimation } from "@/components/phew-moment-animations";
+import { TransactionFlow, type TransactionFlowState } from "@/components/TransactionFlow";
 import { cn } from "@/lib/utils";
 
 type AccessMethod = "CREATION_FEE_SOL" | "WHALE_HOLDER" | "SUBSCRIPTION_STUDIO" | "ADMIN_GRANT";
@@ -137,6 +137,7 @@ export default function CreateCommunityPage() {
   const [accessMethod, setAccessMethod] = useState<AccessMethod>("CREATION_FEE_SOL");
   const [paymentSignature, setPaymentSignature] = useState("");
   const [externalLaunchSignature, setExternalLaunchSignature] = useState("");
+  const [simulatedLockAmount, setSimulatedLockAmount] = useState("");
   const [scan, setScan] = useState<TokenScan | null>(null);
   const [community, setCommunity] = useState<CreateCommunityResponse | null>(null);
   const [launchBuild, setLaunchBuild] = useState<LaunchResponse | null>(null);
@@ -152,7 +153,7 @@ export default function CreateCommunityPage() {
   const collectionAsset = launchSubmit?.verification?.addresses?.collectionAsset ?? launchTx?.collectionAssetAddress ?? null;
   const canLaunch = Boolean(collection?.id);
   const canSubmitLaunch = Boolean(launchTx?.base64UnsignedTransaction || externalLaunchSignature.trim());
-  const launchMomentState = error ? "error" : activeAction ? "loading" : launchSubmit?.result?.confirmed || launchStatus?.launch?.status === "CONFIRMED" ? "success" : "idle";
+  const launchFlowState = communityFlowState(error, activeAction, launchSubmit, launchStatus);
 
   const accessHelp = useMemo(() => accessMethods.find((method) => method.value === accessMethod)?.help, [accessMethod]);
 
@@ -308,12 +309,19 @@ export default function CreateCommunityPage() {
           <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center">
             <div>
               <StatusPill accent="green">Create Community</StatusPill>
-              <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Scan a token CA, pass access, initialize the devnet reserve.</h1>
+              <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Launch your economy from a real token reserve.</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300">
-                This page writes only through the protocol backend. Launch proof comes from the collection asset, reserve PDA, and post-submit verification returned by devnet routes.
+                Scan the token, pass access, create the draft, then initialize the reserve through backend launch routes. No generation or paid provider work runs from this page.
               </p>
             </div>
-            <CommunityLaunchAnimation state={launchMomentState} collectionImage={scan?.imageUri ?? brandAssets.logo} tokenSymbol={scan?.symbol ?? "PHEW"} />
+            <TransactionFlow
+              state={launchFlowState}
+              title="Community launch"
+              description="Token scan, access verification, launch transaction, and reserve proof all come from backend state."
+              image={scan?.imageUri ?? brandAssets.logo}
+              tokenSymbol={scan?.symbol ?? collection?.name ?? "PHEW"}
+              detail={error ?? launchSubmit?.result?.message ?? launchStatus?.launch?.status ?? null}
+            />
           </div>
         </section>
 
@@ -333,17 +341,65 @@ export default function CreateCommunityPage() {
                 </button>
               </div>
               {scan ? (
-                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <Fact label="Name" value={scan.name} />
-                  <Fact label="Symbol" value={scan.symbol} />
-                  <Fact label="Mint" value={short(scan.mint)} />
-                  <Fact label="Risk score" value={formatNumber(scan.riskScore)} />
-                  <Fact label="Metadata URI" value={scan.metadataUri ? short(scan.metadataUri, 18) : "N/A"} />
-                  <Fact label="Provider" value={scan.provider ?? "N/A"} />
-                  <Fact label="Indexed" value={scan.indexed ? "Yes" : "No"} />
-                  <Fact label="Holders" value={formatNumber(scan.holders)} />
+                <div className="mt-5 grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
+                  <div className="rounded-lg border border-vault-line bg-black/25 p-4">
+                    <img src={scan.imageUri || brandAssets.logo} alt="" className="mx-auto size-24 rounded-lg border border-vault-line bg-black/40 object-cover" />
+                    <p className="mt-4 text-center text-lg font-black text-white">{scan.name || "N/A"}</p>
+                    <p className="text-center text-sm font-black text-vault-green">{scan.symbol || "N/A"}</p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <Fact label="Mint" value={short(scan.mint)} />
+                    <Fact label="Supply" value={String(scan.supply ?? "N/A")} />
+                    <Fact label="Decimals" value={String(scan.decimals ?? "N/A")} />
+                    <Fact label="Risk score" value={formatNumber(scan.riskScore)} />
+                    <Fact label="Metadata URI" value={scan.metadataUri ? short(scan.metadataUri, 18) : "N/A"} />
+                    <Fact label="Provider" value={scan.provider ?? "N/A"} />
+                    <Fact label="Indexed" value={scan.indexed ? "Yes" : "No"} />
+                    <Fact label="Holders" value={formatNumber(scan.holders)} />
+                    <Fact label="Liquidity" value={formatUsd(scan.liquidityUsd)} />
+                    <Fact label="Market cap" value={formatUsd(scan.marketCapUsd)} />
+                  </div>
                 </div>
               ) : null}
+            </SectionCard>
+
+            <SectionCard title="TVL Simulation">
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
+                <label className="block">
+                  <span className="text-xs font-bold uppercase text-slate-500">Raw token amount to lock</span>
+                  <input
+                    value={simulatedLockAmount}
+                    onChange={(event) => setSimulatedLockAmount(event.target.value)}
+                    className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm"
+                    inputMode="numeric"
+                    placeholder="Example: 1000000000"
+                  />
+                </label>
+                <div className="rounded-lg border border-vault-line bg-black/25 p-4">
+                  <p className="text-xs uppercase text-slate-500">Simulated TVL</p>
+                  <p className="mt-2 break-words text-lg font-black text-white">{formatSimulatedTvl(simulatedLockAmount, scan)}</p>
+                </div>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                Simulation is a frontend estimate of the raw token reserve only. USD TVL stays N/A unless the backend scan returns market context and the actual launch route confirms reserve balances.
+              </p>
+            </SectionCard>
+
+            <SectionCard title="Vault Mechanics">
+              <div className="grid gap-3 md:grid-cols-4">
+                {[
+                  ["1", "Token scan", "Backend reads metadata, risk notes, and market context for the submitted mint."],
+                  ["2", "Draft economy", "The community draft binds the creator wallet, token mint, and selected access method."],
+                  ["3", "Reserve launch", "The launch transaction creates the collection asset and reserve addresses."],
+                  ["4", "Vault NFTs", "Future mints lock tokens into reserve and expose proof before stake or redeem actions."]
+                ].map(([step, heading, body]) => (
+                  <div key={step} className="rounded-lg border border-vault-line bg-black/25 p-4">
+                    <span className="flex size-8 items-center justify-center rounded-md border border-vault-green/35 bg-vault-green/10 text-sm font-black text-vault-green">{step}</span>
+                    <p className="mt-4 font-black">{heading}</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
+                  </div>
+                ))}
+              </div>
             </SectionCard>
 
             <SectionCard title="Access Gate">
@@ -437,7 +493,7 @@ export default function CreateCommunityPage() {
                 <StatusLine label="Reserve verified" ok={Boolean(reserve?.lastOnChainVerifiedAt || launchSubmit?.verification?.passed)} />
               </div>
               {community?.message ? <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-300">{community.message}</p> : null}
-              {launchStatus?.launch ? <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-300">Launch status: {launchStatus.launch.status ?? "N/A"}{launchStatus.launch.productionReady ? " · production ready" : ""}</p> : null}
+              {launchStatus?.launch ? <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-300">Launch status: {launchStatus.launch.status ?? "N/A"}{launchStatus.launch.productionReady ? " - production ready" : ""}</p> : null}
             </SectionCard>
 
             <SectionCard title="Verified Reserve">
@@ -493,6 +549,14 @@ function StatusLine({ label, ok }: { label: string; ok: boolean }) {
   );
 }
 
+function communityFlowState(error: string | null, activeAction: string | null, launchSubmit: LaunchResponse | null, launchStatus: LaunchStatusResponse | null): TransactionFlowState {
+  if (error) return "error";
+  if (launchSubmit?.result?.confirmed || launchStatus?.launch?.status === "CONFIRMED") return "success";
+  if (activeAction === "submit") return "signing";
+  if (activeAction) return "preparing";
+  return "idle";
+}
+
 function short(value?: string | null, size = 10) {
   if (!value) return "N/A";
   if (value.length <= size * 2 + 3) return value;
@@ -501,4 +565,24 @@ function short(value?: string | null, size = 10) {
 
 function formatNumber(value: unknown) {
   return typeof value === "number" ? value.toLocaleString() : "N/A";
+}
+
+function formatUsd(value: unknown) {
+  return typeof value === "number" ? `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "N/A";
+}
+
+function formatSimulatedTvl(rawAmount: string, scan: TokenScan | null) {
+  const trimmed = rawAmount.trim();
+  if (!trimmed || !scan) return "N/A";
+  if (!/^\d+$/.test(trimmed)) return "Invalid raw amount";
+  return `${formatRawAmount(trimmed, scan.decimals ?? 0)} ${scan.symbol || "tokens"}`;
+}
+
+function formatRawAmount(rawAmount: string, decimals: number) {
+  const normalized = rawAmount.replace(/^0+(?=\d)/, "");
+  if (decimals <= 0) return normalized;
+  const padded = normalized.padStart(decimals + 1, "0");
+  const whole = padded.slice(0, -decimals) || "0";
+  const fraction = padded.slice(-decimals).replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole;
 }

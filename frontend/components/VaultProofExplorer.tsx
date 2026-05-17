@@ -7,7 +7,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { brandAssets } from "@/lib/brand-assets";
-import { ProofVerifiedAnimation } from "@/components/phew-moment-animations";
+import { ProtocolTrustStrip, proofTrust } from "@/components/protocol-trust";
 
 type ProofResponse = {
   ok?: boolean;
@@ -108,6 +108,7 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
         {proof ? (
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
             <SectionCard title="Vault Proof">
+              <ProtocolTrustStrip trust={proofTrust(proof)} className="mb-4" />
               <div className="grid gap-3 md:grid-cols-2">
                 <ProofRow label="NFT mint" value={proof.nftMint} />
                 <ProofRow label="Owner" value={proof.currentOwner ?? proof.dbOwnerSnapshot ?? "N/A"} />
@@ -125,7 +126,6 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
             </SectionCard>
 
             <SectionCard title="Verification">
-              <ProofVerifiedAnimation state={proof.issues.length ? "error" : "success"} tokenSymbol={proof.tokenSymbol} />
               <div className="space-y-3">
                 <StatusLine label="Live owner proof" ok={proof.verificationResult.ownerVerificationAvailable} />
                 <StatusLine label="Owner matches DB" ok={proof.verificationResult.ownerMatchesDb !== false} />

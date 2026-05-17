@@ -34,7 +34,8 @@ import { StatCard } from "./StatCard";
 import { apiWarnings, unwrapApiData } from "@/lib/api";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
-import { RewardClaimAnimation, StakeMomentAnimation } from "./phew-moment-animations";
+import { TransactionFlow } from "./TransactionFlow";
+import { ProtocolTrustInline, ProtocolTrustStrip, collectionTrust, vaultTrust } from "./protocol-trust";
 import { brandAssets } from "@/lib/brand-assets";
 import { CollectionGrid } from "./CollectionGrid";
 import { MetricGrid, PageLayout } from "./PageLayout";
@@ -305,6 +306,7 @@ function HomeDashboardView({ data }: { data: ProductData }) {
                         <StatusPill accent={collection.reserveHealth === "HEALTHY" ? "green" : collection.reserveHealth === "AT_RISK" ? "gold" : "red"}>{collection.reserveHealth ?? "HEALTHY"}</StatusPill>
                       </div>
                       <p className="mt-1 truncate text-sm text-slate-400">{collection.symbol} / {collection.tokenMint || "token mint pending"}</p>
+                      <ProtocolTrustStrip trust={collectionTrust(collection)} compact className="mt-3" />
                       <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                         <MiniMetric label="TVL" value={formatTokenAmount(collection.availableBacking)} />
                         <MiniMetric label="Floor" value={`${collection.floorSol} SOL`} />
@@ -451,97 +453,207 @@ function CollectionDetailView({ data }: { data: ProductData }) {
   const nfts = data.nfts ?? [];
   const raids = data.raids ?? [];
   if (!collection) return <EmptyState title="Collection unavailable" body="This collection was not found, or the database is not available. Public reads return a safe empty state." />;
+  const trust = collectionTrust(collection);
+  const activity = data.activity ?? [];
+  const recentMints = data.recentMints ?? [];
+  const proofHref = nfts.find((nft) => nft.mint)?.mint ? `/proof?mint=${encodeURIComponent(nfts.find((nft) => nft.mint)?.mint ?? "")}` : "/proof";
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <section className="phew-panel relative overflow-hidden rounded-lg">
-        <img src={collection.banner} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
-        <div className="absolute inset-0 bg-gradient-to-r from-vault-ink via-vault-ink/90 to-vault-ink/20" />
-        <div className="relative grid gap-5 p-6 xl:grid-cols-[180px_minmax(0,1fr)_360px]">
-          <img src={collection.image} alt={collection.name} className="aspect-square rounded-lg border border-vault-green/40 object-cover shadow-green" />
+        <img src={collection.banner || collection.image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-34" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/50" />
+        <div className="relative grid gap-6 p-6 xl:grid-cols-[160px_minmax(0,1fr)_360px] xl:p-8">
+          <div className="flex items-start gap-3 xl:block">
+            <img src={collection.image} alt={collection.name} className="size-24 rounded-lg border border-vault-green/30 object-cover xl:size-36" />
+            <img src={brandAssets.logo} alt="Phew mascot" className="size-16 rounded-lg border border-vault-line bg-black/40 object-contain p-2 xl:mt-4" />
+          </div>
           <div>
             <div className="flex flex-wrap gap-2">
               <StatusPill accent="green">{collection.symbol}</StatusPill>
               <StatusPill accent={collection.qualityTier === "Basic" ? "gold" : "cyan"}>{collection.qualityTier}</StatusPill>
-              <StatusPill accent={collection.instantSellEnabled ? "green" : "red"}>{collection.instantSellEnabled ? "Instant sell eligible" : "Instant sell gated"}</StatusPill>
+              <StatusPill accent={collection.mintEligible ? "green" : "gold"}>{collection.mintEligible ? "Mint enabled" : "Mint gated"}</StatusPill>
             </div>
-            <h2 className="mt-4 text-5xl font-black">{collection.name}</h2>
-            <p className="mt-3 max-w-3xl text-slate-300">{collection.description}</p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link href="/mint" className="inline-flex h-11 items-center gap-2 rounded-lg bg-vault-green px-5 text-sm font-bold text-black"><LockKeyhole className="size-4" /> Mint Vault</Link>
-              <Link href="/staking" className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-cyan/50 bg-vault-cyan/10 px-5 text-sm font-bold text-vault-cyan"><Sparkles className="size-4" /> Stake Vault</Link>
-              <Link href={`/collections/${collection.id}/raids`} className="inline-flex h-11 items-center gap-2 rounded-lg border border-vault-line bg-black/35 px-5 text-sm font-bold"><Swords className="size-4 text-vault-green" /> Join Raid</Link>
+            <h2 className="mt-4 max-w-4xl text-4xl font-black leading-tight xl:text-5xl">{collection.name}</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{collection.description || collection.vibe || "N/A"}</p>
+            <ProtocolTrustStrip trust={trust} className="mt-5 max-w-4xl" />
+            <div className="mt-6 flex flex-wrap gap-3">
+              {collection.mintEligible ? (
+                <Link href="/mint" className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-5 text-sm font-black text-black"><LockKeyhole className="size-4" /> Mint Vault</Link>
+              ) : (
+                <span className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/35 px-5 text-sm font-bold text-slate-500"><LockKeyhole className="size-4" /> Mint N/A</span>
+              )}
+              <Link href={proofHref} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-bold text-vault-green"><Shield className="size-4" /> Open Proof</Link>
+              <Link href={`/collections/${collection.id}/raids`} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/35 px-5 text-sm font-bold"><Swords className="size-4 text-vault-green" /> Raids</Link>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <MiniStat label="Vaults" value={formatMetric(collection.vaults)} />
-            <MiniStat label="Holders" value={formatMetric(collection.holders)} />
-            <MiniStat label="Risk score" value={formatMetric(collection.riskScore)} />
+          <div className="grid gap-3">
+            <MiniStat label="Token mint" value={collection.tokenMint || "N/A"} />
+            <MiniStat label="Supply" value={formatMetric(collection.supply)} />
+            <MiniStat label="Risk status" value={`${collection.riskTier} / ${collection.reserveHealth ?? "N/A"}`} />
           </div>
         </div>
       </section>
 
-      <div className="flex gap-2 overflow-x-auto border-b border-vault-line">
-        {["Overview", "Vault NFTs", "Staking", "Raids", "Activity", "Traits"].map((tab, index) => (
-          <a key={tab} href={`#${tab.toLowerCase().replace(/\s+/g, "-")}`} className={`px-4 py-3 text-sm font-bold ${index === 0 ? "border-b-2 border-vault-green text-vault-green" : "text-slate-400"}`}>{tab}</a>
-        ))}
+      <div className="grid gap-4 md:grid-cols-4">
+        <MiniStat label="TVL / locked" value={`${formatTokenAmount(collection.totalLocked ?? collection.availableBacking)} ${collection.symbol}`} />
+        <MiniStat label="Redeemable backing" value={`${formatTokenAmount(collection.availableBacking)} ${collection.symbol}`} />
+        <MiniStat label="Vaults minted" value={formatMetric(collection.vaults || collection.minted)} />
+        <MiniStat label="Reserve ratio" value={formatBps(collection.reserveRatioBps)} />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-5">
-          <SectionCard id="overview" title="Overview">
-            <p className="text-slate-300">{collection.vibe}</p>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <main className="space-y-6">
+          <SectionCard id="overview" title="Token Economy">
+            <div className="grid gap-3 md:grid-cols-3">
               <InfoTile icon={Crown} label="Mascot" value={`${collection.mascot} / ${collection.mascotType}`} />
-              <InfoTile icon={Gem} label="Legendary Trait" value={collection.legendaryTrait} />
-              <InfoTile icon={Trophy} label="Level" value={`Level ${collection.level}`} />
+              <InfoTile icon={Gem} label="Token" value={`${collection.symbol} / ${shortAddress(collection.tokenMint)}`} />
+              <InfoTile icon={Trophy} label="Launch" value={collection.launchStatus ?? "N/A"} />
             </div>
+            <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-4 text-sm leading-6 text-slate-400">
+              This collection functions as its own economy: community tokens are locked in the reserve, Vault NFTs represent positions against that reserve, and redeem/stake actions are blocked unless backend proof says the position is eligible.
+            </p>
           </SectionCard>
-          <SectionCard id="vault-nfts" title="Vault NFT Preview">
-            {nfts.length ? <MarketplaceGrid items={nfts} collections={[collection]} listings={data.listings} /> : <EmptyBlock title="No minted vault NFTs" body="Vault NFT cards appear here after confirmed mint transactions." />}
+
+          <SectionCard id="vault-list" title="Vault List">
+            {nfts.length ? (
+              <div className="grid gap-3">
+                {nfts.map((nft) => (
+                  <div key={nft.id} className="rounded-lg border border-vault-line bg-black/25 p-4">
+                    <div className="grid gap-4 md:grid-cols-[72px_minmax(0,1fr)_auto] md:items-start">
+                      <img src={nft.image} alt={nft.name} className="aspect-[4/5] w-16 rounded-md border border-vault-line object-cover" />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-black">{nft.name}</p>
+                          <StatusPill accent={nft.status === "Redeemable" ? "green" : nft.status === "Staked" ? "cyan" : "gold"}>{nft.status}</StatusPill>
+                        </div>
+                        <p className="mt-1 break-all text-xs text-slate-500">{nft.mint ?? nft.id}</p>
+                        <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
+                          <MiniMetric label="Locked" value={nft.lockedAmount || "N/A"} />
+                          <MiniMetric label="Unlock" value={nft.unlockDate || "N/A"} />
+                          <MiniMetric label="Rarity" value={nft.rarity || "N/A"} />
+                        </div>
+                        <ProtocolTrustStrip trust={vaultTrust(nft, collection)} compact className="mt-3" />
+                      </div>
+                      {nft.mint ? <Link href={`/vaults/${encodeURIComponent(nft.mint)}/proof`} className="inline-flex h-9 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-3 text-sm font-bold text-vault-green">Proof</Link> : <span className="text-sm text-slate-500">Proof N/A</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyBlock title="No minted vault NFTs" body="Vault rows appear after confirmed mint transactions are returned by the backend." />
+            )}
           </SectionCard>
+
+          <SectionCard id="activity" title="Activity Feed">
+            {activity.length || recentMints.length ? (
+              <div className="grid gap-3">
+                {[...activity, ...recentMints].slice(0, 12).map((item, index) => (
+                  <div key={activityKey(item, index)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-vault-line bg-black/25 p-4">
+                    <div>
+                      <p className="font-bold">{activityTitle(item)}</p>
+                      <p className="mt-1 break-all text-xs text-slate-500">{activityDetail(item)}</p>
+                    </div>
+                    <span className="text-sm font-black text-vault-green">{activityAmount(item)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyBlock title="No activity yet" body="Mint, stake, redeem, listing, and proof events appear only after the backend returns activity rows." />
+            )}
+          </SectionCard>
+
           <SectionCard id="raids" title="Raids">
             {raids.length ? <div className="grid gap-3">{raids.map((raid) => <RaidCard key={raid.id} raid={raid} collection={collection} />)}</div> : <EmptyBlock title="No raid rooms yet" body="Raid rooms will appear after this community schedules them." />}
           </SectionCard>
-        </div>
-        <aside className="space-y-5">
-          <SectionCard title="Reserve Proof">
+        </main>
+
+        <aside className="space-y-6">
+          <SectionCard title="Reserve & Risk">
             <div className="space-y-3">
-              <MiniStat label="Reserve health" value={collection.reserveHealth ?? "HEALTHY"} />
-              <MiniStat label="Available backing" value={`${formatTokenAmount(collection.availableBacking)} ${collection.symbol}`} />
-              <MiniStat label="Reserve PDA" value={collection.reserveVaultPda ?? "Pending launch"} />
-              <Link href={`/collections/${collection.id}`} className="inline-flex h-10 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">Collection Proof</Link>
+              <ProtocolTrustInline trust={trust} />
+              <MiniStat label="Reserve PDA" value={collection.reserveVaultPda ?? "N/A"} />
+              <MiniStat label="Collection asset" value={collection.collectionAssetAddress ?? "N/A"} />
+              <MiniStat label="Total staked" value={`${formatTokenAmount(collection.totalStaked)} ${collection.symbol}`} />
+              <MiniStat label="Total redeemed" value={`${formatTokenAmount(collection.totalRedeemed)} ${collection.symbol}`} />
             </div>
           </SectionCard>
+
+          <SectionCard title="Proof Link">
+            <p className="text-sm leading-6 text-slate-400">
+              Proof is vault-specific. When no minted vault exists, the protocol sends users to the proof explorer instead of showing a fabricated collection proof.
+            </p>
+            <Link href={proofHref} className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">Open Proof Explorer</Link>
+          </SectionCard>
+
           <SectionCard title="Strategy">
             <div className="space-y-3">
               <MiniStat label="Type" value={collection.strategy?.type ?? "PASSIVE"} />
               <MiniStat label="Status" value={collection.strategy?.status ?? "DRAFT"} />
               <MiniStat label="Approved" value={collection.strategy?.approvedByCreator ? "Yes" : "No"} />
               <p className="rounded-md border border-vault-line bg-black/25 p-3 text-xs font-bold text-slate-400">
-                Strategies are optional and deterministic. Execution is blocked unless approved, within limits, and backed by strategy treasury rather than locked reserves.
+                Strategies are optional. Execution is blocked unless approved, within limits, and separated from locked reserves.
               </p>
             </div>
           </SectionCard>
+
           <SectionCard id="traits" title="Trait Language">
             <div className="space-y-3">
-              {Object.entries(collection.traitLayers).map(([category, values]) => (
+              {Object.entries(collection.traitLayers ?? {}).map(([category, values]) => (
                 <div key={category} className="rounded-lg border border-vault-line bg-black/25 p-3">
                   <div className="flex justify-between gap-3 text-sm">
                     <span className="capitalize text-slate-400">{category}</span>
                     <span className="font-bold text-vault-green">{values.length}</span>
                   </div>
-                  <p className="mt-2 text-sm text-white">{values.slice(0, 2).join(", ")}</p>
+                  <p className="mt-2 text-sm text-white">{values.slice(0, 2).join(", ") || "N/A"}</p>
                 </div>
               ))}
             </div>
           </SectionCard>
-          <SectionCard title="Staking Chamber">
-            <StakeMomentAnimation state="idle" collectionImage={nfts[0]?.image ?? collection.image} tokenSymbol={collection.symbol} />
+
+          <SectionCard title="Staking Flow">
+            <TransactionFlow state="idle" title="Stake Vault NFT" description="Staking uses the wallet-owned eligible vault list and backend stake route." image={nfts[0]?.image ?? collection.image} tokenSymbol={collection.symbol} compact />
           </SectionCard>
         </aside>
       </div>
     </div>
   );
+}
+
+function formatBps(value: unknown) {
+  return typeof value === "number" ? `${(value / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%` : "N/A";
+}
+
+function shortAddress(value?: string | null, size = 6) {
+  if (!value) return "N/A";
+  if (value.length <= size * 2 + 3) return value;
+  return `${value.slice(0, size)}...${value.slice(-size)}`;
+}
+
+function activityKey(item: unknown, index: number) {
+  const record = activityRecord(item);
+  return String(record?.id ?? record?.signature ?? record?.mint ?? index);
+}
+
+function activityTitle(item: unknown) {
+  const record = activityRecord(item);
+  return String(record?.action ?? record?.type ?? record?.collectionName ?? record?.status ?? "Protocol activity");
+}
+
+function activityDetail(item: unknown) {
+  const record = activityRecord(item);
+  const actor = record?.actor ?? record?.wallet ?? record?.owner ?? record?.mint ?? record?.id;
+  const time = record?.time ?? record?.createdAt ?? record?.updatedAt ?? record?.lastVerifiedAt;
+  return [actor, time].filter(Boolean).map(String).join(" / ") || "N/A";
+}
+
+function activityAmount(item: unknown) {
+  const record = activityRecord(item);
+  const amount = record?.amount ?? record?.lockedAmount ?? record?.price ?? record?.status;
+  return amount === null || amount === undefined ? "N/A" : String(amount);
+}
+
+function activityRecord(item: unknown) {
+  return item && typeof item === "object" ? (item as Record<string, unknown>) : null;
 }
 
 function MarketplaceView({ data }: { data: ProductData }) {
@@ -596,7 +708,7 @@ function RaidsView({ data }: { data: ProductData }) {
       </div>
       <aside className="space-y-5">
         <SectionCard title="Reward Panel">
-          <RewardClaimAnimation state="idle" tokenSymbol="RAID" />
+          <TransactionFlow state="idle" title="Reward claim" description="Claim states remain idle until backend reward routes return real claim data." tokenSymbol="RAID" compact />
           <p className="mt-4 text-sm text-slate-300">Rewards and contributor rows appear from real raid mission and claim data. Join actions stay pending or error until a supported backend route confirms them.</p>
         </SectionCard>
       </aside>
@@ -665,6 +777,7 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
             <div className="grid gap-3">
               {eligibleVaults.map((vault) => {
                 const selected = (selectedVault?.id ?? "") === vault.id;
+                const vaultCollection = collections.find((collection) => collection.id === vault.collectionId || collection.dbId === vault.collectionId) ?? null;
                 return (
                   <div key={vault.id} className={cn("rounded-lg border p-4 transition", selected ? "border-vault-green bg-vault-green/10 shadow-green" : "border-vault-line bg-black/25 hover:border-vault-cyan/40")}>
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -679,6 +792,7 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
                       <MiniMetric label="Unlock" value={vault.unlockDate} />
                       <MiniMetric label="Position" value={vault.mint ? "Verified mint" : "N/A"} />
                     </div>
+                    <ProtocolTrustStrip trust={vaultTrust(vault, vaultCollection)} compact className="mt-3" />
                     <div className="mt-3 flex flex-wrap gap-3">
                       <button type="button" onClick={() => setSelectedVaultId(vault.id)} className="inline-flex h-9 items-center rounded-md border border-vault-green/45 bg-vault-green/10 px-3 text-sm font-bold text-vault-green">
                         Select for staking

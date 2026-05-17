@@ -6,7 +6,8 @@ import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState, ErrorState, LoadingState, WalletDisconnectedState } from "@/components/ApiState";
 import { AnimatedButton } from "@/components/AnimatedButton";
-import { RedeemMomentAnimation, phewMomentStateFromTx } from "@/components/phew-moment-animations";
+import { TransactionFlow, transactionStateFromTxStatus, type TransactionFlowState } from "@/components/TransactionFlow";
+import { ProtocolTrustStrip, proofTrust, vaultTrust } from "@/components/protocol-trust";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { TransactionStatus, type TxStatus } from "@/components/TransactionStatus";
@@ -67,6 +68,7 @@ export default function RedeemPage() {
   const profileState = useApiResource<ProfileData>(walletPath, { enabled: wallet.connected && Boolean(wallet.address) });
   const profile = unwrapApiData(profileState.data);
   const nfts = profile?.nfts ?? [];
+  const collections = profile?.collections ?? [];
   const redeemableNfts = useMemo(() => nfts.filter((nft) => nft.status === "Redeemable" && Boolean(nft.mint)), [nfts]);
   const [selectedVaultId, setSelectedVaultId] = useState("");
   const selectedVault = redeemableNfts.find((nft) => nft.id === selectedVaultId) ?? redeemableNfts[0] ?? null;
@@ -77,7 +79,8 @@ export default function RedeemPage() {
   const [error, setError] = useState<string | null>(null);
   const proofMatchesSelection = Boolean(proof && selectedVault?.mint && proof.nftMint === selectedVault.mint);
   const proofAllowsRedeem = Boolean(proofMatchesSelection && proof?.redeemable && !proof.staked && proof.status !== "REDEEMED");
-  const animationState = error ? "error" : activeAction ? "loading" : phewMomentStateFromTx(redeemTx?.status);
+  const selectedCollection = selectedVault ? collections.find((collection) => collection.id === selectedVault.collectionId || collection.dbId === selectedVault.collectionId) : null;
+  const flowState = redeemFlowState(error, activeAction, txStatus, redeemTx?.status);
 
   async function loadProof(mint = selectedVault?.mint) {
     if (!mint) throw new Error("Select an eligible Vault NFT before checking proof.");
@@ -181,7 +184,14 @@ export default function RedeemPage() {
                 This page mirrors staking: it only shows Vault NFTs returned by the backend for the connected wallet, checks proof, then uses the real redeem build and submit routes.
               </p>
             </div>
-            <RedeemMomentAnimation state={animationState} collectionImage={selectedVault?.image} tokenSymbol={proof?.tokenSymbol ?? selectedVault?.tier ?? "PHEW"} />
+            <TransactionFlow
+              state={flowState}
+              title="Redeem Vault NFT"
+              description="Select a wallet-owned eligible NFT, check proof, build the redeem transaction, then submit through the backend."
+              image={selectedVault?.image}
+              tokenSymbol={proof?.tokenSymbol ?? selectedCollection?.symbol ?? selectedVault?.tier}
+              detail={error ?? redeemTx?.errorMessage ?? redeemTx?.status ?? null}
+            />
           </div>
         </section>
 
@@ -197,6 +207,7 @@ export default function RedeemPage() {
                   <div className="grid gap-3">
                     {redeemableNfts.map((vault) => {
                       const selected = selectedVault?.id === vault.id;
+                      const vaultCollection = collections.find((collection) => collection.id === vault.collectionId || collection.dbId === vault.collectionId) ?? null;
                       return (
                         <div key={vault.id} className={cn("rounded-lg border p-4 transition", selected ? "border-vault-green bg-vault-green/10 shadow-green" : "border-vault-line bg-black/25 hover:border-vault-cyan/40")}>
                           <div className="grid gap-4 md:grid-cols-[88px_minmax(0,1fr)_auto] md:items-center">
@@ -212,6 +223,7 @@ export default function RedeemPage() {
                                 <MiniMetric label="Unlock" value={vault.unlockDate || "N/A"} />
                                 <MiniMetric label="Rarity" value={vault.rarity || "N/A"} />
                               </div>
+                              <ProtocolTrustStrip trust={vaultTrust(vault, vaultCollection)} compact className="mt-3" />
                             </div>
                             <div className="flex flex-wrap gap-2 md:justify-end">
                               <button type="button" onClick={() => selectVault(vault)} className="inline-flex h-9 items-center rounded-md border border-vault-green/45 bg-vault-green/10 px-3 text-sm font-bold text-vault-green">
@@ -275,6 +287,7 @@ export default function RedeemPage() {
                 <SectionCard title="Proof">
                   {proofMatchesSelection && proof ? (
                     <div className="space-y-3">
+                      <ProtocolTrustStrip trust={proofTrust(proof)} compact />
                       <PreviewRow label="Collection" value={proof.collectionName} />
                       <PreviewRow label="Locked amount" value={`${proof.lockedAmount} ${proof.tokenSymbol}`} />
                       <PreviewRow label="Owner" value={proof.currentOwner ?? proof.dbOwnerSnapshot ?? "N/A"} />
@@ -348,6 +361,15 @@ function statusForRedeem(status: string): TxStatus {
   if (status === "CONFIRMED") return "confirmed";
   if (status === "FAILED" || status === "NEEDS_CORE_VERIFY") return "failed";
   return "pending";
+}
+
+function redeemFlowState(error: string | null, activeAction: string | null, txStatus: TxStatus, backendStatus?: string | null): TransactionFlowState {
+  if (error || txStatus === "failed") return "error";
+  if (activeAction === "proof" || activeAction === "build") return "preparing";
+  if (activeAction === "submit" && txStatus === "signing") return "signing";
+  if (activeAction === "submit") return "sending";
+  if (txStatus !== "idle") return transactionStateFromTxStatus(txStatus);
+  return transactionStateFromTxStatus(backendStatus);
 }
 
 function redeemStatusLabel(status: TxStatus, backendStatus?: string) {

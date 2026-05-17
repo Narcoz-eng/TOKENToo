@@ -142,7 +142,9 @@ export function PhewStat({
   );
 }
 
-export function PhewStatusBadge({ children, status = "idle" }: { children: ReactNode; status?: "idle" | "loading" | "success" | "error" | "warning" }) {
+type PhewStatusTone = "idle" | "loading" | "success" | "error" | "warning";
+
+export function PhewStatusBadge({ children, status = "idle" }: { children: ReactNode; status?: PhewStatusTone }) {
   const styles = {
     idle: "border-vault-line bg-black/30 text-slate-300",
     loading: "border-vault-cyan/50 bg-vault-cyan/10 text-vault-cyan",
@@ -151,6 +153,44 @@ export function PhewStatusBadge({ children, status = "idle" }: { children: React
     warning: "border-vault-gold/50 bg-vault-gold/10 text-vault-gold"
   }[status];
   return <span className={cn("inline-flex items-center rounded-md border px-2 py-1 text-xs font-black uppercase", styles)}>{children}</span>;
+}
+
+export function PhewBadge({ children, tone = "idle", className }: { children: ReactNode; tone?: PhewStatusTone; className?: string }) {
+  const styles = {
+    idle: "border-vault-line bg-black/30 text-slate-300",
+    loading: "border-vault-cyan/50 bg-vault-cyan/10 text-vault-cyan",
+    success: "border-vault-green/50 bg-vault-green/10 text-vault-green",
+    error: "border-vault-red/50 bg-vault-red/10 text-vault-red",
+    warning: "border-vault-gold/50 bg-vault-gold/10 text-vault-gold"
+  }[tone];
+  return <span className={cn("inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-black uppercase", styles, className)}>{children}</span>;
+}
+
+export function PhewStatus({
+  label,
+  value,
+  tone = "idle",
+  detail,
+  className
+}: {
+  label: string;
+  value: ReactNode;
+  tone?: PhewStatusTone;
+  detail?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("rounded-lg border border-vault-line bg-black/25 p-4", className)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
+          <p className="mt-1 break-words text-sm font-black text-white">{value}</p>
+        </div>
+        <PhewBadge tone={tone}>{tone}</PhewBadge>
+      </div>
+      {detail ? <p className="mt-2 text-xs leading-5 text-slate-400">{detail}</p> : null}
+    </div>
+  );
 }
 
 export function PhewStepper({ steps, activeIndex }: { steps: string[]; activeIndex: number }) {
@@ -280,6 +320,9 @@ export function PhewProofPanel({
     </PhewCard>
   );
 }
+
+export const VaultCard = PhewVaultCard;
+export const ProofPanel = PhewProofPanel;
 
 export type PhewAnimationState = "idle" | "loading" | "success" | "error";
 export type PhewAnimationMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "studio" | "reward" | "scan" | "layer";

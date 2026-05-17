@@ -3,7 +3,7 @@
 import { CheckCircle2, CircleAlert, Database, Image as ImageIcon, KeyRound, Layers3, RadioTower, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorState, LoadingState, SetupWarning } from "@/components/ApiState";
-import { StudioBibleAnimation } from "@/components/phew-moment-animations";
+import { TransactionFlow } from "@/components/TransactionFlow";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { useApiResource } from "@/hooks/useApiResource";
@@ -85,6 +85,7 @@ export default function AdminSetupPage() {
   const providers = imageProviders.data?.providers ?? [];
   const readyCount = data?.setupChecklist?.items?.filter((item) => item.ok).length ?? 0;
   const totalCount = data?.setupChecklist?.items?.length ?? 0;
+  const productionBlockers = productionBlockerRows(data);
 
   return (
     <AppShell active="setup">
@@ -104,7 +105,14 @@ export default function AdminSetupPage() {
                 This dashboard only reads system routes. It does not trigger image generation, retries, or paid provider calls on render.
               </p>
             </div>
-            <StudioBibleAnimation state={data?.publicReadiness?.professionalPreviewReady ? "success" : "idle"} tokenSymbol="SETUP" />
+            <TransactionFlow
+              state={data?.publicReadiness?.professionalPreviewReady ? "success" : "idle"}
+              title="Setup readiness"
+              description="Read-only system status. No image generation, retries, or paid provider calls are triggered."
+              tokenSymbol="SETUP"
+              detail={data?.warnings?.[0] ?? null}
+              compact
+            />
           </div>
         </section>
 
@@ -124,6 +132,14 @@ export default function AdminSetupPage() {
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_460px]">
               <main className="space-y-6">
+                <SectionCard title="Provider Status">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <SetupReadiness label="Active image provider" ok={Boolean(imageProviders.data?.active?.provider)} value={imageProviders.data?.active?.provider ?? "N/A"} />
+                    <SetupReadiness label="Provider auth" ok={Boolean(imageProviders.data?.active?.authPresent)} value={imageProviders.data?.active?.authPresent ? "Present" : "N/A"} />
+                    <SetupReadiness label="Studio Bible generation" ok={Boolean(imageProviders.data?.active?.canGenerateStudioBible)} value={imageProviders.data?.active?.canGenerateStudioBible ? "Available" : "Gated"} />
+                  </div>
+                </SectionCard>
+
                 <SectionCard title="Setup Modes">
                   <div className="grid gap-3 md:grid-cols-3">
                     {(data.setupModes ?? []).map((mode) => (
@@ -161,6 +177,37 @@ export default function AdminSetupPage() {
               </main>
 
               <aside className="space-y-6">
+                <SectionCard title="Staking Readiness">
+                  <div className="grid gap-2">
+                    <ReadinessLine label="Devnet transaction provider" ok={Boolean(data.capabilities?.solanaTransactionProviderDevnet)} />
+                    <ReadinessLine label="Program configured" ok={Boolean(data.capabilities?.devnetProgramConfigured)} />
+                    <ReadinessLine label="Program executable" ok={Boolean(data.capabilities?.programAccountExecutable)} />
+                    <ReadinessLine label="Minting available" ok={Boolean(data.publicReadiness?.mintingAvailable)} />
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">Production staking remains gated by backend policy until live custody and VaultPosition verification are enabled.</p>
+                </SectionCard>
+
+                <SectionCard title="Storage Readiness">
+                  <div className="grid gap-2">
+                    <ReadinessLine label="Permanent storage" ok={Boolean(data.capabilities?.permanentStorageConfigured)} />
+                    <ReadinessLine label="Production storage" ok={Boolean(data.capabilities?.productionStorageAvailable)} />
+                    <ReadinessLine label="Approved layer pack" ok={Boolean(data.capabilities?.approvedLayerPackAvailable)} />
+                    <ReadinessLine label="Token metadata writes" ok={Boolean(data.capabilities?.tokenMetadataAvailable)} />
+                  </div>
+                </SectionCard>
+
+                <SectionCard title="Production Blockers">
+                  {productionBlockers.length ? (
+                    <div className="grid gap-3">
+                      {productionBlockers.map((blocker) => (
+                        <div key={blocker} className="rounded-md border border-vault-gold/35 bg-vault-gold/10 p-3 text-sm text-vault-gold">{blocker}</div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-md border border-vault-green/35 bg-vault-green/10 p-3 text-sm text-vault-green">No production blockers reported by the current system route.</p>
+                  )}
+                </SectionCard>
+
                 <SectionCard title="Core Capabilities">
                   <div className="grid gap-2">
                     {capabilityRows.map((row) => {
@@ -225,6 +272,29 @@ function SetupStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function SetupReadiness({ label, ok, value }: { label: string; ok: boolean; value: string }) {
+  return (
+    <div className={cn("rounded-lg border p-4", ok ? "border-vault-green/35 bg-vault-green/10" : "border-vault-line bg-black/25")}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs uppercase text-slate-500">{label}</p>
+          <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
+        </div>
+        {ok ? <CheckCircle2 className="size-5 shrink-0 text-vault-green" /> : <CircleAlert className="size-5 shrink-0 text-vault-gold" />}
+      </div>
+    </div>
+  );
+}
+
+function ReadinessLine({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-vault-line bg-black/25 p-3 text-sm">
+      <span className="text-slate-300">{label}</span>
+      <span className={ok ? "text-vault-green" : "text-vault-gold"}>{ok ? "Ready" : "N/A"}</span>
+    </div>
+  );
+}
+
 function ProviderRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3 border-b border-vault-line py-2 last:border-0">
@@ -232,4 +302,19 @@ function ProviderRow({ label, value }: { label: string; value: string }) {
       <span className="min-w-0 break-words text-right font-semibold text-white">{value}</span>
     </div>
   );
+}
+
+function productionBlockerRows(data?: CapabilitiesResponse | null) {
+  const blockers = new Set<string>();
+  for (const warning of data?.warnings ?? []) blockers.add(warning);
+  for (const mode of data?.setupModes ?? []) {
+    if (!mode.ready) {
+      for (const blocker of mode.blockedBy) blockers.add(`${mode.label}: ${blocker}`);
+    }
+  }
+  for (const item of data?.setupChecklist?.items ?? []) {
+    const productionRequired = item.requiredFor?.some((value) => /production|launch|mint/i.test(value)) ?? false;
+    if (!item.ok && productionRequired) blockers.add(item.fix ? `${item.label}: ${item.fix}` : item.label);
+  }
+  return [...blockers];
 }

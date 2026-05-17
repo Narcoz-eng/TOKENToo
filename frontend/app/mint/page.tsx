@@ -13,7 +13,8 @@ import { unwrapApiData } from "@/lib/api";
 import type { VaultCollection } from "@/lib/types";
 import { AnimatedButton } from "@/components/AnimatedButton";
 import { brandAssets } from "@/lib/brand-assets";
-import { MintMomentAnimation, type PhewMomentState } from "@/components/phew-moment-animations";
+import { TransactionFlow, transactionStateFromTxStatus, type TransactionFlowState } from "@/components/TransactionFlow";
+import { ProtocolTrustStrip, collectionTrust } from "@/components/protocol-trust";
 import { TransactionStatus, type TxStatus } from "@/components/TransactionStatus";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +61,7 @@ export default function MintPage() {
   const sliderValue = clampAmount(amount);
   const proofMint = mintState?.vaultNft?.mint ?? mintState?.nftMint ?? null;
   const finalImage = mintState?.assetUri ?? collection?.image ?? brandAssets.logo;
+  const flowState = mintFlowState(txStatus, mintState, error);
 
   async function createIntent() {
     if (!collection || !wallet.address) {
@@ -182,9 +184,17 @@ export default function MintPage() {
                     <HeroMetric label="Collection asset" value={collection.collectionAssetAddress ? short(collection.collectionAssetAddress) : "N/A"} />
                     <HeroMetric label="Reserve PDA" value={collection.reserveVaultPda ? short(collection.reserveVaultPda) : "N/A"} />
                   </div>
+                  <ProtocolTrustStrip trust={collectionTrust(collection)} className="mt-5 max-w-3xl" />
                 </div>
                 <div className="space-y-4">
-                  <MintMomentAnimation state={momentState(txStatus)} collectionImage={finalImage} tokenSymbol={collection.symbol} />
+                  <TransactionFlow
+                    state={flowState}
+                    title="Mint Vault NFT"
+                    description="Intent, transaction build, wallet signature, and backend confirmation use the real mint routes."
+                    image={finalImage}
+                    tokenSymbol={collection.symbol}
+                    detail={error ?? mintState?.errorMessage ?? mintState?.status ?? null}
+                  />
                   <ProjectedVaultCard image={finalImage} collection={collection} amount={amount} lockDurationDays={lockDurationDays} txStatus={txStatus} />
                 </div>
               </div>
@@ -196,6 +206,7 @@ export default function MintPage() {
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {mintableCollections.map((item) => {
                       const selected = (collectionId ? item.id === collectionId || item.dbId === collectionId : item.id === collection.id);
+                      const trust = collectionTrust(item);
                       return (
                         <button
                           key={item.dbId ?? item.id}
@@ -213,7 +224,10 @@ export default function MintPage() {
                               <p className="truncate font-black">{item.name}</p>
                               <p className="mt-1 truncate text-xs text-vault-green">{item.symbol} / {short(item.tokenMint, 6)}</p>
                             </div>
-                            <span className="absolute right-3 top-3"><StatusPill accent={selected ? "green" : "cyan"}>{selected ? "Selected" : "Verified"}</StatusPill></span>
+                            <span className="absolute right-3 top-3"><StatusPill accent={selected ? "green" : trust.verified ? "cyan" : "gold"}>{selected ? "Selected" : trust.verified ? "Verified" : "Pending"}</StatusPill></span>
+                          </div>
+                          <div className="p-3">
+                            <ProtocolTrustStrip trust={trust} compact />
                           </div>
                         </button>
                       );
@@ -301,6 +315,7 @@ export default function MintPage() {
                 <SectionCard title="Selected Community">
                   <h2 className="text-2xl font-black">{collection.name}</h2>
                   <p className="mt-2 break-words text-sm text-slate-400">{collection.tokenMint}</p>
+                  <ProtocolTrustStrip trust={collectionTrust(collection)} compact className="mt-4" />
                   <div className="mt-4 space-y-3">
                     <PreviewRow label="Launch status" value={collection.launchStatus ?? "N/A"} />
                     <PreviewRow label="Reserve health" value={collection.reserveHealth ?? "N/A"} />
@@ -390,11 +405,10 @@ function mintStatusLabel(status: TxStatus, backendStatus?: string) {
   return labels[status];
 }
 
-function momentState(status: TxStatus): PhewMomentState {
-  if (status === "validating" || status === "signing" || status === "pending") return "loading";
-  if (status === "confirmed") return "success";
-  if (status === "failed") return "error";
-  return "idle";
+function mintFlowState(status: TxStatus, transaction: MintTransaction | null, error: string | null): TransactionFlowState {
+  if (error || status === "failed") return "error";
+  if (status !== "idle") return transactionStateFromTxStatus(status);
+  return transactionStateFromTxStatus(transaction?.status);
 }
 
 function clampAmount(value: string) {

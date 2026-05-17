@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { LockKeyhole, Sparkles, UnlockKeyhole } from "lucide-react";
+import { LockKeyhole, Sparkles, UnlockKeyhole, type LucideIcon } from "lucide-react";
 import { AnimatedButton } from "./AnimatedButton";
-import { RewardClaimAnimation, StakeMomentAnimation, UnstakeMomentAnimation, type PhewMomentState } from "./phew-moment-animations";
-import { ProgressBar } from "./ProgressBar";
+import { TransactionFlow, type TransactionFlowState } from "./TransactionFlow";
 import { TransactionStatus, type TxStatus } from "./TransactionStatus";
 
 type FlowResult = { ok?: boolean; message?: string };
@@ -14,15 +13,15 @@ async function defaultUnavailable(): Promise<FlowResult> {
 }
 
 export function StakeFlow({ onStake = defaultUnavailable, collectionImage, tokenSymbol }: { onStake?: () => Promise<FlowResult>; collectionImage?: string | null; tokenSymbol?: string | null }) {
-  return <BaseFlow title="Stake vault" idleLabel="Ready to stake an eligible wallet NFT" pendingLabel="Submitting stake request" successLabel="Stake confirmed" buttonLabel="Stake" icon={LockKeyhole} animation="stake" onRun={onStake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
+  return <BaseFlow title="Stake vault" idleLabel="Ready to stake an eligible wallet NFT" pendingLabel="Submitting stake request" successLabel="Stake confirmed" buttonLabel="Stake" icon={LockKeyhole} onRun={onStake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
 }
 
 export function UnstakeFlow({ onUnstake = defaultUnavailable, collectionImage, tokenSymbol }: { onUnstake?: () => Promise<FlowResult>; collectionImage?: string | null; tokenSymbol?: string | null }) {
-  return <BaseFlow title="Unstake vault" idleLabel="Ready to unstake an active position" pendingLabel="Submitting unstake request" successLabel="Unstake confirmed" buttonLabel="Unstake" icon={UnlockKeyhole} animation="unstake" onRun={onUnstake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
+  return <BaseFlow title="Unstake vault" idleLabel="Ready to unstake an active position" pendingLabel="Submitting unstake request" successLabel="Unstake confirmed" buttonLabel="Unstake" icon={UnlockKeyhole} onRun={onUnstake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
 }
 
 export function ClaimRewardsFlow({ onClaim = defaultUnavailable, collectionImage, tokenSymbol }: { onClaim?: () => Promise<FlowResult>; collectionImage?: string | null; tokenSymbol?: string | null }) {
-  return <BaseFlow title="Claim rewards" idleLabel="Rewards available when API reports them" pendingLabel="Claiming rewards" successLabel="Rewards claimed" buttonLabel="Claim" icon={Sparkles} animation="claim" onRun={onClaim} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
+  return <BaseFlow title="Claim rewards" idleLabel="Rewards available when API reports them" pendingLabel="Claiming rewards" successLabel="Rewards claimed" buttonLabel="Claim" icon={Sparkles} onRun={onClaim} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
 }
 
 function BaseFlow({
@@ -32,7 +31,6 @@ function BaseFlow({
   successLabel,
   buttonLabel,
   icon,
-  animation,
   onRun,
   collectionImage,
   tokenSymbol
@@ -42,46 +40,44 @@ function BaseFlow({
   pendingLabel: string;
   successLabel: string;
   buttonLabel: string;
-  icon: typeof LockKeyhole;
-  animation: "stake" | "unstake" | "claim";
+  icon: LucideIcon;
   onRun: () => Promise<FlowResult>;
   collectionImage?: string | null;
   tokenSymbol?: string | null;
 }) {
   const [status, setStatus] = useState<TxStatus>("idle");
+  const [flowState, setFlowState] = useState<TransactionFlowState>("idle");
   const [detail, setDetail] = useState<string | null>(null);
 
   async function run() {
-    setStatus("pending");
+    setStatus("validating");
+    setFlowState("preparing");
     setDetail(null);
     try {
+      await Promise.resolve();
+      setStatus("pending");
+      setFlowState("sending");
       const result = await onRun();
       setStatus("confirmed");
+      setFlowState("success");
       setDetail(result.message ?? null);
     } catch (error) {
       setStatus("failed");
+      setFlowState("error");
       setDetail(error instanceof Error ? error.message : "Transaction failed");
     }
   }
 
+  const busy = flowState === "preparing" || flowState === "signing" || flowState === "sending" || flowState === "confirming";
+
   return (
     <div className="space-y-3">
       <p className="text-sm font-black uppercase text-white">{title}</p>
-      {animation === "stake" ? <StakeMomentAnimation state={momentState(status)} collectionImage={collectionImage} tokenSymbol={tokenSymbol} /> : null}
-      {animation === "unstake" ? <UnstakeMomentAnimation state={momentState(status)} collectionImage={collectionImage} tokenSymbol={tokenSymbol} /> : null}
-      {animation === "claim" ? <RewardClaimAnimation state={momentState(status)} collectionImage={collectionImage} tokenSymbol={tokenSymbol} /> : null}
-      {status === "pending" ? <ProgressBar value={62} label={pendingLabel} /> : null}
-      <TransactionStatus status={status} label={status === "pending" ? pendingLabel : status === "confirmed" ? successLabel : status === "failed" ? "Action failed" : idleLabel} detail={detail} />
-      <AnimatedButton tone="outline" icon={icon} loading={status === "pending"} success={status === "confirmed"} onClick={run}>
+      <TransactionFlow state={flowState} title={title} description={idleLabel} image={collectionImage} tokenSymbol={tokenSymbol} detail={detail} compact />
+      <TransactionStatus status={status} label={status === "pending" || status === "validating" ? pendingLabel : status === "confirmed" ? successLabel : status === "failed" ? "Action failed" : idleLabel} detail={detail} />
+      <AnimatedButton tone="outline" icon={icon} loading={busy} success={status === "confirmed"} onClick={run}>
         {buttonLabel}
       </AnimatedButton>
     </div>
   );
-}
-
-function momentState(status: TxStatus): PhewMomentState {
-  if (status === "pending" || status === "validating" || status === "signing") return "loading";
-  if (status === "confirmed") return "success";
-  if (status === "failed") return "error";
-  return "idle";
 }

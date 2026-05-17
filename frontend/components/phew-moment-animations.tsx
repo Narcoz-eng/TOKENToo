@@ -22,42 +22,6 @@ type StoryStep = {
   kind: "scan" | "transfer" | "validate" | "lock" | "success" | "reward" | "redeem" | "launch" | "studio";
 };
 
-const stakeSteps: StoryStep[] = [
-  { title: "Stake initiated", caption: "You are staking your NFT", kind: "scan" },
-  { title: "Transferring", caption: "Sending NFT to the vault", kind: "transfer" },
-  { title: "Validating", caption: "Verifying ownership on-chain", kind: "validate" },
-  { title: "Locking", caption: "Locking NFT in staking vault", kind: "lock" },
-  { title: "Stake confirmed", caption: "Backend confirmed the stake", kind: "success" },
-  { title: "Rewards active", caption: "Rewards can accrue from real positions", kind: "reward" }
-];
-
-const unstakeSteps: StoryStep[] = [
-  { title: "Unstake initiated", caption: "Position selected", kind: "scan" },
-  { title: "Unlocking", caption: "Opening staking vault", kind: "lock" },
-  { title: "Validating", caption: "Checking staking position", kind: "validate" },
-  { title: "Returning", caption: "Moving NFT back to wallet", kind: "transfer" },
-  { title: "Unstake confirmed", caption: "Backend confirmed release", kind: "success" },
-  { title: "Vault ready", caption: "NFT can be held or redeemed", kind: "redeem" }
-];
-
-const redeemSteps: StoryStep[] = [
-  { title: "Redeem initiated", caption: "Eligible wallet NFT selected", kind: "scan" },
-  { title: "Proof check", caption: "Reading vault proof", kind: "validate" },
-  { title: "Build transaction", caption: "Backend builds redeem tx", kind: "transfer" },
-  { title: "Wallet signature", caption: "Awaiting owner signature", kind: "lock" },
-  { title: "Redeem confirmed", caption: "Tokens released by backend", kind: "success" },
-  { title: "NFT closed", caption: "Redeem state is final", kind: "redeem" }
-];
-
-const mintSteps: StoryStep[] = [
-  { title: "Terms validated", caption: "Amount and community checked", kind: "scan" },
-  { title: "Tokens locked", caption: "Reserve position prepared", kind: "lock" },
-  { title: "Mint built", caption: "Transaction returned by backend", kind: "transfer" },
-  { title: "Wallet signed", caption: "Owner approved mint", kind: "validate" },
-  { title: "Vault minted", caption: "NFT exists with proof", kind: "success" },
-  { title: "Proof ready", caption: "Open reserve explorer", kind: "reward" }
-];
-
 const proofSteps: StoryStep[] = [
   { title: "Proof lookup", caption: "Vault mint loaded", kind: "scan" },
   { title: "Owner check", caption: "Owner proof inspected", kind: "validate" },
@@ -80,29 +44,6 @@ const studioSteps: StoryStep[] = [
   { title: "Studio Bible", caption: "Generated assets ready", kind: "success" }
 ];
 
-const rewardSteps: StoryStep[] = [
-  { title: "Claim requested", caption: "Real staking position selected", kind: "scan" },
-  { title: "Reward read", caption: "Backend calculates claim", kind: "validate" },
-  { title: "Claim confirmed", caption: "Result returned by backend", kind: "success" },
-  { title: "Rewards updated", caption: "Refresh positions", kind: "reward" }
-];
-
-export function MintMomentAnimation(props: PhewMomentProps) {
-  return <MomentStoryboard {...props} moment="mint" defaultTitle="Mint Vault NFT" steps={mintSteps} />;
-}
-
-export function StakeMomentAnimation(props: PhewMomentProps) {
-  return <MomentStoryboard {...props} moment="stake" defaultTitle="Stake NFT" steps={stakeSteps} />;
-}
-
-export function UnstakeMomentAnimation(props: PhewMomentProps) {
-  return <MomentStoryboard {...props} moment="unstake" defaultTitle="Unstake NFT" steps={unstakeSteps} />;
-}
-
-export function RedeemMomentAnimation(props: PhewMomentProps) {
-  return <MomentStoryboard {...props} moment="redeem" defaultTitle="Redeem NFT" steps={redeemSteps} />;
-}
-
 export function ProofVerifiedAnimation(props: PhewMomentProps) {
   return <MomentStoryboard {...props} moment="proof" defaultTitle="Proof Verified" steps={proofSteps} />;
 }
@@ -113,10 +54,6 @@ export function CommunityLaunchAnimation(props: PhewMomentProps) {
 
 export function StudioBibleAnimation(props: PhewMomentProps) {
   return <MomentStoryboard {...props} moment="studio" defaultTitle="Studio Bible Generated" steps={studioSteps} />;
-}
-
-export function RewardClaimAnimation(props: PhewMomentProps) {
-  return <MomentStoryboard {...props} moment="reward" defaultTitle="Reward Claim" steps={rewardSteps} />;
 }
 
 function MomentStoryboard({
@@ -258,15 +195,6 @@ function getActiveIndex(state: PhewMomentState, total: number) {
   if (state === "success") return total - 1;
   if (state === "error") return Math.max(0, total - 2);
   return Math.max(1, Math.min(total - 2, Math.ceil(total / 2)));
-}
-
-export function phewMomentStateFromTx(status?: string | null): PhewMomentState {
-  if (!status) return "idle";
-  const normalized = status.toLowerCase();
-  if (["confirmed", "success", "complete", "completed", "redeemed", "staked", "unstaked"].some((item) => normalized.includes(item))) return "success";
-  if (["fail", "error", "rejected", "skipped", "needs"].some((item) => normalized.includes(item))) return "error";
-  if (["pending", "validating", "signing", "processing", "building", "loading", "submitting"].some((item) => normalized.includes(item))) return "loading";
-  return "idle";
 }
 
 export function phewMomentStyle(vars: Record<string, string | number>): CSSProperties {

@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { BadgeCheck, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { VaultCollection } from "@/lib/types";
 import { riskAccent } from "@/lib/risk";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
+import { ProtocolTrustStrip, collectionTrust } from "./protocol-trust";
 
 export function CollectionCard({ collection }: { collection: VaultCollection }) {
   const [primary = "#baff00", secondary = "#16d7d2"] = collection.palette;
+  const trust = collectionTrust(collection);
   const collectionStyle = {
     borderColor: `${primary}66`,
     background: `linear-gradient(180deg, ${secondary}14, rgba(7, 12, 21, 0.82))`
@@ -27,10 +29,10 @@ export function CollectionCard({ collection }: { collection: VaultCollection }) 
         <div>
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-white">{collection.name}</h3>
-            <BadgeCheck className="size-4 text-vault-green" />
           </div>
           <p className="text-sm text-slate-400">{collection.subtitle}</p>
           <p className="mt-2 text-xs text-vault-green">{collection.mascot} / {collection.mascotType}</p>
+          <ProtocolTrustStrip trust={trust} compact className="mt-3" />
           <div className="mt-3 flex gap-1" aria-label={`${collection.name} color palette`}>
             {collection.palette.slice(0, 5).map((color) => (
               <span key={color} className="h-1.5 flex-1 rounded-full" style={{ backgroundColor: color }} />

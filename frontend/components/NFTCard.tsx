@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Heart, LockKeyhole, Sparkles, TrendingUp } from "lucide-react";
+import { LockKeyhole, Sparkles, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import type { VaultCollection, VaultNft } from "@/lib/types";
 import { riskAccent } from "@/lib/risk";
@@ -7,6 +7,7 @@ import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
 import { TransactionStatus, type TxStatus } from "./TransactionStatus";
+import { ProtocolTrustStrip, vaultTrust } from "./protocol-trust";
 
 export function NFTCard({ nft, collection, listingId }: { nft: VaultNft; collection: VaultCollection; listingId?: string }) {
   const wallet = useWalletAuth();
@@ -15,6 +16,7 @@ export function NFTCard({ nft, collection, listingId }: { nft: VaultNft; collect
   const hasBacking = nft.backingSol > 0 && nft.priceSol > 0;
   const premium = hasBacking ? Math.round(((nft.priceSol - nft.backingSol) / nft.backingSol) * 100) : 0;
   const backingPercent = hasBacking ? Math.min(100, Math.round((nft.backingSol / nft.priceSol) * 100)) : 0;
+  const trust = vaultTrust(nft, collection);
 
   async function purchase() {
     setPurchaseError(null);
@@ -48,9 +50,6 @@ export function NFTCard({ nft, collection, listingId }: { nft: VaultNft; collect
         <div className="relative aspect-square overflow-hidden">
           <img src={nft.image} alt={nft.name} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
-          <button className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-md border border-white/15 bg-black/45 text-white transition hover:border-vault-green/50 hover:text-vault-green" aria-label="Add to watchlist">
-            <Heart className="size-4" />
-          </button>
           <span className="absolute left-3 top-3 rounded-md border border-vault-green/40 bg-black/55 px-2 py-1 text-xs font-black uppercase text-vault-green">{collection.symbol} Vault</span>
           <span className="absolute bottom-3 left-3">
             <StatusPill accent={riskAccent(collection.riskTier)}>{collection.riskTier}</StatusPill>
@@ -73,6 +72,7 @@ export function NFTCard({ nft, collection, listingId }: { nft: VaultNft; collect
             ))}
             <span className="rounded-md border border-vault-green/20 bg-vault-green/10 px-2 py-1 text-[11px] font-bold text-vault-green">{nft.rank}</span>
           </div>
+          <ProtocolTrustStrip trust={trust} compact className="mt-3" />
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
