@@ -61,7 +61,7 @@ export default function MintPage() {
   const sliderValue = clampAmount(amount);
   const proofMint = mintState?.vaultNft?.mint ?? mintState?.nftMint ?? null;
   const finalImage = mintState?.assetUri ?? collection?.image ?? null;
-  const flowState = mintFlowState(txStatus, mintState, error);
+  const flowState: TransactionFlowState = !wallet.connected ? "wallet-disconnected" : mintFlowState(txStatus, mintState, error);
 
   async function createIntent() {
     if (!collection || !wallet.address) {
@@ -330,13 +330,13 @@ export default function MintPage() {
                     </div>
                     {error ? <div className="rounded-md border border-vault-red/40 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</div> : null}
                     <div className="grid gap-3 md:grid-cols-3">
-                      <AnimatedButton type="button" onClick={createIntent} loading={loading && txStatus === "validating"} className="h-12" icon={ArrowRight}>
+                      <AnimatedButton type="button" onClick={createIntent} loading={loading && txStatus === "validating"} className="h-12" iconAsset={brandAssets.tokenObject}>
                         Create Intent
                       </AnimatedButton>
-                      <AnimatedButton type="button" tone="outline" onClick={buildTransaction} disabled={loading || !mintState?.id} className="h-12">
+                      <AnimatedButton type="button" tone="outline" onClick={buildTransaction} disabled={loading || !mintState?.id} className="h-12" iconAsset={brandAssets.energyBeam}>
                         Build Tx
                       </AnimatedButton>
-                      <AnimatedButton type="button" tone="outline" onClick={signAndSubmit} disabled={loading || !mintState?.unsignedTransaction?.base64UnsignedTransaction} className="h-12">
+                      <AnimatedButton type="button" tone="outline" onClick={signAndSubmit} disabled={loading || !mintState?.unsignedTransaction?.base64UnsignedTransaction} className="h-12" iconAsset={brandAssets.vaultSafe}>
                         Sign + Submit
                       </AnimatedButton>
                     </div>

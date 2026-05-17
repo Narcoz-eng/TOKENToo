@@ -5,6 +5,7 @@ import { Bell, ChevronDown, Command, RadioTower, Search, ShieldCheck } from "luc
 import { WalletButton } from "./WalletButton";
 import { useWalletDisplay } from "@/hooks/useWalletDisplay";
 import { BrandLogo } from "./BrandLogo";
+import { brandAssets } from "@/lib/brand-assets";
 
 export function TopBar() {
   const wallet = useWalletDisplay();
@@ -38,12 +39,12 @@ export function TopBar() {
           <Bell className="size-4" />
           <span className="absolute right-2 top-2 size-2 rounded-full bg-vault-green shadow-green" />
         </button>
-        <Link href="/profile" className="hidden h-10 items-center gap-2 rounded-md border border-vault-line bg-black/35 px-2 pr-3 sm:flex">
+        <Link href="/my-vaults" className="hidden h-10 items-center gap-2 rounded-md border border-vault-line bg-black/35 px-2 pr-3 sm:flex">
           <span className="grid size-8 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10 text-vault-green">
-            <ShieldCheck className="size-4" />
+            <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />
           </span>
           <div className="text-sm">
-            <p className="font-semibold">{wallet.connected ? wallet.label : "Profile"}</p>
+            <p className="font-semibold">{wallet.connected ? wallet.label : "My Vaults"}</p>
             <p className="text-xs text-vault-green">{wallet.connected ? "Wallet connected" : "Connect wallet"}</p>
           </div>
           <ChevronDown className="size-4 text-slate-400" />

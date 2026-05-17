@@ -552,7 +552,7 @@ export default function CreateCollectionPage() {
   const studioMomentState = error ? "error" : loading ? "loading" : hasAllStudioBibleAssets(studioPreview) ? "success" : "idle";
 
   return (
-    <AppShell active="create">
+    <AppShell active="studio">
       <div className="space-y-6">
         <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6 lg:p-8">
           <img src={brandAssets.launchHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-48" />

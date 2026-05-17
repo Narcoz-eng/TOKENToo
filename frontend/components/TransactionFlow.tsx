@@ -1,11 +1,11 @@
 "use client";
 
-import { CheckCircle2, CircleAlert, Flame, LockKeyhole, PackageCheck, RadioTower, ShieldCheck, Sparkles, Vault, WalletCards, Zap } from "lucide-react";
+import { CheckCircle2, CircleAlert, LockKeyhole, RadioTower, ShieldCheck, Zap } from "lucide-react";
 import type { CSSProperties } from "react";
 import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
-export type TransactionFlowState = "idle" | "preparing" | "signing" | "sending" | "confirming" | "success" | "error";
+export type TransactionFlowState = "idle" | "wallet-disconnected" | "preparing" | "signing" | "submitting" | "sending" | "confirming" | "success" | "error";
 export type TransactionFlowMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "community-launch" | "studio" | "studio-bible" | "reward" | "scan";
 
 export type TransactionFlowStep = {
@@ -43,8 +43,9 @@ export function TransactionFlow({
   const visualMoment = normalizeMoment(moment ?? inferMoment(title));
   const scene = sceneForState(state);
   const activeIndex = sceneOrder.indexOf(scene === "ERROR" ? "INIT" : scene);
-  const TargetIcon = targetIcon(visualMoment);
   const telemetry = telemetryRows(visualMoment, state);
+  const actorAsset = actorAssetForState(state);
+  const targetAsset = targetAssetForState(visualMoment, state);
 
   return (
     <section className={cn("transaction-flow phew-flow-scene", compact && "phew-flow-scene-compact", className)} data-state={state} data-scene={scene} data-moment={visualMoment}>
@@ -84,7 +85,7 @@ export function TransactionFlow({
 
         <div className="phew-flow-actor" aria-hidden="true">
           <span className="phew-flow-actor-aura" />
-          <img src={brandAssets.mascot} alt="" className="phew-flow-mascot" />
+          <img src={actorAsset} alt="" className="phew-flow-mascot" />
         </div>
 
         <div className="phew-flow-nft" aria-hidden="true">
@@ -92,19 +93,14 @@ export function TransactionFlow({
           {image ? (
             <img src={image} alt="" className="h-full w-full rounded-md object-cover" />
           ) : (
-            <div className="grid h-full w-full place-items-center rounded-md bg-[radial-gradient(circle_at_50%_25%,rgba(186,255,0,0.22),rgba(0,0,0,0.86)_62%)]">
-              <div className="text-center">
-                <WalletCards className="mx-auto size-7 text-vault-green" />
-                <p className="mt-2 text-[10px] font-black uppercase text-vault-green">NFT</p>
-              </div>
-            </div>
+            <img src={brandAssets.nftSlot} alt="" className="h-full w-full rounded-md object-contain p-1" />
           )}
           <span>{tokenSymbol || "PHEW"}</span>
         </div>
 
         <div className="phew-flow-target" aria-hidden="true">
           <span className="phew-flow-target-core" />
-          <TargetIcon className="size-12" />
+          <img src={targetAsset} alt="" className="size-14 object-contain" />
           <span>{targetLabel(visualMoment)}</span>
         </div>
 
@@ -138,17 +134,6 @@ export function TransactionFlow({
       ) : null}
     </section>
   );
-}
-
-function targetIcon(moment: ReturnType<typeof normalizeMoment>) {
-  if (moment === "stake" || moment === "mint") return Vault;
-  if (moment === "redeem") return Vault;
-  if (moment === "unstake") return Flame;
-  if (moment === "proof") return ShieldCheck;
-  if (moment === "reward") return Sparkles;
-  if (moment === "community" || moment === "scan") return RadioTower;
-  if (moment === "studio") return PackageCheck;
-  return Vault;
 }
 
 function targetLabel(moment: ReturnType<typeof normalizeMoment>) {
@@ -272,8 +257,22 @@ function sceneForState(state: TransactionFlowState): FlowScene {
   if (state === "error") return "ERROR";
   if (state === "confirming") return "LOCK";
   if (state === "preparing") return "VALIDATE";
-  if (state === "signing" || state === "sending") return "TRANSFER";
+  if (state === "signing" || state === "sending" || state === "submitting") return "TRANSFER";
   return "INIT";
+}
+
+function actorAssetForState(state: TransactionFlowState) {
+  if (state === "success") return brandAssets.mascotPoses.success;
+  if (state === "error") return brandAssets.mascotPoses.error;
+  if (state === "signing" || state === "submitting" || state === "sending" || state === "confirming") return brandAssets.mascotPoses.point;
+  return brandAssets.mascotPoses.run;
+}
+
+function targetAssetForState(moment: ReturnType<typeof normalizeMoment>, state: TransactionFlowState) {
+  if (state === "error") return brandAssets.errorGlitch;
+  if (state === "success") return brandAssets.proofRing;
+  if (state === "wallet-disconnected") return brandAssets.vaultSafe;
+  return brandAssets.transactionObjects[moment];
 }
 
 export function transactionStateFromTxStatus(status: string | null | undefined): TransactionFlowState {
@@ -281,9 +280,10 @@ export function transactionStateFromTxStatus(status: string | null | undefined):
   const normalized = status.toLowerCase();
   if (["confirmed", "success", "complete", "completed", "redeemed", "staked", "unstaked"].some((item) => normalized.includes(item))) return "success";
   if (["fail", "error", "rejected", "skipped", "needs", "not_implemented", "unavailable", "no_adapter", "not_paid", "accounted_not_paid"].some((item) => normalized.includes(item))) return "error";
+  if (["wallet_disconnected", "wallet disconnected", "wallet_required", "wallet required", "disconnected"].some((item) => normalized.includes(item))) return "wallet-disconnected";
   if (["signing", "signature"].some((item) => normalized.includes(item))) return "signing";
-  if (["sending", "submitting", "submitted"].some((item) => normalized.includes(item))) return "sending";
-  if (["confirming", "pending"].some((item) => normalized.includes(item))) return "confirming";
+  if (["sending", "submitting", "submitted", "pending"].some((item) => normalized.includes(item))) return "submitting";
+  if (["confirming"].some((item) => normalized.includes(item))) return "confirming";
   if (["validating", "building", "preparing", "processing", "loading"].some((item) => normalized.includes(item))) return "preparing";
   return "idle";
 }
@@ -291,9 +291,11 @@ export function transactionStateFromTxStatus(status: string | null | undefined):
 function flowStatusLabel(state: TransactionFlowState) {
   const labels: Record<TransactionFlowState, string> = {
     idle: "Init",
+    "wallet-disconnected": "Wallet locked",
     preparing: "Validate",
     signing: "Transfer",
-    sending: "Transfer",
+    submitting: "Submit",
+    sending: "Submit",
     confirming: "Lock",
     success: "Success",
     error: "Error"
@@ -304,6 +306,7 @@ function flowStatusLabel(state: TransactionFlowState) {
 function badgeClass(state: TransactionFlowState) {
   if (state === "success") return "border-vault-green/70 bg-vault-green/15 text-vault-green shadow-green";
   if (state === "error") return "border-vault-red/70 bg-vault-red/15 text-vault-red";
+  if (state === "wallet-disconnected") return "border-vault-gold/65 bg-vault-gold/12 text-vault-gold";
   if (state === "idle") return "border-vault-line bg-black/30 text-slate-300";
   return "border-vault-cyan/55 bg-vault-cyan/12 text-vault-cyan";
 }
@@ -311,8 +314,9 @@ function badgeClass(state: TransactionFlowState) {
 function stateIcon(state: TransactionFlowState) {
   if (state === "success") return <CheckCircle2 className="size-3.5" />;
   if (state === "error") return <CircleAlert className="size-3.5" />;
+  if (state === "wallet-disconnected") return <LockKeyhole className="size-3.5" />;
   if (state === "confirming") return <LockKeyhole className="size-3.5" />;
   if (state === "preparing") return <ShieldCheck className="size-3.5" />;
-  if (state === "signing" || state === "sending") return <Zap className="size-3.5" />;
+  if (state === "signing" || state === "sending" || state === "submitting") return <Zap className="size-3.5" />;
   return <RadioTower className="size-3.5" />;
 }

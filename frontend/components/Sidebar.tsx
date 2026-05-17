@@ -23,35 +23,37 @@ import {
 import { cn } from "@/lib/utils";
 import { useWalletDisplay } from "@/hooks/useWalletDisplay";
 import { BrandLogo } from "./BrandLogo";
+import { brandAssets } from "@/lib/brand-assets";
 
 const navSections = [
   {
     title: "Main",
     items: [
-      { href: "/home", label: "Home", icon: Home, key: "home" },
-      { href: "/collections", label: "Collections", icon: Boxes, key: "collections" },
-      { href: "/mint", label: "Mint", icon: LockKeyhole, key: "mint" },
-      { href: "/staking", label: "Staking", icon: Coins, key: "staking" },
-      { href: "/redeem", label: "Redeem", icon: Undo2, key: "redeem" },
-      { href: "/proof", label: "Proof", icon: FileSearch, key: "proof" }
+      { href: "/home", label: "Home", icon: Home, asset: brandAssets.vaultSafe, key: "home" },
+      { href: "/collections", label: "Collections", icon: Boxes, asset: brandAssets.nftSlot, key: "collections" },
+      { href: "/mint", label: "Mint", icon: LockKeyhole, asset: brandAssets.tokenObject, key: "mint" },
+      { href: "/staking", label: "Staking", icon: Coins, asset: brandAssets.vaultSafe, key: "staking" },
+      { href: "/redeem", label: "Redeem", icon: Undo2, asset: brandAssets.redeemParticles, key: "redeem" },
+      { href: "/proof", label: "Proof", icon: FileSearch, asset: brandAssets.proofRing, key: "proof" }
     ]
   },
   {
     title: "Protocol",
     items: [
-      { href: "/profile", label: "My Vaults", icon: Users, key: "profile" },
-      { href: "/marketplace", label: "Marketplace", icon: WalletCards, key: "marketplace" },
-      { href: "/raids", label: "Raids", icon: Swords, key: "raids" },
-      { href: "/create-community", label: "Create Community", icon: PlusCircle, key: "create-community" },
-      { href: "/create-collection", label: "Studio", icon: PlusCircle, key: "create", badge: "New" }
+      { href: "/my-vaults", label: "My Vaults", icon: Users, asset: brandAssets.nftSlot, key: "my-vaults" },
+      { href: "/marketplace", label: "Marketplace", icon: WalletCards, asset: brandAssets.energyBeam, key: "marketplace" },
+      { href: "/raids", label: "Raids", icon: Swords, asset: brandAssets.rewardBurst, key: "raids" },
+      { href: "/leaderboard", label: "Leaderboard", icon: Trophy, asset: brandAssets.rewardBurst, key: "leaderboard" },
+      { href: "/create-community", label: "Create Community", icon: PlusCircle, asset: brandAssets.tokenObject, key: "create-community" },
+      { href: "/studio", label: "Studio", icon: PlusCircle, asset: brandAssets.energyBeam, key: "studio", badge: "New" }
     ]
   },
   {
     title: "Admin",
     items: [
-      { href: "/admin/setup", label: "Setup", icon: SlidersHorizontal, key: "setup" },
-      { href: "/admin/risk", label: "Risk", icon: ShieldAlert, key: "risk" },
-      { href: "/instant-sell", label: "Strategy", icon: Zap, key: "instant-sell" }
+      { href: "/admin/setup", label: "Setup", icon: SlidersHorizontal, asset: brandAssets.proofRing, key: "setup" },
+      { href: "/admin/risk", label: "Risk", icon: ShieldAlert, asset: brandAssets.errorGlitch, key: "risk" },
+      { href: "/strategy-engine", label: "Strategy", icon: Zap, asset: brandAssets.energyBeam, key: "strategy-engine" }
     ]
   }
 ];
@@ -83,6 +85,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
               <div className="space-y-1">
                 {section.items.map((item) => {
                   const Icon = item.icon;
+                  const asset = "asset" in item ? item.asset : null;
                   const selected = active === item.key;
                   return (
                     <Link
@@ -94,7 +97,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
                       )}
                     >
                       {selected ? <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r bg-vault-green shadow-green" /> : null}
-                      <Icon className={cn("size-4 transition group-hover:text-vault-green", selected ? "text-vault-green" : "text-slate-500")} />
+                      {asset ? <img src={asset} alt="" className={cn("size-5 shrink-0 object-contain transition group-hover:scale-110", selected ? "drop-shadow-[0_0_10px_rgba(186,255,0,0.65)]" : "opacity-70")} /> : <Icon className={cn("size-4 transition group-hover:text-vault-green", selected ? "text-vault-green" : "text-slate-500")} />}
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
                       {"badge" in item && item.badge ? <span className="rounded border border-vault-green/35 bg-vault-green/10 px-1.5 py-0.5 text-[9px] font-black uppercase text-vault-green">{item.badge}</span> : null}
                     </Link>

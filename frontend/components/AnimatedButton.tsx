@@ -5,12 +5,13 @@ import { cn } from "@/lib/utils";
 
 type AnimatedButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: LucideIcon;
+  iconAsset?: string;
   loading?: boolean;
   success?: boolean;
   tone?: "primary" | "outline" | "ghost" | "gold";
 };
 
-export function AnimatedButton({ children, className, icon: Icon, loading, success, tone = "primary", disabled, ...props }: AnimatedButtonProps) {
+export function AnimatedButton({ children, className, icon: Icon, iconAsset, loading, success, tone = "primary", disabled, ...props }: AnimatedButtonProps) {
   return (
     <button
       {...props}
@@ -25,7 +26,7 @@ export function AnimatedButton({ children, className, icon: Icon, loading, succe
         className
       )}
     >
-      {loading ? <Loader2 className="size-4 animate-spin" /> : Icon ? <Icon className="size-4" /> : null}
+      {loading ? <Loader2 className="size-4 animate-spin" /> : iconAsset ? <img src={iconAsset} alt="" className="size-5 object-contain" /> : Icon ? <Icon className="size-4" /> : null}
       <span>{children}</span>
     </button>
   );

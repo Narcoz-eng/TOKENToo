@@ -14,6 +14,7 @@ import { TransactionStatus, type TxStatus } from "@/components/TransactionStatus
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { apiFetch, unwrapApiData } from "@/lib/api";
+import { brandAssets } from "@/lib/brand-assets";
 import type { VaultCollection, VaultNft } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -80,7 +81,7 @@ export default function RedeemPage() {
   const proofMatchesSelection = Boolean(proof && selectedVault?.mint && proof.nftMint === selectedVault.mint);
   const proofAllowsRedeem = Boolean(proofMatchesSelection && proof?.redeemable && !proof.staked && proof.status !== "REDEEMED");
   const selectedCollection = selectedVault ? collections.find((collection) => collection.id === selectedVault.collectionId || collection.dbId === selectedVault.collectionId) : null;
-  const flowState = redeemFlowState(error, activeAction, txStatus, redeemTx?.status);
+  const flowState: TransactionFlowState = !wallet.connected ? "wallet-disconnected" : redeemFlowState(error, activeAction, txStatus, redeemTx?.status);
 
   async function loadProof(mint = selectedVault?.mint) {
     if (!mint) throw new Error("Select an eligible Vault NFT before checking proof.");
@@ -255,13 +256,13 @@ export default function RedeemPage() {
                   ) : null}
                   {error ? <div className="mt-4 rounded-md border border-vault-red/40 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</div> : null}
                   <div className="mt-5 flex flex-wrap gap-3">
-                    <AnimatedButton type="button" tone="outline" icon={FileSearch} loading={activeAction === "proof"} disabled={!selectedVault?.mint || activeAction !== null} onClick={() => void loadProof()}>
+                    <AnimatedButton type="button" tone="outline" iconAsset={brandAssets.proofRing} loading={activeAction === "proof"} disabled={!selectedVault?.mint || activeAction !== null} onClick={() => void loadProof()}>
                       Check Proof
                     </AnimatedButton>
-                    <AnimatedButton type="button" icon={Undo2} loading={activeAction === "build"} disabled={!selectedVault?.mint || activeAction !== null} onClick={buildRedeem}>
+                    <AnimatedButton type="button" iconAsset={brandAssets.redeemParticles} loading={activeAction === "build"} disabled={!selectedVault?.mint || activeAction !== null} onClick={buildRedeem}>
                       Build Redeem Tx
                     </AnimatedButton>
-                    <AnimatedButton type="button" tone="outline" icon={ShieldCheck} loading={activeAction === "submit"} disabled={!redeemTx?.unsignedTransaction?.base64UnsignedTransaction || activeAction !== null} onClick={signAndSubmit}>
+                    <AnimatedButton type="button" tone="outline" iconAsset={brandAssets.vaultSafe} loading={activeAction === "submit"} disabled={!redeemTx?.unsignedTransaction?.base64UnsignedTransaction || activeAction !== null} onClick={signAndSubmit}>
                       Sign + Submit
                     </AnimatedButton>
                     <button type="button" onClick={profileState.reload} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-300">
@@ -423,7 +424,7 @@ function redeemFlowState(error: string | null, activeAction: string | null, txSt
   if (error || txStatus === "failed") return "error";
   if (activeAction === "proof" || activeAction === "build") return "preparing";
   if (activeAction === "submit" && txStatus === "signing") return "signing";
-  if (activeAction === "submit") return "sending";
+  if (activeAction === "submit") return "submitting";
   if (txStatus !== "idle") return transactionStateFromTxStatus(txStatus);
   return transactionStateFromTxStatus(backendStatus);
 }

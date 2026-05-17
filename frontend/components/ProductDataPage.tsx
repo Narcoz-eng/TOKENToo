@@ -34,7 +34,7 @@ import { StatCard } from "./StatCard";
 import { apiWarnings, unwrapApiData } from "@/lib/api";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
-import { TransactionFlow } from "./TransactionFlow";
+import { TransactionFlow, type TransactionFlowState } from "./TransactionFlow";
 import { ProtocolTrustInline, ProtocolTrustStrip, collectionTrust, vaultTrust } from "./protocol-trust";
 import { brandAssets } from "@/lib/brand-assets";
 import { CollectionGrid } from "./CollectionGrid";
@@ -115,6 +115,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   const pageMotionState = state.loading ? "loading" : state.error ? "error" : "idle";
   const pageMotionImage = data?.collection?.image ?? data?.collections?.[0]?.image ?? data?.nfts?.[0]?.image ?? null;
   const pageMotionSymbol = data?.collection?.symbol ?? data?.collections?.[0]?.symbol ?? data?.nfts?.[0]?.tier ?? "PHEW";
+  const showRouteHero = active !== "home" && !["staking"].includes(active);
   const visibleCollections = useMemo(() => {
     const collections = data?.collections ?? (data?.collection ? [data.collection] : []);
     const filtered = collections.filter((collection) => {
@@ -139,14 +140,14 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   return (
     <AppShell active={active} stats={data?.stats}>
       <div className="space-y-5">
-        {active !== "home" ? <section className="phew-panel phew-hero-canvas phew-scanline relative overflow-hidden rounded-lg p-5">
+        {showRouteHero ? <section className="phew-panel phew-hero-canvas phew-scanline relative overflow-hidden rounded-lg p-5">
           <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-y-0 right-0 hidden h-full w-3/5 object-cover opacity-30 mix-blend-screen lg:block" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/35" />
           <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center">
             <div className="min-w-0 max-w-4xl">
               <p className="text-sm font-black uppercase text-vault-green">PHEW.DEVNET / Faction OS</p>
               <h1 className="mt-2 max-w-[calc(100vw-4rem)] text-3xl font-black leading-tight sm:max-w-4xl sm:text-4xl">{title}</h1>
-              <p className="mt-2 max-w-[calc(100vw-4rem)] break-words text-sm text-slate-300 sm:max-w-3xl">{data?.subtitle ?? "Launch faction vaults, coordinate raids, and reward holders on Solana."}</p>
+              <p className="mt-2 max-w-[calc(100vw-4rem)] break-words text-sm text-slate-300 sm:max-w-3xl">{routeSubtitleForPage(active, data?.subtitle)}</p>
               <div className="mt-4">
                 <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
                   <UserPlus className="size-4" /> Create Community
@@ -172,7 +173,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
         {(!state.loading || active === "home" || showFallbackDuringLoad) && !state.error && renderData
           ? children
             ? children(renderData)
-            : renderProductView(endpoint, renderData, { query, setQuery, filter, setFilter, sort, setSort, visibleCollections, walletConnected: wallet.connected, walletAddress: wallet.address, reload: state.reload })
+            : renderProductView(endpoint, renderData, { active, query, setQuery, filter, setFilter, sort, setSort, visibleCollections, walletConnected: wallet.connected, walletAddress: wallet.address, reload: state.reload })
           : null}
       </div>
     </AppShell>
@@ -269,6 +270,7 @@ function renderProductView(
   endpoint: string,
   data: ProductData,
   controls: {
+    active: string;
     query: string;
     setQuery: (value: string) => void;
     filter: string;
@@ -281,13 +283,14 @@ function renderProductView(
     reload: () => void;
   }
 ) {
+  if (endpoint.includes("/instant-sell") || controls.active === "strategy-engine") return <StrategyEngineView data={data} walletConnected={controls.walletConnected} walletAddress={controls.walletAddress} />;
+  if (controls.active === "leaderboard") return <LeaderboardView data={data} />;
   if (endpoint.includes("/collections/") && !endpoint.includes("/raids")) return <CollectionDetailView data={data} />;
   if (endpoint.includes("/collections")) return <CollectionsView data={data} controls={controls} />;
   if (endpoint.includes("/marketplace")) return <MarketplaceView data={data} />;
   if (endpoint.includes("/raids")) return <RaidsView data={data} />;
   if (endpoint.includes("/staking")) return <StakingView data={data} reload={controls.reload} />;
   if (endpoint.includes("/profile")) return <ProfileView data={data} walletAddress={controls.walletAddress} />;
-  if (endpoint.includes("/instant-sell")) return <InstantSellView data={data} />;
   if (endpoint.includes("/admin/risk")) return <RiskAdminView data={data} />;
   if (endpoint.includes("/home")) return <HomeDashboardView data={data} />;
   return <DefaultProductView data={data} />;
@@ -309,19 +312,19 @@ function HomeDashboardView({ data }: { data: ProductData }) {
         <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-20 mix-blend-screen xl:w-[52%]" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/34" />
         <div className="absolute inset-0 grid-mask opacity-35" />
-        <div className="relative grid gap-8 p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_520px]">
+        <div className="relative grid gap-5 p-4 lg:p-5 xl:grid-cols-[minmax(0,1fr)_470px]">
           <div className="min-w-0 max-w-4xl">
             <div className="flex flex-wrap gap-2">
               <StatusPill accent="green">Protocol Dashboard</StatusPill>
               <StatusPill accent="cyan">Solana Vault NFTs</StatusPill>
             </div>
-            <h1 className="mt-5 max-w-[calc(100vw-4rem)] break-words text-[40px] font-black leading-tight sm:max-w-4xl sm:text-5xl lg:text-6xl">Real tokens. <span className="text-vault-green">Real backing. Real ownership.</span></h1>
-            <p className="mt-4 max-w-[calc(100vw-4rem)] text-lg text-slate-300 sm:max-w-2xl">The protocol for token-backed NFT vaults. Lock community tokens, mint verified vault NFTs, trade freely, stake for rewards, and redeem through proof.</p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/collections" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
+            <h1 className="mt-4 max-w-[calc(100vw-4rem)] break-words text-[40px] font-black leading-tight sm:max-w-4xl lg:text-5xl">Real tokens. <span className="text-vault-green">Real backing. Real ownership.</span></h1>
+            <p className="mt-3 max-w-[calc(100vw-4rem)] text-base text-slate-300 sm:max-w-2xl">The protocol for token-backed NFT vaults. Lock community tokens, mint verified vault NFTs, trade freely, stake for rewards, and redeem through proof.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="/collections" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
                 <Search className="size-4" /> Explore Collections
               </Link>
-              <Link href="/create-community" className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-black text-vault-green">
+              <Link href="/create-community" className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-black text-vault-green">
                 <UserPlus className="size-4" /> Create Community
               </Link>
             </div>
@@ -847,6 +850,10 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
   const firstActivePosition = activePositions[0];
   const firstPosition = getPositionId(firstActivePosition);
   const firstPositionMint = positionText(firstActivePosition, "vaultNft.mint");
+  const walletDisconnected = !wallet.connected;
+  const stakeBlockedReason = walletDisconnected ? "Connect a wallet before staking an owned Vault NFT." : !selectedVault ? "No eligible wallet-owned Vault NFT is available from the backend." : null;
+  const unstakeBlockedReason = walletDisconnected ? "Connect a wallet before unstaking." : !firstPosition ? "No active staking position is available from the backend." : null;
+  const rewardsBlockedReason = walletDisconnected ? "Connect a wallet before claiming rewards." : !firstPosition ? "No active staking position is available for reward claims." : null;
 
   async function stakeVault(): Promise<{ message?: string }> {
     if (!wallet.connected) throw new Error("Connect and authenticate your wallet before staking.");
@@ -953,9 +960,9 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
       </div>
       <SectionCard title="Transaction Flows">
         <div className="space-y-5">
-          <StakeFlow onStake={stakeVault} collectionImage={selectedVault?.image} tokenSymbol={selectedCollection?.symbol ?? selectedVault?.tier} />
-          <UnstakeFlow onUnstake={unstakeVault} collectionImage={selectedVault?.image} tokenSymbol={selectedCollection?.symbol ?? selectedVault?.tier} />
-          <ClaimRewardsFlow onClaim={claimRewards} collectionImage={selectedVault?.image} tokenSymbol={selectedCollection?.symbol ?? selectedVault?.tier} />
+          <StakeFlow onStake={stakeVault} collectionImage={selectedVault?.image} tokenSymbol={selectedCollection?.symbol ?? selectedVault?.tier} disabled={Boolean(stakeBlockedReason)} disabledReason={stakeBlockedReason} walletDisconnected={walletDisconnected} />
+          <UnstakeFlow onUnstake={unstakeVault} collectionImage={selectedVault?.image} tokenSymbol={selectedCollection?.symbol ?? selectedVault?.tier} disabled={Boolean(unstakeBlockedReason)} disabledReason={unstakeBlockedReason} walletDisconnected={walletDisconnected} />
+          <ClaimRewardsFlow onClaim={claimRewards} collectionImage={selectedVault?.image} tokenSymbol={selectedCollection?.symbol ?? selectedVault?.tier} disabled={Boolean(rewardsBlockedReason)} disabledReason={rewardsBlockedReason} walletDisconnected={walletDisconnected} />
         </div>
       </SectionCard>
     </div>
@@ -964,43 +971,156 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
 
 function ProfileView({ data, walletAddress }: { data: ProductData; walletAddress?: string | null }) {
   const nfts = data.nfts ?? [];
+  const connected = Boolean(walletAddress);
   return (
     <div className="space-y-5">
       <SectionCard title="Wallet Profile">
         <div className="grid gap-4 md:grid-cols-3">
           <MiniStat label="Connected wallet" value={walletAddress ?? "Disconnected"} />
-          <MiniStat label="Owned vaults" value={formatMetric(nfts.length)} />
-          <MiniStat label="Activity rows" value={formatMetric((data.activity ?? []).length)} />
+          <MiniStat label="Owned vaults" value={connected ? formatMetric(nfts.length) : "N/A"} />
+          <MiniStat label="Activity rows" value={connected ? formatMetric((data.activity ?? []).length) : "N/A"} />
         </div>
       </SectionCard>
       <SectionCard title="Owned Vaults">
-        {nfts.length && data.collections?.length ? <MarketplaceGrid items={nfts} collections={data.collections} /> : <EmptyBlock title="No owned vaults" body="Owned vault NFTs appear only after a connected wallet has confirmed vault ownership." />}
+        {nfts.length && data.collections?.length ? <MarketplaceGrid items={nfts} collections={data.collections} /> : <EmptyBlock title={connected ? "No owned vaults" : "Wallet required"} body="Owned vault NFTs appear only after a connected wallet has confirmed vault ownership through the backend." />}
       </SectionCard>
     </div>
   );
 }
 
-function InstantSellView({ data }: { data: ProductData }) {
-  const quotes = data.quotes ?? [];
+function LeaderboardView({ data }: { data: ProductData }) {
+  const collections = [...(data.collections ?? [])].sort((a, b) => leaderboardScore(b) - leaderboardScore(a));
+  const raids = data.raids ?? [];
+  const activity = data.activity ?? [];
+  const recentMints = data.recentMints ?? [];
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <SectionCard title="Quote Console">
-        <div className="rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-4 text-sm text-slate-200">
-          <div className="flex gap-3">
-            <AlertTriangle className="size-5 shrink-0 text-vault-gold" />
-            <p>{data.poolConfigured ? "Instant sell pool is configured. Quotes still depend on eligible vault inventory and live liquidity." : "Instant sell liquidity pool is unavailable. Quote writes are blocked until real liquidity is configured."}</p>
+      <main className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-4">
+          <StatCard icon={Trophy} label="Ranked factions" value={formatMetric(collections.length)} accent="gold" />
+          <StatCard icon={LockKeyhole} label="Vault-weighted score" value={formatMetric(collections.reduce((sum, collection) => sum + leaderboardScore(collection), 0))} accent="green" />
+          <StatCard icon={Swords} label="Raid rooms" value={formatMetric(raids.length)} accent="cyan" />
+          <StatCard icon={Shield} label="Recent mints" value={formatMetric(recentMints.length)} />
+        </div>
+
+        <SectionCard title="Faction Leaderboard">
+          {collections.length ? (
+            <div className="grid gap-3">
+              {collections.map((collection, index) => (
+                <Link key={collection.id} href={`/collections/${collection.id}`} className="rounded-lg border border-vault-line bg-black/25 p-4 transition hover:border-vault-green/45">
+                  <div className="grid gap-4 md:grid-cols-[64px_minmax(0,1fr)_160px] md:items-center">
+                    <div className="grid size-16 place-items-center rounded-md border border-vault-green/35 bg-vault-green/10 text-xl font-black text-vault-green">#{index + 1}</div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <img src={collection.image || brandAssets.factionMark} alt="" className="size-10 rounded-md border border-vault-line object-cover" />
+                        <div className="min-w-0">
+                          <p className="truncate font-black text-white">{collection.name}</p>
+                          <p className="truncate text-xs text-slate-500">{collection.symbol} / {collection.tokenMint || "token mint N/A"}</p>
+                        </div>
+                        <StatusPill accent={collection.reserveHealth === "HEALTHY" ? "green" : "gold"}>{collection.reserveHealth ?? "N/A"}</StatusPill>
+                      </div>
+                      <ProtocolTrustStrip trust={collectionTrust(collection)} compact className="mt-3" />
+                    </div>
+                    <div className="grid gap-2 text-sm md:text-right">
+                      <MiniMetric label="Score" value={formatMetric(leaderboardScore(collection))} />
+                      <MiniMetric label="Vaults" value={formatMetric(collection.vaults)} />
+                      <MiniMetric label="XP" value={formatMetric(collection.xp)} />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <EmptyBlock title="No leaderboard rows" body="Leaderboard ranks appear only after real launched collections, vaults, raid activity, or XP rows are returned by the backend." />
+          )}
+        </SectionCard>
+      </main>
+
+      <aside className="space-y-5">
+        <SectionCard title="Reward Rail">
+          <TransactionFlow state={collections.length ? "idle" : "preparing"} moment="reward" title="Leaderboard reward route" description="Scores are derived from backend collection XP, vault count, raid activity, and recent mints. No sample ranks are inserted." tokenSymbol="PHEW" compact />
+        </SectionCard>
+        <SectionCard title="Data Sources">
+          <div className="grid gap-3">
+            <MiniStat label="Activity rows" value={formatMetric(activity.length)} />
+            <MiniStat label="Market source" value={data.marketSnapshot?.source ?? "N/A"} />
+            <MiniStat label="Last verified" value="N/A" />
           </div>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <input className="h-12 rounded-lg border border-vault-line bg-black/25 px-4 text-sm outline-none focus:border-vault-purple" placeholder="Vault NFT mint" />
-          <button className="h-12 rounded-lg border border-vault-line bg-black/25 font-bold text-slate-400" disabled>Request quote</button>
-        </div>
-        {quotes.length ? <pre className="mt-4 max-h-80 overflow-auto rounded-lg border border-vault-line bg-black/35 p-4 text-xs text-slate-300">{JSON.stringify(quotes, null, 2)}</pre> : <EmptyBlock title="No quotes" body="Quotes appear only after real pool-backed quote requests." />}
-      </SectionCard>
-      <SectionCard title="Risk Discount">
-        <Zap className="mb-4 size-8 text-vault-green" />
-        <p className="text-sm text-slate-300">Discounts must come from liquidity, backing, unlock date, and risk-tier data. This panel will not show invented liquidity.</p>
-      </SectionCard>
+        </SectionCard>
+      </aside>
+    </div>
+  );
+}
+
+function StrategyEngineView({ data, walletConnected, walletAddress }: { data: ProductData; walletConnected: boolean; walletAddress?: string | null }) {
+  const quotes = data.quotes ?? [];
+  const poolReady = Boolean(data.poolConfigured);
+  const sceneState: TransactionFlowState = !walletConnected ? "wallet-disconnected" : poolReady ? "idle" : "error";
+  const strategyTrust = {
+    verified: poolReady,
+    reserveStatus: poolReady ? "POOL_READY" : "POOL_UNAVAILABLE",
+    reserveTone: poolReady ? ("success" as const) : ("warning" as const),
+    source: quotes.length ? ("live" as const) : ("cached" as const),
+    lastVerifiedAt: null
+  };
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <main className="space-y-5">
+        <SectionCard title="Strategy Engine Console">
+          <div className="grid gap-4 lg:grid-cols-[160px_minmax(0,1fr)]">
+            <div className="grid min-h-36 place-items-center rounded-lg border border-vault-green/30 bg-vault-green/5">
+              <img src={poolReady ? brandAssets.energyBeam : brandAssets.errorGlitch} alt="" className="size-28 object-contain drop-shadow-[0_0_24px_rgba(186,255,0,0.25)]" />
+            </div>
+            <div className="min-w-0">
+              <ProtocolTrustStrip trust={strategyTrust} />
+              <div className="mt-4 rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-4 text-sm text-slate-200">
+                {poolReady ? "Instant-sell strategy is configured. Quotes still depend on eligible wallet inventory, backing, unlock date, and live liquidity." : "Instant-sell liquidity is unavailable. Quote writes remain blocked until real pool liquidity is configured."}
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <input className="phew-input h-12 rounded-md px-4 text-sm" placeholder="Vault NFT mint" disabled={!poolReady || !walletConnected} />
+                <button className="h-12 rounded-md border border-vault-line bg-black/25 font-bold text-slate-400 disabled:cursor-not-allowed disabled:opacity-55" disabled>
+                  Request quote
+                </button>
+              </div>
+            </div>
+          </div>
+          {quotes.length ? <pre className="mt-4 max-h-80 overflow-auto rounded-lg border border-vault-line bg-black/35 p-4 text-xs text-slate-300">{JSON.stringify(quotes, null, 2)}</pre> : <EmptyBlock title="No quotes" body="Quotes appear only after real pool-backed quote requests for this wallet." />}
+        </SectionCard>
+        <SectionCard title="Risk Discount Inputs">
+          <div className="grid gap-3 md:grid-cols-4">
+            <MiniStat label="Wallet" value={walletAddress ?? "Disconnected"} />
+            <MiniStat label="Liquidity pool" value={poolReady ? "Configured" : "Unavailable"} />
+            <MiniStat label="Quotes" value={formatMetric(quotes.length)} />
+            <MiniStat label="Live source" value={quotes.length ? "Quotes table" : "N/A"} />
+          </div>
+          <p className="mt-4 text-sm text-slate-300">Discounts must come from liquidity, backing, unlock date, and risk-tier data. This panel will not show invented liquidity.</p>
+        </SectionCard>
+      </main>
+      <aside className="space-y-5">
+        <SectionCard title="Transaction Scene">
+          <TransactionFlow state={sceneState} moment="redeem" title="Strategy quote route" description="Wallet inventory, reserve backing, risk, and quote state stay locked to backend responses." tokenSymbol="PHEW" detail={poolReady ? "Ready for wallet-owned vault inventory" : "Liquidity pool unavailable"} compact />
+        </SectionCard>
+        <SectionCard title="Protocol Rules">
+          <div className="grid gap-2">
+            <CheckRow label="Wallet authenticated" ok={walletConnected} />
+            <CheckRow label="Real pool configured" ok={poolReady} />
+            <CheckRow label="Quote rows returned" ok={quotes.length > 0} />
+          </div>
+        </SectionCard>
+      </aside>
+    </div>
+  );
+}
+
+function leaderboardScore(collection: VaultCollection) {
+  return Math.max(0, Number(collection.xp ?? 0)) + Math.max(0, Number(collection.vaults ?? 0)) * 1000 + Math.max(0, Number(collection.raidSuccessRate ?? 0)) * 10 + Math.max(0, Number(collection.activeUsers24h ?? 0));
+}
+
+function CheckRow({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-vault-line bg-black/25 p-3 text-sm">
+      <span className="text-slate-300">{label}</span>
+      <span className={ok ? "text-vault-green" : "text-vault-gold"}>{ok ? "Verified" : "N/A"}</span>
     </div>
   );
 }
@@ -1129,11 +1249,12 @@ function formatRewardSum(positions: unknown[]) {
 
 function motionMomentForPage(active: string, endpoint: string): PhewAnimationMoment {
   if (active === "staking" || endpoint.includes("/staking")) return "stake";
-  if (active === "redeem" || endpoint.includes("/instant-sell")) return "redeem";
+  if (active === "redeem" || active === "strategy-engine" || endpoint.includes("/instant-sell")) return "redeem";
   if (active === "raids" || endpoint.includes("/raids")) return "reward";
+  if (active === "leaderboard") return "reward";
   if (active === "marketplace" || endpoint.includes("/marketplace")) return "mint";
   if (active === "risk" || endpoint.includes("/admin/risk")) return "scan";
-  if (active === "profile" || endpoint.includes("/profile")) return "proof";
+  if (active === "profile" || active === "my-vaults" || endpoint.includes("/profile")) return "proof";
   if (active === "collections" || endpoint.includes("/collections")) return "community";
   return "scan";
 }
@@ -1141,9 +1262,10 @@ function motionMomentForPage(active: string, endpoint: string): PhewAnimationMom
 function motionTitleForPage(active: string, title: string) {
   if (active === "marketplace") return "Purchase intent";
   if (active === "raids") return "Raid reward route";
+  if (active === "leaderboard") return "Reward leaderboard";
   if (active === "staking") return "Stake action";
-  if (active === "instant-sell") return "Liquidity quote";
-  if (active === "profile") return "Wallet vault proof";
+  if (active === "instant-sell" || active === "strategy-engine") return "Liquidity quote";
+  if (active === "profile" || active === "my-vaults") return "Wallet vault proof";
   if (active === "risk") return "Risk scan";
   if (active === "collections") return "Community reserve";
   return title;
@@ -1152,12 +1274,21 @@ function motionTitleForPage(active: string, title: string) {
 function motionSubtitleForPage(active: string) {
   if (active === "marketplace") return "Backend purchase state pending";
   if (active === "raids") return "Raid engine state pending";
+  if (active === "leaderboard") return "Reward rank state";
   if (active === "staking") return "Stake and reward state pending";
-  if (active === "instant-sell") return "Liquidity state pending";
-  if (active === "profile") return "Wallet proof state";
+  if (active === "instant-sell" || active === "strategy-engine") return "Liquidity state pending";
+  if (active === "profile" || active === "my-vaults") return "Wallet proof state";
   if (active === "risk") return "Risk snapshot state";
   if (active === "collections") return "Reserve state pending";
   return "Backend state pending";
+}
+
+function routeSubtitleForPage(active: string, subtitle?: string | null) {
+  if (active === "leaderboard") return "Rank factions from live vault count, XP, raid, mint, and activity rows returned by the backend.";
+  if (active === "strategy-engine" || active === "instant-sell") return "Review instant-sell liquidity, quote readiness, and risk-discount inputs without inventing pool data.";
+  if (active === "my-vaults" || active === "profile") return "Connect a wallet to load owned Vault NFTs, proof shortcuts, staking state, and redeemable positions.";
+  if (subtitle) return subtitle;
+  return "Launch faction vaults, coordinate raids, and reward holders on Solana.";
 }
 
 function normalizeProductData(endpoint: string, data: ProductData | VaultCollection[] | VaultNft[] | RaidRoom[] | null): ProductData | null {

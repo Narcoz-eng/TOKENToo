@@ -10,6 +10,7 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { CollectionCard } from "./CollectionCard";
 import { TrustBadge } from "./protocol-trust";
+import { TransactionFlow, type TransactionFlowMoment, type TransactionFlowState } from "./TransactionFlow";
 
 type ShellStats = {
   collections?: number | null;
@@ -28,6 +29,10 @@ export function PhewShell({ children, active, stats }: { children: ReactNode; ac
       </div>
     </div>
   );
+}
+
+export function PhewWorkspace({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("space-y-5", className)}>{children}</div>;
 }
 
 export function PhewSidebar(props: Parameters<typeof Sidebar>[0]) {
@@ -262,6 +267,211 @@ export function PhewActionPanel({
   );
 }
 
+export function PhewStepPanel({
+  step,
+  title,
+  description,
+  status = "idle",
+  children,
+  action,
+  className
+}: {
+  step: number | string;
+  title: string;
+  description?: string;
+  status?: PhewStatusTone;
+  children?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <PhewCard className={cn("p-4", className)}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-3">
+          <span className={cn("grid size-8 shrink-0 place-items-center rounded-full border text-sm font-black", status === "success" ? "border-vault-green bg-vault-green/15 text-vault-green" : status === "error" ? "border-vault-red bg-vault-red/15 text-vault-red" : status === "loading" ? "border-vault-cyan bg-vault-cyan/15 text-vault-cyan" : "border-vault-green/45 bg-black/35 text-vault-green")}>
+            {step}
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-black uppercase text-white">{title}</h2>
+            {description ? <p className="mt-1 text-sm leading-5 text-slate-400">{description}</p> : null}
+          </div>
+        </div>
+        {action ?? <PhewBadge tone={status}>{status}</PhewBadge>}
+      </div>
+      {children ? <div>{children}</div> : null}
+    </PhewCard>
+  );
+}
+
+export function PhewStatusPanel({
+  title,
+  rows,
+  className,
+  action
+}: {
+  title?: string;
+  rows: Array<{ label: string; value: ReactNode; tone?: PhewStatusTone; detail?: ReactNode }>;
+  className?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <PhewCard title={title} action={action} className={className}>
+      <div className="grid gap-2">
+        {rows.map((row) => (
+          <div key={row.label} className="flex min-w-0 items-start justify-between gap-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm">
+            <div className="min-w-0">
+              <p className="text-xs uppercase text-slate-500">{row.label}</p>
+              {row.detail ? <p className="mt-1 text-xs leading-5 text-slate-400">{row.detail}</p> : null}
+            </div>
+            <div className="min-w-0 text-right">
+              <p className="break-words font-black text-white">{row.value}</p>
+              {row.tone ? <PhewBadge tone={row.tone} className="mt-2">{row.tone}</PhewBadge> : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    </PhewCard>
+  );
+}
+
+export function PhewTrustPanel({
+  title = "Protocol Trust",
+  rows,
+  className
+}: {
+  title?: string;
+  rows: Array<{ label: string; ok?: boolean | null; detail?: ReactNode }>;
+  className?: string;
+}) {
+  return (
+    <PhewCard title={title} className={className}>
+      <div className="grid gap-2">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-vault-line bg-black/25 p-3 text-sm">
+            <span className="text-slate-300">{row.label}</span>
+            <span className={row.ok ? "text-vault-green" : row.ok === false ? "text-vault-red" : "text-vault-gold"}>{row.ok ? "Verified" : row.ok === false ? "Blocked" : "N/A"}</span>
+          </div>
+        ))}
+      </div>
+    </PhewCard>
+  );
+}
+
+export function PhewActionCard({
+  title,
+  description,
+  children,
+  locked,
+  status = "idle",
+  className
+}: {
+  title: string;
+  description?: string;
+  children?: ReactNode;
+  locked?: boolean;
+  status?: PhewStatusTone;
+  className?: string;
+}) {
+  return (
+    <PhewActionPanel title={title} description={description} status={locked ? "warning" : status} className={className}>
+      {locked ? <p className="mb-3 rounded-md border border-vault-line bg-black/30 p-3 text-sm text-slate-400">Action locked until required backend checks pass.</p> : null}
+      {children}
+    </PhewActionPanel>
+  );
+}
+
+export function PhewMascotActor({
+  pose = "run",
+  className,
+  label = "Phew mascot"
+}: {
+  pose?: "run" | "point" | "guide" | "success" | "error";
+  className?: string;
+  label?: string;
+}) {
+  return <img src={brandAssets.mascotPoses[pose]} alt={label} data-pose={pose} className={cn("object-contain drop-shadow-[0_0_26px_rgba(186,255,0,0.42)]", className)} />;
+}
+
+export function PhewNftSlot({
+  image,
+  tokenSymbol,
+  label = "Vault NFT",
+  className
+}: {
+  image?: string | null;
+  tokenSymbol?: string | null;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("relative overflow-hidden rounded-lg border border-vault-green/35 bg-black/60 p-2", className)}>
+      {image ? <img src={image} alt="" className="aspect-[4/5] w-full rounded-md object-cover" /> : <img src={brandAssets.nftSlot} alt="" className="aspect-[4/5] w-full rounded-md object-contain p-1" />}
+      <div className="absolute inset-x-3 bottom-3 rounded-md border border-vault-green/35 bg-black/70 px-2 py-1 text-center">
+        <p className="truncate text-[10px] font-black uppercase text-vault-green">{tokenSymbol || label}</p>
+      </div>
+    </div>
+  );
+}
+
+export function PhewProofRing({
+  state = "idle",
+  className
+}: {
+  state?: "idle" | "loading" | "success" | "error";
+  className?: string;
+}) {
+  return (
+    <div className={cn("phew-proof-ring relative grid aspect-square place-items-center rounded-full border bg-black/35", state === "success" ? "border-vault-green text-vault-green shadow-green" : state === "error" ? "border-vault-red text-vault-red" : state === "loading" ? "border-vault-cyan text-vault-cyan" : "border-vault-line text-slate-400", className)} data-state={state}>
+      <img src={state === "error" ? brandAssets.redeemParticles : brandAssets.proofRing} alt="" className="h-3/4 w-3/4 object-contain" />
+    </div>
+  );
+}
+
+export function PhewTransactionScene(props: {
+  state: TransactionFlowState;
+  title: string;
+  description?: string;
+  tokenSymbol?: string | null;
+  image?: string | null;
+  detail?: string | null;
+  className?: string;
+  compact?: boolean;
+  moment?: TransactionFlowMoment;
+}) {
+  return <TransactionFlow {...props} />;
+}
+
+export function PhewLoadingState({ title = "Loading backend state", detail }: { title?: string; detail?: string }) {
+  return (
+    <PhewCard>
+      <div className="phew-loading-stage relative min-h-48 overflow-hidden rounded-lg">
+        <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-0 h-full w-full object-cover opacity-35" />
+        <div className="absolute inset-0 grid-mask opacity-30" />
+        <div className="relative grid min-h-48 place-items-center p-6 text-center">
+          <PhewProofRing state="loading" className="mb-4 size-24" />
+          <p className="font-black text-white">{title}</p>
+          {detail ? <p className="mt-2 max-w-md text-sm text-slate-400">{detail}</p> : null}
+        </div>
+      </div>
+    </PhewCard>
+  );
+}
+
+export function PhewErrorState({ title = "Action failed", message, action }: { title?: string; message: ReactNode; action?: ReactNode }) {
+  return (
+    <PhewCard className="border-vault-red/45 bg-vault-red/10">
+      <div className="flex items-start gap-4">
+        <PhewProofRing state="error" className="size-20 shrink-0" />
+        <div className="min-w-0">
+          <h2 className="text-lg font-black text-vault-red">{title}</h2>
+          <div className="mt-2 break-words text-sm leading-6 text-slate-300">{message}</div>
+          {action ? <div className="mt-4">{action}</div> : null}
+        </div>
+      </div>
+    </PhewCard>
+  );
+}
+
 export function PhewEmptyState({
   title,
   body,
@@ -408,16 +618,16 @@ export function PhewAnimationFrame({
       <span className="phew-moment-orbit absolute left-1/2 top-1/2 size-48 -translate-x-1/2 -translate-y-1/2 rounded-full border border-vault-cyan/30 motion-reduce:animate-none" />
       <span className="phew-moment-orbit absolute left-1/2 top-1/2 size-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-vault-green/35 motion-reduce:animate-none" style={{ animationDelay: "220ms" }} />
       <span className="phew-coded-beam" />
-      <img src={brandAssets.mascot} alt="" className="phew-coded-mascot" />
+      <img src={state === "success" ? brandAssets.mascotPoses.success : state === "error" ? brandAssets.mascotPoses.error : brandAssets.mascotPoses.run} alt="" className="phew-coded-mascot" />
       <div className="phew-moment-card absolute left-1/2 top-1/2 w-32 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-vault-green/50 bg-black/75 p-2 shadow-green motion-reduce:animate-none sm:w-36">
         {collectionImage ? (
           <img src={collectionImage} alt="" className="aspect-[4/5] w-full rounded-md object-cover" />
         ) : (
-          <GenericVaultArt tokenSymbol={tokenSymbol} compact />
+          <PhewNftSlot tokenSymbol={tokenSymbol} className="border-0 bg-transparent p-0" />
         )}
       </div>
       <div className="phew-coded-object">
-        <MomentGlyph moment={visualMoment} state={state} />
+        <img src={momentObjectAsset(visualMoment, state)} alt="" className="size-14 object-contain" />
       </div>
       <div className="absolute inset-x-4 bottom-4 flex flex-wrap items-end justify-between gap-3">
         <div className="rounded-md border border-vault-line bg-black/55 px-3 py-2 backdrop-blur">
@@ -452,12 +662,18 @@ function GenericVaultArt({ tokenSymbol, compact = false }: { tokenSymbol?: strin
   return (
     <div className={cn("grid aspect-[4/5] w-full place-items-center rounded-md border border-vault-green/35 bg-[radial-gradient(circle_at_50%_25%,rgba(186,255,0,0.25),rgba(3,9,11,0.92)_50%,rgba(0,0,0,0.98))]", compact ? "p-2" : "p-4")}>
       <div className="text-center">
-        <WalletCards className={cn("mx-auto text-vault-green drop-shadow-[0_0_20px_rgba(186,255,0,0.38)]", compact ? "size-12" : "size-20")} />
+        <img src={brandAssets.nftSlot} alt="" className={cn("mx-auto object-contain drop-shadow-[0_0_20px_rgba(186,255,0,0.38)]", compact ? "size-16" : "size-24")} />
         <p className="mt-3 text-sm font-black text-vault-green">{tokenSymbol || "PHEW"}</p>
         <p className="mt-1 text-[10px] font-bold uppercase text-slate-500">Vault NFT</p>
       </div>
     </div>
   );
+}
+
+function momentObjectAsset(moment: ReturnType<typeof normalizeAnimationMoment>, state: PhewAnimationState) {
+  if (state === "error") return brandAssets.errorGlitch;
+  if (state === "success") return brandAssets.proofRing;
+  return brandAssets.transactionObjects[moment];
 }
 
 function MomentGlyph({ moment, state }: { moment: ReturnType<typeof normalizeAnimationMoment>; state: PhewAnimationState }) {

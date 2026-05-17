@@ -153,7 +153,7 @@ export default function CreateCommunityPage() {
   const collectionAsset = launchSubmit?.verification?.addresses?.collectionAsset ?? launchTx?.collectionAssetAddress ?? null;
   const canLaunch = Boolean(collection?.id);
   const canSubmitLaunch = Boolean(launchTx?.base64UnsignedTransaction || externalLaunchSignature.trim());
-  const launchFlowState = communityFlowState(error, activeAction, launchSubmit, launchStatus);
+  const launchFlowState: TransactionFlowState = !wallet.connected ? "wallet-disconnected" : communityFlowState(error, activeAction, launchSubmit, launchStatus);
 
   const accessHelp = useMemo(() => accessMethods.find((method) => method.value === accessMethod)?.help, [accessMethod]);
 
@@ -338,7 +338,7 @@ export default function CreateCommunityPage() {
                   <input value={tokenMint} onChange={(event) => setTokenMint(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Solana token mint address" />
                 </label>
                 <button onClick={scanToken} disabled={activeAction === "scan" || !tokenMint.trim()} className="phew-button phew-button-primary mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                  {activeAction === "scan" ? <Loader2 className="size-4 animate-spin" /> : <ScanSearch className="size-4" />}
+                  {activeAction === "scan" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />}
                   Scan
                 </button>
               </div>
@@ -431,17 +431,17 @@ export default function CreateCommunityPage() {
                 <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-400">{accessHelp}</p>
               )}
               <button onClick={createCommunity} disabled={activeAction === "create" || !tokenMint.trim()} className="phew-button phew-button-primary mt-5 inline-flex h-12 items-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                {activeAction === "create" ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
+                {activeAction === "create" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" />}
                 Create Draft
               </button>
               {collection ? (
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button onClick={verifyPayment} disabled={activeAction === "payment" || !paymentSignature.trim()} className="inline-flex h-10 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-                    {activeAction === "payment" ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
+                    {activeAction === "payment" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" />}
                     Verify Payment
                   </button>
                   <button onClick={verifyWhale} disabled={activeAction === "whale"} className="inline-flex h-10 items-center gap-2 rounded-md border border-vault-cyan/45 bg-vault-cyan/10 px-4 text-sm font-bold text-vault-cyan">
-                    {activeAction === "whale" ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                    {activeAction === "whale" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />}
                     Verify Whale
                   </button>
                 </div>
@@ -463,15 +463,15 @@ export default function CreateCommunityPage() {
                 </label>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <button onClick={buildLaunch} disabled={activeAction === "build" || !canLaunch} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-                    {activeAction === "build" ? <Loader2 className="size-4 animate-spin" /> : <RadioTower className="size-4" />}
+                    {activeAction === "build" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.energyBeam} alt="" className="size-5 object-contain" />}
                     Build Launch Tx
                   </button>
                   <button onClick={submitLaunch} disabled={activeAction === "submit" || !canSubmitLaunch} className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-4 text-sm font-black text-black">
-                    {activeAction === "submit" ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                    {activeAction === "submit" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.vaultSafe} alt="" className="size-5 object-contain" />}
                     Sign + Submit Launch
                   </button>
                   <button onClick={refreshLaunchStatus} disabled={activeAction === "status"} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-300">
-                    {activeAction === "status" ? <Loader2 className="size-4 animate-spin" /> : <RadioTower className="size-4" />}
+                    {activeAction === "status" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />}
                     Refresh Status
                   </button>
                 </div>
