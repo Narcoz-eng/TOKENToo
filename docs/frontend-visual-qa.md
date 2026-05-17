@@ -70,6 +70,24 @@ Verification to run for this pass:
 - Captured: `tmp/visual-qa-current/leaderboard-metric-assets.png`.
 - Passed: CDP page checks reported no framework overlay on `/staking`, `/marketplace`, and `/leaderboard`.
 
+### 2026-05-17 trust badge pass
+
+Fix applied:
+
+- Replaced `ProtocolTrustStrip`, `ProtocolTrustInline`, and `TrustBadge` generic badge icons with local Phew proof, vault, beam, and glitch assets.
+- Preserved trust semantics: verified/pending, reserve health, live/cached, and last verified remain backend-derived or `N/A`.
+
+Verification to run for this pass:
+
+- Passed: `npm --workspace frontend run typecheck`.
+- Passed: `npm --workspace frontend run build`.
+- Passed: `npm run build`.
+- Captured: `tmp/visual-qa-current/collections-trust-assets.png`.
+- Captured: `tmp/visual-qa-current/mint-trust-assets.png`.
+- Captured: `tmp/visual-qa-current/redeem-trust-assets.png`.
+- Captured: `tmp/visual-qa-current/proof-trust-assets.png`.
+- Passed: CDP page checks reported no framework overlay on `/collections`, `/mint`, `/redeem`, and `/proof`.
+
 ## Mascot And Assets
 
 - [ ] `frontend/public/brand/phew-mascot.png` exists.

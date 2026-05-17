@@ -52,6 +52,11 @@ This file tracks local assets used to rebuild the frontend from the approved Phe
 - `StatCard` supports `iconAsset` for Phew-native metric visuals.
 - Product data metric cards on marketplace, staking, leaderboard, and collection summaries now use Phew NFT slot, vault, proof, beam, reward, glitch, and token assets.
 
+## 2026-05-17 Trust Badge Pass
+
+- `ProtocolTrustStrip`, `ProtocolTrustInline`, and `TrustBadge` now render Phew proof, vault, beam, and glitch assets instead of icon-library trust symbols.
+- Verified, reserve health, live/cached, and last-verified badges keep the same data contract and do not fabricate timestamps.
+
 ## Remaining Asset Gaps
 
 - A formal Image 2 reference set is still needed for additional mascot poses, admin empty/error states, and route-specific transaction keyframes if the approved local references are not enough.

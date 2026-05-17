@@ -1,5 +1,5 @@
-import { BadgeCheck, Clock3, Database, RadioTower, ShieldAlert, ShieldCheck, type LucideIcon } from "lucide-react";
 import type { VaultCollection, VaultNft } from "@/lib/types";
+import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
 type TrustTone = "success" | "warning" | "error" | "idle";
@@ -16,10 +16,10 @@ export type ProtocolTrust = {
 export function ProtocolTrustStrip({ trust, compact = false, className }: { trust: ProtocolTrust; compact?: boolean; className?: string }) {
   return (
     <div className={cn("grid gap-2", compact ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4", className)}>
-      <TrustBadge tone={trust.verified ? "success" : "warning"} icon={trust.verified ? BadgeCheck : ShieldAlert} label={trust.verified ? "On-chain verified" : "Verification pending"} />
-      <TrustBadge tone={trust.reserveTone} icon={ShieldCheck} label={`Reserve ${normalizeReserveLabel(trust.reserveStatus)}`} />
-      <TrustBadge tone={trust.source === "live" ? "success" : "idle"} icon={trust.source === "live" ? RadioTower : Database} label={trust.source === "live" ? "Live" : "Cached"} />
-      <TrustBadge tone={trust.lastVerifiedAt ? "idle" : "warning"} icon={Clock3} label={formatTrustTime(trust.lastVerifiedAt)} />
+      <TrustBadge tone={trust.verified ? "success" : "warning"} iconAsset={trust.verified ? brandAssets.proofRing : brandAssets.errorGlitch} label={trust.verified ? "On-chain verified" : "Verification pending"} />
+      <TrustBadge tone={trust.reserveTone} iconAsset={trust.reserveTone === "error" ? brandAssets.errorGlitch : brandAssets.vaultSafe} label={`Reserve ${normalizeReserveLabel(trust.reserveStatus)}`} />
+      <TrustBadge tone={trust.source === "live" ? "success" : "idle"} iconAsset={trust.source === "live" ? brandAssets.energyBeam : brandAssets.vaultSafe} label={trust.source === "live" ? "Live" : "Cached"} />
+      <TrustBadge tone={trust.lastVerifiedAt ? "idle" : "warning"} iconAsset={brandAssets.proofRing} label={formatTrustTime(trust.lastVerifiedAt)} />
     </div>
   );
 }
@@ -27,17 +27,17 @@ export function ProtocolTrustStrip({ trust, compact = false, className }: { trus
 export function ProtocolTrustInline({ trust, className }: { trust: ProtocolTrust; className?: string }) {
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
-      <TrustBadge tone={trust.verified ? "success" : "warning"} icon={trust.verified ? BadgeCheck : ShieldAlert} label={trust.verified ? "Verified" : "Pending"} />
-      <TrustBadge tone={trust.reserveTone} icon={ShieldCheck} label={normalizeReserveLabel(trust.reserveStatus)} />
-      <TrustBadge tone={trust.source === "live" ? "success" : "idle"} icon={trust.source === "live" ? RadioTower : Database} label={trust.source === "live" ? "Live" : "Cached"} />
+      <TrustBadge tone={trust.verified ? "success" : "warning"} iconAsset={trust.verified ? brandAssets.proofRing : brandAssets.errorGlitch} label={trust.verified ? "Verified" : "Pending"} />
+      <TrustBadge tone={trust.reserveTone} iconAsset={trust.reserveTone === "error" ? brandAssets.errorGlitch : brandAssets.vaultSafe} label={normalizeReserveLabel(trust.reserveStatus)} />
+      <TrustBadge tone={trust.source === "live" ? "success" : "idle"} iconAsset={trust.source === "live" ? brandAssets.energyBeam : brandAssets.vaultSafe} label={trust.source === "live" ? "Live" : "Cached"} />
     </div>
   );
 }
 
-export function TrustBadge({ tone, icon: Icon, label }: { tone: TrustTone; icon?: LucideIcon; label: string }) {
+export function TrustBadge({ tone, iconAsset, label }: { tone: TrustTone; iconAsset?: string; label: string }) {
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-black uppercase", trustToneClass(tone))}>
-      {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
+      {iconAsset ? <img src={iconAsset} alt="" className="size-3.5 shrink-0 object-contain" /> : null}
       <span className="truncate">{label}</span>
     </span>
   );
