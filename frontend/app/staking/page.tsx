@@ -1,5 +1,5 @@
-import { ProductDataPage } from "@/components/ProductDataPage";
+import { StakingReferencePage } from "@/components/reference-data-pages";
 
 export default function StakingPage() {
-  return <ProductDataPage active="staking" title="Staking" endpoint="/product/staking" walletRequired />;
+  return <StakingReferencePage />;
 }

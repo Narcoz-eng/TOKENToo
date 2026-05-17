@@ -1,5 +1,5 @@
-import { ProductDataPage } from "@/components/ProductDataPage";
+import { HomeReferencePage } from "@/components/reference-data-pages";
 
 export default function HomePage() {
-  return <ProductDataPage active="home" title="Phew Run Protocol" endpoint="/product/home" />;
+  return <HomeReferencePage />;
 }

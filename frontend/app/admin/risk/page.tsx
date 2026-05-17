@@ -1,5 +1,5 @@
-import { ProductDataPage } from "@/components/ProductDataPage";
+import { AdminRiskReferencePage } from "@/components/reference-data-pages";
 
 export default function AdminRiskPage() {
-  return <ProductDataPage active="risk" title="Risk Admin" endpoint="/product/admin/risk" />;
+  return <AdminRiskReferencePage />;
 }

@@ -1,5 +1,5 @@
-import { ProductDataPage } from "@/components/ProductDataPage";
+import { StrategyEngineReferencePage } from "@/components/reference-data-pages";
 
 export default function StrategyEnginePage() {
-  return <ProductDataPage active="strategy-engine" title="Strategy Engine" endpoint="/product/instant-sell" walletRequired />;
+  return <StrategyEngineReferencePage />;
 }

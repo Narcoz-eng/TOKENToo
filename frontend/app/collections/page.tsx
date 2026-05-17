@@ -1,5 +1,5 @@
-import { ProductDataPage } from "@/components/ProductDataPage";
+import { CollectionsReferencePage } from "@/components/reference-data-pages";
 
 export default function CollectionsPage() {
-  return <ProductDataPage active="collections" title="Collections" endpoint="/product/collections" />;
+  return <CollectionsReferencePage />;
 }
