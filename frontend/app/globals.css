@@ -84,11 +84,38 @@ select {
   background: radial-gradient(circle at 50% 0%, transparent 0 48%, rgba(0, 0, 0, 0.52) 100%);
 }
 
+.phew-sidebar {
+  background:
+    linear-gradient(180deg, rgba(3, 5, 5, 0.98), rgba(0, 0, 0, 0.98)) !important;
+  border-right-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 18px 0 54px rgba(0, 0, 0, 0.48) !important;
+}
+
+.phew-sidebar nav a,
+.phew-sidebar a,
+.phew-topbar a,
+.phew-topbar button,
+.phew-topbar input {
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.phew-sidebar nav a:hover,
+.phew-topbar a:hover,
+.phew-topbar button:hover {
+  transform: translateY(-1px);
+}
+
+.phew-topbar {
+  background:
+    linear-gradient(180deg, rgba(2, 5, 4, 0.96), rgba(0, 0, 0, 0.9)) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
 .phew-panel {
   border: 1px solid rgba(110, 255, 222, 0.11);
   background:
-    linear-gradient(180deg, rgba(8, 23, 20, 0.78), rgba(3, 9, 11, 0.88)),
-    radial-gradient(circle at 12% 0%, rgba(186, 255, 0, 0.035), transparent 36%);
+    linear-gradient(180deg, rgba(7, 14, 12, 0.78), rgba(1, 4, 5, 0.9)),
+    radial-gradient(circle at 12% 0%, rgba(186, 255, 0, 0.05), transparent 36%);
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.025);
   backdrop-filter: blur(14px);
 }
@@ -103,15 +130,40 @@ select {
   opacity: 0.32;
 }
 
+.phew-hero-canvas {
+  border-color: rgba(186, 255, 0, 0.24);
+  background:
+    radial-gradient(circle at 76% 30%, rgba(186, 255, 0, 0.16), transparent 31%),
+    radial-gradient(circle at 26% 74%, rgba(22, 215, 210, 0.11), transparent 28%),
+    linear-gradient(115deg, rgba(2, 8, 6, 0.96), rgba(5, 16, 13, 0.92) 44%, rgba(2, 8, 6, 0.98));
+  box-shadow:
+    0 0 0 1px rgba(186, 255, 0, 0.08),
+    0 0 44px rgba(186, 255, 0, 0.12),
+    0 22px 80px rgba(0, 0, 0, 0.42),
+    inset 0 0 68px rgba(22, 215, 210, 0.05);
+}
+
+.phew-hero-canvas::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  background:
+    conic-gradient(from 120deg at 70% 42%, transparent, rgba(186, 255, 0, 0.13), transparent 28%, rgba(22, 215, 210, 0.1), transparent 58%);
+  filter: blur(18px);
+  opacity: 0.6;
+  animation: phew-hero-energy 9s ease-in-out infinite alternate;
+}
+
 .phew-card-hover {
   transform: translateZ(0);
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
 .phew-card-hover:hover {
-  transform: translateY(-2px);
-  border-color: rgba(186, 255, 0, 0.32);
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.32), 0 0 18px rgba(186, 255, 0, 0.07);
+  transform: translateY(-3px);
+  border-color: rgba(186, 255, 0, 0.46);
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.36), 0 0 26px rgba(186, 255, 0, 0.16);
 }
 
 .phew-button {
@@ -135,7 +187,22 @@ select {
 .phew-button-primary {
   border: 1px solid rgba(220, 255, 92, 0.85);
   background: linear-gradient(135deg, #d9ff27 0%, #91ff00 48%, #16d7d2 100%);
-  box-shadow: 0 0 16px rgba(186, 255, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  box-shadow: 0 0 22px rgba(186, 255, 0, 0.26), 0 0 42px rgba(22, 215, 210, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.phew-button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.phew-button:focus-visible,
+.phew-card-hover:focus-visible,
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(186, 255, 0, 0.78);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(186, 255, 0, 0.08), 0 0 24px rgba(186, 255, 0, 0.18);
 }
 
 .phew-input {
@@ -150,6 +217,69 @@ select {
   border-color: rgba(186, 255, 0, 0.62);
   box-shadow: 0 0 0 3px rgba(186, 255, 0, 0.065), 0 0 14px rgba(186, 255, 0, 0.07);
   background: rgba(0, 0, 0, 0.46);
+}
+
+.phew-input:hover {
+  border-color: rgba(186, 255, 0, 0.38);
+  box-shadow: 0 0 16px rgba(186, 255, 0, 0.08);
+}
+
+.phew-home-hero-actor {
+  position: relative;
+  isolation: isolate;
+}
+
+.phew-home-mascot-stage {
+  position: relative;
+  min-height: 292px;
+  overflow: visible;
+}
+
+.phew-home-mascot-glow {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: min(92%, 420px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 52% 52%, rgba(186, 255, 0, 0.36), transparent 48%),
+    radial-gradient(circle at 48% 58%, rgba(22, 215, 210, 0.18), transparent 58%);
+  filter: blur(14px);
+  animation: phew-aura 1.6s ease-in-out infinite;
+}
+
+.phew-home-mascot-ring {
+  position: absolute;
+  left: 50%;
+  bottom: 1.75rem;
+  width: min(72%, 320px);
+  height: 38px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  border: 2px solid rgba(186, 255, 0, 0.72);
+  box-shadow: 0 0 30px rgba(186, 255, 0, 0.42), inset 0 0 22px rgba(186, 255, 0, 0.16);
+  animation: phew-ring 1.9s ease-in-out infinite;
+}
+
+.phew-home-mascot {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  z-index: 2;
+  width: clamp(245px, 35vw, 420px);
+  height: clamp(230px, 34vw, 400px);
+  transform: translateX(-50%);
+  object-fit: contain;
+  filter: drop-shadow(0 0 36px rgba(186, 255, 0, 0.64)) drop-shadow(0 20px 22px rgba(0, 0, 0, 0.48));
+  animation: phew-home-mascot-run 1.1s ease-in-out infinite;
+}
+
+.phew-home-stat-grid > * {
+  border-color: rgba(186, 255, 0, 0.18);
+  background: rgba(0, 0, 0, 0.46);
+  box-shadow: inset 0 0 24px rgba(186, 255, 0, 0.055), 0 0 18px rgba(22, 215, 210, 0.06);
 }
 
 .phew-scanline {
@@ -248,6 +378,17 @@ select {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
+    color: transparent !important;
+    font-size: 0 !important;
+  }
+
+  .wallet-adapter-button::before {
+    content: "";
+    width: 18px;
+    height: 14px;
+    border: 2px solid #020508;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px rgba(2, 5, 8, 0.24);
   }
 }
 
@@ -348,8 +489,114 @@ select {
   box-shadow: inset 0 0 0 1px rgba(255, 79, 79, 0.18), 0 0 30px rgba(255, 79, 79, 0.12);
 }
 
+.phew-proof-hero {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(186, 255, 0, 0.11), transparent 30%),
+    linear-gradient(180deg, rgba(4, 10, 9, 0.9), rgba(0, 0, 0, 0.94));
+}
+
+.phew-proof-card {
+  background:
+    radial-gradient(circle at 70% 15%, rgba(186, 255, 0, 0.045), transparent 34%),
+    linear-gradient(180deg, rgba(5, 13, 12, 0.9), rgba(0, 0, 0, 0.92));
+}
+
+.phew-proof-state {
+  display: grid;
+  min-height: 96px;
+  place-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(110, 255, 222, 0.16);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  text-align: center;
+}
+
+.phew-proof-state span {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px dashed rgba(255, 255, 255, 0.56);
+}
+
+.phew-proof-state strong {
+  border-radius: 5px;
+  border: 1px solid currentColor;
+  padding: 0.2rem 0.5rem;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.phew-proof-state-loading {
+  color: #16d7d2;
+}
+
+.phew-proof-state-loading span {
+  border-color: rgba(22, 215, 210, 0.8);
+  border-top-color: transparent;
+  animation: phew-proof-spin 1.1s linear infinite;
+}
+
+.phew-proof-state-success {
+  color: #baff00;
+}
+
+.phew-proof-state-success span {
+  display: grid;
+  place-items: center;
+  border-style: solid;
+  border-color: rgba(186, 255, 0, 0.86);
+  box-shadow: 0 0 24px rgba(186, 255, 0, 0.32);
+}
+
+.phew-proof-state-success span::before {
+  content: "";
+  width: 13px;
+  height: 7px;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.phew-proof-state-error {
+  color: #ff6b6b;
+}
+
+.phew-proof-state-error span {
+  position: relative;
+  border-style: solid;
+  border-color: rgba(255, 79, 79, 0.78);
+  box-shadow: 0 0 22px rgba(255, 79, 79, 0.24);
+}
+
+.phew-proof-state-error span::before,
+.phew-proof-state-error span::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  height: 2px;
+  background: currentColor;
+}
+
+.phew-proof-state-error span::before {
+  transform: rotate(45deg);
+}
+
+.phew-proof-state-error span::after {
+  transform: rotate(-45deg);
+}
+
 .phew-coded-moment {
-  min-height: 240px;
+  min-height: 300px;
+  border-color: rgba(186, 255, 0, 0.18);
+  background:
+    radial-gradient(circle at 24% 56%, rgba(186, 255, 0, 0.18), transparent 28%),
+    radial-gradient(circle at 76% 42%, rgba(22, 215, 210, 0.13), transparent 26%),
+    linear-gradient(180deg, rgba(2, 8, 6, 0.18), rgba(2, 8, 6, 0.92));
+  box-shadow: 0 0 40px rgba(186, 255, 0, 0.1), inset 0 0 64px rgba(22, 215, 210, 0.05);
 }
 
 .phew-moment-orbit {
@@ -371,29 +618,661 @@ select {
 
 .phew-coded-mascot {
   position: absolute;
-  left: clamp(0.8rem, 6%, 2.4rem);
-  bottom: 3.85rem;
-  z-index: 4;
-  width: 102px;
-  height: 100px;
+  left: clamp(0.6rem, 3%, 1.6rem);
+  bottom: 2.4rem;
+  z-index: 7;
+  width: clamp(150px, 28vw, 230px);
+  height: clamp(145px, 27vw, 220px);
   object-fit: contain;
-  filter: drop-shadow(0 0 22px rgba(186, 255, 0, 0.28));
-  animation: phew-tx-mascot 2.35s ease-in-out infinite;
+  filter: drop-shadow(0 0 28px rgba(186, 255, 0, 0.56)) drop-shadow(0 18px 20px rgba(0, 0, 0, 0.45));
+  animation: phew-mascot-run 1.15s ease-in-out infinite;
 }
 
 .phew-coded-object {
   position: absolute;
   right: clamp(0.9rem, 7%, 3rem);
-  bottom: 4.8rem;
+  bottom: 4.35rem;
   z-index: 4;
   display: grid;
-  width: 78px;
-  height: 78px;
+  width: 96px;
+  height: 96px;
   place-items: center;
   border: 1px solid rgba(186, 255, 0, 0.28);
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.52);
-  box-shadow: inset 0 0 26px rgba(186, 255, 0, 0.08), 0 0 20px rgba(22, 215, 210, 0.08);
+  box-shadow: inset 0 0 30px rgba(186, 255, 0, 0.12), 0 0 28px rgba(22, 215, 210, 0.16);
+}
+
+.phew-moment-card {
+  border-style: dashed !important;
+  border-color: rgba(186, 255, 0, 0.78) !important;
+  background: rgba(0, 0, 0, 0.62) !important;
+  box-shadow: 0 0 34px rgba(186, 255, 0, 0.2), inset 0 0 30px rgba(186, 255, 0, 0.12) !important;
+  animation: phew-nft-charge 2.3s ease-in-out infinite !important;
+}
+
+.phew-coded-moment::after {
+  content: "";
+  position: absolute;
+  left: 2%;
+  bottom: 0;
+  z-index: 3;
+  width: min(44%, 260px);
+  height: 68%;
+  pointer-events: none;
+  background: radial-gradient(circle at 48% 58%, rgba(186, 255, 0, 0.28), transparent 48%);
+  filter: blur(12px);
+  animation: phew-aura 1.8s ease-in-out infinite;
+}
+
+.phew-flow-scene {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.phew-flow-copy {
+  position: relative;
+  z-index: 12;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.phew-flow-canvas {
+  position: relative;
+  min-height: 430px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(186, 255, 0, 0.26);
+  background:
+    radial-gradient(circle at 24% 60%, rgba(186, 255, 0, 0.28), transparent 31%),
+    radial-gradient(circle at 68% 48%, rgba(22, 215, 210, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(2, 8, 6, 0.22), rgba(0, 0, 0, 0.94));
+  box-shadow:
+    0 0 54px rgba(186, 255, 0, 0.16),
+    0 26px 70px rgba(0, 0, 0, 0.42),
+    inset 0 0 88px rgba(186, 255, 0, 0.08),
+    inset 0 0 54px rgba(22, 215, 210, 0.08);
+}
+
+.phew-flow-scene-compact .phew-flow-canvas {
+  min-height: 360px;
+}
+
+.phew-flow-scene-compact .phew-flow-actor {
+  left: clamp(-0.7rem, 2%, 0.65rem);
+  bottom: 2.6rem;
+  width: clamp(148px, 22vw, 224px);
+  height: clamp(144px, 21vw, 216px);
+}
+
+.phew-flow-scene-compact .phew-flow-nft {
+  width: clamp(108px, 14vw, 142px);
+  min-height: clamp(152px, 19vw, 198px);
+}
+
+.phew-flow-scene-compact .phew-flow-target {
+  right: clamp(0.7rem, 5%, 2rem);
+  width: clamp(76px, 10vw, 106px);
+  height: clamp(76px, 10vw, 106px);
+}
+
+.phew-flow-scene-compact .phew-flow-target svg {
+  width: 38px;
+  height: 38px;
+}
+
+.phew-flow-scene-compact .phew-flow-telemetry {
+  width: min(28%, 118px);
+}
+
+.phew-flow-mode-label {
+  position: absolute;
+  left: 1rem;
+  top: 1rem;
+  z-index: 11;
+  display: grid;
+  max-width: 46%;
+  gap: 0.2rem;
+  pointer-events: none;
+}
+
+.phew-flow-mode-label span {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: #baff00;
+}
+
+.phew-flow-mode-label strong {
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.phew-flow-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.28;
+  background-image:
+    linear-gradient(rgba(186, 255, 0, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 215, 210, 0.045) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(circle at 52% 50%, black, transparent 76%);
+}
+
+.phew-flow-gradient {
+  position: absolute;
+  width: 56%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  filter: blur(24px);
+  opacity: 0.75;
+  animation: phew-flow-gradient 5.5s ease-in-out infinite alternate;
+}
+
+.phew-flow-gradient-a {
+  left: -12%;
+  bottom: -16%;
+  background: rgba(186, 255, 0, 0.2);
+}
+
+.phew-flow-gradient-b {
+  right: -10%;
+  top: -14%;
+  background: rgba(22, 215, 210, 0.16);
+  animation-delay: 700ms;
+}
+
+.phew-flow-floor {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 3.55rem;
+  z-index: 1;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(186, 255, 0, 0.34);
+  background: radial-gradient(ellipse at center, rgba(186, 255, 0, 0.22), transparent 68%);
+  box-shadow: 0 0 42px rgba(186, 255, 0, 0.2), inset 0 0 26px rgba(22, 215, 210, 0.08);
+}
+
+.phew-flow-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  border-radius: 999px;
+  border: 1px solid rgba(186, 255, 0, 0.32);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 28px rgba(186, 255, 0, 0.08);
+  animation: phew-tx-orbit 7s linear infinite;
+}
+
+.phew-flow-orbit-a {
+  width: 360px;
+  height: 360px;
+}
+
+.phew-flow-orbit-b {
+  width: 250px;
+  height: 250px;
+  border-color: rgba(22, 215, 210, 0.32);
+  animation-duration: 5s;
+  animation-direction: reverse;
+}
+
+.phew-flow-orbit-c {
+  width: 150px;
+  height: 150px;
+  border-style: dashed;
+  border-color: rgba(186, 255, 0, 0.42);
+  animation-duration: 3.8s;
+}
+
+.phew-flow-actor {
+  position: absolute;
+  left: clamp(-0.35rem, 3%, 1.75rem);
+  bottom: 2.8rem;
+  z-index: 7;
+  width: clamp(210px, 31vw, 330px);
+  height: clamp(205px, 30vw, 318px);
+  pointer-events: none;
+}
+
+.phew-flow-actor-aura {
+  position: absolute;
+  inset: 8%;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 52% 54%, rgba(186, 255, 0, 0.42), transparent 48%),
+    radial-gradient(circle at 38% 44%, rgba(22, 215, 210, 0.24), transparent 58%);
+  filter: blur(16px);
+  opacity: 0.9;
+  animation: phew-aura 1.45s ease-in-out infinite;
+}
+
+.phew-flow-mascot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 34px rgba(186, 255, 0, 0.62)) drop-shadow(0 18px 20px rgba(0, 0, 0, 0.5));
+  animation: phew-mascot-run 1.05s ease-in-out infinite;
+}
+
+.phew-flow-nft {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  z-index: 6;
+  display: flex;
+  width: clamp(132px, 18vw, 172px);
+  min-height: clamp(184px, 25vw, 238px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%) rotate(-2deg);
+  border: 2px dashed rgba(186, 255, 0, 0.86);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.74);
+  padding: 0.45rem;
+  box-shadow:
+    0 0 46px rgba(186, 255, 0, 0.34),
+    0 0 78px rgba(22, 215, 210, 0.12),
+    inset 0 0 38px rgba(186, 255, 0, 0.18),
+    inset 0 0 18px rgba(22, 215, 210, 0.08);
+  animation: phew-nft-charge 2.1s ease-in-out infinite;
+}
+
+.phew-flow-nft > span:not(.phew-flow-nft-light) {
+  margin-top: 0.45rem;
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid rgba(186, 255, 0, 0.4);
+  background: rgba(0, 0, 0, 0.64);
+  padding: 0.18rem 0.5rem;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #baff00;
+}
+
+.phew-flow-nft-light {
+  position: absolute;
+  inset: 0.35rem;
+  border-radius: 10px;
+  pointer-events: none;
+  box-shadow: inset 0 0 24px rgba(186, 255, 0, 0.22);
+  animation: phew-nft-inner-light 1.45s ease-in-out infinite;
+}
+
+.phew-flow-target {
+  position: absolute;
+  right: clamp(1.25rem, 7%, 3.75rem);
+  bottom: 5.25rem;
+  z-index: 5;
+  display: grid;
+  width: clamp(104px, 13vw, 136px);
+  height: clamp(104px, 13vw, 136px);
+  place-items: center;
+  border: 1px solid rgba(186, 255, 0, 0.5);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(7, 20, 14, 0.68), rgba(0, 0, 0, 0.58));
+  color: #baff00;
+  box-shadow: 0 0 30px rgba(22, 215, 210, 0.16), inset 0 0 30px rgba(186, 255, 0, 0.1);
+}
+
+.phew-flow-target > span:not(.phew-flow-target-core) {
+  position: absolute;
+  bottom: -1.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(186, 255, 0, 0.34);
+  background: rgba(0, 0, 0, 0.72);
+  padding: 0.2rem 0.55rem;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #baff00;
+}
+
+.phew-flow-target-core {
+  position: absolute;
+  inset: 15%;
+  border-radius: inherit;
+  border: 1px solid rgba(186, 255, 0, 0.24);
+  box-shadow: inset 0 0 32px rgba(186, 255, 0, 0.1);
+  animation: phew-target-core 2s ease-in-out infinite;
+}
+
+.phew-flow-beam {
+  position: absolute;
+  top: 53%;
+  z-index: 4;
+  height: 4px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, transparent, rgba(186, 255, 0, 0.98), rgba(22, 215, 210, 0.7), transparent);
+  box-shadow: 0 0 22px rgba(186, 255, 0, 0.62), 0 0 36px rgba(22, 215, 210, 0.26);
+  animation: phew-flow-beam 1.25s ease-in-out infinite;
+}
+
+.phew-flow-beam-input {
+  left: 17%;
+  right: 50%;
+}
+
+.phew-flow-beam-output {
+  left: 52%;
+  right: 14%;
+  animation-delay: 240ms;
+}
+
+.phew-flow-impact {
+  position: absolute;
+  left: 50%;
+  top: 51%;
+  z-index: 8;
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  border: 1px solid rgba(186, 255, 0, 0.38);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6);
+  box-shadow: 0 0 40px rgba(186, 255, 0, 0.32), inset 0 0 24px rgba(22, 215, 210, 0.18);
+  animation: phew-impact-flash 1.8s ease-out infinite;
+}
+
+.phew-flow-scan-rail {
+  position: absolute;
+  left: 40%;
+  top: 24%;
+  z-index: 10;
+  width: 2px;
+  height: 54%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, transparent, rgba(22, 215, 210, 0.94), rgba(186, 255, 0, 0.65), transparent);
+  box-shadow: 0 0 22px rgba(22, 215, 210, 0.5);
+  opacity: 0;
+  animation: phew-scan-rail 1.45s ease-in-out infinite;
+}
+
+.phew-flow-scan-rail-b {
+  left: 60%;
+  animation-delay: 420ms;
+}
+
+.phew-flow-success-burst {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  z-index: 10;
+  width: 220px;
+  height: 220px;
+  border-radius: 999px;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6);
+  background:
+    radial-gradient(circle, rgba(186, 255, 0, 0.28), transparent 55%),
+    conic-gradient(from 0deg, transparent 0 16deg, rgba(186, 255, 0, 0.5) 17deg 20deg, transparent 21deg 46deg);
+  filter: blur(1px);
+  animation: phew-success-burst 1.8s ease-out infinite;
+}
+
+.phew-flow-error-shard {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  z-index: 10;
+  width: 56px;
+  height: 3px;
+  border-radius: 999px;
+  background: #ff4f4f;
+  box-shadow: 0 0 18px rgba(255, 79, 79, 0.6);
+  opacity: 0;
+  transform-origin: center;
+}
+
+.phew-flow-error-shard-a {
+  transform: translate(-50%, -50%) rotate(18deg);
+}
+
+.phew-flow-error-shard-b {
+  transform: translate(-50%, -50%) rotate(112deg);
+}
+
+.phew-flow-error-shard-c {
+  transform: translate(-50%, -50%) rotate(-42deg);
+}
+
+.phew-flow-telemetry {
+  position: absolute;
+  right: 0.95rem;
+  top: 0.95rem;
+  z-index: 11;
+  display: grid;
+  width: min(30%, 150px);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(110, 255, 222, 0.16);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(12px);
+}
+
+.phew-flow-telemetry div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  border-bottom: 1px solid rgba(110, 255, 222, 0.1);
+  padding: 0.55rem 0.65rem;
+  font-size: 10px;
+}
+
+.phew-flow-telemetry div:last-child {
+  border-bottom: 0;
+}
+
+.phew-flow-telemetry span {
+  color: #94a3b8;
+}
+
+.phew-flow-telemetry strong {
+  color: #f8fafc;
+  font-size: 11px;
+  text-align: right;
+}
+
+.phew-flow-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.phew-flow-particles span {
+  --angle: calc(var(--i) * 20deg);
+  position: absolute;
+  left: 50%;
+  top: 51%;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #baff00;
+  box-shadow: 0 0 14px rgba(186, 255, 0, 0.9);
+  transform: rotate(var(--angle)) translateX(18px) scale(0.4);
+  opacity: 0;
+  animation: phew-flow-particle 1.45s ease-out infinite;
+  animation-delay: calc(var(--i) * 42ms);
+}
+
+.phew-flow-scenes {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+}
+
+.phew-flow-scenes span {
+  min-width: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(110, 255, 222, 0.12);
+  background: rgba(0, 0, 0, 0.26);
+  padding: 0.45rem 0.35rem;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 900;
+  color: #64748b;
+}
+
+.phew-flow-scenes span.is-active,
+.phew-flow-scenes span.is-current {
+  border-color: rgba(186, 255, 0, 0.5);
+  background: rgba(186, 255, 0, 0.1);
+  color: #baff00;
+  box-shadow: 0 0 18px rgba(186, 255, 0, 0.12);
+}
+
+.phew-flow-scenes span.is-error {
+  border-color: rgba(255, 79, 79, 0.55);
+  background: rgba(255, 79, 79, 0.12);
+  color: #ff6b6b;
+}
+
+.phew-flow-detail {
+  margin-top: 0.75rem;
+  border-radius: 6px;
+  border-width: 1px;
+  padding: 0.65rem 0.75rem;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.phew-flow-scene[data-scene="INIT"] .phew-flow-beam-output,
+.phew-flow-scene[data-scene="INIT"] .phew-flow-impact,
+.phew-flow-scene[data-scene="INIT"] .phew-flow-particles {
+  opacity: 0.3;
+}
+
+.phew-flow-scene[data-scene="TRANSFER"] .phew-flow-actor,
+.phew-flow-scene[data-scene="LOCK"] .phew-flow-actor {
+  animation: phew-actor-push 1.2s ease-in-out infinite;
+}
+
+.phew-flow-scene[data-scene="VALIDATE"] .phew-flow-orbit-c {
+  border-color: rgba(22, 215, 210, 0.62);
+  animation-duration: 1.8s;
+}
+
+.phew-flow-scene[data-scene="LOCK"] .phew-flow-nft {
+  animation-name: phew-nft-lock;
+}
+
+.phew-flow-scene[data-scene="SUCCESS"] .phew-flow-impact {
+  animation-duration: 1.1s;
+}
+
+.phew-flow-scene[data-scene="SUCCESS"] .phew-flow-success-burst {
+  opacity: 1;
+}
+
+.phew-flow-scene[data-scene="SUCCESS"] .phew-flow-target,
+.phew-flow-scene[data-scene="SUCCESS"] .phew-flow-nft {
+  border-color: rgba(186, 255, 0, 0.95);
+  box-shadow: 0 0 42px rgba(186, 255, 0, 0.32), inset 0 0 40px rgba(186, 255, 0, 0.18);
+}
+
+.phew-flow-scene[data-scene="ERROR"] .phew-flow-canvas {
+  border-color: rgba(255, 79, 79, 0.42);
+  box-shadow: 0 0 40px rgba(255, 79, 79, 0.12), inset 0 0 44px rgba(255, 79, 79, 0.08);
+}
+
+.phew-flow-scene[data-scene="ERROR"] .phew-flow-beam {
+  background: linear-gradient(90deg, transparent, rgba(255, 79, 79, 0.92), transparent);
+  box-shadow: 0 0 20px rgba(255, 79, 79, 0.36);
+}
+
+.phew-flow-scene[data-scene="ERROR"] .phew-flow-error-shard {
+  animation: phew-error-shard 820ms ease-in-out infinite;
+}
+
+.phew-flow-scene[data-scene="ERROR"] .phew-flow-nft,
+.phew-flow-scene[data-scene="ERROR"] .phew-flow-target {
+  border-color: rgba(255, 79, 79, 0.82);
+  color: #ff6b6b;
+  box-shadow: 0 0 34px rgba(255, 79, 79, 0.24), inset 0 0 28px rgba(255, 79, 79, 0.1);
+}
+
+.phew-flow-scene[data-moment="mint"] .phew-flow-target {
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 50%, rgba(186, 255, 0, 0.18), rgba(0, 0, 0, 0.62) 58%);
+}
+
+.phew-flow-scene[data-moment="mint"] .phew-flow-target-core {
+  border-radius: 999px;
+}
+
+.phew-flow-scene[data-moment="stake"] .phew-flow-target,
+.phew-flow-scene[data-moment="redeem"] .phew-flow-target {
+  transform: perspective(500px) rotateY(-12deg);
+  box-shadow: -16px 0 0 rgba(186, 255, 0, 0.08), 0 0 32px rgba(186, 255, 0, 0.2), inset 0 0 30px rgba(186, 255, 0, 0.12);
+}
+
+.phew-flow-scene[data-moment="stake"] .phew-flow-target::after,
+.phew-flow-scene[data-moment="redeem"] .phew-flow-target::after {
+  content: "";
+  position: absolute;
+  right: -14px;
+  top: 10px;
+  width: 18px;
+  height: calc(100% - 20px);
+  border: 1px solid rgba(186, 255, 0, 0.28);
+  border-left: 0;
+  border-radius: 0 16px 16px 0;
+  background: rgba(186, 255, 0, 0.05);
+}
+
+.phew-flow-scene[data-moment="redeem"] .phew-flow-target {
+  border-color: rgba(22, 215, 210, 0.56);
+  color: #16d7d2;
+}
+
+.phew-flow-scene[data-moment="redeem"] .phew-flow-beam {
+  background: linear-gradient(90deg, transparent, rgba(22, 215, 210, 0.98), rgba(186, 255, 0, 0.68), transparent);
+  box-shadow: 0 0 24px rgba(22, 215, 210, 0.48);
+}
+
+.phew-flow-scene[data-moment="proof"] .phew-flow-scan-rail,
+.phew-flow-scene[data-moment="scan"] .phew-flow-scan-rail {
+  opacity: 1;
+}
+
+.phew-flow-scene[data-moment="proof"] .phew-flow-target,
+.phew-flow-scene[data-moment="scan"] .phew-flow-target {
+  border-radius: 999px;
+  border-color: rgba(22, 215, 210, 0.68);
+  color: #16d7d2;
+}
+
+.phew-flow-scene[data-moment="proof"] .phew-flow-grid,
+.phew-flow-scene[data-moment="scan"] .phew-flow-grid {
+  opacity: 0.42;
+}
+
+.phew-flow-scene[data-moment="reward"] .phew-flow-target {
+  border-radius: 999px;
+  border-color: rgba(244, 197, 66, 0.72);
+  color: #f4c542;
+  box-shadow: 0 0 38px rgba(244, 197, 66, 0.28), inset 0 0 32px rgba(244, 197, 66, 0.12);
 }
 
 .phew-tx-stage {
@@ -618,16 +1497,93 @@ select {
     right: 20%;
   }
 
+  .phew-home-mascot-stage {
+    min-height: 250px;
+  }
+
+  .phew-home-mascot {
+    width: clamp(210px, 76vw, 320px);
+    height: clamp(200px, 72vw, 300px);
+  }
+
+  .phew-home-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
   .phew-coded-mascot {
-    bottom: 3.85rem;
-    width: 68px;
-    height: 66px;
+    left: -0.8rem;
+    bottom: 2.7rem;
+    width: clamp(118px, 42vw, 158px);
+    height: clamp(112px, 40vw, 152px);
   }
 
   .phew-coded-object {
-    bottom: 4.25rem;
-    width: 56px;
-    height: 56px;
+    right: 0.6rem;
+    bottom: 4.65rem;
+    width: 62px;
+    height: 62px;
+  }
+
+  .phew-coded-moment {
+    min-height: 320px;
+  }
+
+  .phew-flow-copy {
+    flex-direction: column;
+  }
+
+  .phew-flow-canvas {
+    min-height: 330px;
+  }
+
+  .phew-flow-scene-compact .phew-flow-canvas {
+    min-height: 310px;
+  }
+
+  .phew-flow-actor {
+    left: -1.15rem;
+    bottom: 2.6rem;
+    width: 158px;
+    height: 154px;
+  }
+
+  .phew-flow-nft {
+    width: 100px;
+    min-height: 144px;
+  }
+
+  .phew-flow-target {
+    right: 0.55rem;
+    bottom: 4.9rem;
+    width: 70px;
+    height: 70px;
+  }
+
+  .phew-flow-target svg {
+    width: 34px;
+    height: 34px;
+  }
+
+  .phew-flow-beam-input {
+    left: 20%;
+    right: 52%;
+  }
+
+  .phew-flow-beam-output {
+    left: 53%;
+    right: 16%;
+  }
+
+  .phew-flow-scenes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .phew-flow-mode-label {
+    max-width: 58%;
+  }
+
+  .phew-flow-telemetry {
+    display: none;
   }
 }
 
@@ -730,6 +1686,9 @@ select {
 .phew-reduced-motion .phew-story-nft,
 .phew-reduced-motion .phew-stage-beam,
 .phew-reduced-motion .phew-motion-image,
+.phew-reduced-motion .phew-home-mascot,
+.phew-reduced-motion .phew-home-mascot-glow,
+.phew-reduced-motion .phew-home-mascot-ring,
 .phew-reduced-motion .phew-aura-pulse,
 .phew-reduced-motion .phew-glow-trail::before,
 .phew-reduced-motion .phew-particle,
@@ -742,8 +1701,20 @@ select {
 .phew-reduced-motion .phew-coded-mascot,
 .phew-reduced-motion .phew-coded-beam,
 .phew-reduced-motion .phew-moment-orbit,
+.phew-reduced-motion .phew-flow-gradient,
+.phew-reduced-motion .phew-flow-orbit,
+.phew-reduced-motion .phew-flow-mascot,
+.phew-reduced-motion .phew-flow-nft,
+.phew-reduced-motion .phew-flow-beam,
+.phew-reduced-motion .phew-flow-impact,
+.phew-reduced-motion .phew-flow-scan-rail,
+.phew-reduced-motion .phew-flow-success-burst,
+.phew-reduced-motion .phew-flow-error-shard,
+.phew-reduced-motion .phew-flow-target-core,
+.phew-reduced-motion .phew-flow-particles span,
 .phew-reduced-motion .phew-loader-ring,
-.phew-reduced-motion .phew-loading-stage::before {
+.phew-reduced-motion .phew-loading-stage::before,
+.phew-reduced-motion .phew-proof-state-loading span {
   animation: none !important;
 }
 
@@ -752,6 +1723,9 @@ select {
   .phew-story-nft,
   .phew-stage-beam,
   .phew-motion-image,
+  .phew-home-mascot,
+  .phew-home-mascot-glow,
+  .phew-home-mascot-ring,
   .phew-aura-pulse,
   .phew-glow-trail::before,
   .phew-particle,
@@ -764,8 +1738,20 @@ select {
   .phew-coded-mascot,
   .phew-coded-beam,
   .phew-moment-orbit,
+  .phew-flow-gradient,
+  .phew-flow-orbit,
+  .phew-flow-mascot,
+  .phew-flow-nft,
+  .phew-flow-beam,
+  .phew-flow-impact,
+  .phew-flow-scan-rail,
+  .phew-flow-success-burst,
+  .phew-flow-error-shard,
+  .phew-flow-target-core,
+  .phew-flow-particles span,
   .phew-loader-ring,
-  .phew-loading-stage::before {
+  .phew-loading-stage::before,
+  .phew-proof-state-loading span {
     animation: none !important;
   }
 }
@@ -867,4 +1853,102 @@ select {
 @keyframes phew-tx-beam {
   0%, 100% { opacity: 0.2; transform: scaleX(0.35); }
   50% { opacity: 0.9; transform: scaleX(1); }
+}
+
+@keyframes phew-hero-energy {
+  0% { transform: translate3d(-2%, -1%, 0) rotate(0deg) scale(1); opacity: 0.38; }
+  50% { opacity: 0.72; }
+  100% { transform: translate3d(2%, 1.5%, 0) rotate(8deg) scale(1.08); opacity: 0.58; }
+}
+
+@keyframes phew-mascot-run {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-5deg) scale(1); }
+  25% { transform: translate3d(8px, -7px, 0) rotate(4deg) scale(1.03); }
+  50% { transform: translate3d(15px, 1px, 0) rotate(-1deg) scale(0.99); }
+  75% { transform: translate3d(6px, -5px, 0) rotate(5deg) scale(1.02); }
+}
+
+@keyframes phew-home-mascot-run {
+  0%, 100% { transform: translateX(-50%) translate3d(0, 0, 0) rotate(-5deg) scale(1); }
+  25% { transform: translateX(-50%) translate3d(8px, -7px, 0) rotate(4deg) scale(1.03); }
+  50% { transform: translateX(-50%) translate3d(15px, 1px, 0) rotate(-1deg) scale(0.99); }
+  75% { transform: translateX(-50%) translate3d(6px, -5px, 0) rotate(5deg) scale(1.02); }
+}
+
+@keyframes phew-actor-push {
+  0%, 100% { transform: translateX(0) scale(1); }
+  45% { transform: translateX(18px) scale(1.03); }
+  65% { transform: translateX(10px) scale(0.98); }
+}
+
+@keyframes phew-nft-charge {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0) rotate(-2deg) scale(0.98);
+    filter: brightness(0.92);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-9px) rotate(2deg) scale(1.04);
+    filter: brightness(1.18);
+  }
+}
+
+@keyframes phew-nft-lock {
+  0% { transform: translate(-50%, -62%) rotate(-2deg) scale(1.03); }
+  60%, 100% { transform: translate(-50%, -50%) rotate(0deg) scale(0.92); }
+}
+
+@keyframes phew-nft-inner-light {
+  0%, 100% { opacity: 0.35; transform: scale(0.96); }
+  50% { opacity: 0.95; transform: scale(1.02); }
+}
+
+@keyframes phew-flow-gradient {
+  0% { transform: translate3d(-4%, 2%, 0) scale(0.92); opacity: 0.46; }
+  100% { transform: translate3d(5%, -3%, 0) scale(1.08); opacity: 0.82; }
+}
+
+@keyframes phew-flow-beam {
+  0%, 100% { opacity: 0.16; transform: scaleX(0.18); }
+  38% { opacity: 1; transform: scaleX(1); }
+  64% { opacity: 0.58; transform: scaleX(0.74); }
+}
+
+@keyframes phew-impact-flash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.42); }
+  30% { opacity: 0.88; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.8); }
+}
+
+@keyframes phew-flow-particle {
+  0% { opacity: 0; transform: rotate(calc(var(--i) * 20deg)) translateX(16px) scale(0.35); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(calc(var(--i) * 20deg)) translateX(150px) scale(1); }
+}
+
+@keyframes phew-target-core {
+  0%, 100% { opacity: 0.42; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+@keyframes phew-scan-rail {
+  0% { opacity: 0; transform: translateX(-28px) scaleY(0.35); }
+  28% { opacity: 1; transform: translateX(-8px) scaleY(1); }
+  66% { opacity: 0.7; transform: translateX(22px) scaleY(0.85); }
+  100% { opacity: 0; transform: translateX(46px) scaleY(0.35); }
+}
+
+@keyframes phew-success-burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.45) rotate(0deg); }
+  32% { opacity: 0.85; transform: translate(-50%, -50%) scale(1) rotate(18deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.55) rotate(72deg); }
+}
+
+@keyframes phew-error-shard {
+  0%, 100% { opacity: 0; filter: blur(0); }
+  35% { opacity: 1; filter: blur(0); }
+  70% { opacity: 0.32; filter: blur(2px); }
+}
+
+@keyframes phew-proof-spin {
+  to { transform: rotate(360deg); }
 }

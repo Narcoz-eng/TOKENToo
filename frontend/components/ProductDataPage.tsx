@@ -26,7 +26,7 @@ import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { useApiResource } from "@/hooks/useApiResource";
 import type { VaultCollection, VaultNft, RaidRoom } from "@/lib/types";
 import { AppShell } from "./AppShell";
-import { EmptyState, ErrorState, FounderStatusPanel, LoadingState, SetupWarning, WalletDisconnectedState } from "./ApiState";
+import { EmptyState, ErrorState, LoadingState, SetupWarning, WalletDisconnectedState } from "./ApiState";
 import { MarketplaceGrid } from "./MarketplaceGrid";
 import { RaidCard } from "./RaidCard";
 import { SectionCard } from "./SectionCard";
@@ -139,11 +139,10 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   return (
     <AppShell active={active} stats={data?.stats}>
       <div className="space-y-5">
-        {active === "home" && privateDiagnostics ? <FounderStatusPanel status={capabilityState.data} /> : null}
-        {active !== "home" ? <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-5">
+        {active !== "home" ? <section className="phew-panel phew-hero-canvas phew-scanline relative overflow-hidden rounded-lg p-5">
           <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-y-0 right-0 hidden h-full w-3/5 object-cover opacity-30 mix-blend-screen lg:block" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/35" />
-          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
+          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center">
             <div className="min-w-0 max-w-4xl">
               <p className="text-sm font-black uppercase text-vault-green">PHEW.DEVNET / Faction OS</p>
               <h1 className="mt-2 max-w-[calc(100vw-4rem)] text-3xl font-black leading-tight sm:max-w-4xl sm:text-4xl">{title}</h1>
@@ -161,7 +160,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
               tokenSymbol={pageMotionSymbol}
               title={motionTitleForPage(active, title)}
               subtitle={motionSubtitleForPage(active)}
-              className="min-h-[200px]"
+              className="min-h-[320px]"
             />
           </div>
         </section> : null}
@@ -306,11 +305,11 @@ function HomeDashboardView({ data }: { data: ProductData }) {
   const totalVaults = stats.totalVaults ?? stats.vaults ?? stats.nfts;
   return (
     <div className="space-y-6">
-      <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg">
-        <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-48 mix-blend-screen xl:w-[58%]" />
+      <section className="phew-panel phew-hero-canvas phew-scanline relative overflow-hidden rounded-lg">
+        <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-20 mix-blend-screen xl:w-[52%]" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/34" />
         <div className="absolute inset-0 grid-mask opacity-35" />
-        <div className="relative grid gap-8 p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="relative grid gap-8 p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_520px]">
           <div className="min-w-0 max-w-4xl">
             <div className="flex flex-wrap gap-2">
               <StatusPill accent="green">Protocol Dashboard</StatusPill>
@@ -327,17 +326,23 @@ function HomeDashboardView({ data }: { data: ProductData }) {
               </Link>
             </div>
           </div>
-          <div className="min-w-0 rounded-lg border border-vault-green/25 bg-black/50 p-4 shadow-green">
-            <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="phew-home-hero-actor min-w-0">
+            <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-black uppercase text-white">Protocol Overview</p>
               <StatusPill accent={protocolState.data?.ok ? "green" : "gold"}>{protocolState.data?.ok ? "Live" : "N/A"}</StatusPill>
             </div>
-            <img src={brandAssets.mascot} alt="Phew mascot" className="mx-auto size-32 object-contain drop-shadow-[0_0_28px_rgba(186,255,0,0.35)]" />
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="phew-home-mascot-stage mt-2">
+              <span className="phew-home-mascot-glow" />
+              <span className="phew-home-mascot-ring" />
+              <img src={brandAssets.mascot} alt="Phew mascot" className="phew-home-mascot" />
+            </div>
+            <div className="phew-home-stat-grid mt-3 grid grid-cols-2 gap-3">
               <MiniStat label="TVL" value={formatCurrency(stats.tvlUsd)} />
               <MiniStat label="Vaults" value={formatMetric(totalVaults)} />
               <MiniStat label="Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} />
+              <MiniStat label="Phews Minted" value={formatMetric(stats.phewsMinted ?? stats.nfts)} />
               <MiniStat label="Trades" value={formatMetric(stats.totalTrades)} />
+              <MiniStat label="Unique Wallets" value={formatMetric(stats.uniqueWallets)} />
             </div>
           </div>
         </div>

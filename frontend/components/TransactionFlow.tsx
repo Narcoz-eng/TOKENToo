@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckCircle2, CircleAlert, Clock3, Loader2, LockKeyhole, PackageCheck, RadioTower, Send, ShieldCheck, Sparkles, Undo2, WalletCards } from "lucide-react";
+import { CheckCircle2, CircleAlert, Flame, LockKeyhole, PackageCheck, RadioTower, ShieldCheck, Sparkles, Vault, WalletCards, Zap } from "lucide-react";
+import type { CSSProperties } from "react";
 import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
@@ -13,12 +14,9 @@ export type TransactionFlowStep = {
   detail: string;
 };
 
-const defaultSteps: TransactionFlowStep[] = [
-  { state: "preparing", label: "Prepare", detail: "Backend checks inputs" },
-  { state: "signing", label: "Sign", detail: "Wallet approval" },
-  { state: "sending", label: "Send", detail: "Submit transaction" },
-  { state: "confirming", label: "Confirm", detail: "Await chain/backend state" }
-];
+type FlowScene = "INIT" | "TRANSFER" | "VALIDATE" | "LOCK" | "SUCCESS" | "ERROR";
+
+const sceneOrder: FlowScene[] = ["INIT", "TRANSFER", "VALIDATE", "LOCK", "SUCCESS"];
 
 export function TransactionFlow({
   state,
@@ -26,7 +24,6 @@ export function TransactionFlow({
   description,
   tokenSymbol,
   image,
-  steps = defaultSteps,
   detail,
   className,
   compact = false,
@@ -43,118 +40,148 @@ export function TransactionFlow({
   compact?: boolean;
   moment?: TransactionFlowMoment;
 }) {
-  const activeIndex = flowIndex(state, steps);
-  const status = flowStatusLabel(state);
   const visualMoment = normalizeMoment(moment ?? inferMoment(title));
-  const active = state !== "idle" && state !== "error";
+  const scene = sceneForState(state);
+  const activeIndex = sceneOrder.indexOf(scene === "ERROR" ? "INIT" : scene);
+  const TargetIcon = targetIcon(visualMoment);
+  const telemetry = telemetryRows(visualMoment, state);
+
   return (
-    <div className={cn("transaction-flow min-w-0 max-w-full rounded-lg border border-vault-line bg-black/30 p-4", compact ? "space-y-3" : "space-y-4", className)} data-state={state} data-moment={visualMoment}>
-      <div className="flex items-start gap-4">
-        <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border border-vault-green/20 bg-black/40">
-          {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <img src={brandAssets.mascot} alt="" className="size-12 object-contain opacity-95" />}
-          <span className={cn("absolute inset-0 border border-transparent", state === "success" && "border-vault-green/60", state === "error" && "border-vault-red/60")} />
+    <section className={cn("transaction-flow phew-flow-scene", compact && "phew-flow-scene-compact", className)} data-state={state} data-scene={scene} data-moment={visualMoment}>
+      <div className="phew-flow-copy">
+        <div>
+          <p className="text-[10px] font-black uppercase text-vault-green">{tokenSymbol || "PHEW"} / {scene}</p>
+          <h2 className="mt-1 text-sm font-black uppercase text-white">{title}</h2>
+          {description ? <p className="mt-1 max-w-sm text-xs leading-5 text-slate-400">{description}</p> : null}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-black uppercase text-white">{title}</p>
-              {description ? <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p> : null}
-            </div>
-            <span className={cn("inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-black uppercase", badgeClass(state))}>
-              {stateIcon(state)}
-              {status}
-            </span>
-          </div>
-          {tokenSymbol ? <p className="mt-2 text-xs font-black uppercase text-vault-green">{tokenSymbol}</p> : null}
-        </div>
+        <span className={cn("inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[10px] font-black uppercase", badgeClass(state))}>
+          {stateIcon(state)}
+          {flowStatusLabel(state)}
+        </span>
       </div>
 
-      <div className={cn("phew-tx-stage", compact && "phew-tx-stage-compact", active && "phew-tx-stage-active", state === "success" && "phew-tx-stage-success", state === "error" && "phew-tx-stage-error")} data-state={state} data-moment={visualMoment}>
-        <div className="phew-tx-stage-head">
-          <div>
-            <p className="text-[10px] font-black uppercase text-vault-green">{tokenSymbol || "PHEW"} flow</p>
-            <p className="mt-1 text-sm font-black text-white">{momentTitle(visualMoment)}</p>
-          </div>
-          <span className={cn("inline-flex items-center gap-2 rounded-md border px-2 py-1 text-[10px] font-black uppercase", badgeClass(state))}>
-            {stateIcon(state)}
-            {status}
-          </span>
+      <div className="phew-flow-canvas" aria-label={`${title} ${scene.toLowerCase()} scene`}>
+        <div className="phew-flow-mode-label" aria-hidden="true">
+          <span>{modeKicker(visualMoment)}</span>
+          <strong>{modeHeadline(visualMoment)}</strong>
         </div>
-        <span className="phew-tx-orbit phew-tx-orbit-a" />
-        <span className="phew-tx-orbit phew-tx-orbit-b" />
-        <span className="phew-tx-beam" />
-        <span className="phew-tx-floor" />
-        <img src={brandAssets.mascot} alt="" className="phew-tx-mascot" />
-        <div className="phew-tx-nft">
+        <span className="phew-flow-gradient phew-flow-gradient-a" />
+        <span className="phew-flow-gradient phew-flow-gradient-b" />
+        <span className="phew-flow-grid" />
+        <span className="phew-flow-floor" />
+        <span className="phew-flow-orbit phew-flow-orbit-a" />
+        <span className="phew-flow-orbit phew-flow-orbit-b" />
+        <span className="phew-flow-orbit phew-flow-orbit-c" />
+        <span className="phew-flow-beam phew-flow-beam-input" />
+        <span className="phew-flow-beam phew-flow-beam-output" />
+        <span className="phew-flow-impact" />
+        <span className="phew-flow-scan-rail phew-flow-scan-rail-a" />
+        <span className="phew-flow-scan-rail phew-flow-scan-rail-b" />
+        <span className="phew-flow-success-burst" />
+        <span className="phew-flow-error-shard phew-flow-error-shard-a" />
+        <span className="phew-flow-error-shard phew-flow-error-shard-b" />
+        <span className="phew-flow-error-shard phew-flow-error-shard-c" />
+
+        <div className="phew-flow-actor" aria-hidden="true">
+          <span className="phew-flow-actor-aura" />
+          <img src={brandAssets.mascot} alt="" className="phew-flow-mascot" />
+        </div>
+
+        <div className="phew-flow-nft" aria-hidden="true">
+          <span className="phew-flow-nft-light" />
           {image ? (
             <img src={image} alt="" className="h-full w-full rounded-md object-cover" />
           ) : (
-            <div className="grid h-full w-full place-items-center rounded-md bg-[radial-gradient(circle_at_50%_26%,rgba(186,255,0,0.18),rgba(0,0,0,0.9)_62%)]">
+            <div className="grid h-full w-full place-items-center rounded-md bg-[radial-gradient(circle_at_50%_25%,rgba(186,255,0,0.22),rgba(0,0,0,0.86)_62%)]">
               <div className="text-center">
-                <WalletCards className="mx-auto size-7 text-slate-400" />
-                <p className="mt-2 text-[10px] font-black uppercase text-vault-green">NFT art slot</p>
+                <WalletCards className="mx-auto size-7 text-vault-green" />
+                <p className="mt-2 text-[10px] font-black uppercase text-vault-green">NFT</p>
               </div>
             </div>
           )}
-          <span className="mt-2 inline-flex max-w-full rounded-md border border-vault-green/35 bg-black/60 px-2 py-1 text-[10px] font-black uppercase text-vault-green">{tokenSymbol || "Token symbol"}</span>
+          <span>{tokenSymbol || "PHEW"}</span>
         </div>
-        <div className="phew-tx-object">
-          <StageObject moment={visualMoment} state={state} />
-          <span className="phew-tx-action-label">{objectLabel(visualMoment, state)}</span>
+
+        <div className="phew-flow-target" aria-hidden="true">
+          <span className="phew-flow-target-core" />
+          <TargetIcon className="size-12" />
+          <span>{targetLabel(visualMoment)}</span>
         </div>
-        <div className="absolute bottom-3 left-4 right-4 z-10 flex items-center justify-center gap-2">
-          {steps.map((step, index) => {
-            const complete = state === "success" || (activeIndex >= 0 && index < activeIndex);
-            const current = step.state === state || (state === "idle" && index === 0);
-            return <span key={`${step.state}-dot`} className={cn("h-1.5 flex-1 max-w-16 rounded-full border border-vault-line bg-black/60", complete && "border-vault-green bg-vault-green", current && !complete && "border-vault-cyan bg-vault-cyan")} />;
-          })}
+
+        <div className="phew-flow-telemetry" aria-hidden="true">
+          {telemetry.map((row) => (
+            <div key={row.label}>
+              <span>{row.label}</span>
+              <strong>{row.value}</strong>
+            </div>
+          ))}
+        </div>
+
+        <div className="phew-flow-particles" aria-hidden="true">
+          {Array.from({ length: 18 }, (_, index) => <span key={index} style={{ "--i": index } as CSSProperties} />)}
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-4">
-        {steps.map((step, index) => {
-          const active = step.state === state;
-          const complete = state === "success" || (activeIndex >= 0 && index < activeIndex);
-          return (
-            <div key={step.state} className={cn("rounded-md border px-3 py-3", complete ? "border-vault-green/35 bg-vault-green/8" : active ? "border-vault-cyan/45 bg-vault-cyan/8" : "border-vault-line bg-black/25")}>
-              <div className="flex items-center justify-between gap-2">
-                <p className={cn("text-xs font-black uppercase", complete ? "text-vault-green" : active ? "text-vault-cyan" : "text-slate-500")}>{step.label}</p>
-                {complete ? <CheckCircle2 className="size-3.5 text-vault-green" /> : active ? <Loader2 className="size-3.5 animate-spin text-vault-cyan" /> : <Clock3 className="size-3.5 text-slate-600" />}
-              </div>
-              {!compact ? <p className="mt-1 text-xs leading-5 text-slate-500">{step.detail}</p> : null}
-            </div>
-          );
-        })}
+      <div className="phew-flow-scenes" aria-hidden="true">
+        {sceneOrder.map((item, index) => (
+          <span key={item} className={cn(index <= activeIndex && scene !== "ERROR" && "is-active", scene === item && "is-current")}>
+            {item}
+          </span>
+        ))}
+        <span className={cn(scene === "ERROR" && "is-error")}>ERROR</span>
       </div>
 
       {detail ? (
-        <div className={cn("rounded-md border px-3 py-2 text-xs", state === "error" ? "border-vault-red/35 bg-vault-red/10 text-vault-red" : "border-vault-line bg-black/25 text-slate-400")}>
+        <p className={cn("phew-flow-detail", state === "error" ? "border-vault-red/35 bg-vault-red/10 text-vault-red" : "border-vault-line bg-black/25 text-slate-300")}>
           {detail}
-        </div>
+        </p>
       ) : null}
-    </div>
+    </section>
   );
 }
 
-function StageObject({ moment, state }: { moment: TransactionFlowMoment; state: TransactionFlowState }) {
-  if (state === "success") return <CheckCircle2 className="size-12 text-vault-green" />;
-  if (state === "error") return <CircleAlert className="size-12 text-vault-red" />;
-  if (moment === "stake") return <LockKeyhole className="size-11 text-vault-green" />;
-  if (moment === "unstake" || moment === "redeem") return <Undo2 className="size-11 text-vault-cyan" />;
-  if (moment === "proof") return <ShieldCheck className="size-11 text-vault-green" />;
-  if (moment === "community" || moment === "scan") return <RadioTower className="size-11 text-vault-cyan" />;
-  if (moment === "studio") return <PackageCheck className="size-11 text-vault-green" />;
-  if (moment === "reward") return <Sparkles className="size-11 text-vault-gold" />;
-  return <WalletCards className="size-11 text-vault-green" />;
+function targetIcon(moment: ReturnType<typeof normalizeMoment>) {
+  if (moment === "stake" || moment === "mint") return Vault;
+  if (moment === "redeem") return Vault;
+  if (moment === "unstake") return Flame;
+  if (moment === "proof") return ShieldCheck;
+  if (moment === "reward") return Sparkles;
+  if (moment === "community" || moment === "scan") return RadioTower;
+  if (moment === "studio") return PackageCheck;
+  return Vault;
 }
 
-function normalizeMoment(moment: TransactionFlowMoment) {
-  if (moment === "community-launch") return "community";
-  if (moment === "studio-bible") return "studio";
-  return moment;
+function targetLabel(moment: ReturnType<typeof normalizeMoment>) {
+  const labels: Record<ReturnType<typeof normalizeMoment>, string> = {
+    mint: "mint",
+    stake: "lock",
+    unstake: "release",
+    redeem: "unlock",
+    proof: "proof",
+    community: "launch",
+    studio: "studio",
+    reward: "reward",
+    scan: "scan"
+  };
+  return labels[moment];
 }
 
-function momentTitle(moment: ReturnType<typeof normalizeMoment>) {
+function modeKicker(moment: ReturnType<typeof normalizeMoment>) {
+  const labels: Record<ReturnType<typeof normalizeMoment>, string> = {
+    mint: "Creation field",
+    stake: "Vault transfer",
+    unstake: "Release route",
+    redeem: "Redeem moment",
+    proof: "Verification scan",
+    community: "Launch uplink",
+    studio: "Studio compile",
+    reward: "Reward route",
+    scan: "Token scan"
+  };
+  return labels[moment];
+}
+
+function modeHeadline(moment: ReturnType<typeof normalizeMoment>) {
   const labels: Record<ReturnType<typeof normalizeMoment>, string> = {
     mint: "Mint storyboard",
     stake: "Stake storyboard",
@@ -162,28 +189,69 @@ function momentTitle(moment: ReturnType<typeof normalizeMoment>) {
     redeem: "Redeem storyboard",
     proof: "Proof storyboard",
     community: "Community launch",
-    studio: "Studio bible",
-    reward: "Reward claim",
-    scan: "Token scan"
+    studio: "Setup engine",
+    reward: "Reward activation",
+    scan: "Risk scan"
   };
   return labels[moment];
 }
 
-function objectLabel(moment: ReturnType<typeof normalizeMoment>, state: TransactionFlowState) {
-  if (state === "success") return "confirmed";
-  if (state === "error") return "blocked";
-  const labels: Record<ReturnType<typeof normalizeMoment>, string> = {
-    mint: "mint",
-    stake: "lock",
-    unstake: "unlock",
-    redeem: "burn",
-    proof: "verify",
-    community: "launch",
-    studio: "build",
-    reward: "claim",
-    scan: "scan"
+function telemetryRows(moment: ReturnType<typeof normalizeMoment>, state: TransactionFlowState) {
+  const status = flowStatusLabel(state).toUpperCase();
+  const rows: Record<ReturnType<typeof normalizeMoment>, Array<{ label: string; value: string }>> = {
+    mint: [
+      { label: "Collection", value: "N/A" },
+      { label: "Reserve", value: "N/A" },
+      { label: "Status", value: status }
+    ],
+    stake: [
+      { label: "Owner", value: "N/A" },
+      { label: "Stake vault", value: "N/A" },
+      { label: "Status", value: status }
+    ],
+    unstake: [
+      { label: "Position", value: "N/A" },
+      { label: "Release", value: "N/A" },
+      { label: "Status", value: status }
+    ],
+    redeem: [
+      { label: "Owner proof", value: "N/A" },
+      { label: "Reserve vault", value: "N/A" },
+      { label: "Status", value: status }
+    ],
+    proof: [
+      { label: "Owner check", value: "N/A" },
+      { label: "Reserve check", value: "N/A" },
+      { label: "Status", value: status }
+    ],
+    community: [
+      { label: "Token scan", value: "N/A" },
+      { label: "Launch PDA", value: "N/A" },
+      { label: "Status", value: status }
+    ],
+    studio: [
+      { label: "Provider", value: "N/A" },
+      { label: "Layer pack", value: "N/A" },
+      { label: "Status", value: status }
+    ],
+    reward: [
+      { label: "Reward token", value: "N/A" },
+      { label: "Engine", value: "N/A" },
+      { label: "Status", value: status }
+    ],
+    scan: [
+      { label: "Token", value: "N/A" },
+      { label: "Risk", value: "N/A" },
+      { label: "Status", value: status }
+    ]
   };
-  return labels[moment];
+  return rows[moment];
+}
+
+function normalizeMoment(moment: TransactionFlowMoment) {
+  if (moment === "community-launch") return "community";
+  if (moment === "studio-bible") return "studio";
+  return moment;
 }
 
 function inferMoment(title: string): TransactionFlowMoment {
@@ -199,6 +267,15 @@ function inferMoment(title: string): TransactionFlowMoment {
   return "mint";
 }
 
+function sceneForState(state: TransactionFlowState): FlowScene {
+  if (state === "success") return "SUCCESS";
+  if (state === "error") return "ERROR";
+  if (state === "confirming") return "LOCK";
+  if (state === "preparing") return "VALIDATE";
+  if (state === "signing" || state === "sending") return "TRANSFER";
+  return "INIT";
+}
+
 export function transactionStateFromTxStatus(status: string | null | undefined): TransactionFlowState {
   if (!status) return "idle";
   const normalized = status.toLowerCase();
@@ -211,20 +288,13 @@ export function transactionStateFromTxStatus(status: string | null | undefined):
   return "idle";
 }
 
-function flowIndex(state: TransactionFlowState, steps: TransactionFlowStep[]) {
-  if (state === "idle") return -1;
-  if (state === "success") return steps.length;
-  if (state === "error") return -1;
-  return steps.findIndex((step) => step.state === state);
-}
-
 function flowStatusLabel(state: TransactionFlowState) {
   const labels: Record<TransactionFlowState, string> = {
-    idle: "Ready",
-    preparing: "Preparing",
-    signing: "Signing",
-    sending: "Sending",
-    confirming: "Confirming",
+    idle: "Init",
+    preparing: "Validate",
+    signing: "Transfer",
+    sending: "Transfer",
+    confirming: "Lock",
     success: "Success",
     error: "Error"
   };
@@ -232,18 +302,17 @@ function flowStatusLabel(state: TransactionFlowState) {
 }
 
 function badgeClass(state: TransactionFlowState) {
-  if (state === "success") return "border-vault-green/45 bg-vault-green/10 text-vault-green";
-  if (state === "error") return "border-vault-red/45 bg-vault-red/10 text-vault-red";
-  if (state === "idle") return "border-vault-line bg-black/30 text-slate-400";
-  return "border-vault-cyan/40 bg-vault-cyan/10 text-vault-cyan";
+  if (state === "success") return "border-vault-green/70 bg-vault-green/15 text-vault-green shadow-green";
+  if (state === "error") return "border-vault-red/70 bg-vault-red/15 text-vault-red";
+  if (state === "idle") return "border-vault-line bg-black/30 text-slate-300";
+  return "border-vault-cyan/55 bg-vault-cyan/12 text-vault-cyan";
 }
 
 function stateIcon(state: TransactionFlowState) {
   if (state === "success") return <CheckCircle2 className="size-3.5" />;
   if (state === "error") return <CircleAlert className="size-3.5" />;
-  if (state === "signing") return <WalletCards className="size-3.5" />;
-  if (state === "sending") return <Send className="size-3.5" />;
-  if (state === "confirming") return <ShieldCheck className="size-3.5" />;
-  if (state === "preparing") return <Loader2 className="size-3.5 animate-spin" />;
+  if (state === "confirming") return <LockKeyhole className="size-3.5" />;
+  if (state === "preparing") return <ShieldCheck className="size-3.5" />;
+  if (state === "signing" || state === "sending") return <Zap className="size-3.5" />;
   return <RadioTower className="size-3.5" />;
 }

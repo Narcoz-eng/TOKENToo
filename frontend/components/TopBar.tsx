@@ -10,7 +10,7 @@ export function TopBar() {
   const wallet = useWalletDisplay();
 
   return (
-    <header className="sticky top-0 z-20 w-full max-w-[100vw] overflow-hidden border-b border-white/10 bg-[#020806]/90 backdrop-blur-xl">
+    <header className="phew-topbar sticky top-0 z-20 w-full max-w-[100vw] overflow-hidden border-b border-white/10 bg-[#020806]/90 backdrop-blur-xl">
       <div className="flex min-h-16 items-center gap-3 px-4 sm:px-5 lg:px-6">
         <Link href="/home" className="lg:hidden" aria-label="Phew home">
           <BrandLogo compact />

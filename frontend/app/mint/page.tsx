@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock3, ExternalLink, LockKeyhole, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { EmptyState, ErrorState, WalletDisconnectedState } from "@/components/ApiState";
+import { ErrorState, WalletDisconnectedState } from "@/components/ApiState";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { useApiResource } from "@/hooks/useApiResource";
@@ -148,10 +148,10 @@ export default function MintPage() {
     return (
       <AppShell active="mint">
         <div className="space-y-6">
-          <section className="phew-panel relative overflow-hidden rounded-lg">
+          <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg">
             <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-52" />
             <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/36" />
-            <div className="relative grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="relative grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_520px]">
               <div className="max-w-3xl">
                 <div className="flex flex-wrap gap-2">
                   <StatusPill accent="green">Mint Vault NFT</StatusPill>
@@ -191,21 +191,47 @@ export default function MintPage() {
         {collectionState.error ? <ErrorState error={collectionState.error} retry={collectionState.reload} /> : null}
         {!collectionState.error && !mintableCollections.length ? (
           <>
-            <EmptyState
-              title="No mint-eligible launched communities"
-              body="Minting is hidden until the backend returns a launched collection with a confirmed collection asset, reserve PDA, and Premium production profile. No preview collection is shown here."
-              action={<Link href="/create-community" className="inline-flex h-11 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-bold text-vault-green">Create Community</Link>}
-            />
+            <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg">
+              <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-46" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/40" />
+              <div className="relative grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
+                <div className="max-w-3xl">
+                  <div className="flex flex-wrap gap-2">
+                    <StatusPill accent="green">Mint Vault NFT</StatusPill>
+                    <StatusPill accent="gold">No eligible community</StatusPill>
+                  </div>
+                  <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">No mint-eligible launched communities yet.</h1>
+                  <p className="mt-3 text-sm text-slate-300">
+                    Minting stays locked until the backend returns a launched collection with a confirmed collection asset, reserve PDA, and Premium production profile.
+                  </p>
+                  <div className="mt-6">
+                    <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
+                      Create Community <ArrowRight className="size-4" />
+                    </Link>
+                  </div>
+                </div>
+                <TransactionFlow
+                  state="idle"
+                  moment="mint"
+                  title="Mint Vault NFT"
+                  description="Input community tokens, transform through reserve validation, output a verified Vault NFT when backend eligibility exists."
+                  image={null}
+                  tokenSymbol="PHEW"
+                  detail="Awaiting eligible launched community"
+                  compact
+                />
+              </div>
+            </section>
             <MintEmptyWorkspace />
           </>
         ) : null}
 
         {collection ? (
           <>
-            <section className="phew-panel relative overflow-hidden rounded-lg">
+            <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg">
               <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-52" />
               <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/36" />
-              <div className="relative grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="relative grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_520px]">
                 <div className="max-w-3xl">
                   <div className="flex flex-wrap gap-2">
                     <StatusPill accent="green">Mint Vault NFT</StatusPill>

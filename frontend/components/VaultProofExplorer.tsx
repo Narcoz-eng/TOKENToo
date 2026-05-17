@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { FileSearch, Search, ShieldCheck, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { ExternalLink, FileSearch, LockKeyhole, Search, ShieldCheck, TriangleAlert, Undo2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { apiFetch, unwrapApiData } from "@/lib/api";
-import { brandAssets } from "@/lib/brand-assets";
 import { ProtocolTrustStrip, proofTrust } from "@/components/protocol-trust";
 import { TransactionFlow } from "@/components/TransactionFlow";
 
@@ -85,24 +84,57 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
   return (
     <AppShell active="proof">
       <div className="space-y-6">
-        <section className="phew-panel relative overflow-hidden rounded-lg p-5">
-          <img src={brandAssets.vaultHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-38" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/48" />
-          <div className="relative max-w-4xl">
-            <StatusPill accent="green">Proof Explorer</StatusPill>
-            <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl">Verify owner, locked amount, reserve PDA, redeemability, and stake state.</h1>
-            {allowSearch ? (
-              <div className="mt-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
-                <label className="relative block">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-vault-green" />
-                  <input value={mint} onChange={(event) => setMint(event.target.value)} className="phew-input h-12 w-full rounded-md pl-11 pr-4 text-sm" placeholder="Vault NFT mint or id" />
-                </label>
-                <button onClick={() => void loadProof(mint)} className="phew-button phew-button-primary h-12 rounded-md px-5 text-sm font-black text-black" disabled={loading}>
-                  {loading ? "Checking" : "Verify"}
-                </button>
+        <section className="phew-panel phew-proof-hero relative overflow-hidden rounded-lg p-5">
+          <div className="absolute inset-0 grid-mask opacity-20" />
+          <div className="relative flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold text-slate-400">Vaults <span className="mx-2 text-slate-600">/</span> Mint Details <span className="mx-2 text-slate-600">/</span> Proof Explorer</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-black leading-tight sm:text-4xl">Proof Explorer</h1>
+                <StatusPill accent="green">Beta</StatusPill>
               </div>
-            ) : null}
-            {error ? <p className="mt-3 rounded-md border border-vault-red/35 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</p> : null}
+              <p className="mt-2 max-w-3xl text-sm text-slate-300">Verify on-chain ownership, reserve lock, and protocol state for this NFT mint.</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <a href="https://explorer.solana.com/?cluster=devnet" className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-200" target="_blank" rel="noreferrer">
+                Open in Explorer <ExternalLink className="size-4" />
+              </a>
+              <a href="/proof" className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-200">
+                Proof Docs <ExternalLink className="size-4" />
+              </a>
+            </div>
+          </div>
+          <div className="relative mt-6 grid gap-4 rounded-lg border border-vault-line bg-black/24 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)] xl:items-center">
+            {allowSearch ? (
+              <label className="relative block">
+                <span className="mb-3 block text-sm font-black text-white">NFT Mint</span>
+                <Search className="pointer-events-none absolute left-4 top-[3.05rem] size-4 text-vault-green" />
+                <input value={mint} onChange={(event) => setMint(event.target.value)} className="phew-input h-12 w-full rounded-md pl-11 pr-4 text-sm" placeholder="Enter or paste NFT mint address on Solana" />
+              </label>
+            ) : (
+              <div>
+                <span className="mb-3 block text-sm font-black text-white">NFT Mint</span>
+                <p className="h-12 rounded-md border border-vault-line bg-black/25 px-4 py-3 text-sm text-slate-400">{mint || "N/A"}</p>
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_148px] sm:items-end">
+              <div className="min-w-0">
+                <span className="mb-3 block text-sm font-black text-white">Mint Loaded</span>
+                <div className="flex items-center gap-3 rounded-md border border-vault-line bg-black/25 p-2">
+                  <div className="grid size-11 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10">
+                    <FileSearch className="size-5 text-vault-green" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black">{proof?.collectionName ?? "No mint loaded"}</p>
+                    <p className="truncate text-xs text-slate-400">{proof?.tokenSymbol ?? (mint || "Awaiting input")}</p>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => void loadProof(mint)} className="phew-button phew-button-primary h-12 rounded-md px-5 text-sm font-black text-black" disabled={loading || !allowSearch}>
+                {loading ? "Checking" : "Verify"}
+              </button>
+            </div>
+            {error ? <p className="xl:col-span-2 rounded-md border border-vault-red/35 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</p> : null}
           </div>
         </section>
 
@@ -170,45 +202,120 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
 
 function ProofEmptyWorkspace({ mint, allowSearch }: { mint: string; allowSearch: boolean }) {
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <main className="space-y-5">
-        <SectionCard title="Vault Proof">
-          <div className="mb-4 flex items-start gap-3 rounded-md border border-vault-gold/30 bg-vault-gold/10 p-3 text-sm text-slate-300">
-            <FileSearch className="size-5 shrink-0 text-vault-gold" />
-            <p>{allowSearch ? "Enter a confirmed Vault NFT mint to inspect live reserve mapping." : "The requested Vault NFT proof is unavailable from the backend."}</p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <ProofRow label="NFT mint" value={mint || "N/A"} />
-            <ProofRow label="Owner" value="N/A" />
-            <ProofRow label="Locked amount" value="N/A" />
-            <ProofRow label="Reserve PDA" value="N/A" />
-            <ProofRow label="Redeemability" value="N/A" />
-            <ProofRow label="Stake status" value="N/A" />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Verification Checks">
-          <div className="grid gap-3 md:grid-cols-3">
-            <StatusLine label="Owner proof" ok={false} />
-            <StatusLine label="Reserve active" ok={false} />
-            <StatusLine label="Production proof" ok={false} />
-          </div>
-        </SectionCard>
-      </main>
-
-      <aside className="space-y-5">
-        <SectionCard title="Proof Status">
+    <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.8fr)_minmax(320px,0.9fr)]">
+        <SectionCard title="Proof Verification" className="phew-proof-card">
           <TransactionFlow
             state="idle"
             moment="proof"
             title="Proof verification"
             description="Awaiting proof endpoint data before owner, reserve, and redeem checks are marked ready."
             tokenSymbol="PHEW"
-            detail="Last verified N/A"
+            detail={allowSearch ? "Enter a confirmed Vault NFT mint to inspect live reserve mapping." : "The requested Vault NFT proof is unavailable from the backend."}
             compact
           />
+          <ProofAnimationStates />
         </SectionCard>
-      </aside>
+
+        <SectionCard title="Proof Data" className="phew-proof-card">
+          <div className="grid gap-2">
+            <ProofRow label="Owner Wallet" value="N/A" />
+            <ProofRow label="Locked Amount" value="N/A" />
+            <ProofRow label="Reserve PDA" value="N/A" />
+            <ProofRow label="Position PDA" value="N/A" />
+            <ProofRow label="Collection Asset" value="N/A" />
+            <ProofRow label="Token Mint" value={mint || "N/A"} />
+            <ProofRow label="Unlock Date" value="N/A" />
+            <ProofRow label="Redeemed Date" value="N/A" />
+          </div>
+          <button className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-vault-line bg-black/25 text-sm font-bold text-slate-400" disabled>
+            Raw Proof (JSON) <LockKeyhole className="size-4" />
+          </button>
+        </SectionCard>
+
+        <SectionCard title="Verification Checklist" className="phew-proof-card">
+          <div className="space-y-2">
+            <StatusLine label="Live Owner Proof" ok={false} />
+            <StatusLine label="Owner Matches DB" ok={false} />
+            <StatusLine label="Collection Matches" ok={false} />
+            <StatusLine label="Reserve Lock Active" ok={false} />
+            <StatusLine label="Production Proof" ok={false} />
+          </div>
+          <div className="mt-4 rounded-lg border border-vault-line bg-white/[0.03] p-5 text-center">
+            <LockKeyhole className="mx-auto mb-2 size-5 text-slate-500" />
+            <p className="font-black text-slate-300">Proof Not Verified Yet</p>
+            <p className="mt-1 text-sm text-slate-500">All checks must pass to enable actions.</p>
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.72fr)_minmax(320px,0.9fr)]">
+        <SectionCard title="Proof Check Details" className="phew-proof-card">
+          <div className="grid gap-2">
+            {["Owner Proof", "Reserve Proof", "Position Proof", "Metadata Proof"].map((label) => (
+              <div key={label} className="grid grid-cols-[1fr_1fr_90px] gap-3 border-b border-vault-line py-2 text-sm last:border-0">
+                <span className="text-slate-300">{label}</span>
+                <span className="text-slate-500">/api/proof/{label.toLowerCase().split(" ")[0]}</span>
+                <span className="text-vault-gold">Pending</span>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Issues" className="phew-proof-card">
+          <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-6 text-center">
+            <TriangleAlert className="mx-auto mb-3 size-7 text-slate-400" />
+            <p className="font-black">No issues detected yet.</p>
+            <p className="mt-2 text-sm text-slate-500">Issues will appear here if any check fails.</p>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Actions" className="phew-proof-card">
+          <div className="grid gap-3">
+            <ProofLockedAction icon={<Undo2 className="size-5" />} title="Redeem NFT" body="Redeem and unlock your NFT." />
+            <ProofLockedAction icon={<ShieldCheck className="size-5" />} title="Stake Vault NFT" body="Stake to earn rewards." />
+          </div>
+          <div className="mt-4 rounded-lg border border-vault-line bg-white/[0.03] p-4 text-center text-sm text-slate-400">
+            Actions locked. Complete verification to enable actions.
+          </div>
+        </SectionCard>
+      </div>
+    </div>
+  );
+}
+
+function ProofAnimationStates() {
+  return (
+    <div className="mt-4">
+      <p className="mb-3 text-sm font-black text-white">Animation States <span className="font-normal text-slate-400">for CSS recreation</span></p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[
+          ["Idle", "idle"],
+          ["Loading", "loading"],
+          ["Success", "success"],
+          ["Error", "error"]
+        ].map(([label, tone]) => (
+          <div key={tone} className={`phew-proof-state phew-proof-state-${tone}`}>
+            <span />
+            <strong>{label}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProofLockedAction({ icon, title, body }: { icon: ReactNode; title: string; body: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-vault-line bg-black/25 p-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10 text-vault-green">{icon}</span>
+        <span className="min-w-0">
+          <strong className="block truncate text-sm text-white">{title}</strong>
+          <span className="block truncate text-xs text-slate-500">{body}</span>
+        </span>
+      </div>
+      <LockKeyhole className="size-4 shrink-0 text-slate-500" />
     </div>
   );
 }

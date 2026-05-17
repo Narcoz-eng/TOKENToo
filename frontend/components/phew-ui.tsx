@@ -452,7 +452,7 @@ function GenericVaultArt({ tokenSymbol, compact = false }: { tokenSymbol?: strin
   return (
     <div className={cn("grid aspect-[4/5] w-full place-items-center rounded-md border border-vault-green/35 bg-[radial-gradient(circle_at_50%_25%,rgba(186,255,0,0.25),rgba(3,9,11,0.92)_50%,rgba(0,0,0,0.98))]", compact ? "p-2" : "p-4")}>
       <div className="text-center">
-        <img src={brandAssets.mascot} alt="" className={cn("mx-auto object-contain drop-shadow-[0_0_20px_rgba(186,255,0,0.28)]", compact ? "size-12" : "size-20")} />
+        <WalletCards className={cn("mx-auto text-vault-green drop-shadow-[0_0_20px_rgba(186,255,0,0.38)]", compact ? "size-12" : "size-20")} />
         <p className="mt-3 text-sm font-black text-vault-green">{tokenSymbol || "PHEW"}</p>
         <p className="mt-1 text-[10px] font-bold uppercase text-slate-500">Vault NFT</p>
       </div>

@@ -70,7 +70,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
   const tvl = typeof stats?.tvlUsd === "number" ? `$${stats.tvlUsd.toLocaleString()}` : "N/A";
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 border-r border-white/10 bg-[#020806]/96 shadow-[18px_0_60px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block">
+    <aside className="phew-sidebar fixed inset-y-0 left-0 z-30 hidden w-56 border-r border-white/10 bg-[#020806]/96 shadow-[18px_0_60px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block">
       <div className="flex h-full flex-col">
         <Link href="/home" className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
           <BrandLogo />

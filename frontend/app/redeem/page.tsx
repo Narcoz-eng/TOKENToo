@@ -170,10 +170,10 @@ export default function RedeemPage() {
   return (
     <AppShell active="redeem">
       <div className="space-y-6">
-        <section className="phew-panel relative overflow-hidden rounded-lg p-5">
+        <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg p-5">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_22%,rgba(186,255,0,0.2),transparent_28%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
           <div className="absolute inset-0 grid-mask opacity-30" />
-          <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
+          <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
             <div>
               <div className="flex flex-wrap gap-2">
                 <StatusPill accent="green">Redeem</StatusPill>
