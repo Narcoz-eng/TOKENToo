@@ -1,17 +1,14 @@
 import type { ButtonHTMLAttributes } from "react";
-import type { LucideIcon } from "lucide-react";
-import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type AnimatedButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  icon?: LucideIcon;
   iconAsset?: string;
   loading?: boolean;
   success?: boolean;
   tone?: "primary" | "outline" | "ghost" | "gold";
 };
 
-export function AnimatedButton({ children, className, icon: Icon, iconAsset, loading, success, tone = "primary", disabled, ...props }: AnimatedButtonProps) {
+export function AnimatedButton({ children, className, iconAsset, loading, success, tone = "primary", disabled, ...props }: AnimatedButtonProps) {
   return (
     <button
       {...props}
@@ -26,7 +23,9 @@ export function AnimatedButton({ children, className, icon: Icon, iconAsset, loa
         className
       )}
     >
-      {loading ? <Loader2 className="size-4 animate-spin" /> : iconAsset ? <img src={iconAsset} alt="" className="size-5 object-contain" /> : Icon ? <Icon className="size-4" /> : null}
+      {loading ? (
+        iconAsset ? <img src={iconAsset} alt="" className="size-5 animate-spin object-contain" /> : <span className="phew-button-loader" aria-hidden="true" />
+      ) : iconAsset ? <img src={iconAsset} alt="" className="size-5 object-contain" /> : null}
       <span>{children}</span>
     </button>
   );

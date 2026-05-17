@@ -40,6 +40,13 @@ This file tracks local assets used to rebuild the frontend from the approved Phe
 - Home trust chips, metrics, overview tiles, protocol feature tiles, workflow tiles, proof link, and launch CTA now use local Phew SVG assets instead of Lucide action icons.
 - No paid image generation was used in this pass. Existing approved references were sufficient for the home reset.
 
+## 2026-05-17 Transaction Icon Pass
+
+- `TransactionFlow` state badges now use Phew proof, vault, token, beam, reward, and glitch assets instead of Lucide icons.
+- `TransactionStatus` status badges now use Phew proof, beam, reward, and glitch assets.
+- `AnimatedButton` loading state now uses the provided Phew asset or a CSS scan ring, not a generic loader icon.
+- Staking, mint, redeem, and create-community core transaction buttons/checks now use Phew-native assets for proof, lock, redeem, submit, refresh, success, and transaction-link visuals.
+
 ## Remaining Asset Gaps
 
 - A formal Image 2 reference set is still needed for additional mascot poses, admin empty/error states, and route-specific transaction keyframes if the approved local references are not enough.

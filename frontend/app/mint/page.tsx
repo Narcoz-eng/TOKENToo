@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Clock3, ExternalLink, LockKeyhole, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorState, WalletDisconnectedState } from "@/components/ApiState";
@@ -206,7 +205,7 @@ export default function MintPage() {
                   </p>
                   <div className="mt-6">
                     <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                      Create Community <ArrowRight className="size-4" />
+                      Create Community <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" />
                     </Link>
                   </div>
                 </div>
@@ -353,12 +352,12 @@ export default function MintPage() {
                   <div className="mt-4 flex flex-wrap gap-3">
                     {mintState?.txSignature ? (
                       <a href={`https://explorer.solana.com/tx/${mintState.txSignature}?cluster=devnet`} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-green px-4 text-sm font-bold text-vault-green">
-                        View transaction <ExternalLink className="size-4" />
+                        View transaction <img src={brandAssets.energyBeam} alt="" className="size-5 object-contain" />
                       </a>
                     ) : null}
                     {proofMint ? (
                       <Link href={`/vaults/${encodeURIComponent(proofMint)}/proof`} className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-cyan/50 bg-vault-cyan/10 px-4 text-sm font-bold text-vault-cyan">
-                        Show proof <ShieldCheck className="size-4" />
+                        Show proof <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />
                       </Link>
                     ) : null}
                   </div>
@@ -389,10 +388,10 @@ export default function MintPage() {
 
                 <SectionCard title="After Mint">
                   <Link href={proofMint ? `/vaults/${encodeURIComponent(proofMint)}/proof` : "/proof"} className="mb-3 flex h-11 items-center justify-center gap-2 rounded-md border border-vault-line bg-black/25 font-bold">
-                    <ShieldCheck className="size-4 text-vault-green" /> Open proof
+                    <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" /> Open proof
                   </Link>
                   <Link href="/staking" className="flex h-11 items-center justify-center gap-2 rounded-md border border-vault-line bg-black/25 font-bold">
-                    <LockKeyhole className="size-4 text-vault-cyan" /> Stake eligible vault
+                    <img src={brandAssets.vaultSafe} alt="" className="size-5 object-contain" /> Stake eligible vault
                   </Link>
                 </SectionCard>
               </aside>
@@ -486,7 +485,7 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
 function StateTile({ title, body, complete }: { title: string; body: string; complete: boolean }) {
   return (
     <div className={cn("rounded-md border p-4", complete ? "border-vault-green/40 bg-vault-green/10" : "border-vault-line bg-black/25")}>
-      {complete ? <CheckCircle2 className="mb-3 size-5 text-vault-green" /> : <Clock3 className="mb-3 size-5 text-slate-500" />}
+      <img src={complete ? brandAssets.rewardBurst : brandAssets.proofRing} alt="" className={cn("mb-3 size-8 object-contain", complete ? "drop-shadow-[0_0_14px_rgba(186,255,0,0.28)]" : "opacity-55 grayscale")} />
       <p className="font-black">{title}</p>
       <p className="mt-1 text-sm text-slate-400">{body}</p>
     </div>

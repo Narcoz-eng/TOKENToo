@@ -1,6 +1,5 @@
 "use client";
 
-import { CheckCircle2, CircleAlert, LockKeyhole, RadioTower, ShieldCheck, Zap } from "lucide-react";
 import type { CSSProperties } from "react";
 import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
@@ -312,11 +311,15 @@ function badgeClass(state: TransactionFlowState) {
 }
 
 function stateIcon(state: TransactionFlowState) {
-  if (state === "success") return <CheckCircle2 className="size-3.5" />;
-  if (state === "error") return <CircleAlert className="size-3.5" />;
-  if (state === "wallet-disconnected") return <LockKeyhole className="size-3.5" />;
-  if (state === "confirming") return <LockKeyhole className="size-3.5" />;
-  if (state === "preparing") return <ShieldCheck className="size-3.5" />;
-  if (state === "signing" || state === "sending" || state === "submitting") return <Zap className="size-3.5" />;
-  return <RadioTower className="size-3.5" />;
+  return <img src={stateIconAsset(state)} alt="" className="size-3.5 object-contain" />;
+}
+
+function stateIconAsset(state: TransactionFlowState) {
+  if (state === "success") return brandAssets.rewardBurst;
+  if (state === "error") return brandAssets.errorGlitch;
+  if (state === "wallet-disconnected") return brandAssets.vaultSafe;
+  if (state === "confirming") return brandAssets.vaultSafe;
+  if (state === "preparing") return brandAssets.proofRing;
+  if (state === "signing" || state === "sending" || state === "submitting") return brandAssets.energyBeam;
+  return brandAssets.tokenObject;
 }

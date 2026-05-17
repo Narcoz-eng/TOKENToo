@@ -1,10 +1,10 @@
-import { AlertTriangle, CheckCircle2, Loader2, RadioTower } from "lucide-react";
+import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
 export type TxStatus = "idle" | "validating" | "signing" | "pending" | "confirmed" | "failed";
 
 export function TransactionStatus({ status, label, detail }: { status: TxStatus; label: string; detail?: string | null }) {
-  const Icon = status === "pending" || status === "validating" || status === "signing" ? Loader2 : status === "confirmed" ? CheckCircle2 : status === "failed" ? AlertTriangle : RadioTower;
+  const busy = status === "pending" || status === "validating" || status === "signing";
   return (
     <div
       className={cn(
@@ -16,10 +16,17 @@ export function TransactionStatus({ status, label, detail }: { status: TxStatus;
       )}
     >
       <div className="flex items-center gap-2 font-black">
-        <Icon className={cn("size-4", (status === "pending" || status === "validating" || status === "signing") && "animate-spin")} />
+        <img src={transactionStatusAsset(status)} alt="" className={cn("size-4 object-contain", busy && "animate-spin")} />
         {label}
       </div>
       {detail ? <p className="mt-2 text-xs opacity-80">{detail}</p> : null}
     </div>
   );
+}
+
+function transactionStatusAsset(status: TxStatus) {
+  if (status === "confirmed") return brandAssets.rewardBurst;
+  if (status === "failed") return brandAssets.errorGlitch;
+  if (status === "pending" || status === "validating" || status === "signing") return brandAssets.energyBeam;
+  return brandAssets.proofRing;
 }

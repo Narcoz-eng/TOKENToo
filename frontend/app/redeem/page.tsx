@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, ExternalLink, FileSearch, Loader2, RefreshCcw, ShieldCheck, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState, ErrorState, LoadingState, WalletDisconnectedState } from "@/components/ApiState";
@@ -266,7 +265,7 @@ export default function RedeemPage() {
                       Sign + Submit
                     </AnimatedButton>
                     <button type="button" onClick={profileState.reload} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-300">
-                      <RefreshCcw className="size-4" /> Refresh Wallet NFTs
+                      <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" /> Refresh Wallet NFTs
                     </button>
                   </div>
                 </SectionCard>
@@ -283,7 +282,7 @@ export default function RedeemPage() {
                   </div>
                   {redeemTx?.txSignature ? (
                     <a href={`https://explorer.solana.com/tx/${redeemTx.txSignature}?cluster=devnet`} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-                      View transaction <ExternalLink className="size-4" />
+                      View transaction <img src={brandAssets.energyBeam} alt="" className="size-5 object-contain" />
                     </a>
                   ) : null}
                 </SectionCard>
@@ -380,7 +379,7 @@ function RedeemEmptyWorkspace() {
 function CheckTile({ label, ok }: { label: string; ok: boolean }) {
   return (
     <div className={cn("rounded-md border p-4", ok ? "border-vault-green/40 bg-vault-green/10" : "border-vault-line bg-black/25")}>
-      <CheckCircle2 className={cn("mb-3 size-5", ok ? "text-vault-green" : "text-slate-500")} />
+      <img src={ok ? brandAssets.rewardBurst : brandAssets.proofRing} alt="" className={cn("mb-3 size-8 object-contain", ok ? "drop-shadow-[0_0_14px_rgba(186,255,0,0.28)]" : "opacity-55 grayscale")} />
       <p className="text-sm font-black">{label}</p>
       <p className="mt-1 text-xs text-slate-500">{ok ? "Ready" : "N/A"}</p>
     </div>

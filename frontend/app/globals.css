@@ -194,6 +194,16 @@ select {
   transform: translateY(1px) scale(0.99);
 }
 
+.phew-button-loader {
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 999px;
+  border: 2px solid rgba(186, 255, 0, 0.22);
+  border-top-color: currentColor;
+  box-shadow: 0 0 12px rgba(186, 255, 0, 0.28);
+  animation: phew-spin 0.85s linear infinite;
+}
+
 .phew-button:focus-visible,
 .phew-card-hover:focus-visible,
 a:focus-visible,
@@ -1829,6 +1839,10 @@ select:focus-visible {
 @keyframes phew-aura {
   0%, 100% { opacity: 0.45; transform: scale(0.96); }
   50% { opacity: 1; transform: scale(1.04); }
+}
+
+@keyframes phew-spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes phew-ring {

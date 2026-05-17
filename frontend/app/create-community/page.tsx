@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, ExternalLink, Loader2, RadioTower, ScanSearch, ShieldCheck, WalletCards } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
@@ -338,7 +337,7 @@ export default function CreateCommunityPage() {
                   <input value={tokenMint} onChange={(event) => setTokenMint(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Solana token mint address" />
                 </label>
                 <button onClick={scanToken} disabled={activeAction === "scan" || !tokenMint.trim()} className="phew-button phew-button-primary mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                  {activeAction === "scan" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />}
+                  <ActionIcon loading={activeAction === "scan"} asset={brandAssets.proofRing} />
                   Scan
                 </button>
               </div>
@@ -431,17 +430,17 @@ export default function CreateCommunityPage() {
                 <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-400">{accessHelp}</p>
               )}
               <button onClick={createCommunity} disabled={activeAction === "create" || !tokenMint.trim()} className="phew-button phew-button-primary mt-5 inline-flex h-12 items-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                {activeAction === "create" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" />}
+                <ActionIcon loading={activeAction === "create"} asset={brandAssets.tokenObject} />
                 Create Draft
               </button>
               {collection ? (
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button onClick={verifyPayment} disabled={activeAction === "payment" || !paymentSignature.trim()} className="inline-flex h-10 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-                    {activeAction === "payment" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" />}
+                    <ActionIcon loading={activeAction === "payment"} asset={brandAssets.tokenObject} />
                     Verify Payment
                   </button>
                   <button onClick={verifyWhale} disabled={activeAction === "whale"} className="inline-flex h-10 items-center gap-2 rounded-md border border-vault-cyan/45 bg-vault-cyan/10 px-4 text-sm font-bold text-vault-cyan">
-                    {activeAction === "whale" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />}
+                    <ActionIcon loading={activeAction === "whale"} asset={brandAssets.proofRing} />
                     Verify Whale
                   </button>
                 </div>
@@ -463,22 +462,22 @@ export default function CreateCommunityPage() {
                 </label>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <button onClick={buildLaunch} disabled={activeAction === "build" || !canLaunch} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-                    {activeAction === "build" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.energyBeam} alt="" className="size-5 object-contain" />}
+                    <ActionIcon loading={activeAction === "build"} asset={brandAssets.energyBeam} />
                     Build Launch Tx
                   </button>
                   <button onClick={submitLaunch} disabled={activeAction === "submit" || !canSubmitLaunch} className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-4 text-sm font-black text-black">
-                    {activeAction === "submit" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.vaultSafe} alt="" className="size-5 object-contain" />}
+                    <ActionIcon loading={activeAction === "submit"} asset={brandAssets.vaultSafe} />
                     Sign + Submit Launch
                   </button>
                   <button onClick={refreshLaunchStatus} disabled={activeAction === "status"} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-300">
-                    {activeAction === "status" ? <Loader2 className="size-4 animate-spin" /> : <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />}
+                    <ActionIcon loading={activeAction === "status"} asset={brandAssets.proofRing} />
                     Refresh Status
                   </button>
                 </div>
                 {launchTx?.base64UnsignedTransaction ? <p className="mt-3 break-all rounded-md border border-vault-line bg-black/25 p-3 font-mono text-xs text-slate-400">Unsigned launch tx: {short(launchTx.base64UnsignedTransaction, 80)}</p> : null}
                 {launchSubmit?.result?.txSignature ? (
                   <a href={`https://explorer.solana.com/tx/${launchSubmit.result.txSignature}?cluster=devnet`} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-                    View launch transaction <ExternalLink className="size-4" />
+                    View launch transaction <img src={brandAssets.energyBeam} alt="" className="size-5 object-contain" />
                   </a>
                 ) : null}
               </SectionCard>
@@ -531,6 +530,10 @@ export default function CreateCommunityPage() {
   );
 }
 
+function ActionIcon({ asset, loading }: { asset: string; loading: boolean }) {
+  return <img src={asset} alt="" className={cn("size-5 object-contain", loading && "animate-spin")} />;
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 border-b border-vault-line py-3 last:border-0">
@@ -545,7 +548,7 @@ function StatusLine({ label, ok }: { label: string; ok: boolean }) {
     <div className="flex items-center justify-between gap-3 border-b border-vault-line py-3 text-sm last:border-0">
       <span className="text-slate-300">{label}</span>
       <span className={ok ? "text-vault-green" : "text-slate-500"}>
-        <CheckCircle2 className="inline size-4" /> {ok ? "Ready" : "Pending"}
+        <img src={ok ? brandAssets.rewardBurst : brandAssets.proofRing} alt="" className="inline size-4 object-contain align-[-2px]" /> {ok ? "Ready" : "Pending"}
       </span>
     </div>
   );

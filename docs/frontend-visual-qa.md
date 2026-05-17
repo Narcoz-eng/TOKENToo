@@ -31,6 +31,28 @@ Verification to run for this pass:
 - Captured: `tmp/visual-qa-current/home-reset-mobile.png`.
 - Passed: CDP page check reported no framework overlay and expected home headings.
 
+### 2026-05-17 transaction icon pass
+
+Reference intent: core protocol actions must use Phew-native visual objects instead of generic icon-library symbols.
+
+Fix applied:
+
+- Replaced `TransactionFlow` state badge icons with Phew SVG assets.
+- Replaced `TransactionStatus` status badge icons with Phew SVG assets.
+- Replaced `AnimatedButton` generic loader with Phew asset spin/CSS scan ring.
+- Replaced mint, redeem, create-community, and staking core action/check icons with Phew proof, token, vault, beam, reward, glitch, and redeem assets.
+
+Verification to run for this pass:
+
+- Passed: `npm --workspace frontend run typecheck`.
+- Passed: `npm --workspace frontend run build`.
+- Passed: `npm run build`.
+- Captured: `tmp/visual-qa-current/mint-native-icons.png`.
+- Captured: `tmp/visual-qa-current/redeem-native-icons.png`.
+- Captured: `tmp/visual-qa-current/create-community-native-icons.png`.
+- Captured: `tmp/visual-qa-current/staking-native-icons.png`.
+- Passed: CDP page checks reported no framework overlay on `/mint`, `/redeem`, `/create-community`, and `/staking`.
+
 ## Mascot And Assets
 
 - [ ] `frontend/public/brand/phew-mascot.png` exists.
