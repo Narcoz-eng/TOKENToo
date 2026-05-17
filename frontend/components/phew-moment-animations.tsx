@@ -148,7 +148,7 @@ function MomentStage({ step, active, complete, collectionImage, tokenSymbol }: {
   return (
     <div className={cn("phew-moment-stage", active && "phew-moment-stage-active", complete && "phew-moment-stage-complete")} data-kind={step.kind}>
       <span className="phew-stage-ring" />
-      <img src={brandAssets.logo} alt="" className="phew-story-mascot" />
+      <img src={brandAssets.mascot} alt="" className="phew-story-mascot" />
       <div className="phew-story-nft">
         {collectionImage ? (
           <img src={collectionImage} alt="" className="h-full w-full rounded-md object-cover" />

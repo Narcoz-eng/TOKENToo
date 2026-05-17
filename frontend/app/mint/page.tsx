@@ -60,7 +60,7 @@ export default function MintPage() {
   const collection = mintableCollections.find((item) => item.id === collectionId || item.dbId === collectionId) ?? mintableCollections[0] ?? null;
   const sliderValue = clampAmount(amount);
   const proofMint = mintState?.vaultNft?.mint ?? mintState?.nftMint ?? null;
-  const finalImage = mintState?.assetUri ?? collection?.image ?? brandAssets.logo;
+  const finalImage = mintState?.assetUri ?? collection?.image ?? null;
   const flowState = mintFlowState(txStatus, mintState, error);
 
   async function createIntent() {
@@ -147,7 +147,39 @@ export default function MintPage() {
   if (collectionState.loading) {
     return (
       <AppShell active="mint">
-        <LoadingState />
+        <div className="space-y-6">
+          <section className="phew-panel relative overflow-hidden rounded-lg">
+            <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-52" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/36" />
+            <div className="relative grid gap-8 p-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:p-8">
+              <div className="max-w-3xl">
+                <div className="flex flex-wrap gap-2">
+                  <StatusPill accent="green">Mint Vault NFT</StatusPill>
+                  <StatusPill accent="cyan">Loading live communities</StatusPill>
+                </div>
+                <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Lock real community tokens and mint from a verified reserve.</h1>
+                <p className="mt-3 text-sm text-slate-300">
+                  Mint-eligible communities are loaded from the backend. Missing values stay N/A until a real collection is returned.
+                </p>
+                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                  <HeroMetric label="Selected community" value="N/A" />
+                  <HeroMetric label="Collection asset" value="N/A" />
+                  <HeroMetric label="Reserve PDA" value="N/A" />
+                </div>
+              </div>
+              <TransactionFlow
+                state="preparing"
+                moment="mint"
+                title="Mint Vault NFT"
+                description="Loading mint eligibility from the backend before any wallet action is enabled."
+                image={null}
+                tokenSymbol="PHEW"
+                detail="Awaiting live collection data"
+              />
+            </div>
+          </section>
+          <LoadingState />
+        </div>
       </AppShell>
     );
   }
@@ -341,11 +373,17 @@ export default function MintPage() {
   );
 }
 
-function ProjectedVaultCard({ image, collection, amount, lockDurationDays, txStatus }: { image: string; collection: VaultCollection; amount: string; lockDurationDays: number; txStatus: TxStatus }) {
+function ProjectedVaultCard({ image, collection, amount, lockDurationDays, txStatus }: { image?: string | null; collection: VaultCollection; amount: string; lockDurationDays: number; txStatus: TxStatus }) {
   return (
     <div className="rounded-lg border border-vault-green/30 bg-black/45 p-4 shadow-green">
       <div className="relative overflow-hidden rounded-lg">
-        <img src={image} alt="" className="aspect-[4/5] w-full object-cover" />
+        {image ? (
+          <img src={image} alt="" className="aspect-[4/5] w-full object-cover" />
+        ) : (
+          <div className="grid aspect-[4/5] w-full place-items-center border border-dashed border-vault-green/35 bg-[radial-gradient(circle_at_50%_28%,rgba(186,255,0,0.2),rgba(0,0,0,0.9)_62%)]">
+            <img src={brandAssets.mascot} alt="" className="size-28 object-contain drop-shadow-[0_0_22px_rgba(186,255,0,0.24)]" />
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
         <div className="absolute bottom-4 left-4 right-4">
           <StatusPill accent={txStatus === "confirmed" ? "gold" : "green"}>{txStatus === "confirmed" ? "Minted" : "Selected"}</StatusPill>

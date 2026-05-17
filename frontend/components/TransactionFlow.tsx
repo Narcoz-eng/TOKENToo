@@ -5,7 +5,7 @@ import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
 export type TransactionFlowState = "idle" | "preparing" | "signing" | "sending" | "confirming" | "success" | "error";
-export type TransactionFlowMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "studio" | "reward" | "scan";
+export type TransactionFlowMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "community-launch" | "studio" | "studio-bible" | "reward" | "scan";
 
 export type TransactionFlowStep = {
   state: TransactionFlowState;
@@ -45,13 +45,13 @@ export function TransactionFlow({
 }) {
   const activeIndex = flowIndex(state, steps);
   const status = flowStatusLabel(state);
-  const visualMoment = moment ?? inferMoment(title);
+  const visualMoment = normalizeMoment(moment ?? inferMoment(title));
   const active = state !== "idle" && state !== "error";
   return (
     <div className={cn("transaction-flow rounded-lg border border-vault-line bg-black/30 p-4", compact ? "space-y-3" : "space-y-4", className)} data-state={state} data-moment={visualMoment}>
       <div className="flex items-start gap-4">
-        <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border border-vault-line bg-black/40">
-          {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <img src={brandAssets.logo} alt="" className="size-10 object-contain opacity-90" />}
+        <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border border-vault-green/20 bg-black/40">
+          {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <img src={brandAssets.mascot} alt="" className="size-12 object-contain opacity-95" />}
           <span className={cn("absolute inset-0 border border-transparent", state === "success" && "border-vault-green/60", state === "error" && "border-vault-red/60")} />
         </div>
         <div className="min-w-0 flex-1">
@@ -70,10 +70,21 @@ export function TransactionFlow({
       </div>
 
       <div className={cn("phew-tx-stage", compact && "phew-tx-stage-compact", active && "phew-tx-stage-active", state === "success" && "phew-tx-stage-success", state === "error" && "phew-tx-stage-error")} data-state={state} data-moment={visualMoment}>
+        <div className="phew-tx-stage-head">
+          <div>
+            <p className="text-[10px] font-black uppercase text-vault-green">{tokenSymbol || "PHEW"} flow</p>
+            <p className="mt-1 text-sm font-black text-white">{momentTitle(visualMoment)}</p>
+          </div>
+          <span className={cn("inline-flex items-center gap-2 rounded-md border px-2 py-1 text-[10px] font-black uppercase", badgeClass(state))}>
+            {stateIcon(state)}
+            {status}
+          </span>
+        </div>
         <span className="phew-tx-orbit phew-tx-orbit-a" />
         <span className="phew-tx-orbit phew-tx-orbit-b" />
         <span className="phew-tx-beam" />
-        <img src={brandAssets.logo} alt="" className="phew-tx-mascot" />
+        <span className="phew-tx-floor" />
+        <img src={brandAssets.mascot} alt="" className="phew-tx-mascot" />
         <div className="phew-tx-nft">
           {image ? (
             <img src={image} alt="" className="h-full w-full rounded-md object-cover" />
@@ -89,6 +100,7 @@ export function TransactionFlow({
         </div>
         <div className="phew-tx-object">
           <StageObject moment={visualMoment} state={state} />
+          <span className="phew-tx-action-label">{objectLabel(visualMoment, state)}</span>
         </div>
         <div className="absolute bottom-3 left-4 right-4 z-10 flex items-center justify-center gap-2">
           {steps.map((step, index) => {
@@ -136,6 +148,44 @@ function StageObject({ moment, state }: { moment: TransactionFlowMoment; state: 
   return <WalletCards className="size-11 text-vault-green" />;
 }
 
+function normalizeMoment(moment: TransactionFlowMoment) {
+  if (moment === "community-launch") return "community";
+  if (moment === "studio-bible") return "studio";
+  return moment;
+}
+
+function momentTitle(moment: ReturnType<typeof normalizeMoment>) {
+  const labels: Record<ReturnType<typeof normalizeMoment>, string> = {
+    mint: "Mint storyboard",
+    stake: "Stake storyboard",
+    unstake: "Unstake storyboard",
+    redeem: "Redeem storyboard",
+    proof: "Proof storyboard",
+    community: "Community launch",
+    studio: "Studio bible",
+    reward: "Reward claim",
+    scan: "Token scan"
+  };
+  return labels[moment];
+}
+
+function objectLabel(moment: ReturnType<typeof normalizeMoment>, state: TransactionFlowState) {
+  if (state === "success") return "confirmed";
+  if (state === "error") return "blocked";
+  const labels: Record<ReturnType<typeof normalizeMoment>, string> = {
+    mint: "mint",
+    stake: "lock",
+    unstake: "unlock",
+    redeem: "burn",
+    proof: "verify",
+    community: "launch",
+    studio: "build",
+    reward: "claim",
+    scan: "scan"
+  };
+  return labels[moment];
+}
+
 function inferMoment(title: string): TransactionFlowMoment {
   const normalized = title.toLowerCase();
   if (normalized.includes("unstake")) return "unstake";
@@ -153,7 +203,7 @@ export function transactionStateFromTxStatus(status: string | null | undefined):
   if (!status) return "idle";
   const normalized = status.toLowerCase();
   if (["confirmed", "success", "complete", "completed", "redeemed", "staked", "unstaked"].some((item) => normalized.includes(item))) return "success";
-  if (["fail", "error", "rejected", "skipped", "needs"].some((item) => normalized.includes(item))) return "error";
+  if (["fail", "error", "rejected", "skipped", "needs", "not_implemented", "unavailable", "no_adapter", "not_paid", "accounted_not_paid"].some((item) => normalized.includes(item))) return "error";
   if (["signing", "signature"].some((item) => normalized.includes(item))) return "signing";
   if (["sending", "submitting", "submitted"].some((item) => normalized.includes(item))) return "sending";
   if (["confirming", "pending"].some((item) => normalized.includes(item))) return "confirming";

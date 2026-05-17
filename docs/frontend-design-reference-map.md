@@ -1,33 +1,44 @@
 # Frontend Design Reference Map
 
-Generated reference images are saved under `frontend/public/design-reference/`. They are visual source material only and are not rendered as static page UI.
+Approved references live in `frontend/public/design-reference/phew-redesign/`. They are source material only; the app must not render them as static screenshots.
 
-## Reference Inventory
+| Page/component | Exact reference image used | Visual details copied | Intentional differences | Remaining gaps |
+| --- | --- | --- | --- | --- |
+| `PhewShell`, `AppShell` | `home.png` | 224px dark sidebar, compact 64px topbar, constrained dashboard canvas, thin borders, low glow, black grid background | Mobile uses a compact topbar brand because the reference set is desktop-first | Pixel spacing can vary with wallet button width |
+| `PhewSidebar` | `home.png`, `collections.png` | Sectioned navigation, neon active rail, protocol stats block, launch CTA, compact wallet card | Existing routes are preserved, including Marketplace/Raids/Admin | Exact icon set differs where a route has no one-to-one reference icon |
+| `PhewTopbar` | `home.png` | Search-first topbar, Solana devnet badge, notification control, connected wallet/profile cluster | Wallet adapter renders its own internal button text | Wallet adapter library styling limits exact padding |
+| `BrandLogo`, mascot asset | `home.png`, `animations-stake.png`, `animations-redeem.png` | Transparent running mascot, no square logo, no text in animation asset | Favicon remains the existing small mark in `app/layout.tsx` | Mascot is extracted from committed banner art, not redrawn from the reference PNG |
+| `PhewCard`, `SectionCard` | `home.png`, `admin-setup.png`, `admin-risk.png` | Dark glass panels, 8px radius, thin cyan/green borders, controlled radial glow | Card content density follows live data volume | Exact row counts differ by backend response |
+| `PhewButton` | `mint.png`, `create-community.png` | Neon lime primary CTA, dark outlined secondary CTAs, sharp protocol dashboard button shape | Wallet buttons remain from Solana adapter | Solana adapter hover animation is external |
+| `PhewStatCard`, `StatCard` | `home.png`, `staking.png`, `admin-risk.png` | Compact metric cards, icon tiles, N/A-compatible values, non-marketing hierarchy | Metrics are not fabricated when the backend omits them | Some legacy pages still call `StatCard`; it now shares the Phew treatment |
+| `PhewStatusBadge`, `PhewTrustBadge`, `ProtocolTrustStrip` | `proof.png`, `mint.png`, `collections.png` | Small uppercase status chips, reserve/live/cache/verified badge language, tone-specific borders | Live/cached state is derived from current API fields | Exact wording differs when backend uses different status strings |
+| `PhewVaultCard` | `mint.png`, `collection-detail.png`, `marketplace.png` | Framed NFT art slot, gradient bottom title, token symbol chip, backing rows | Uses real NFT image URI or transparent mascot placeholder | Rare trait overlays are only shown where backend data exists |
+| `PhewCollectionCard`, `CollectionCard` | `collections.png`, `collection-detail.png` | Dense collection card, risk badge, trust strip, palette strip, vault stats | Collection data is whatever `/product/collections` returns | Card art aspect varies if backend image dimensions vary |
+| `PhewActionPanel` | `create-community.png`, `admin-setup.png` | Left status icon, dark panel body, action status tone, backend-first copy | Actions are not simulated for setup-only routes | No new backend setup mutation routes were added |
+| `PhewStepper` | `mint.png`, `create-collection-studio.png` | Numbered phase blocks, active cyan, complete green, dense horizontal rhythm | Long labels wrap on small screens | Exact five-step labels depend on each page workflow |
+| `PhewEmptyState`, `EmptyState` | `home.png`, `collections.png` | Mascot-led empty panels, dashed border, no fake collection/listing rows | Empty states explain the missing live data instead of showing mock rows | Copy remains page-specific |
+| `PhewAnimationStage`, `PhewAnimationFrame` | `animations-stake.png`, `animations-redeem.png` | Mascot-left, NFT/vault center, action object right, beam/orbits, progress-ready status badge | Implemented with live React/CSS rather than using storyboard PNGs | Exact illustrated poses are limited by the extracted local mascot |
+| `TransactionFlow` | `animations-stake.png`, `animations-redeem.png`, `mint.png`, `redeem.png`, `proof.png` | Large mascot, central NFT slot, action object, neon beam, orbit rings, progress dots, readable state title, success/error variants | Success only appears when backend state/status indicates completion | Wallet-specific images can be missing until the backend returns asset URIs |
+| `/home` | `home.png` | Protocol dashboard hero, overview card with mascot, metric grid, trending collections, market snapshot, CTA band | Trending, market chart, and my-vault sections stay empty/N/A without API rows | Chart stays textual until backend chart data is formalized |
+| `/create-community` | `create-community.png` | Token CA scanner, access gates, launch flow stage, right-side reserve/proof status, launch-readiness rhythm | TVL simulation uses raw token amount without invented USD conversion | Real token imagery appears only after token scan returns metadata |
+| `/create-collection` | `create-collection-studio.png` | Studio mode hero, five-step workflow, Studio Bible storyboard, provider/readiness panels, launch actions | No generation is triggered on render; user action is required for provider calls | Some advanced diagnostics remain hidden unless founder diagnostics are allowed |
+| `/mint` | `mint.png`, `animations-stake.png` | Hero terms, selected community panel, trust badges, transaction storyboard, projected vault card | Mint flow remains disabled or pending until real intent/build/submit state | Final NFT art is absent until backend returns asset URI |
+| `/staking` | `staking.png`, `animations-stake.png` | Wallet-required layout, eligible NFT list, active positions, stake/unstake/claim transaction side panel | Claim success is not shown for skipped/no-adapter responses | Reward details depend on staking API shape |
+| `/redeem` | `redeem.png`, `animations-redeem.png` | Wallet-owned redeemable NFT list, proof-first flow, redeem transaction panel, status rows | Redeem list excludes non-redeemable and fake positions | A user with no wallet data sees the live empty state |
+| `/proof`, `/vaults/:mint/proof` | `proof.png`, `animations-redeem.png` | Proof search hero, verification checklist, trust strip, proof transaction stage | Proof data is only from `/vaults/:mint/proof`; no collection proof is invented | A proof image slot is not shown unless NFT image data is added to proof responses |
+| `/collections` | `collections.png` | Filter/search/sort controls, dense collection grid, risk/reserve/trust badges | Sort options are limited to current backend fields | Table-style reference rows are represented as cards for existing route ergonomics |
+| `/collections/:id` | `collection-detail.png` | Collection hero, mascot side marker, reserve stats, vault list, activity feed, proof/risk side panels | Proof links stay vault-specific; no fake collection-level proof | Hero media depends on collection banner/image availability |
+| `/marketplace` | `marketplace.png` | Vault exchange filters, listing inventory metrics, Phew vault cards, trust badges | Purchase actions use current marketplace intent route | Prices remain N/A/no-listings when backend has no listing rows |
+| `/raids` | `marketplace.png`, `staking.png` | Dense active/upcoming panels, reward transaction panel, neon status cards | Join/reward actions stay pending/error until backend confirms them | Raid artwork depends on collection imagery |
+| `/profile` | `profile.png` | Wallet vault dashboard, owned-vault card structure, proof/action links | Wallet gated; no placeholder owned vaults | Profile only renders after wallet-specific backend data returns |
+| `/admin/setup` | `admin-setup.png`, `create-collection-studio.png` | Readiness hero, Studio setup transaction stage, provider status, checklist, production blockers | Read-only system routes; no provider generation or setup mutation on render | Backend still controls which setup fields exist |
+| `/admin/risk` | `admin-risk.png` | Compact risk stats, warning tone, admin row density | Risk rows are only from `/product/admin/risk` | Exact table columns depend on the backend payload |
 
-| Reference path | Page/component using it | Copied design details | Intentional differences |
-| --- | --- | --- | --- |
-| `frontend/public/design-reference/concept.png` | Global Phew brand direction | Black/neon green palette, mascot-forward identity, dense protocol dashboard tone | Final UI uses live components and backend state instead of concept metrics |
-| `frontend/public/design-reference/phew-redesign/home.png` | `/home`, `HomeDashboardView`, `Sidebar`, `TopBar` | Sidebar grouping, hero hierarchy, mascot placement, protocol overview card, N/A-first metrics, bottom launch CTA | Trending/market/vault data is only shown when returned by backend |
-| `frontend/public/design-reference/phew-redesign/create-community.png` | `/create-community` | Token scanner flow, launch gate cards, right-column proof/readiness panels, backend-first action sequencing | TVL simulation is raw-token only unless backend scan returns market context |
-| `frontend/public/design-reference/phew-redesign/create-collection-studio.png` | `/create-collection`, `StudioBibleAnimation` | Studio/provider readiness language and explicit generation controls | Existing Studio workflow remains backend/API driven; no auto-generation on render |
-| `frontend/public/design-reference/phew-redesign/mint.png` | `/mint`, `TransactionFlow` | Configure/build/sign/confirm hierarchy, selected-community panel, trust badges, animation preview stage | Mint actions stay disabled or pending until real backend routes return intent/build/submit state |
-| `frontend/public/design-reference/phew-redesign/proof.png` | `/proof`, `/vaults/:mint/proof`, `VaultProofExplorer`, `TransactionFlow` | Proof search layout, proof data/checklist cards, verification animation stage, locked action panel tone | Proof status is derived from `/vaults/:mint/proof`; no fabricated proof rows |
-| `frontend/public/design-reference/phew-redesign/staking.png` | `/staking`, `StakeFlow`, `UnstakeFlow`, `ClaimRewardsFlow`, `TransactionFlow` | Eligible wallet NFT list, transaction side panel, wallet-owned staking UX | Staking/unstaking success appears only after backend routes return success |
-| `frontend/public/design-reference/phew-redesign/redeem.png` | `/redeem`, `TransactionFlow` | Redeem-by-eligible-wallet-NFT model, proof-first checks, right-column redeem status | Redeem list filters only real wallet-owned NFTs with backend `Redeemable` status |
-| `frontend/public/design-reference/phew-redesign/collection-detail.png` | `/collections/:id`, `CollectionDetailView` | Collection hero with mascot/branding, reserve stats, vault list, activity feed, proof/risk side panels | Proof links are vault-specific; collection-level proof is not invented when no vault exists |
-| `frontend/public/design-reference/phew-redesign/collections.png` | `/collections`, `CollectionCard` | Collection cards with risk/reserve badges and compact protocol metadata | Card metrics display N/A/empty states when backend data is missing |
-| `frontend/public/design-reference/phew-redesign/marketplace.png` | `/marketplace`, `NFTCard`, `MarketplaceGrid` | Vault card density, backing ratio panel, trust badges, black/neon card treatment | Purchase flow uses existing marketplace intent route only |
-| `frontend/public/design-reference/phew-redesign/profile.png` | `/profile` | Wallet vault dashboard tone and owned-vault card structure | Profile data is wallet/backend gated; no placeholder owned vaults |
-| `frontend/public/design-reference/phew-redesign/admin-setup.png` | `/admin/setup` | Actionable setup grid, provider status, storage readiness, production blockers, no auto-generation warning | Admin actions remain read-only because no new backend setup routes were added |
-| `frontend/public/design-reference/phew-redesign/admin-risk.png` | `/admin/risk` | Risk dashboard card density and status language | Existing risk rows are shown only from `/product/admin/risk` |
-| `frontend/public/design-reference/phew-redesign/animations-stake.png` | `TransactionFlow`, `StakeFlow`, `UnstakeFlow` | Mascot-left/NFT-slot/object-right storyboard, beam/orbit motion, status dots, reduced-motion fallback | Implemented with CSS and live props, not the storyboard PNG |
-| `frontend/public/design-reference/phew-redesign/animations-redeem.png` | `TransactionFlow`, `/redeem`, `VaultProofExplorer` | Redeem/proof stage language, dynamic NFT slot, loading/success/error states | State transitions follow real transaction/proof status, not timed fake success |
-| `frontend/public/design-reference/phew-redesign/manifest.json` | Documentation/source map | Route-to-reference mapping for approved generated references | Manifest is documentation only; code imports no reference screenshots |
+## Implementation Rules
 
-## Implementation Rules Preserved
-
-- Reference PNGs are not rendered as page screenshots.
-- `TransactionFlow` recreates storyboard motion in CSS with a dynamic NFT image slot and injected token symbol.
+- Reference PNGs are not imported or displayed as page UI.
+- `frontend/public/brand/phew-mascot.png` is the animation/storytelling mascot source.
+- Transaction and page animation stages are React/CSS/SVG/icon compositions with dynamic NFT image and token symbol slots.
 - Reduced-motion users receive static state transitions through CSS media queries.
-- Paid AI/image calls are not triggered by these frontend pages.
-- Backend values remain authoritative; missing values render as `N/A`, empty states, or locked actions.
+- Paid AI/image calls are not made during render, docs, extraction, build, or verification.
+- Backend values remain authoritative; missing values render as `N/A`, locked actions, or empty states.

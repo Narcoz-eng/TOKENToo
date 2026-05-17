@@ -8,30 +8,34 @@ import { StatusPill } from "./StatusPill";
 import { ParticleBurst } from "./animations";
 import { brandAssets } from "@/lib/brand-assets";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
+import { backendActionOutcome, type BackendActionResponse } from "@/lib/action-contracts";
+import { TransactionStatus, type TxStatus } from "./TransactionStatus";
 
 export function RaidCard({ raid, collection }: { raid: RaidRoom; collection?: VaultCollection }) {
   const wallet = useWalletAuth();
-  const [state, setState] = useState<"idle" | "validating" | "pending" | "confirmed" | "failed">("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<TxStatus>("idle");
+  const [detail, setDetail] = useState<string | null>(null);
 
   async function joinRaid() {
-    setError(null);
+    setDetail(null);
     if (!wallet.connected) {
       setState("failed");
-      setError("Connect and authenticate your wallet before joining a raid.");
+      setDetail("Connect and authenticate your wallet before joining a raid.");
       return;
     }
     setState("validating");
     try {
       setState("pending");
-      await wallet.authFetch(`/raids/${raid.id}/join`, {
+      const response = await wallet.authFetch<BackendActionResponse>(`/raids/${raid.id}/join`, {
         method: "POST",
         body: JSON.stringify({ idempotencyKey: `${wallet.address}:join:${raid.id}` })
       });
-      setState("confirmed");
+      const outcome = backendActionOutcome(response, "Raid join route returned an intent but no completed participant status.");
+      setState(outcome.phase === "confirmed" ? "confirmed" : outcome.phase === "failed" ? "failed" : "pending");
+      setDetail(outcome.confirmed ? outcome.detail ?? null : outcome.detail ?? "Raid join is pending backend confirmation.");
     } catch (err) {
       setState("failed");
-      setError(err instanceof Error ? err.message : "Join raid failed");
+      setDetail(err instanceof Error ? err.message : "Join raid failed");
     }
   }
 
@@ -64,7 +68,7 @@ export function RaidCard({ raid, collection }: { raid: RaidRoom; collection?: Va
             <p className="font-semibold text-vault-green">{raid.rewardSol.toLocaleString()} SOL</p>
           </div>
         </div>
-        {error ? <p className="rounded-md border border-vault-red/40 bg-vault-red/10 p-2 text-xs text-vault-red">{error}</p> : null}
+        {state !== "idle" ? <TransactionStatus status={state} label={state === "failed" ? "Raid unavailable" : state === "confirmed" ? "Raid joined" : "Raid join pending"} detail={detail} /> : null}
         <button onClick={joinRaid} disabled={state === "validating" || state === "pending"} className="phew-button phew-button-primary flex h-10 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black disabled:opacity-60">
           <Shield className="size-4" /> {state === "validating" ? "Validating" : state === "pending" ? "Joining" : state === "confirmed" ? "Raid Joined" : raid.status === "Live" ? "Join Raid" : "View Details"}
         </button>

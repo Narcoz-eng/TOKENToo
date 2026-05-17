@@ -12,9 +12,9 @@ export function AppShell({ children, active, stats }: { children: React.ReactNod
   return (
     <div className="phew-app-bg min-h-screen bg-vault-radial text-white">
       <Sidebar active={active} stats={stats} />
-      <div className="relative min-h-screen lg:pl-64">
+      <div className="relative min-h-screen lg:pl-56">
         <TopBar />
-        <main className="mx-auto w-full max-w-[1780px] px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1540px] px-4 py-5 sm:px-5 lg:px-6">{children}</main>
       </div>
     </div>
   );

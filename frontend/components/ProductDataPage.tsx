@@ -42,6 +42,8 @@ import { MetricGrid, PageLayout } from "./PageLayout";
 import { StakeFlow, UnstakeFlow, ClaimRewardsFlow } from "./StakingFlows";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { cn } from "@/lib/utils";
+import { assertBackendActionCompleted } from "@/lib/action-contracts";
+import { PhewAnimationFrame, type PhewAnimationMoment } from "./phew-ui";
 
 type ProductData = {
   title?: string;
@@ -89,6 +91,7 @@ type ProtocolHealth = {
 type StakingIntentResponse = {
   ok?: boolean;
   status?: string;
+  payoutStatus?: string;
   message?: string;
   position?: unknown;
   idempotent?: boolean;
@@ -104,8 +107,13 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   const state = useApiResource<ProductData | VaultCollection[] | VaultNft[] | RaidRoom[]>(walletPath, { enabled: !blockedByWallet });
   const capabilityState = useApiResource<{ mode: string; capabilities: Record<string, boolean>; warnings: string[] }>("/system/capabilities");
   const data = normalizeProductData(endpoint, state.data);
+  const renderData = data ?? (active === "home" ? homeFallbackData(title) : null);
   const warnings = apiWarnings(state.data);
   const privateDiagnostics = showPrivateDiagnostics(wallet.address);
+  const pageMoment = motionMomentForPage(active, endpoint);
+  const pageMotionState = state.loading ? "loading" : state.error ? "error" : "idle";
+  const pageMotionImage = data?.collection?.image ?? data?.collections?.[0]?.image ?? data?.nfts?.[0]?.image ?? null;
+  const pageMotionSymbol = data?.collection?.symbol ?? data?.collections?.[0]?.symbol ?? data?.nfts?.[0]?.tier ?? "PHEW";
   const visibleCollections = useMemo(() => {
     const collections = data?.collections ?? (data?.collection ? [data.collection] : []);
     const filtered = collections.filter((collection) => {
@@ -134,30 +142,58 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
         {active !== "home" ? <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
           <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-y-0 right-0 hidden h-full w-3/5 object-cover opacity-30 mix-blend-screen lg:block" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/35" />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
+          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
+            <div className="max-w-4xl">
               <p className="text-sm font-black uppercase text-vault-green">PHEW.DEVNET / Faction OS</p>
               <h1 className="mt-2 max-w-4xl text-4xl font-black leading-tight">{title}</h1>
               <p className="mt-2 max-w-3xl text-slate-300">{data?.subtitle ?? "Launch faction vaults, coordinate raids, and reward holders on Solana."}</p>
+              <div className="mt-5">
+                <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
+                  <UserPlus className="size-4" /> Create Community
+                </Link>
+              </div>
             </div>
-            <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-              <UserPlus className="size-4" /> Create Community
-            </Link>
+            <PhewAnimationFrame
+              moment={pageMoment}
+              state={pageMotionState}
+              collectionImage={pageMotionImage}
+              tokenSymbol={pageMotionSymbol}
+              title={motionTitleForPage(active, title)}
+              subtitle={motionSubtitleForPage(active)}
+              className="min-h-[220px]"
+            />
           </div>
         </section> : null}
 
         {blockedByWallet ? <WalletDisconnectedState /> : null}
         {privateDiagnostics ? <SetupWarning warnings={warnings} /> : null}
-        {state.loading ? <LoadingState /> : null}
+        {state.loading && active !== "home" ? <LoadingState /> : null}
         {!state.loading && state.error ? <ErrorState error={state.error} retry={state.reload} /> : null}
-        {!state.loading && !state.error && !blockedByWallet && data
+        {(!state.loading || active === "home") && !state.error && !blockedByWallet && renderData
           ? children
-            ? children(data)
-            : renderProductView(endpoint, data, { query, setQuery, filter, setFilter, sort, setSort, visibleCollections, walletConnected: wallet.connected, walletAddress: wallet.address, reload: state.reload })
+            ? children(renderData)
+            : renderProductView(endpoint, renderData, { query, setQuery, filter, setFilter, sort, setSort, visibleCollections, walletConnected: wallet.connected, walletAddress: wallet.address, reload: state.reload })
           : null}
       </div>
     </AppShell>
   );
+}
+
+function homeFallbackData(title: string): ProductData {
+  return {
+    title,
+    subtitle: "The protocol for token-backed NFTs on Solana.",
+    collections: [],
+    nfts: [],
+    raids: [],
+    activity: [],
+    recentMints: [],
+    stats: {},
+    marketSnapshot: {
+      source: "loading-live-data",
+      chart: []
+    }
+  };
 }
 
 export function DefaultProductView({ data }: { data: ProductData }) {
@@ -255,12 +291,12 @@ function HomeDashboardView({ data }: { data: ProductData }) {
         <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/34" />
         <div className="absolute inset-0 grid-mask opacity-35" />
         <div className="relative grid gap-8 p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="max-w-4xl">
+          <div className="min-w-0 max-w-4xl">
             <div className="flex flex-wrap gap-2">
               <StatusPill accent="green">Protocol Dashboard</StatusPill>
               <StatusPill accent="cyan">Solana Vault NFTs</StatusPill>
             </div>
-            <h1 className="mt-5 max-w-4xl text-5xl font-black leading-tight lg:text-6xl">Real tokens. <span className="text-vault-green">Real backing. Real ownership.</span></h1>
+            <h1 className="mt-5 max-w-4xl break-words text-[40px] font-black leading-tight sm:text-5xl lg:text-6xl">Real tokens. <span className="text-vault-green">Real backing. Real ownership.</span></h1>
             <p className="mt-4 max-w-2xl text-lg text-slate-300">The protocol for token-backed NFT vaults. Lock community tokens, mint verified vault NFTs, trade freely, stake for rewards, and redeem through proof.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/collections" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
@@ -271,12 +307,12 @@ function HomeDashboardView({ data }: { data: ProductData }) {
               </Link>
             </div>
           </div>
-          <div className="rounded-lg border border-vault-green/25 bg-black/50 p-4 shadow-green">
+          <div className="min-w-0 rounded-lg border border-vault-green/25 bg-black/50 p-4 shadow-green">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-sm font-black uppercase text-white">Protocol Overview</p>
               <StatusPill accent={protocolState.data?.ok ? "green" : "gold"}>{protocolState.data?.ok ? "Live" : "N/A"}</StatusPill>
             </div>
-            <img src={brandAssets.logo} alt="Phew mascot" className="mx-auto size-28 rounded-lg object-contain drop-shadow-[0_0_28px_rgba(186,255,0,0.35)]" />
+            <img src={brandAssets.mascot} alt="Phew mascot" className="mx-auto size-32 object-contain drop-shadow-[0_0_28px_rgba(186,255,0,0.35)]" />
             <div className="mt-4 grid grid-cols-2 gap-3">
               <MiniStat label="TVL" value={formatCurrency(stats.tvlUsd)} />
               <MiniStat label="Vaults" value={formatMetric(totalVaults)} />
@@ -469,7 +505,7 @@ function CollectionDetailView({ data }: { data: ProductData }) {
         <div className="relative grid gap-6 p-6 xl:grid-cols-[160px_minmax(0,1fr)_360px] xl:p-8">
           <div className="flex items-start gap-3 xl:block">
             <img src={collection.image} alt={collection.name} className="size-24 rounded-lg border border-vault-green/30 object-cover xl:size-36" />
-            <img src={brandAssets.logo} alt="Phew mascot" className="size-16 rounded-lg border border-vault-line bg-black/40 object-contain p-2 xl:mt-4" />
+            <img src={brandAssets.mascot} alt="Phew mascot" className="size-20 rounded-lg border border-vault-line bg-black/40 object-contain p-2 xl:mt-4" />
           </div>
           <div>
             <div className="flex flex-wrap gap-2">
@@ -741,7 +777,7 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
       method: "POST",
       body: JSON.stringify({ idempotencyKey: `${wallet.address}:stake:${selectedVault.mint}` })
     });
-    if (response.status === "SKIPPED") throw new Error(response.message ?? "Staking adapter unavailable; no stake was recorded.");
+    assertBackendActionCompleted(response, "Backend did not confirm that the vault was staked.");
     reload();
     return response;
   }
@@ -754,7 +790,7 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
       method: "POST",
       body: JSON.stringify({ stakingPositionId: firstPosition, idempotencyKey: `${wallet.address}:unstake:${firstPosition}` })
     });
-    if (response.status === "SKIPPED") throw new Error(response.message ?? "Staking adapter unavailable; no unstake was recorded.");
+    assertBackendActionCompleted(response, "Backend did not confirm that the vault was unstaked.");
     reload();
     return response;
   }
@@ -1010,6 +1046,39 @@ function formatRewardSum(positions: unknown[]) {
     return Number.isFinite(value) ? sum + value : sum;
   }, 0);
   return `${total.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL`;
+}
+
+function motionMomentForPage(active: string, endpoint: string): PhewAnimationMoment {
+  if (active === "staking" || endpoint.includes("/staking")) return "stake";
+  if (active === "redeem" || endpoint.includes("/instant-sell")) return "redeem";
+  if (active === "raids" || endpoint.includes("/raids")) return "reward";
+  if (active === "marketplace" || endpoint.includes("/marketplace")) return "mint";
+  if (active === "risk" || endpoint.includes("/admin/risk")) return "scan";
+  if (active === "profile" || endpoint.includes("/profile")) return "proof";
+  if (active === "collections" || endpoint.includes("/collections")) return "community";
+  return "scan";
+}
+
+function motionTitleForPage(active: string, title: string) {
+  if (active === "marketplace") return "Purchase intent";
+  if (active === "raids") return "Raid reward route";
+  if (active === "staking") return "Stake action";
+  if (active === "instant-sell") return "Liquidity quote";
+  if (active === "profile") return "Wallet vault proof";
+  if (active === "risk") return "Risk scan";
+  if (active === "collections") return "Community reserve";
+  return title;
+}
+
+function motionSubtitleForPage(active: string) {
+  if (active === "marketplace") return "Backend purchase state pending";
+  if (active === "raids") return "Raid engine state pending";
+  if (active === "staking") return "Stake and reward state pending";
+  if (active === "instant-sell") return "Liquidity state pending";
+  if (active === "profile") return "Wallet proof state";
+  if (active === "risk") return "Risk snapshot state";
+  if (active === "collections") return "Reserve state pending";
+  return "Backend state pending";
 }
 
 function normalizeProductData(endpoint: string, data: ProductData | VaultCollection[] | VaultNft[] | RaidRoom[] | null): ProductData | null {

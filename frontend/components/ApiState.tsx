@@ -98,7 +98,7 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
   return (
     <SectionCard>
       <div className="phew-scanline grid gap-6 rounded-lg border border-dashed border-vault-green/35 bg-vault-green/5 p-6 text-left md:grid-cols-[180px_minmax(0,1fr)] md:items-center">
-        <img src={brandAssets.emptyVault} alt="" className="mx-auto aspect-square w-40 rounded-lg object-cover opacity-90 shadow-green" />
+        <img src={brandAssets.emptyVault} alt="" className="mx-auto aspect-square w-40 rounded-lg object-contain p-2 opacity-90 drop-shadow-[0_0_24px_rgba(186,255,0,0.24)]" />
         <div>
           <p className="text-xl font-black">{title}</p>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">{body}</p>

@@ -5,8 +5,9 @@ import { LockKeyhole, Sparkles, UnlockKeyhole, type LucideIcon } from "lucide-re
 import { AnimatedButton } from "./AnimatedButton";
 import { TransactionFlow, type TransactionFlowState } from "./TransactionFlow";
 import { TransactionStatus, type TxStatus } from "./TransactionStatus";
+import { assertBackendActionCompleted } from "@/lib/action-contracts";
 
-type FlowResult = { ok?: boolean; message?: string };
+type FlowResult = { ok?: boolean; message?: string; status?: string; payoutStatus?: string };
 
 async function defaultUnavailable(): Promise<FlowResult> {
   throw new Error("This transaction endpoint is not configured yet.");
@@ -60,9 +61,10 @@ function BaseFlow({
       setStatus("pending");
       setFlowState("sending");
       const result = await onRun();
+      const outcome = assertBackendActionCompleted(result, "Backend did not confirm a completed transaction.");
       setStatus("confirmed");
       setFlowState("success");
-      setDetail(result.message ?? null);
+      setDetail(outcome.detail ?? result.message ?? null);
     } catch (error) {
       setStatus("failed");
       setFlowState("error");

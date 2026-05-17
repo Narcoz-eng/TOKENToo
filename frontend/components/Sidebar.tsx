@@ -26,33 +26,33 @@ import { BrandLogo } from "./BrandLogo";
 
 const navSections = [
   {
-    title: null,
+    title: "Main",
     items: [
       { href: "/home", label: "Home", icon: Home, key: "home" },
       { href: "/collections", label: "Collections", icon: Boxes, key: "collections" },
-      { href: "/create-community", label: "Create Community", icon: PlusCircle, key: "create-community" },
-      { href: "/create-collection", label: "Studio", icon: PlusCircle, key: "create" },
-      { href: "/mint", label: "Mint Vault", icon: LockKeyhole, key: "mint" },
-      { href: "/profile", label: "My Vaults", icon: Users, key: "profile" },
+      { href: "/mint", label: "Mint", icon: LockKeyhole, key: "mint" },
       { href: "/staking", label: "Staking", icon: Coins, key: "staking" },
       { href: "/redeem", label: "Redeem", icon: Undo2, key: "redeem" },
-      { href: "/marketplace", label: "Marketplace", icon: WalletCards, key: "marketplace" },
-      { href: "/raids", label: "Raids", icon: Swords, key: "raids" },
-      { href: "/proof", label: "Proof Explorer", icon: FileSearch, key: "proof" }
+      { href: "/proof", label: "Proof", icon: FileSearch, key: "proof" }
     ]
   },
   {
-    title: "Analytics",
+    title: "Protocol",
     items: [
-      { href: "/home", label: "Protocol Stats", icon: Trophy, key: "protocol-stats" },
-      { href: "/proof", label: "Reserves", icon: Boxes, key: "reserves" },
-      { href: "/admin/risk", label: "Risk Dashboard", icon: ShieldAlert, key: "risk" },
-      { href: "/instant-sell", label: "Strategy Engine", icon: Zap, key: "instant-sell" }
+      { href: "/profile", label: "My Vaults", icon: Users, key: "profile" },
+      { href: "/marketplace", label: "Marketplace", icon: WalletCards, key: "marketplace" },
+      { href: "/raids", label: "Raids", icon: Swords, key: "raids" },
+      { href: "/create-community", label: "Create Community", icon: PlusCircle, key: "create-community" },
+      { href: "/create-collection", label: "Studio", icon: PlusCircle, key: "create", badge: "New" }
     ]
   },
   {
     title: "Admin",
-    items: [{ href: "/admin/setup", label: "Setup", icon: SlidersHorizontal, key: "setup" }]
+    items: [
+      { href: "/admin/setup", label: "Setup", icon: SlidersHorizontal, key: "setup" },
+      { href: "/admin/risk", label: "Risk", icon: ShieldAlert, key: "risk" },
+      { href: "/instant-sell", label: "Strategy", icon: Zap, key: "instant-sell" }
+    ]
   }
 ];
 
@@ -70,16 +70,16 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
   const tvl = typeof stats?.tvlUsd === "number" ? `$${stats.tvlUsd.toLocaleString()}` : "N/A";
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-vault-cyan/15 bg-[#020806]/96 shadow-[18px_0_60px_rgba(0,0,0,0.4)] backdrop-blur-xl lg:block">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 border-r border-white/10 bg-[#020806]/96 shadow-[18px_0_60px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block">
       <div className="flex h-full flex-col">
-        <Link href="/home" className="flex h-20 items-center gap-3 border-b border-vault-cyan/15 px-6">
+        <Link href="/home" className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
           <BrandLogo />
         </Link>
 
-        <nav className="flex-1 space-y-5 overflow-y-auto px-4 py-5">
-          {navSections.map((section, sectionIndex) => (
-            <div key={section.title ?? "main"} className={cn(sectionIndex > 0 && "border-t border-vault-line pt-4")}>
-              {section.title ? <p className="mb-2 px-2 text-[11px] font-black uppercase tracking-wide text-slate-500">{section.title}</p> : null}
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+          {navSections.map((section) => (
+            <div key={section.title} className="space-y-2">
+              <p className="px-2 text-[10px] font-black uppercase text-slate-500">{section.title}</p>
               <div className="space-y-1">
                 {section.items.map((item) => {
                   const Icon = item.icon;
@@ -89,13 +89,14 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
                       key={`${section.title ?? "main"}-${item.href}-${item.key}`}
                       href={item.href}
                       className={cn(
-                        "group relative flex items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-sm font-semibold text-slate-400 transition hover:border-vault-cyan/25 hover:bg-vault-cyan/5 hover:text-white",
-                        selected && "border-vault-green/45 bg-vault-green/12 text-white shadow-green"
+                        "group relative flex min-h-10 items-center gap-2.5 rounded-md border border-transparent px-2.5 py-2 text-[13px] font-bold text-slate-400 transition hover:border-vault-cyan/20 hover:bg-vault-cyan/5 hover:text-white",
+                        selected && "border-vault-green/45 bg-vault-green/12 text-white shadow-[0_0_18px_rgba(186,255,0,0.12)]"
                       )}
                     >
                       {selected ? <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r bg-vault-green shadow-green" /> : null}
                       <Icon className={cn("size-4 transition group-hover:text-vault-green", selected ? "text-vault-green" : "text-slate-500")} />
-                      <span>{item.label}</span>
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {"badge" in item && item.badge ? <span className="rounded border border-vault-green/35 bg-vault-green/10 px-1.5 py-0.5 text-[9px] font-black uppercase text-vault-green">{item.badge}</span> : null}
                     </Link>
                   );
                 })}
@@ -104,11 +105,11 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
           ))}
         </nav>
 
-        <div className="space-y-3 p-4">
-          <div className="relative overflow-hidden rounded-lg border border-vault-cyan/15 bg-black/35 p-3">
+        <div className="space-y-3 p-3">
+          <div className="relative overflow-hidden rounded-lg border border-white/10 bg-black/35 p-3">
             <div className="absolute inset-0 bg-gradient-to-br from-vault-green/8 via-transparent to-vault-cyan/8" />
             <p className="relative text-xs font-black uppercase text-slate-400">Wallet</p>
-            <div className="relative mt-3 flex items-center gap-3 rounded-md border border-vault-line bg-black/35 p-3">
+            <div className="relative mt-3 flex items-center gap-3 rounded-md border border-white/10 bg-black/35 p-3">
               <div className="flex size-10 items-center justify-center rounded-md border border-vault-green/25 bg-vault-green/10 text-vault-green shadow-green">
                 <Coins className="size-5" />
               </div>
@@ -118,7 +119,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
               </div>
             </div>
           </div>
-          <div className="relative overflow-hidden rounded-lg border border-vault-cyan/15 bg-black/35 p-3">
+          <div className="relative overflow-hidden rounded-lg border border-vault-green/20 bg-black/40 p-3">
             <p className="relative text-xs font-black uppercase text-slate-400">Protocol Stats</p>
             <div className="relative mt-3 grid grid-cols-3 gap-2 text-sm">
               <SidebarMetric label="TVL" value={tvl} />
@@ -126,10 +127,10 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
               <SidebarMetric label="Factions" value={communities} />
             </div>
             <Link href="/create-community" className="phew-button phew-button-primary relative mt-4 flex h-10 items-center justify-center rounded-md text-sm font-black text-black">
-              Create
+              Launch
             </Link>
           </div>
-          <div className="flex items-center justify-between rounded-md border border-vault-line bg-black/30 px-4 py-3 text-slate-500">
+          <div className="flex items-center justify-between rounded-md border border-white/10 bg-black/30 px-4 py-3 text-slate-500">
             <Bell className="size-4" />
             <Search className="size-4" />
             <Trophy className="size-4" />

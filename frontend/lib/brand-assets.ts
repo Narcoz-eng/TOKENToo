@@ -1,7 +1,10 @@
 export const brandAssets = {
-  logo: "/brand/phew-run-logo-mark.png",
+  logo: "/brand/phew-mascot.png",
+  mascot: "/brand/phew-mascot.png",
+  wordmark: "/brand/phew-run-logo.svg",
+  banner: "/banner.png",
   vaultHero: "/art/phew-vault-hero.png",
-  emptyVault: "/art/empty-state-vault.png",
+  emptyVault: "/brand/phew-mascot.png",
   actionIcons: "/art/phew-action-icons.png",
   motionCore: "/art/phew-motion-core.png",
   launchHero: "/art/phew-launch-hero.png",

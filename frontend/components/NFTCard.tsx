@@ -8,39 +8,42 @@ import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
 import { TransactionStatus, type TxStatus } from "./TransactionStatus";
 import { ProtocolTrustStrip, vaultTrust } from "./protocol-trust";
+import { backendActionOutcome, type BackendActionResponse } from "@/lib/action-contracts";
 
 export function NFTCard({ nft, collection, listingId }: { nft: VaultNft; collection: VaultCollection; listingId?: string }) {
   const wallet = useWalletAuth();
   const [purchaseStatus, setPurchaseStatus] = useState<TxStatus>("idle");
-  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [purchaseDetail, setPurchaseDetail] = useState<string | null>(null);
   const hasBacking = nft.backingSol > 0 && nft.priceSol > 0;
   const premium = hasBacking ? Math.round(((nft.priceSol - nft.backingSol) / nft.backingSol) * 100) : 0;
   const backingPercent = hasBacking ? Math.min(100, Math.round((nft.backingSol / nft.priceSol) * 100)) : 0;
   const trust = vaultTrust(nft, collection);
 
   async function purchase() {
-    setPurchaseError(null);
+    setPurchaseDetail(null);
     if (!listingId) {
       setPurchaseStatus("failed");
-      setPurchaseError("This vault does not have an active listing id.");
+      setPurchaseDetail("This vault does not have an active listing id.");
       return;
     }
     if (!wallet.connected) {
       setPurchaseStatus("failed");
-      setPurchaseError("Connect and authenticate your wallet before purchasing.");
+      setPurchaseDetail("Connect and authenticate your wallet before purchasing.");
       return;
     }
     setPurchaseStatus("validating");
     try {
       setPurchaseStatus("pending");
-      await wallet.authFetch("/marketplace/purchases/intents", {
+      const response = await wallet.authFetch<BackendActionResponse>("/marketplace/purchases/intents", {
         method: "POST",
         body: JSON.stringify({ listingId, idempotencyKey: `${wallet.address}:purchase:${listingId}` })
       });
-      setPurchaseStatus("confirmed");
+      const outcome = backendActionOutcome(response, "Purchase route returned an intent but no completed escrow/transfer status.");
+      setPurchaseStatus(outcome.phase === "confirmed" ? "confirmed" : outcome.phase === "failed" ? "failed" : "pending");
+      setPurchaseDetail(outcome.confirmed ? outcome.detail ?? null : outcome.detail ?? "Purchase is pending backend confirmation.");
     } catch (err) {
       setPurchaseStatus("failed");
-      setPurchaseError(err instanceof Error ? err.message : "Purchase intent failed");
+      setPurchaseDetail(err instanceof Error ? err.message : "Purchase intent failed");
     }
   }
 
@@ -97,7 +100,7 @@ export function NFTCard({ nft, collection, listingId }: { nft: VaultNft; collect
           <span className="flex items-center gap-2"><LockKeyhole className="size-4 text-vault-green" /> {nft.status}</span>
           <span className="flex items-center gap-1 text-vault-green"><Sparkles className="size-4" /> {nft.aura}</span>
         </div>
-        {purchaseStatus !== "idle" ? <TransactionStatus status={purchaseStatus} label={purchaseStatus === "failed" ? "Purchase unavailable" : purchaseStatus === "confirmed" ? "Purchase confirmed" : "Purchase pending"} detail={purchaseError} /> : null}
+        {purchaseStatus !== "idle" ? <TransactionStatus status={purchaseStatus} label={purchaseStatus === "failed" ? "Purchase unavailable" : purchaseStatus === "confirmed" ? "Purchase confirmed" : "Purchase pending"} detail={purchaseDetail} /> : null}
         <button onClick={purchase} disabled={purchaseStatus === "validating" || purchaseStatus === "pending"} className="phew-button phew-button-primary flex h-10 w-full items-center justify-center gap-2 rounded-md text-sm font-black text-black disabled:opacity-60">
           <TrendingUp className="size-4" /> {listingId ? "Buy Vault" : "No Active Listing"}
         </button>

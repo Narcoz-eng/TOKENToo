@@ -22,6 +22,7 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 12% 6%, rgba(186, 255, 0, 0.045), transparent 26%),
     radial-gradient(circle at 84% 12%, rgba(22, 215, 210, 0.055), transparent 26%),
@@ -208,6 +209,26 @@ select {
   border: 1px solid rgba(22, 215, 210, 0.35) !important;
 }
 
+.wallet-adapter-dropdown {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .wallet-adapter-dropdown {
+    width: 48px !important;
+  }
+
+  .wallet-adapter-button {
+    width: 48px !important;
+    max-width: 48px !important;
+    min-width: 0 !important;
+    padding-inline: 12px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+}
+
 .rounded-inherit {
   border-radius: inherit;
 }
@@ -305,20 +326,70 @@ select {
   box-shadow: inset 0 0 0 1px rgba(255, 79, 79, 0.18), 0 0 30px rgba(255, 79, 79, 0.12);
 }
 
+.phew-coded-moment {
+  min-height: 300px;
+}
+
+.phew-moment-orbit {
+  animation: phew-tx-orbit 8s linear infinite;
+}
+
+.phew-coded-beam {
+  position: absolute;
+  left: 18%;
+  right: 15%;
+  top: 49%;
+  z-index: 2;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(186, 255, 0, 0.84), rgba(22, 215, 210, 0.48), transparent);
+  box-shadow: 0 0 18px rgba(186, 255, 0, 0.38);
+  transform-origin: left center;
+  animation: phew-tx-beam 1.85s ease-in-out infinite;
+}
+
+.phew-coded-mascot {
+  position: absolute;
+  left: clamp(0.8rem, 6%, 2.4rem);
+  bottom: 4.2rem;
+  z-index: 4;
+  width: 112px;
+  height: 108px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 22px rgba(186, 255, 0, 0.28));
+  animation: phew-tx-mascot 2.35s ease-in-out infinite;
+}
+
+.phew-coded-object {
+  position: absolute;
+  right: clamp(0.9rem, 7%, 3rem);
+  bottom: 5.2rem;
+  z-index: 4;
+  display: grid;
+  width: 86px;
+  height: 86px;
+  place-items: center;
+  border: 1px solid rgba(186, 255, 0, 0.28);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.52);
+  box-shadow: inset 0 0 26px rgba(186, 255, 0, 0.08), 0 0 20px rgba(22, 215, 210, 0.08);
+}
+
 .phew-tx-stage {
   position: relative;
-  min-height: 260px;
+  min-height: 320px;
   overflow: hidden;
   border-radius: 10px;
   border: 1px solid rgba(110, 255, 222, 0.14);
   background:
-    radial-gradient(circle at 50% 36%, rgba(186, 255, 0, 0.08), transparent 34%),
+    radial-gradient(circle at 50% 40%, rgba(186, 255, 0, 0.11), transparent 34%),
+    radial-gradient(circle at 12% 72%, rgba(186, 255, 0, 0.075), transparent 24%),
+    radial-gradient(circle at 88% 66%, rgba(22, 215, 210, 0.08), transparent 24%),
     linear-gradient(180deg, rgba(2, 8, 6, 0.92), rgba(0, 0, 0, 0.96));
   isolation: isolate;
 }
 
 .phew-tx-stage-compact {
-  min-height: 200px;
+  min-height: 240px;
 }
 
 .phew-tx-stage::before {
@@ -331,10 +402,22 @@ select {
   opacity: 0.7;
 }
 
+.phew-tx-stage-head {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  top: 1rem;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .phew-tx-orbit {
   position: absolute;
   left: 50%;
-  top: 48%;
+  top: 50%;
   border-radius: 999px;
   border: 1px solid rgba(186, 255, 0, 0.28);
   transform: translate(-50%, -50%);
@@ -342,38 +425,51 @@ select {
 }
 
 .phew-tx-orbit-a {
-  width: 240px;
-  height: 240px;
+  width: 300px;
+  height: 300px;
   animation: phew-tx-orbit 7s linear infinite;
 }
 
 .phew-tx-orbit-b {
-  width: 165px;
-  height: 165px;
+  width: 205px;
+  height: 205px;
   border-color: rgba(22, 215, 210, 0.28);
   animation: phew-tx-orbit 5s linear infinite reverse;
 }
 
+.phew-tx-floor {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  bottom: 3.15rem;
+  z-index: 1;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(186, 255, 0, 0.24);
+  background: radial-gradient(ellipse at center, rgba(186, 255, 0, 0.14), transparent 64%);
+  box-shadow: 0 0 34px rgba(186, 255, 0, 0.12), inset 0 0 20px rgba(22, 215, 210, 0.06);
+}
+
 .phew-tx-mascot {
   position: absolute;
-  left: clamp(1rem, 8%, 4rem);
-  bottom: 3.1rem;
+  left: clamp(1rem, 7%, 4rem);
+  bottom: 4.05rem;
   z-index: 3;
-  width: 78px;
-  height: 78px;
+  width: 128px;
+  height: 122px;
   object-fit: contain;
-  filter: drop-shadow(0 0 16px rgba(186, 255, 0, 0.25));
+  filter: drop-shadow(0 0 22px rgba(186, 255, 0, 0.28));
   animation: phew-tx-mascot 2.4s ease-in-out infinite;
 }
 
 .phew-tx-nft {
   position: absolute;
   left: 50%;
-  top: 47%;
+  top: 52%;
   z-index: 4;
   display: flex;
-  width: 94px;
-  min-height: 130px;
+  width: 126px;
+  min-height: 176px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -388,12 +484,12 @@ select {
 
 .phew-tx-object {
   position: absolute;
-  right: clamp(1rem, 9%, 4.5rem);
-  bottom: 4rem;
+  right: clamp(1rem, 8%, 4.5rem);
+  bottom: 5.15rem;
   z-index: 3;
   display: grid;
-  width: 82px;
-  height: 82px;
+  width: 104px;
+  height: 104px;
   place-items: center;
   border: 1px solid rgba(186, 255, 0, 0.28);
   border-radius: 14px;
@@ -401,14 +497,31 @@ select {
   box-shadow: inset 0 0 24px rgba(186, 255, 0, 0.08);
 }
 
+.phew-tx-action-label {
+  position: absolute;
+  left: 50%;
+  bottom: -1.75rem;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  border: 1px solid rgba(186, 255, 0, 0.28);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  padding: 0.18rem 0.5rem;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #baff00;
+}
+
 .phew-tx-beam {
   position: absolute;
-  left: 27%;
-  right: 25%;
-  top: 47%;
+  left: 24%;
+  right: 22%;
+  top: 52%;
   z-index: 2;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(186, 255, 0, 0.86), transparent);
+  background: linear-gradient(90deg, transparent, rgba(186, 255, 0, 0.86), rgba(22, 215, 210, 0.5), transparent);
   box-shadow: 0 0 14px rgba(186, 255, 0, 0.42);
   transform-origin: left center;
   animation: phew-tx-beam 1.8s ease-in-out infinite;
@@ -426,31 +539,46 @@ select {
 
 @media (max-width: 640px) {
   .phew-tx-stage {
-    min-height: 220px;
+    min-height: 250px;
+  }
+
+  .phew-tx-stage-head {
+    left: 0.75rem;
+    right: 0.75rem;
   }
 
   .phew-tx-mascot {
     left: 0.85rem;
-    bottom: 3.3rem;
-    width: 58px;
-    height: 58px;
+    bottom: 4.05rem;
+    width: 70px;
+    height: 68px;
   }
 
   .phew-tx-nft {
-    width: 78px;
-    min-height: 112px;
+    width: 84px;
+    min-height: 122px;
   }
 
   .phew-tx-object {
     right: 0.85rem;
-    bottom: 3.7rem;
-    width: 58px;
-    height: 58px;
+    bottom: 4.55rem;
+    width: 62px;
+    height: 62px;
   }
 
   .phew-tx-beam {
     left: 21%;
     right: 20%;
+  }
+
+  .phew-coded-mascot {
+    width: 76px;
+    height: 74px;
+  }
+
+  .phew-coded-object {
+    width: 62px;
+    height: 62px;
   }
 }
 
@@ -562,6 +690,9 @@ select {
 .phew-reduced-motion .phew-tx-mascot,
 .phew-reduced-motion .phew-tx-nft,
 .phew-reduced-motion .phew-tx-beam,
+.phew-reduced-motion .phew-coded-mascot,
+.phew-reduced-motion .phew-coded-beam,
+.phew-reduced-motion .phew-moment-orbit,
 .phew-reduced-motion .phew-loader-ring,
 .phew-reduced-motion .phew-loading-stage::before {
   animation: none !important;
@@ -581,6 +712,9 @@ select {
   .phew-tx-mascot,
   .phew-tx-nft,
   .phew-tx-beam,
+  .phew-coded-mascot,
+  .phew-coded-beam,
+  .phew-moment-orbit,
   .phew-loader-ring,
   .phew-loading-stage::before {
     animation: none !important;
