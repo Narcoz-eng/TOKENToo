@@ -1,5 +1,5 @@
-import CreateCollectionPage from "../create-collection/page";
+import { StudioReferencePage } from "@/components/reference-data-pages";
 
 export default function StudioPage() {
-  return <CreateCollectionPage />;
+  return <StudioReferencePage />;
 }

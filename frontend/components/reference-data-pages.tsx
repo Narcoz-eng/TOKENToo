@@ -24,7 +24,7 @@ import {
 import { BackendUnavailableBanner, CheckRow, LockedButton, ReferenceBadge, ReferenceButton, ReferenceEmpty, ReferenceHeader, ReferenceInput, ReferenceMetric, ReferencePanel, ReferenceRows, ReferenceShell, ReferenceStepper, ReferenceTable, ReferenceTransactionScene, SearchControl, WalletRequiredBanner, na, shortAddress } from "@/components/reference-ui";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
-import { unwrapApiData } from "@/lib/api";
+import { apiFetch, unwrapApiData } from "@/lib/api";
 import { brandAssets } from "@/lib/brand-assets";
 import type { VaultCollection, VaultNft } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -73,6 +73,49 @@ type RiskRow = {
   instantSell?: boolean | null;
   emergency?: boolean | null;
   lastScannedAt?: string | null;
+};
+
+type CapabilitiesResponse = {
+  ok?: boolean;
+  mode?: string;
+  cluster?: string;
+  rpcUrl?: string;
+  capabilities?: Record<string, boolean>;
+  warnings?: string[];
+  setupChecklist?: {
+    storageProvider?: string;
+    creativePreviewReady?: boolean;
+    devnetLaunchReady?: boolean;
+    productionLaunchReady?: boolean;
+    items?: Array<{ key: string; label: string; ok: boolean; requiredFor?: string[]; fix?: string }>;
+  };
+  publicReadiness?: {
+    professionalPreviewReady?: boolean;
+    launchAvailable?: boolean;
+    mintingAvailable?: boolean;
+    creatorSetupRequired?: boolean;
+    messages?: string[];
+  };
+  setupModes?: Array<{ id: string; label: string; ready: boolean; output: string; missing: string[]; blockedBy: string[] }>;
+};
+
+type ImageProvidersResponse = {
+  ok?: boolean;
+  active?: { provider?: string; authPresent?: boolean; canGenerateStudioBible?: boolean; quotaStatus?: string; lastProbeResult?: string; selectedModel?: string };
+  providers?: Array<{ provider: string; authPresent?: boolean; canGenerateStudioBible?: boolean; quotaStatus?: string; lastProbeResult?: string; selectedModel?: string }>;
+};
+
+type TokenScan = {
+  mint: string;
+  name?: string;
+  symbol?: string;
+  decimals?: number;
+  supply?: string | number;
+  imageUri?: string;
+  logoUri?: string;
+  metadataUri?: string;
+  provider?: string;
+  riskScore?: number;
 };
 
 export function HomeReferencePage() {
@@ -621,6 +664,290 @@ export function StrategyEngineReferencePage() {
   );
 }
 
+export function AdminSetupReferencePage() {
+  const capabilities = useApiResource<CapabilitiesResponse>("/system/capabilities");
+  const imageProviders = useApiResource<ImageProvidersResponse>("/system/image-providers");
+  const data = capabilities.data;
+  const providers = imageProviders.data?.providers ?? [];
+  const checklist = data?.setupChecklist?.items ?? [];
+  const complete = checklist.filter((item) => item.ok).length;
+  const total = checklist.length || 10;
+  const capabilityKeys = [
+    ["Image Generation", "openaiImagesAvailable"],
+    ["Paid Generation", "aiGenerationEnabled"],
+    ["Caching", "permanentStorageConfigured"],
+    ["Layer Pack", "approvedLayerPackAvailable"],
+    ["Studio Mode", "professionalPreviewReady"],
+    ["Public Mint", "mintingAvailable"],
+    ["Community Launch", "launchAvailable"]
+  ] as const;
+
+  return (
+    <ReferenceShell active="setup">
+      <ReferenceHeader
+        eyebrow={<><ReferenceBadge tone="muted">Founders & Operators</ReferenceBadge><ReferenceBadge tone={data?.publicReadiness?.launchAvailable ? "green" : "gold"}>{data?.publicReadiness?.launchAvailable ? "Setup complete" : "Setup not complete"}</ReferenceBadge></>}
+        title="Admin Setup"
+        subtitle="Configure protocol settings, providers, and backend services."
+        mascot
+        warning={<div className="rounded-lg border border-vault-gold/45 bg-vault-gold/10 p-3 text-sm text-slate-200"><AlertTriangle className="mr-2 inline size-5 text-vault-gold" /> Complete all required sections to enable protocol features. No user-facing actions are enabled until setup is validated.</div>}
+      />
+      {capabilities.error ? <BackendUnavailableBanner message={capabilities.error.message} retry={capabilities.reload} /> : null}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px_260px]">
+        <ReferencePanel title="System Capabilities" className="xl:col-span-1">
+          <div className="grid gap-2 md:grid-cols-4 xl:grid-cols-7">
+            {capabilityKeys.map(([label, key]) => (
+              <div key={key} className="rounded-lg border border-vault-gold/35 bg-black/25 p-3">
+                <p className="truncate text-xs font-black text-white">{label}</p>
+                <ReferenceBadge tone={data?.capabilities?.[key] ? "green" : "muted"} className="mt-2">{data?.capabilities?.[key] ? "Enabled" : "Disabled"}</ReferenceBadge>
+              </div>
+            ))}
+          </div>
+        </ReferencePanel>
+        <ReferencePanel title="Setup Progress">
+          <p className="text-3xl font-black text-vault-green">{complete} <span className="text-white">/ {total}</span></p>
+          <p className="mt-1 text-xs text-slate-400">sections complete</p>
+          <div className="mt-3 h-2 rounded-full bg-white/10"><span className="block h-full rounded-full bg-vault-green" style={{ width: `${total ? (complete / total) * 100 : 0}%` }} /></div>
+        </ReferencePanel>
+        <ReferencePanel title="Validate All" subtitle="Run full system validation.">
+          <ReferenceButton tone="outline" icon={ShieldCheck} className="w-full">Validate All</ReferenceButton>
+        </ReferencePanel>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-4">
+        <ReferencePanel title="1. Image Providers">
+          <ReferenceTable
+            columns={["Provider", "Status", "Approval", "Paid Gen", "Config"]}
+            rows={(providers.length ? providers : [{ provider: "Phew Studio (Primary)" }, { provider: "OpenAI (DALL-E)" }, { provider: "Imagen (Fallback)" }, { provider: "Custom Provider" }]).map((provider) => [
+              provider.provider,
+              provider.authPresent ? "Configured" : "Not Configured",
+              provider.canGenerateStudioBible ? "Approved" : "Pending",
+              provider.canGenerateStudioBible ? "On" : "Off",
+              <ReferenceButton key="configure" tone="ghost">Configure</ReferenceButton>
+            ])}
+          />
+          <div className="mt-3 rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-3 text-sm text-vault-gold">No providers approved. Image generation is disabled.</div>
+        </ReferencePanel>
+        <ReferencePanel title="2. Provider Configuration Checklist">
+          <ReferenceRows rows={[
+            { label: "Studio provider configured", value: imageProviders.data?.active?.provider ?? "N/A" },
+            { label: "Provider explicitly approved", value: imageProviders.data?.active?.canGenerateStudioBible ? "Yes" : "N/A" },
+            { label: "Paid generation enabled", value: data?.capabilities?.aiGenerationEnabled ? "Yes" : "N/A" },
+            { label: "Payment method configured", value: "N/A" },
+            { label: "Usage limits configured", value: "N/A" },
+            { label: "Fallback provider enabled", value: "N/A" }
+          ]} />
+        </ReferencePanel>
+        <ReferencePanel title="3. Cache & Storage">
+          <ReferenceRows rows={[
+            { label: "Image Cache", value: data?.capabilities?.permanentStorageConfigured ? "Enabled" : "Disabled" },
+            { label: "Metadata Cache", value: data?.capabilities?.tokenMetadataAvailable ? "Enabled" : "Disabled" },
+            { label: "Layer Pack Cache", value: data?.capabilities?.approvedLayerPackAvailable ? "Enabled" : "Disabled" },
+            { label: "Cache TTL", value: "N/A" },
+            { label: "Storage Provider", value: data?.setupChecklist?.storageProvider ?? "N/A" },
+            { label: "Storage Bucket", value: "N/A" }
+          ]} />
+        </ReferencePanel>
+        <ReferencePanel title="4. Backend Health">
+          <ReferenceRows rows={["API Server", "Database", "Helius RPC", "Solana Program", "Queue / Worker", "Storage", "Redis"].map((label) => ({ label, value: healthValue(label, data?.capabilities) }))} />
+          <ReferenceButton tone="outline" icon={RefreshCcw} className="mt-3 w-full">Run Health Check</ReferenceButton>
+        </ReferencePanel>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-4">
+        <ReferencePanel title="5. Solana Integration">
+          <ReferenceRows rows={[
+            { label: "Network", value: data?.cluster ?? "Solana Devnet" },
+            { label: "RPC Endpoint", value: data?.rpcUrl ?? "N/A" },
+            { label: "Program ID", value: data?.capabilities?.devnetProgramConfigured ? "Configured" : "N/A" },
+            { label: "Program Authority", value: "N/A" },
+            { label: "PDA Seed", value: "N/A" }
+          ]} />
+        </ReferencePanel>
+        <ReferencePanel title="6. Studio Provider (Paid Generation)">
+          <ReferenceRows rows={[
+            { label: "Paid Generation", value: data?.capabilities?.aiGenerationEnabled ? "On" : "Off" },
+            { label: "Require Payment Signature", value: "Off" },
+            { label: "Price (USD)", value: "N/A" },
+            { label: "Max Generation Size", value: "N/A" },
+            { label: "Daily Generation Limit", value: "N/A" },
+            { label: "Timeout (sec)", value: "N/A" }
+          ]} />
+        </ReferencePanel>
+        <ReferencePanel title="7. Layer Pack (Curated)">
+          <ReferenceRows rows={[
+            { label: "Layer Pack Status", value: data?.capabilities?.approvedLayerPackAvailable ? "Loaded" : "Not Loaded" },
+            { label: "Total Layers", value: "N/A" },
+            { label: "Trait Validation", value: "Disabled" },
+            { label: "Duplicate Prevention", value: "Disabled" },
+            { label: "Rarity Rules", value: "Not Configured" }
+          ]} />
+        </ReferencePanel>
+        <ReferencePanel title="8. AI & Fallback Rules">
+          <ReferenceRows rows={[
+            { label: "Primary Provider", value: imageProviders.data?.active?.provider ?? "N/A" },
+            { label: "Fallback Provider", value: "N/A" },
+            { label: "Fallback Enabled", value: "Off" },
+            { label: "Retry Attempts", value: "N/A" },
+            { label: "Timeout (sec)", value: "N/A" }
+          ]} />
+        </ReferencePanel>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_1.15fr_0.8fr_1fr]">
+        <ReferencePanel title="9. Environment Diagnostics">
+          <ReferenceRows rows={[
+            { label: "Node Environment", value: data?.mode ?? "N/A" },
+            { label: "App Version", value: "N/A" },
+            { label: "Server Time", value: "N/A" },
+            { label: "Uptime", value: "N/A" },
+            { label: "Memory Usage", value: "N/A" }
+          ]} />
+        </ReferencePanel>
+        <ReferencePanel title="10. Validation & Launch Readiness">
+          <ReferenceRows rows={(checklist.length ? checklist : [
+            { key: "core", label: "All core services healthy", ok: false },
+            { key: "providers", label: "Providers configured & approved", ok: false },
+            { key: "payment", label: "Payment configured", ok: false },
+            { key: "program", label: "On-chain program configured", ok: false },
+            { key: "layer", label: "Layer pack loaded & validated", ok: false }
+          ]).map((item) => ({ label: item.label, value: item.ok ? "Ready" : "N/A", tone: item.ok ? "green" : "gold" }))} />
+        </ReferencePanel>
+        <ReferencePanel title="Setup Actions">
+          <div className="grid gap-2">
+            <LockedButton>Validate All Sections</LockedButton>
+            <LockedButton>Save Configuration</LockedButton>
+            <ReferenceButton tone="danger" disabled>Reset Setup</ReferenceButton>
+          </div>
+        </ReferencePanel>
+        <ReferencePanel title="Activity Log">
+          <ReferenceTable columns={["Time", "Event", "User", "Status"]} rows={[]} empty={<ReferenceEmpty title="No activity yet" body="Setup changes will appear here." />} />
+        </ReferencePanel>
+      </div>
+    </ReferenceShell>
+  );
+}
+
+export function StudioReferencePage() {
+  const wallet = useWalletAuth();
+  const capabilities = useApiResource<CapabilitiesResponse>("/system/capabilities");
+  const [tokenMint, setTokenMint] = useState("");
+  const [scan, setScan] = useState<TokenScan | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const studioReady = Boolean(capabilities.data?.publicReadiness?.professionalPreviewReady || capabilities.data?.capabilities?.professionalPreviewReady);
+  const activeIndex = scan ? 1 : 0;
+
+  async function scanToken() {
+    const mint = tokenMint.trim();
+    if (!mint) {
+      setScanError("Enter a token contract address first.");
+      return;
+    }
+    setScanning(true);
+    setScanError(null);
+    setScan(null);
+    try {
+      const response = await apiFetch<TokenScan>(`/tokens/${encodeURIComponent(mint)}/scan`, { timeoutMs: 30_000 });
+      setScan(unwrapApiData(response) ?? response);
+    } catch (error) {
+      setScanError(error instanceof Error ? error.message : "Token scan failed");
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  return (
+    <ReferenceShell active="studio">
+      <ReferenceHeader
+        eyebrow={<><ReferenceBadge tone="muted">Studio</ReferenceBadge><ReferenceBadge tone={studioReady ? "green" : "gold"}>{studioReady ? "Subscription active" : "Setup gated"}</ReferenceBadge></>}
+        title="Studio Mode"
+        subtitle="Build a token-backed NFT collection with the Phew Studio workbench."
+        actions={<><ReferenceButton tone="ghost">Studio Docs</ReferenceButton><ReferenceButton tone="ghost">Watch Tutorial</ReferenceButton><ReferenceButton tone="ghost" icon={SlidersHorizontal}>Studio Settings</ReferenceButton></>}
+      />
+      {capabilities.error ? <BackendUnavailableBanner message={capabilities.error.message} retry={capabilities.reload} /> : null}
+      <div className="grid gap-4 xl:grid-cols-[210px_minmax(0,1fr)]">
+        <aside className="space-y-4">
+          <ReferencePanel title="Studio Workflow">
+            <ReferenceStepper steps={["Token Scan", "Brand Kit", "Studio Bible", "Layer Pack", "Launch Readiness"]} activeIndex={activeIndex} />
+          </ReferencePanel>
+          <ReferencePanel title="Run Status">
+            <ReferenceRows rows={[
+              { label: "Run ID", value: "N/A" },
+              { label: "Created", value: "N/A" },
+              { label: "Last Updated", value: "N/A" },
+              { label: "Status", value: scan ? "Token scanned" : "Not Started", tone: scan ? "green" : "gold" },
+              { label: "Owner", value: wallet.address ? shortAddress(wallet.address) : "N/A" }
+            ]} />
+          </ReferencePanel>
+          <LockedButton>Save Draft</LockedButton>
+        </aside>
+        <main className="space-y-4">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_430px]">
+            <ReferencePanel title="1. Token Scan (CA-First)" subtitle="Enter the token contract address to fetch on-chain metadata and supply.">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_150px]">
+                <ReferenceInput value={tokenMint} onChange={setTokenMint} placeholder="Paste token CA..." />
+                <ReferenceButton icon={Search} onClick={scanToken} disabled={scanning}>{scanning ? "Scanning" : "Scan Token"}</ReferenceButton>
+              </div>
+              {scanError ? <div className="mt-3 rounded-lg border border-vault-red/40 bg-vault-red/10 p-3 text-sm text-vault-red">{scanError}</div> : null}
+              <div className="mt-3 grid gap-3 md:grid-cols-4">
+                <ReferenceMetric label="Network" value="Solana" />
+                <ReferenceMetric label="Metadata" value={scan?.metadataUri ? "Loaded" : "N/A"} />
+                <ReferenceMetric label="Total Supply" value={na(scan?.supply)} />
+                <ReferenceMetric label="Holders" value="N/A" />
+              </div>
+              <div className="mt-3 rounded-lg border border-vault-line bg-black/25 p-3 text-sm text-slate-400">We never auto-generate. You control every step.</div>
+            </ReferencePanel>
+            <ReferencePanel title="Fast Studio Preview (Estimate)">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ReferenceMetric label="Estimated Cost" value="N/A USD" />
+                <ReferenceMetric label="Estimated Time" value="N/A min" />
+              </div>
+              <ReferenceRows className="mt-3" rows={[
+                { label: "Image Provider (Studio)", value: capabilities.data?.capabilities?.aiGenerationEnabled ? "Configured" : "N/A" },
+                { label: "Explicit Approval", value: "Required" },
+                { label: "Cache Status", value: "N/A" }
+              ]} />
+            </ReferencePanel>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <ReferencePanel title="3. Studio Bible (Style Guide)" subtitle="The bible defines the visual rules and creative direction for your collection.">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_250px]">
+                <ReferenceTransactionScene mode="studio" state={scanning ? "loading" : scan ? "success" : "idle"} title="Studio Bible" tokenSymbol={scan?.symbol ?? "TOKEN"} image={scan?.imageUri ?? scan?.logoUri} compact />
+                <div>
+                  <ReferenceBadge tone="gold">Not Generated</ReferenceBadge>
+                  <ReferenceRows className="mt-3" rows={["Colors & Mood", "Typography", "Character / Mascot Rules", "Do's & Don'ts", "Scene & Background Rules", "Trait Behavior Rules"].map((label) => ({ label, value: "N/A" }))} />
+                  <LockedButton>Generate Studio Bible</LockedButton>
+                </div>
+              </div>
+            </ReferencePanel>
+            <ReferencePanel title="4. Layer Pack (Curated)" subtitle="Curate, validate and lock your layer pack before approval.">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_230px]">
+                <ReferenceTransactionScene mode="layer" state="idle" title="Layer Pack" tokenSymbol={scan?.symbol ?? "TOKEN"} compact />
+                <div>
+                  <ReferenceBadge tone="gold">Not Curated</ReferenceBadge>
+                  <ReferenceRows className="mt-3" rows={["Layer Count", "Combinations", "Duplicates", "Validation", "Status"].map((label) => ({ label, value: "N/A" }))} />
+                  <LockedButton>Open Layer Pack Manager</LockedButton>
+                </div>
+              </div>
+            </ReferencePanel>
+          </div>
+          <ReferencePanel title="5. Launch Readiness" subtitle="Complete all requirements to enable collection launch.">
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              {["Token Scanned", "Brand Kit", "Studio Bible", "Layer Pack", "Approvals", "Launch"].map((label, index) => (
+                <ReferenceMetric key={label} label={label} value={index === 0 && scan ? "Ready" : index === 0 ? "Not Started" : "Locked"} tone={index === 0 && scan ? "green" : "muted"} />
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <LockedButton>Launch Collection</LockedButton>
+              <LockedButton>Export Studio Package</LockedButton>
+            </div>
+          </ReferencePanel>
+        </main>
+      </div>
+    </ReferenceShell>
+  );
+}
+
 function useProductData(endpoint: string, enabled = true) {
   const state = useApiResource<ProductData | VaultCollection[] | VaultNft[]>(endpoint, { enabled });
   const data = normalizeProductData(endpoint, state.data);
@@ -736,6 +1063,15 @@ function positionText(position: unknown, path: string) {
   if (value === null || value === undefined) return "";
   if (value instanceof Date) return value.toISOString();
   return String(value);
+}
+
+function healthValue(label: string, capabilities?: Record<string, boolean>) {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("database")) return capabilities?.databaseAvailable ? "Ready" : "Unknown";
+  if (normalized.includes("helius")) return capabilities?.heliusAvailable ? "Ready" : "Unknown";
+  if (normalized.includes("solana")) return capabilities?.solanaAvailable || capabilities?.solanaTransactionProviderDevnet ? "Ready" : "Unknown";
+  if (normalized.includes("storage")) return capabilities?.permanentStorageConfigured ? "Ready" : "Unknown";
+  return "Unknown";
 }
 
 function formatMetric(value: unknown) {
