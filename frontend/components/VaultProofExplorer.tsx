@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { ExternalLink, FileSearch, LockKeyhole, Search, ShieldCheck, TriangleAlert, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ExternalLink, LockKeyhole, Search, ShieldCheck, TriangleAlert } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { ProtocolTrustStrip, proofTrust } from "@/components/protocol-trust";
 import { TransactionFlow } from "@/components/TransactionFlow";
+import { brandAssets } from "@/lib/brand-assets";
 
 type ProofResponse = {
   ok?: boolean;
@@ -122,7 +123,7 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
                 <span className="mb-3 block text-sm font-black text-white">Mint Loaded</span>
                 <div className="flex items-center gap-3 rounded-md border border-vault-line bg-black/25 p-2">
                   <div className="grid size-11 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10">
-                    <FileSearch className="size-5 text-vault-green" />
+                    <img src={brandAssets.proofRing} alt="" className="size-7 object-contain" />
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black">{proof?.collectionName ?? "No mint loaded"}</p>
@@ -229,7 +230,7 @@ function ProofEmptyWorkspace({ mint, allowSearch }: { mint: string; allowSearch:
             <ProofRow label="Redeemed Date" value="N/A" />
           </div>
           <button className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-vault-line bg-black/25 text-sm font-bold text-slate-400" disabled>
-            Raw Proof (JSON) <LockKeyhole className="size-4" />
+            Raw Proof <img src={brandAssets.proofRing} alt="" className="size-5 object-contain opacity-60" />
           </button>
         </SectionCard>
 
@@ -272,8 +273,8 @@ function ProofEmptyWorkspace({ mint, allowSearch }: { mint: string; allowSearch:
 
         <SectionCard title="Actions" className="phew-proof-card">
           <div className="grid gap-3">
-            <ProofLockedAction icon={<Undo2 className="size-5" />} title="Redeem NFT" body="Redeem and unlock your NFT." />
-            <ProofLockedAction icon={<ShieldCheck className="size-5" />} title="Stake Vault NFT" body="Stake to earn rewards." />
+            <ProofLockedAction asset={brandAssets.redeemParticles} title="Redeem NFT" body="Redeem and unlock your NFT." />
+            <ProofLockedAction asset={brandAssets.vaultSafe} title="Stake Vault NFT" body="Stake to earn rewards." />
           </div>
           <div className="mt-4 rounded-lg border border-vault-line bg-white/[0.03] p-4 text-center text-sm text-slate-400">
             Actions locked. Complete verification to enable actions.
@@ -287,7 +288,7 @@ function ProofEmptyWorkspace({ mint, allowSearch }: { mint: string; allowSearch:
 function ProofAnimationStates() {
   return (
     <div className="mt-4">
-      <p className="mb-3 text-sm font-black text-white">Animation States <span className="font-normal text-slate-400">for CSS recreation</span></p>
+      <p className="mb-3 text-sm font-black text-white">Proof State Rail</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
           ["Idle", "idle"],
@@ -305,11 +306,13 @@ function ProofAnimationStates() {
   );
 }
 
-function ProofLockedAction({ icon, title, body }: { icon: ReactNode; title: string; body: string }) {
+function ProofLockedAction({ asset, title, body }: { asset: string; title: string; body: string }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-lg border border-vault-line bg-black/25 p-4">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10 text-vault-green">{icon}</span>
+        <span className="grid size-10 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10 text-vault-green">
+          <img src={asset} alt="" className="size-7 object-contain" />
+        </span>
         <span className="min-w-0">
           <strong className="block truncate text-sm text-white">{title}</strong>
           <span className="block truncate text-xs text-slate-500">{body}</span>

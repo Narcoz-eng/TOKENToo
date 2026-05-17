@@ -16,7 +16,6 @@ import {
   Sparkles,
   Swords,
   Trophy,
-  UserPlus,
   Users,
   WalletCards,
   Zap
@@ -150,7 +149,7 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
               <p className="mt-2 max-w-[calc(100vw-4rem)] break-words text-sm text-slate-300 sm:max-w-3xl">{routeSubtitleForPage(active, data?.subtitle)}</p>
               <div className="mt-4">
                 <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                  <UserPlus className="size-4" /> Create Community
+                  <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" /> Create Community
                 </Link>
               </div>
             </div>
@@ -322,10 +321,10 @@ function HomeDashboardView({ data }: { data: ProductData }) {
             <p className="mt-3 max-w-[calc(100vw-4rem)] text-base text-slate-300 sm:max-w-2xl">The protocol for token-backed NFT vaults. Lock community tokens, mint verified vault NFTs, trade freely, stake for rewards, and redeem through proof.</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link href="/collections" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                <Search className="size-4" /> Explore Collections
+                <img src={brandAssets.nftSlot} alt="" className="size-5 object-contain" /> Explore Collections
               </Link>
               <Link href="/create-community" className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-black text-vault-green">
-                <UserPlus className="size-4" /> Create Community
+                <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" /> Create Community
               </Link>
             </div>
           </div>
