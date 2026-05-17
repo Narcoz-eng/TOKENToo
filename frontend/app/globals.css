@@ -229,17 +229,30 @@ select:focus-visible {
   isolation: isolate;
 }
 
+.phew-home-dashboard-hero {
+  border-color: rgba(186, 255, 0, 0.24);
+  background:
+    radial-gradient(circle at 48% 34%, rgba(186, 255, 0, 0.16), transparent 28%),
+    radial-gradient(circle at 78% 58%, rgba(22, 215, 210, 0.12), transparent 30%),
+    linear-gradient(118deg, rgba(2, 8, 6, 0.98), rgba(5, 16, 13, 0.94) 52%, rgba(2, 8, 6, 0.98));
+  box-shadow:
+    0 0 0 1px rgba(186, 255, 0, 0.08),
+    0 0 38px rgba(186, 255, 0, 0.1),
+    0 22px 70px rgba(0, 0, 0, 0.38),
+    inset 0 0 58px rgba(22, 215, 210, 0.045);
+}
+
 .phew-home-mascot-stage {
   position: relative;
-  min-height: 292px;
+  min-height: 224px;
   overflow: visible;
 }
 
 .phew-home-mascot-glow {
   position: absolute;
   left: 50%;
-  top: 52%;
-  width: min(92%, 420px);
+  top: 53%;
+  width: min(84%, 294px);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 999px;
@@ -253,9 +266,9 @@ select:focus-visible {
 .phew-home-mascot-ring {
   position: absolute;
   left: 50%;
-  bottom: 1.75rem;
-  width: min(72%, 320px);
-  height: 38px;
+  bottom: 1.25rem;
+  width: min(68%, 232px);
+  height: 30px;
   transform: translateX(-50%);
   border-radius: 999px;
   border: 2px solid rgba(186, 255, 0, 0.72);
@@ -266,10 +279,11 @@ select:focus-visible {
 .phew-home-mascot {
   position: absolute;
   left: 50%;
-  bottom: 1rem;
+  bottom: 0.85rem;
   z-index: 2;
-  width: clamp(245px, 35vw, 420px);
-  height: clamp(230px, 34vw, 400px);
+  width: clamp(168px, 20vw, 246px);
+  height: auto;
+  max-height: 242px;
   transform: translateX(-50%);
   object-fit: contain;
   filter: drop-shadow(0 0 36px rgba(186, 255, 0, 0.64)) drop-shadow(0 20px 22px rgba(0, 0, 0, 0.48));
@@ -280,6 +294,10 @@ select:focus-visible {
   border-color: rgba(186, 255, 0, 0.18);
   background: rgba(0, 0, 0, 0.46);
   box-shadow: inset 0 0 24px rgba(186, 255, 0, 0.055), 0 0 18px rgba(22, 215, 210, 0.06);
+}
+
+.phew-home-metric-strip > * {
+  min-width: 0;
 }
 
 .phew-scanline {
@@ -1521,12 +1539,13 @@ select:focus-visible {
   }
 
   .phew-home-mascot-stage {
-    min-height: 250px;
+    min-height: 206px;
   }
 
   .phew-home-mascot {
-    width: clamp(210px, 76vw, 320px);
-    height: clamp(200px, 72vw, 300px);
+    width: clamp(170px, 56vw, 230px);
+    height: auto;
+    max-height: 226px;
   }
 
   .phew-home-stat-grid {

@@ -35,6 +35,23 @@ These concepts are UX truth, not static screenshot assets. The frontend should e
 | `profile.png` | `/profile` wallet dashboard | Wallet-first profile, connect card in first viewport, vault/redeemable/staking/activity/proof panels, account actions. | Wallet connects to load vaults, staking, rewards, and proof shortcuts. | `PhewStatusPanel`, `PhewEmptyState`, `PhewActionCard` | Wallet address, owned vaults, staking positions, redeemable vaults, proof summary, activity. | `GET /product/profile?wallet=...` | Wallet disconnected is primary state; no fake owned vaults or actions. |
 | `create-collection-studio.png` | `/create-collection` Studio workflow | Five-step Studio workflow with token scan, brand kit, style bible, layer pack, launch readiness; provider cost/status side panel. | Subscription/admin studio runs explicit user-triggered provider steps only. | `PhewStepper`, `PhewTransactionScene`, `PhewStatusPanel`, `PhewActionCard` | Token scan, provider status, style bible, layer pack, launch readiness, approvals. | Existing Studio/product routes | Provider disabled blocks generation; no auto-generation on render. |
 
+## 2026-05-17 Home Reset Extraction
+
+Reference used: `frontend/public/design-reference/phew-redesign/home.png`.
+
+The approved home composition is a dense protocol dashboard, not a landing hero. The rebuilt `/home` first viewport now maps the reference as:
+
+| Reference area | React mapping | Asset/motion mapping | Data contract |
+| --- | --- | --- | --- |
+| Left title and CTAs | `HomeDashboardView` left column | CTA icons use `brandAssets.nftSlot` and `brandAssets.tokenObject` | Links remain `/collections` and `/create-community` |
+| Center mascot | `phew-home-mascot-stage` inside the hero grid | Transparent `brandAssets.mascot`; no `object-cover`, no background hero crop | Decorative only; never supplies fake data |
+| Right protocol overview | `HomeOverviewStat` grid | Phew proof/token/vault SVGs | `GET /product/home` plus `GET /protocol/health` |
+| Stats row | `HomeMetricCard` strip immediately below hero | Token, vault, NFT slot, proof, beam assets | Missing values render `N/A` |
+| Trust layer | `HomeTrustChip` rail in hero | Phew proof/vault/beam/glitch assets for live/cached, reserve status, verified badge, last verified `N/A` where backend has no timestamp | No fabricated timestamps |
+| Feature and workflow tiles | `NativeFeatureTile`, `NativeStepTile` | Phew-native SVG objects replace generic icon tiles | Static protocol explanation only |
+
+The home hero must not use `phew-vault-hero.svg` as a cropped `object-cover` background. That asset can support route heroes, but the home concept requires a clean mascot actor with independent sizing and a compact grid.
+
 ## Page State Contracts
 
 All transaction pages normalize action state to:

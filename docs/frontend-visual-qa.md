@@ -2,6 +2,35 @@
 
 Use this checklist when changing the Phew redesign implementation.
 
+## QA Pass Log
+
+### 2026-05-17 `/home` reset pass
+
+Reference: `frontend/public/design-reference/phew-redesign/home.png`.
+
+Observed mismatch before fix:
+
+- Home hero behaved like a giant empty banner instead of a compact dashboard grid.
+- `phew-vault-hero.svg` was used as an `object-cover` background, which cropped and distorted the mascot area.
+- Stats were pushed below an oversized hero and used generic icon cards.
+- Protocol feature/workflow tiles used generic icon language instead of Phew-native objects.
+
+Fix applied:
+
+- Rebuilt `/home` first viewport as title/CTA, mascot actor, and protocol overview grid.
+- Constrained mascot sizing with transparent SVG actor and `object-contain`.
+- Replaced home trust chips, stats, feature tiles, workflow tiles, proof link, and launch CTA visuals with Phew SVG assets.
+- Kept backend data contracts unchanged: `/product/home` and `/protocol/health` remain the only data sources for the page.
+
+Verification to run for this pass:
+
+- Passed: `npm --workspace frontend run typecheck`.
+- Passed: `npm --workspace frontend run build`.
+- Passed: `npm run build`.
+- Captured: `tmp/visual-qa-current/home-reset-desktop.png`.
+- Captured: `tmp/visual-qa-current/home-reset-mobile.png`.
+- Passed: CDP page check reported no framework overlay and expected home headings.
+
 ## Mascot And Assets
 
 - [ ] `frontend/public/brand/phew-mascot.png` exists.

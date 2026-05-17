@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
-  BadgeDollarSign,
   Boxes,
   Crown,
   Gem,
@@ -16,9 +15,7 @@ import {
   Sparkles,
   Swords,
   Trophy,
-  Users,
-  WalletCards,
-  Zap
+  WalletCards
 } from "lucide-react";
 import { useWalletDisplay } from "@/hooks/useWalletDisplay";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
@@ -305,20 +302,60 @@ function HomeDashboardView({ data }: { data: ProductData }) {
   const trending = collections.slice(0, 6);
   const myVaults = data.nfts ?? [];
   const totalVaults = stats.totalVaults ?? stats.vaults ?? stats.nfts;
+  const reserveStatus = protocolState.data?.reserveHealth?.status ?? (protocolState.loading ? "Verifying" : protocolState.error ? "Backend unavailable" : "N/A");
+  const homeTrustChips = [
+    { label: protocolState.data?.ok ? "On-chain verified" : "Verification pending", asset: brandAssets.proofRing, accent: protocolState.data?.ok ? ("green" as const) : ("gold" as const) },
+    { label: `Reserve ${reserveStatus}`, asset: protocolState.error ? brandAssets.errorGlitch : brandAssets.vaultSafe, accent: protocolState.error ? ("red" as const) : protocolState.data?.ok ? ("green" as const) : ("gold" as const) },
+    { label: protocolState.data?.ok ? "Live" : "Cached", asset: protocolState.data?.ok ? brandAssets.energyBeam : brandAssets.vaultSafe, accent: protocolState.data?.ok ? ("cyan" as const) : ("gold" as const) },
+    { label: "Last verified N/A", asset: brandAssets.proofRing, accent: "gold" as const }
+  ];
+  const protocolMetrics = [
+    { label: "Protocol TVL", value: formatCurrency(stats.tvlUsd), asset: brandAssets.tokenObject, accent: "gold" as const },
+    { label: "Total Vaults", value: formatMetric(totalVaults), asset: brandAssets.vaultSafe, accent: "green" as const },
+    { label: "Communities", value: formatMetric(stats.activeCommunities ?? stats.collections), asset: brandAssets.nftSlot, accent: "cyan" as const },
+    { label: "Phews Minted", value: formatMetric(stats.phewsMinted ?? stats.nfts), asset: brandAssets.proofRing, accent: "green" as const },
+    { label: "Total Trades", value: formatMetric(stats.totalTrades), asset: brandAssets.energyBeam, accent: "purple" as const },
+    { label: "Reserve Health", value: reserveStatus, asset: brandAssets.proofRing, accent: protocolState.data?.ok ? ("green" as const) : ("gold" as const) }
+  ];
+  const overviewStats = [
+    { label: "TVL", value: formatCurrency(stats.tvlUsd), asset: brandAssets.tokenObject },
+    { label: "Vaults", value: formatMetric(totalVaults), asset: brandAssets.vaultSafe },
+    { label: "Communities", value: formatMetric(stats.activeCommunities ?? stats.collections), asset: brandAssets.nftSlot },
+    { label: "Phews Minted", value: formatMetric(stats.phewsMinted ?? stats.nfts), asset: brandAssets.proofRing },
+    { label: "Trades", value: formatMetric(stats.totalTrades), asset: brandAssets.energyBeam },
+    { label: "Wallets", value: formatMetric(stats.uniqueWallets), asset: brandAssets.rewardBurst }
+  ];
+  const featureTiles = [
+    { asset: brandAssets.tokenObject, title: "Backed by tokens", body: "Each Vault NFT maps to locked community-token backing." },
+    { asset: brandAssets.nftSlot, title: "Trade freely", body: "Normal Solana NFT/Core assets remain marketplace compatible." },
+    { asset: brandAssets.vaultSafe, title: "Stake & earn", body: "Staking preserves backing and blocks redemption while active." },
+    { asset: brandAssets.rewardBurst, title: "Raids & rewards", body: "Collections can attach utility without weakening reserves." },
+    { asset: brandAssets.proofRing, title: "Protocol security", body: "Proof endpoints separate live verification from dev fallback." }
+  ];
+  const workflowSteps = [
+    { stage: "01", asset: brandAssets.tokenObject, title: "Lock tokens", body: "A community member selects a launched collection and locks that token mint." },
+    { stage: "02", asset: brandAssets.nftSlot, title: "Mint Vault NFT", body: "The protocol mints a verified collection asset with backing metadata." },
+    { stage: "03", asset: brandAssets.vaultSafe, title: "Trade & Stake", body: "Ownership can move on marketplaces; staking keeps backing intact." },
+    { stage: "04", asset: brandAssets.redeemParticles, title: "Redeem Anytime", body: "After unlock, the live NFT owner burns or invalidates and receives tokens." }
+  ];
   return (
-    <div className="space-y-6">
-      <section className="phew-panel phew-hero-canvas phew-scanline relative overflow-hidden rounded-lg">
-        <img src={brandAssets.vaultHero} alt="" className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-20 mix-blend-screen xl:w-[52%]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/34" />
-        <div className="absolute inset-0 grid-mask opacity-35" />
-        <div className="relative grid gap-5 p-4 lg:p-5 xl:grid-cols-[minmax(0,1fr)_470px]">
-          <div className="min-w-0 max-w-4xl">
+    <div className="space-y-5">
+      <section className="phew-panel phew-home-dashboard-hero phew-scanline relative overflow-hidden rounded-lg">
+        <div className="absolute inset-0 grid-mask opacity-25" />
+        <img src={brandAssets.motionCore} alt="" className="absolute inset-y-0 right-[18%] hidden h-full w-[48%] object-cover opacity-[0.18] mix-blend-screen lg:block" />
+        <div className="relative grid gap-4 p-4 lg:p-5 xl:grid-cols-[minmax(0,1fr)_330px_410px] xl:items-stretch">
+          <div className="min-w-0 self-center">
             <div className="flex flex-wrap gap-2">
               <StatusPill accent="green">Protocol Dashboard</StatusPill>
-              <StatusPill accent="cyan">Solana Vault NFTs</StatusPill>
+              <StatusPill accent={protocolState.data?.ok ? "green" : protocolState.error ? "red" : "gold"}>{protocolState.data?.ok ? "Live backend" : protocolState.error ? "Backend issue" : "Checking"}</StatusPill>
             </div>
-            <h1 className="mt-4 max-w-[calc(100vw-4rem)] break-words text-[40px] font-black leading-tight sm:max-w-4xl lg:text-5xl">Real tokens. <span className="text-vault-green">Real backing. Real ownership.</span></h1>
-            <p className="mt-3 max-w-[calc(100vw-4rem)] text-base text-slate-300 sm:max-w-2xl">The protocol for token-backed NFT vaults. Lock community tokens, mint verified vault NFTs, trade freely, stake for rewards, and redeem through proof.</p>
+            <h1 className="mt-4 max-w-[760px] break-words text-[34px] font-black leading-[1.03] sm:text-[42px] lg:text-[48px]">Real tokens. <span className="text-vault-green">Real backing.</span> Real ownership.</h1>
+            <p className="mt-3 max-w-[650px] text-sm leading-6 text-slate-300 sm:text-base">The protocol for token-backed NFT vaults. Lock community tokens, mint verified vault NFTs, trade freely, stake for rewards, and redeem through proof.</p>
+            <div className="mt-4 grid max-w-[640px] grid-cols-2 gap-2 sm:grid-cols-4">
+              {homeTrustChips.map((chip) => (
+                <HomeTrustChip key={chip.label} {...chip} />
+              ))}
+            </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link href="/collections" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
                 <img src={brandAssets.nftSlot} alt="" className="size-5 object-contain" /> Explore Collections
@@ -328,36 +365,39 @@ function HomeDashboardView({ data }: { data: ProductData }) {
               </Link>
             </div>
           </div>
-          <div className="phew-home-hero-actor min-w-0">
+          <div className="phew-home-hero-actor min-w-0 rounded-lg border border-vault-green/15 bg-black/28 p-3">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-black uppercase text-white">Protocol Overview</p>
-              <StatusPill accent={protocolState.data?.ok ? "green" : "gold"}>{protocolState.data?.ok ? "Live" : "N/A"}</StatusPill>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-vault-green">Vault Actor</p>
+              <StatusPill accent="cyan">Clean SVG</StatusPill>
             </div>
             <div className="phew-home-mascot-stage mt-2">
               <span className="phew-home-mascot-glow" />
               <span className="phew-home-mascot-ring" />
               <img src={brandAssets.mascot} alt="Phew mascot" className="phew-home-mascot" />
             </div>
-            <div className="phew-home-stat-grid mt-3 grid grid-cols-2 gap-3">
-              <MiniStat label="TVL" value={formatCurrency(stats.tvlUsd)} />
-              <MiniStat label="Vaults" value={formatMetric(totalVaults)} />
-              <MiniStat label="Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} />
-              <MiniStat label="Phews Minted" value={formatMetric(stats.phewsMinted ?? stats.nfts)} />
-              <MiniStat label="Trades" value={formatMetric(stats.totalTrades)} />
-              <MiniStat label="Unique Wallets" value={formatMetric(stats.uniqueWallets)} />
+          </div>
+          <div className="min-w-0 rounded-lg border border-vault-green/18 bg-black/42 p-4 shadow-[inset_0_0_28px_rgba(186,255,0,0.055)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black uppercase text-white">Protocol Overview</p>
+                <p className="mt-1 text-xs text-slate-500">Live health, reserve state, and activity counts.</p>
+              </div>
+              <img src={brandAssets.proofRing} alt="" className="size-10 shrink-0 object-contain drop-shadow-[0_0_18px_rgba(186,255,0,0.36)]" />
+            </div>
+            <div className="phew-home-stat-grid mt-4 grid grid-cols-2 gap-3">
+              {overviewStats.map((item) => (
+                <HomeOverviewStat key={item.label} {...item} />
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      <MetricGrid>
-        <StatCard icon={BadgeDollarSign} label="Protocol TVL" value={formatCurrency(stats.tvlUsd)} accent="gold" />
-        <StatCard icon={Boxes} label="Total Vaults" value={formatMetric(totalVaults)} />
-        <StatCard icon={Users} label="Active Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} accent="green" />
-        <StatCard icon={LockKeyhole} label="Phews Minted" value={formatMetric(stats.phewsMinted ?? stats.nfts)} accent="cyan" />
-        <StatCard icon={WalletCards} label="Total Trades" value={formatMetric(stats.totalTrades)} accent="purple" />
-        <StatCard icon={Shield} label="Reserve Health" value={protocolState.data?.reserveHealth?.status ?? "N/A"} accent={protocolState.data?.ok ? "green" : "gold"} />
-      </MetricGrid>
+      <div className="phew-home-metric-strip grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {protocolMetrics.map((item) => (
+          <HomeMetricCard key={item.label} {...item} />
+        ))}
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
         <SectionCard title="Trending Collections" action={<Link href="/collections" className="text-sm font-bold text-vault-green">View all</Link>}>
@@ -403,27 +443,16 @@ function HomeDashboardView({ data }: { data: ProductData }) {
 
       <SectionCard title="Protocol Features">
         <div className="grid gap-3 md:grid-cols-5">
-          <FeatureTile icon={LockKeyhole} title="Backed by tokens" body="Each Vault NFT maps to locked community-token backing." />
-          <FeatureTile icon={WalletCards} title="Trade freely" body="Normal Solana NFT/Core assets remain marketplace compatible." />
-          <FeatureTile icon={Sparkles} title="Stake & earn" body="Staking preserves backing and blocks redemption while active." />
-          <FeatureTile icon={Swords} title="Raids & rewards" body="Collections can attach utility without weakening reserves." />
-          <FeatureTile icon={Shield} title="Protocol security" body="Proof endpoints separate live verification from dev fallback." />
+          {featureTiles.map((feature) => (
+            <NativeFeatureTile key={feature.title} {...feature} />
+          ))}
         </div>
       </SectionCard>
 
       <SectionCard title="How It Works">
         <div className="grid gap-3 md:grid-cols-4">
-          {[
-            ["1", "Lock tokens", "A community member selects a launched collection and locks that token mint."],
-            ["2", "Mint Vault NFT", "The protocol mints a verified collection asset with backing metadata."],
-            ["3", "Trade & Stake", "Ownership can move on marketplaces; staking keeps backing intact."],
-            ["4", "Redeem Anytime", "After unlock, the live NFT owner burns/invalidates and receives tokens."]
-          ].map(([step, heading, body]) => (
-            <div key={step} className="rounded-lg border border-vault-line bg-black/25 p-4">
-              <span className="flex size-8 items-center justify-center rounded-md border border-vault-green/35 bg-vault-green/10 text-sm font-black text-vault-green">{step}</span>
-              <p className="mt-4 font-black">{heading}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
-            </div>
+          {workflowSteps.map((step) => (
+            <NativeStepTile key={step.stage} {...step} />
           ))}
         </div>
       </SectionCard>
@@ -457,7 +486,7 @@ function HomeDashboardView({ data }: { data: ProductData }) {
             <EmptyBlock title="Connect to view vaults" body="Wallet-owned vaults appear from live API ownership data. Marketplace transfers require owner refresh before sensitive actions." />
           )}
           <Link href="/proof" className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-            Open Proof Explorer <ArrowRight className="size-4" />
+            Open Proof Explorer <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />
           </Link>
         </SectionCard>
       </div>
@@ -470,7 +499,7 @@ function HomeDashboardView({ data }: { data: ProductData }) {
             <h2 className="mt-2 text-3xl font-black">Create a token-backed NFT vault collection for your community.</h2>
           </div>
           <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-            Create Community <ArrowRight className="size-4" />
+            Create Community <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" />
           </Link>
         </div>
       </section>
@@ -1160,6 +1189,70 @@ function RiskAdminView({ data }: { data: ProductData }) {
   );
 }
 
+type NativeAccent = "green" | "cyan" | "gold" | "purple" | "red";
+
+function HomeTrustChip({ asset, label, accent }: { asset: string; label: string; accent: NativeAccent }) {
+  return (
+    <div className={cn("flex min-w-0 items-center gap-2 rounded-md border bg-black/34 px-2.5 py-2", nativeAccentClass(accent))}>
+      <img src={asset} alt="" className="size-4 shrink-0 object-contain" />
+      <span className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.08em]">{label}</span>
+    </div>
+  );
+}
+
+function HomeMetricCard({ asset, label, value, accent = "green" }: { asset: string; label: string; value: string; accent?: NativeAccent }) {
+  return (
+    <div className={cn("rounded-lg border bg-black/34 p-3 shadow-[inset_0_0_22px_rgba(186,255,0,0.045)]", nativeAccentClass(accent))}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="min-w-0 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">{label}</p>
+        <img src={asset} alt="" className="size-8 shrink-0 object-contain drop-shadow-[0_0_14px_rgba(186,255,0,0.28)]" />
+      </div>
+      <p className="mt-2 min-h-[1.75rem] break-words text-lg font-black leading-tight text-white">{value}</p>
+    </div>
+  );
+}
+
+function HomeOverviewStat({ asset, label, value }: { asset: string; label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-vault-line bg-black/35 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
+        <img src={asset} alt="" className="size-6 shrink-0 object-contain" />
+      </div>
+      <p className="mt-2 break-words text-base font-black leading-tight text-white">{value}</p>
+    </div>
+  );
+}
+
+function NativeFeatureTile({ asset, title, body }: { asset: string; title: string; body: string }) {
+  return (
+    <div className="rounded-lg border border-vault-line bg-black/25 p-4">
+      <img src={asset} alt="" className="size-9 object-contain drop-shadow-[0_0_16px_rgba(186,255,0,0.24)]" />
+      <p className="mt-4 font-black">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
+    </div>
+  );
+}
+
+function NativeStepTile({ asset, stage, title, body }: { asset: string; stage: string; title: string; body: string }) {
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-vault-line bg-black/25 p-4">
+      <div className="absolute right-3 top-3 text-[11px] font-black uppercase tracking-[0.2em] text-vault-green/55">{stage}</div>
+      <img src={asset} alt="" className="size-10 object-contain drop-shadow-[0_0_16px_rgba(186,255,0,0.28)]" />
+      <p className="mt-4 font-black">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
+    </div>
+  );
+}
+
+function nativeAccentClass(accent: NativeAccent) {
+  if (accent === "cyan") return "border-vault-cyan/24";
+  if (accent === "gold") return "border-vault-gold/24";
+  if (accent === "purple") return "border-fuchsia-400/24";
+  if (accent === "red") return "border-vault-red/24";
+  return "border-vault-green/24";
+}
+
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-vault-line bg-black/35 p-4">
@@ -1175,16 +1268,6 @@ function InfoTile({ icon: Icon, label, value }: { icon: typeof Crown; label: str
       <Icon className="mb-3 size-6 text-vault-green" />
       <p className="text-xs uppercase text-slate-500">{label}</p>
       <p className="mt-1 font-bold">{value}</p>
-    </div>
-  );
-}
-
-function FeatureTile({ icon: Icon, title, body }: { icon: typeof Crown; title: string; body: string }) {
-  return (
-    <div className="rounded-lg border border-vault-line bg-black/25 p-4">
-      <Icon className="size-5 text-vault-green" />
-      <p className="mt-4 font-black">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
     </div>
   );
 }
