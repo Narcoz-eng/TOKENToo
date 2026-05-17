@@ -85,12 +85,12 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
   return (
     <AppShell active="proof">
       <div className="space-y-6">
-        <section className="phew-panel relative overflow-hidden rounded-lg p-6">
+        <section className="phew-panel relative overflow-hidden rounded-lg p-5">
           <img src={brandAssets.vaultHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-38" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/48" />
           <div className="relative max-w-4xl">
             <StatusPill accent="green">Proof Explorer</StatusPill>
-            <h1 className="mt-4 text-4xl font-black leading-tight">Verify owner, locked amount, reserve PDA, redeemability, and stake state.</h1>
+            <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl">Verify owner, locked amount, reserve PDA, redeemability, and stake state.</h1>
             {allowSearch ? (
               <div className="mt-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
                 <label className="relative block">
@@ -161,15 +161,55 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
             </SectionCard>
           </div>
         ) : (
-          <SectionCard title="No Proof Loaded">
-            <div className="flex items-start gap-3 text-sm text-slate-400">
-              <FileSearch className="size-5 text-vault-green" />
-              <p>Enter a confirmed Vault NFT mint to inspect the live reserve mapping and backend verification result.</p>
-            </div>
-          </SectionCard>
+          <ProofEmptyWorkspace mint={mint} allowSearch={allowSearch} />
         )}
       </div>
     </AppShell>
+  );
+}
+
+function ProofEmptyWorkspace({ mint, allowSearch }: { mint: string; allowSearch: boolean }) {
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <main className="space-y-5">
+        <SectionCard title="Vault Proof">
+          <div className="mb-4 flex items-start gap-3 rounded-md border border-vault-gold/30 bg-vault-gold/10 p-3 text-sm text-slate-300">
+            <FileSearch className="size-5 shrink-0 text-vault-gold" />
+            <p>{allowSearch ? "Enter a confirmed Vault NFT mint to inspect live reserve mapping." : "The requested Vault NFT proof is unavailable from the backend."}</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <ProofRow label="NFT mint" value={mint || "N/A"} />
+            <ProofRow label="Owner" value="N/A" />
+            <ProofRow label="Locked amount" value="N/A" />
+            <ProofRow label="Reserve PDA" value="N/A" />
+            <ProofRow label="Redeemability" value="N/A" />
+            <ProofRow label="Stake status" value="N/A" />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Verification Checks">
+          <div className="grid gap-3 md:grid-cols-3">
+            <StatusLine label="Owner proof" ok={false} />
+            <StatusLine label="Reserve active" ok={false} />
+            <StatusLine label="Production proof" ok={false} />
+          </div>
+        </SectionCard>
+      </main>
+
+      <aside className="space-y-5">
+        <SectionCard title="Proof Status">
+          <TransactionFlow
+            state="idle"
+            moment="proof"
+            title="Proof verification"
+            description="Awaiting proof endpoint data before owner, reserve, and redeem checks are marked ready."
+            tokenSymbol="PHEW"
+            detail="Last verified N/A"
+            compact
+          />
+        </SectionCard>
+      </aside>
+    </div>
   );
 }
 

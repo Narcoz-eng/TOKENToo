@@ -90,17 +90,17 @@ export default function AdminSetupPage() {
   return (
     <AppShell active="setup">
       <div className="space-y-6">
-        <section className="phew-panel relative overflow-hidden rounded-lg p-6">
+        <section className="phew-panel relative overflow-hidden rounded-lg p-5">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_18%,rgba(186,255,0,0.2),transparent_30%),linear-gradient(120deg,#020806_0%,#06110f_62%,#020806_100%)]" />
           <div className="absolute inset-0 grid-mask opacity-30" />
-          <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
+          <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
             <div>
               <div className="flex flex-wrap gap-2">
                 <StatusPill accent="green">Admin Setup</StatusPill>
                 <StatusPill accent="cyan">{data?.cluster ?? "N/A"}</StatusPill>
                 <StatusPill accent={data?.publicReadiness?.launchAvailable ? "green" : "gold"}>{data?.publicReadiness?.launchAvailable ? "Launch available" : "Launch gated"}</StatusPill>
               </div>
-              <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Backend readiness, provider gates, and Studio generation controls.</h1>
+              <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">Backend readiness, provider gates, and Studio generation controls.</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300">
                 This dashboard only reads system routes. It does not trigger image generation, retries, or paid provider calls on render.
               </p>

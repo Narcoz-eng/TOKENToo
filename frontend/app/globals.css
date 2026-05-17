@@ -214,6 +214,28 @@ select {
 }
 
 @media (max-width: 640px) {
+  .phew-app-bg,
+  .phew-app-bg main {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .phew-app-bg main {
+    width: 100vw;
+  }
+
+  .phew-panel,
+  .transaction-flow,
+  .phew-coded-moment {
+    max-width: 100%;
+  }
+
+  .phew-app-bg h1,
+  .phew-app-bg h2,
+  .phew-app-bg p {
+    overflow-wrap: anywhere;
+  }
+
   .wallet-adapter-dropdown {
     width: 48px !important;
   }
@@ -327,7 +349,7 @@ select {
 }
 
 .phew-coded-moment {
-  min-height: 300px;
+  min-height: 240px;
 }
 
 .phew-moment-orbit {
@@ -350,10 +372,10 @@ select {
 .phew-coded-mascot {
   position: absolute;
   left: clamp(0.8rem, 6%, 2.4rem);
-  bottom: 4.2rem;
+  bottom: 3.85rem;
   z-index: 4;
-  width: 112px;
-  height: 108px;
+  width: 102px;
+  height: 100px;
   object-fit: contain;
   filter: drop-shadow(0 0 22px rgba(186, 255, 0, 0.28));
   animation: phew-tx-mascot 2.35s ease-in-out infinite;
@@ -362,11 +384,11 @@ select {
 .phew-coded-object {
   position: absolute;
   right: clamp(0.9rem, 7%, 3rem);
-  bottom: 5.2rem;
+  bottom: 4.8rem;
   z-index: 4;
   display: grid;
-  width: 86px;
-  height: 86px;
+  width: 78px;
+  height: 78px;
   place-items: center;
   border: 1px solid rgba(186, 255, 0, 0.28);
   border-radius: 14px;
@@ -376,7 +398,7 @@ select {
 
 .phew-tx-stage {
   position: relative;
-  min-height: 320px;
+  min-height: 280px;
   overflow: hidden;
   border-radius: 10px;
   border: 1px solid rgba(110, 255, 222, 0.14);
@@ -389,7 +411,7 @@ select {
 }
 
 .phew-tx-stage-compact {
-  min-height: 240px;
+  min-height: 220px;
 }
 
 .phew-tx-stage::before {
@@ -453,10 +475,10 @@ select {
 .phew-tx-mascot {
   position: absolute;
   left: clamp(1rem, 7%, 4rem);
-  bottom: 4.05rem;
+  bottom: 3.85rem;
   z-index: 3;
-  width: 128px;
-  height: 122px;
+  width: 112px;
+  height: 108px;
   object-fit: contain;
   filter: drop-shadow(0 0 22px rgba(186, 255, 0, 0.28));
   animation: phew-tx-mascot 2.4s ease-in-out infinite;
@@ -468,8 +490,8 @@ select {
   top: 52%;
   z-index: 4;
   display: flex;
-  width: 126px;
-  min-height: 176px;
+  width: 112px;
+  min-height: 158px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -485,11 +507,11 @@ select {
 .phew-tx-object {
   position: absolute;
   right: clamp(1rem, 8%, 4.5rem);
-  bottom: 5.15rem;
+  bottom: 4.85rem;
   z-index: 3;
   display: grid;
-  width: 104px;
-  height: 104px;
+  width: 88px;
+  height: 88px;
   place-items: center;
   border: 1px solid rgba(186, 255, 0, 0.28);
   border-radius: 14px;
@@ -527,6 +549,25 @@ select {
   animation: phew-tx-beam 1.8s ease-in-out infinite;
 }
 
+.phew-tx-stage-compact .phew-tx-mascot {
+  left: clamp(0.85rem, 6%, 2.8rem);
+  bottom: 3.7rem;
+  width: 88px;
+  height: 84px;
+}
+
+.phew-tx-stage-compact .phew-tx-nft {
+  width: 88px;
+  min-height: 126px;
+}
+
+.phew-tx-stage-compact .phew-tx-object {
+  right: clamp(0.85rem, 7%, 3rem);
+  bottom: 4.25rem;
+  width: 68px;
+  height: 68px;
+}
+
 .phew-tx-stage-success .phew-tx-object {
   border-color: rgba(186, 255, 0, 0.5);
   box-shadow: 0 0 24px rgba(186, 255, 0, 0.15), inset 0 0 26px rgba(186, 255, 0, 0.1);
@@ -539,12 +580,18 @@ select {
 
 @media (max-width: 640px) {
   .phew-tx-stage {
-    min-height: 250px;
+    min-height: 232px;
   }
 
   .phew-tx-stage-head {
     left: 0.75rem;
     right: 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .phew-tx-stage-head > span {
+    align-self: flex-start;
   }
 
   .phew-tx-mascot {
@@ -572,13 +619,15 @@ select {
   }
 
   .phew-coded-mascot {
-    width: 76px;
-    height: 74px;
+    bottom: 3.85rem;
+    width: 68px;
+    height: 66px;
   }
 
   .phew-coded-object {
-    width: 62px;
-    height: 62px;
+    bottom: 4.25rem;
+    width: 56px;
+    height: 56px;
   }
 }
 

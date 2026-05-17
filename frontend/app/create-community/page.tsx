@@ -303,13 +303,13 @@ export default function CreateCommunityPage() {
   return (
     <AppShell active="create-community">
       <div className="space-y-6">
-        <section className="phew-panel relative overflow-hidden rounded-lg p-6">
+        <section className="phew-panel relative overflow-hidden rounded-lg p-5">
           <img src={brandAssets.launchHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/42" />
-          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center">
+          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
             <div>
               <StatusPill accent="green">Create Community</StatusPill>
-              <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Launch your economy from a real token reserve.</h1>
+              <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">Launch your economy from a real token reserve.</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300">
                 Scan the token, pass access, create the draft, then initialize the reserve through backend launch routes. No generation or paid provider work runs from this page.
               </p>
@@ -322,6 +322,7 @@ export default function CreateCommunityPage() {
               image={scan?.imageUri ?? null}
               tokenSymbol={scan?.symbol ?? collection?.name ?? "PHEW"}
               detail={error ?? launchSubmit?.result?.message ?? launchStatus?.launch?.status ?? null}
+              compact
             />
           </div>
         </section>

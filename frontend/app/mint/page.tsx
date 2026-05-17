@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock3, ExternalLink, LockKeyhole, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { EmptyState, ErrorState, LoadingState, WalletDisconnectedState } from "@/components/ApiState";
+import { EmptyState, ErrorState, WalletDisconnectedState } from "@/components/ApiState";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { useApiResource } from "@/hooks/useApiResource";
@@ -151,13 +151,13 @@ export default function MintPage() {
           <section className="phew-panel relative overflow-hidden rounded-lg">
             <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-52" />
             <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/36" />
-            <div className="relative grid gap-8 p-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:p-8">
+            <div className="relative grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="max-w-3xl">
                 <div className="flex flex-wrap gap-2">
                   <StatusPill accent="green">Mint Vault NFT</StatusPill>
                   <StatusPill accent="cyan">Loading live communities</StatusPill>
                 </div>
-                <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Lock real community tokens and mint from a verified reserve.</h1>
+                <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">Lock real community tokens and mint from a verified reserve.</h1>
                 <p className="mt-3 text-sm text-slate-300">
                   Mint-eligible communities are loaded from the backend. Missing values stay N/A until a real collection is returned.
                 </p>
@@ -175,10 +175,11 @@ export default function MintPage() {
                 image={null}
                 tokenSymbol="PHEW"
                 detail="Awaiting live collection data"
+                compact
               />
             </div>
           </section>
-          <LoadingState />
+          <MintEmptyWorkspace />
         </div>
       </AppShell>
     );
@@ -189,11 +190,14 @@ export default function MintPage() {
       <div className="space-y-6">
         {collectionState.error ? <ErrorState error={collectionState.error} retry={collectionState.reload} /> : null}
         {!collectionState.error && !mintableCollections.length ? (
-          <EmptyState
-            title="No mint-eligible launched communities"
-            body="Minting is hidden until the backend returns a launched collection with a confirmed collection asset, reserve PDA, and Premium production profile. No preview collection is shown here."
-            action={<Link href="/create-community" className="inline-flex h-11 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-bold text-vault-green">Create Community</Link>}
-          />
+          <>
+            <EmptyState
+              title="No mint-eligible launched communities"
+              body="Minting is hidden until the backend returns a launched collection with a confirmed collection asset, reserve PDA, and Premium production profile. No preview collection is shown here."
+              action={<Link href="/create-community" className="inline-flex h-11 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-bold text-vault-green">Create Community</Link>}
+            />
+            <MintEmptyWorkspace />
+          </>
         ) : null}
 
         {collection ? (
@@ -201,13 +205,13 @@ export default function MintPage() {
             <section className="phew-panel relative overflow-hidden rounded-lg">
               <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-52" />
               <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/36" />
-              <div className="relative grid gap-8 p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-8">
+              <div className="relative grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_340px]">
                 <div className="max-w-3xl">
                   <div className="flex flex-wrap gap-2">
                     <StatusPill accent="green">Mint Vault NFT</StatusPill>
                     <StatusPill accent="cyan">Devnet Transaction</StatusPill>
                   </div>
-                  <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Lock real community tokens and mint from a verified reserve.</h1>
+                  <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">Lock real community tokens and mint from a verified reserve.</h1>
                   <p className="mt-3 text-sm text-slate-300">
                     The backend validates token balance, production profile, collection asset, reserve PDA, and vault position PDA before the mint can finalize.
                   </p>
@@ -227,6 +231,7 @@ export default function MintPage() {
                     image={finalImage}
                     tokenSymbol={collection.symbol}
                     detail={error ?? mintState?.errorMessage ?? mintState?.status ?? null}
+                    compact
                   />
                   <ProjectedVaultCard image={finalImage} collection={collection} amount={amount} lockDurationDays={lockDurationDays} txStatus={txStatus} />
                 </div>
@@ -370,6 +375,50 @@ export default function MintPage() {
         ) : null}
       </div>
     </AppShell>
+  );
+}
+
+function MintEmptyWorkspace() {
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <main className="space-y-5">
+        <SectionCard title="Mint Configuration">
+          <div className="grid gap-3 md:grid-cols-3">
+            <HeroMetric label="Selected community" value="N/A" />
+            <HeroMetric label="Collection asset" value="N/A" />
+            <HeroMetric label="Reserve PDA" value="N/A" />
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <StateTile title="Intent" body="Waiting for launched community" complete={false} />
+            <StateTile title="Build" body="Transaction N/A" complete={false} />
+            <StateTile title="Confirm" body="Mint N/A" complete={false} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Mint-Eligible Communities">
+          <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-5 text-sm text-slate-400">
+            No eligible launched communities were returned by the backend. The list stays empty instead of showing demo collections.
+          </div>
+        </SectionCard>
+      </main>
+
+      <aside className="space-y-5">
+        <SectionCard title="Mint Status">
+          <TransactionStatus status="idle" label="Ready when eligible" detail="Create or launch a community before minting." />
+          <div className="mt-4 space-y-3">
+            <PreviewRow label="Transaction id" value="N/A" />
+            <PreviewRow label="NFT mint" value="N/A" />
+            <PreviewRow label="Position PDA" value="N/A" />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Next Action">
+          <Link href="/create-community" className="phew-button phew-button-primary flex h-11 items-center justify-center rounded-md text-sm font-black text-black">
+            Create Community
+          </Link>
+        </SectionCard>
+      </aside>
+    </div>
   );
 }
 

@@ -107,7 +107,8 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   const state = useApiResource<ProductData | VaultCollection[] | VaultNft[] | RaidRoom[]>(walletPath, { enabled: !blockedByWallet });
   const capabilityState = useApiResource<{ mode: string; capabilities: Record<string, boolean>; warnings: string[] }>("/system/capabilities");
   const data = normalizeProductData(endpoint, state.data);
-  const renderData = data ?? (active === "home" ? homeFallbackData(title) : null);
+  const renderData = data ?? fallbackProductData(active, title, endpoint, walletRequired);
+  const showFallbackDuringLoad = Boolean(!data && (walletRequired || endpoint.includes("/collections/")));
   const warnings = apiWarnings(state.data);
   const privateDiagnostics = showPrivateDiagnostics(wallet.address);
   const pageMoment = motionMomentForPage(active, endpoint);
@@ -139,15 +140,15 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
     <AppShell active={active} stats={data?.stats}>
       <div className="space-y-5">
         {active === "home" && privateDiagnostics ? <FounderStatusPanel status={capabilityState.data} /> : null}
-        {active !== "home" ? <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6">
+        {active !== "home" ? <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-5">
           <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-y-0 right-0 hidden h-full w-3/5 object-cover opacity-30 mix-blend-screen lg:block" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/35" />
-          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
-            <div className="max-w-4xl">
+          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
+            <div className="min-w-0 max-w-4xl">
               <p className="text-sm font-black uppercase text-vault-green">PHEW.DEVNET / Faction OS</p>
-              <h1 className="mt-2 max-w-4xl text-4xl font-black leading-tight">{title}</h1>
-              <p className="mt-2 max-w-3xl text-slate-300">{data?.subtitle ?? "Launch faction vaults, coordinate raids, and reward holders on Solana."}</p>
-              <div className="mt-5">
+              <h1 className="mt-2 max-w-[calc(100vw-4rem)] text-3xl font-black leading-tight sm:max-w-4xl sm:text-4xl">{title}</h1>
+              <p className="mt-2 max-w-[calc(100vw-4rem)] break-words text-sm text-slate-300 sm:max-w-3xl">{data?.subtitle ?? "Launch faction vaults, coordinate raids, and reward holders on Solana."}</p>
+              <div className="mt-4">
                 <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
                   <UserPlus className="size-4" /> Create Community
                 </Link>
@@ -160,16 +161,16 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
               tokenSymbol={pageMotionSymbol}
               title={motionTitleForPage(active, title)}
               subtitle={motionSubtitleForPage(active)}
-              className="min-h-[220px]"
+              className="min-h-[200px]"
             />
           </div>
         </section> : null}
 
         {blockedByWallet ? <WalletDisconnectedState /> : null}
         {privateDiagnostics ? <SetupWarning warnings={warnings} /> : null}
-        {state.loading && active !== "home" ? <LoadingState /> : null}
+        {state.loading && active !== "home" && !showFallbackDuringLoad ? <LoadingState /> : null}
         {!state.loading && state.error ? <ErrorState error={state.error} retry={state.reload} /> : null}
-        {(!state.loading || active === "home") && !state.error && !blockedByWallet && renderData
+        {(!state.loading || active === "home" || showFallbackDuringLoad) && !state.error && renderData
           ? children
             ? children(renderData)
             : renderProductView(endpoint, renderData, { query, setQuery, filter, setFilter, sort, setSort, visibleCollections, walletConnected: wallet.connected, walletAddress: wallet.address, reload: state.reload })
@@ -194,6 +195,25 @@ function homeFallbackData(title: string): ProductData {
       chart: []
     }
   };
+}
+
+function fallbackProductData(active: string, title: string, endpoint: string, walletRequired?: boolean): ProductData | null {
+  if (active === "home") return homeFallbackData(title);
+  if (walletRequired || endpoint.includes("/collections/")) {
+    return {
+      title,
+      subtitle: "Live backend data is unavailable for this view right now; N/A states stay visible instead of inventing records.",
+      collections: [],
+      nfts: [],
+      raids: [],
+      positions: [],
+      eligibleVaults: [],
+      activity: [],
+      recentMints: [],
+      stats: {}
+    };
+  }
+  return null;
 }
 
 export function DefaultProductView({ data }: { data: ProductData }) {
@@ -296,8 +316,8 @@ function HomeDashboardView({ data }: { data: ProductData }) {
               <StatusPill accent="green">Protocol Dashboard</StatusPill>
               <StatusPill accent="cyan">Solana Vault NFTs</StatusPill>
             </div>
-            <h1 className="mt-5 max-w-4xl break-words text-[40px] font-black leading-tight sm:text-5xl lg:text-6xl">Real tokens. <span className="text-vault-green">Real backing. Real ownership.</span></h1>
-            <p className="mt-4 max-w-2xl text-lg text-slate-300">The protocol for token-backed NFT vaults. Lock community tokens, mint verified vault NFTs, trade freely, stake for rewards, and redeem through proof.</p>
+            <h1 className="mt-5 max-w-[calc(100vw-4rem)] break-words text-[40px] font-black leading-tight sm:max-w-4xl sm:text-5xl lg:text-6xl">Real tokens. <span className="text-vault-green">Real backing. Real ownership.</span></h1>
+            <p className="mt-4 max-w-[calc(100vw-4rem)] text-lg text-slate-300 sm:max-w-2xl">The protocol for token-backed NFT vaults. Lock community tokens, mint verified vault NFTs, trade freely, stake for rewards, and redeem through proof.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/collections" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
                 <Search className="size-4" /> Explore Collections
@@ -492,7 +512,7 @@ function CollectionDetailView({ data }: { data: ProductData }) {
   const collection = data.collection;
   const nfts = data.nfts ?? [];
   const raids = data.raids ?? [];
-  if (!collection) return <EmptyState title="Collection unavailable" body="This collection was not found, or the database is not available. Public reads return a safe empty state." />;
+  if (!collection) return <CollectionUnavailableView />;
   const trust = collectionTrust(collection);
   const activity = data.activity ?? [];
   const recentMints = data.recentMints ?? [];
@@ -652,6 +672,60 @@ function CollectionDetailView({ data }: { data: ProductData }) {
 
           <SectionCard title="Staking Flow">
             <TransactionFlow state="idle" moment="stake" title="Stake Vault NFT" description="Staking uses the wallet-owned eligible vault list and backend stake route." image={nfts[0]?.image ?? collection.image} tokenSymbol={collection.symbol} compact />
+          </SectionCard>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function CollectionUnavailableView() {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-4">
+        <MiniStat label="Token mint" value="N/A" />
+        <MiniStat label="Vaults minted" value="N/A" />
+        <MiniStat label="Reserve ratio" value="N/A" />
+        <MiniStat label="Launch status" value="N/A" />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <main className="space-y-5">
+          <SectionCard title="Collection Overview">
+            <div className="grid gap-4 md:grid-cols-[120px_minmax(0,1fr)] md:items-center">
+              <div className="grid aspect-square place-items-center rounded-lg border border-dashed border-vault-green/35 bg-vault-green/5">
+                <img src={brandAssets.mascot} alt="" className="size-24 object-contain drop-shadow-[0_0_22px_rgba(186,255,0,0.24)]" />
+              </div>
+              <div>
+                <div className="flex flex-wrap gap-2">
+                  <StatusPill accent="gold">N/A</StatusPill>
+                  <StatusPill accent="cyan">Safe empty state</StatusPill>
+                </div>
+                <h2 className="mt-3 text-2xl font-black">Collection unavailable</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">Public reads returned no collection for this id. The proof, vault, and activity panels stay mounted with N/A values so the page hierarchy remains stable.</p>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Vault List">
+            <EmptyBlock title="No minted vault NFTs" body="Vault rows appear after a real collection is returned by the backend." />
+          </SectionCard>
+        </main>
+
+        <aside className="space-y-5">
+          <SectionCard title="Collection Actions">
+            <div className="grid gap-2">
+              <Link href="/mint" className="inline-flex h-10 items-center justify-center rounded-md border border-vault-line bg-black/25 text-sm font-bold text-slate-400">Mint N/A</Link>
+              <Link href="/proof" className="inline-flex h-10 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 text-sm font-bold text-vault-green">Open Proof Explorer</Link>
+              <Link href="/collections" className="inline-flex h-10 items-center justify-center rounded-md border border-vault-line bg-black/25 text-sm font-bold text-slate-300">Back to Collections</Link>
+            </div>
+          </SectionCard>
+          <SectionCard title="Reserve Proof">
+            <div className="space-y-3">
+              <MiniMetric label="Reserve PDA" value="N/A" />
+              <MiniMetric label="Backing" value="N/A" />
+              <MiniMetric label="Last verified" value="N/A" />
+            </div>
           </SectionCard>
         </aside>
       </div>

@@ -13,7 +13,7 @@ export type ApiResourceState<T> = {
 export function useApiResource<T>(path: string, options: { enabled?: boolean } = {}): ApiResourceState<T> {
   const [version, setVersion] = useState(0);
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(options.enabled !== false);
   const [error, setError] = useState<ApiError | null>(null);
 
   useEffect(() => {

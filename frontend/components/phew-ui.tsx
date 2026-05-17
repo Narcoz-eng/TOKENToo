@@ -392,7 +392,7 @@ export function PhewAnimationFrame({
   const visualMoment = normalizeAnimationMoment(moment);
   const active = state === "loading" || state === "success";
   const frameClass = cn(
-    "phew-coded-moment relative isolate min-h-[260px] overflow-hidden rounded-lg border border-vault-line bg-black/40",
+    "phew-coded-moment relative isolate min-h-[260px] min-w-0 w-full max-w-full overflow-hidden rounded-lg border border-vault-line bg-black/40",
     `phew-moment-${visualMoment}`,
     state === "success" && "phew-moment-success",
     state === "error" && "phew-moment-error",

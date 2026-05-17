@@ -48,7 +48,7 @@ export function TransactionFlow({
   const visualMoment = normalizeMoment(moment ?? inferMoment(title));
   const active = state !== "idle" && state !== "error";
   return (
-    <div className={cn("transaction-flow rounded-lg border border-vault-line bg-black/30 p-4", compact ? "space-y-3" : "space-y-4", className)} data-state={state} data-moment={visualMoment}>
+    <div className={cn("transaction-flow min-w-0 max-w-full rounded-lg border border-vault-line bg-black/30 p-4", compact ? "space-y-3" : "space-y-4", className)} data-state={state} data-moment={visualMoment}>
       <div className="flex items-start gap-4">
         <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border border-vault-green/20 bg-black/40">
           {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <img src={brandAssets.mascot} alt="" className="size-12 object-contain opacity-95" />}

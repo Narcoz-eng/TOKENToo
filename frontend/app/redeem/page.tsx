@@ -170,16 +170,16 @@ export default function RedeemPage() {
   return (
     <AppShell active="redeem">
       <div className="space-y-6">
-        <section className="phew-panel relative overflow-hidden rounded-lg p-6">
+        <section className="phew-panel relative overflow-hidden rounded-lg p-5">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_22%,rgba(186,255,0,0.2),transparent_28%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
           <div className="absolute inset-0 grid-mask opacity-30" />
-          <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
+          <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
             <div>
               <div className="flex flex-wrap gap-2">
                 <StatusPill accent="green">Redeem</StatusPill>
                 <StatusPill accent="cyan">Wallet-owned eligible NFTs</StatusPill>
               </div>
-              <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight">Redeem from an eligible Vault NFT in your wallet.</h1>
+              <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">Redeem from an eligible Vault NFT in your wallet.</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300">
                 This page mirrors staking: it only shows Vault NFTs returned by the backend for the connected wallet, checks proof, then uses the real redeem build and submit routes.
               </p>
@@ -192,11 +192,13 @@ export default function RedeemPage() {
               image={selectedVault?.image}
               tokenSymbol={proof?.tokenSymbol ?? selectedCollection?.symbol ?? selectedVault?.tier}
               detail={error ?? redeemTx?.errorMessage ?? redeemTx?.status ?? null}
+              compact
             />
           </div>
         </section>
 
         {!wallet.connected ? <WalletDisconnectedState /> : null}
+        {!wallet.connected ? <RedeemEmptyWorkspace /> : null}
         {wallet.connected && profileState.loading ? <LoadingState /> : null}
         {wallet.connected && profileState.error ? <ErrorState error={profileState.error} retry={profileState.reload} /> : null}
 
@@ -318,6 +320,59 @@ export default function RedeemPage() {
         ) : null}
       </div>
     </AppShell>
+  );
+}
+
+function RedeemEmptyWorkspace() {
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <main className="space-y-5">
+        <SectionCard title="Eligible Vault NFTs">
+          <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-5">
+            <div className="grid gap-4 md:grid-cols-[88px_minmax(0,1fr)_auto] md:items-center">
+              <div className="aspect-[4/5] w-20 rounded-md border border-vault-green/25 bg-vault-green/5" />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-black">Wallet-owned vault</p>
+                  <StatusPill accent="gold">N/A</StatusPill>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Connect a wallet to load eligible redeemable Vault NFTs.</p>
+                <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
+                  <MiniMetric label="Locked" value="N/A" />
+                  <MiniMetric label="Unlock" value="N/A" />
+                  <MiniMetric label="Rarity" value="N/A" />
+                </div>
+              </div>
+              <span className="inline-flex h-9 items-center rounded-md border border-vault-line bg-black/25 px-3 text-sm font-bold text-slate-500">Select N/A</span>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Redeem Checks">
+          <div className="grid gap-3 md:grid-cols-4">
+            <CheckTile label="Wallet connected" ok={false} />
+            <CheckTile label="NFT selected" ok={false} />
+            <CheckTile label="Proof checked" ok={false} />
+            <CheckTile label="Tx built" ok={false} />
+          </div>
+        </SectionCard>
+      </main>
+
+      <aside className="space-y-5">
+        <SectionCard title="Redeem Status">
+          <TransactionStatus status="idle" label="Wallet required" detail="Redeem actions stay disabled until wallet-owned eligible NFTs load from the backend." />
+          <div className="mt-4 space-y-3">
+            <PreviewRow label="Selected mint" value="N/A" />
+            <PreviewRow label="Redeem tx id" value="N/A" />
+            <PreviewRow label="Backend status" value="N/A" />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Proof">
+          <p className="text-sm text-slate-400">Proof rows appear after a wallet NFT is selected and the proof endpoint returns live reserve state.</p>
+        </SectionCard>
+      </aside>
+    </div>
   );
 }
 
