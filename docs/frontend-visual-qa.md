@@ -53,6 +53,23 @@ Verification to run for this pass:
 - Captured: `tmp/visual-qa-current/staking-native-icons.png`.
 - Passed: CDP page checks reported no framework overlay on `/mint`, `/redeem`, `/create-community`, and `/staking`.
 
+### 2026-05-17 metric card pass
+
+Fix applied:
+
+- Added Phew asset support to `StatCard`.
+- Replaced generic product metric icons for marketplace, staking, leaderboard, and collection summary cards with local Phew assets.
+
+Verification to run for this pass:
+
+- Passed: `npm --workspace frontend run typecheck`.
+- Passed: `npm --workspace frontend run build`.
+- Passed: `npm run build`.
+- Captured: `tmp/visual-qa-current/staking-metric-assets.png`.
+- Captured: `tmp/visual-qa-current/marketplace-metric-assets.png`.
+- Captured: `tmp/visual-qa-current/leaderboard-metric-assets.png`.
+- Passed: CDP page checks reported no framework overlay on `/staking`, `/marketplace`, and `/leaderboard`.
+
 ## Mascot And Assets
 
 - [ ] `frontend/public/brand/phew-mascot.png` exists.

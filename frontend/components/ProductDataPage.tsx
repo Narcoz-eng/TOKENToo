@@ -3,19 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  AlertTriangle,
   ArrowRight,
-  Boxes,
   Crown,
   Gem,
-  LockKeyhole,
   Search,
-  Shield,
   ShieldAlert,
-  Sparkles,
-  Swords,
-  Trophy,
-  WalletCards
+  Trophy
 } from "lucide-react";
 import { useWalletDisplay } from "@/hooks/useWalletDisplay";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
@@ -225,9 +218,9 @@ export function DefaultProductView({ data }: { data: ProductData }) {
     <PageLayout>
       {data.stats ? (
         <MetricGrid className="md:grid-cols-3">
-          <StatCard icon={Shield} label="Collections" value={String(data.stats.collections ?? collections.length)} />
-          <StatCard icon={LockKeyhole} label="Vault NFTs" value={String(data.stats.nfts ?? nfts.length)} accent="green" />
-          <StatCard icon={Swords} label="Raids" value={String(data.stats.raids ?? raids.length)} accent="purple" />
+          <StatCard iconAsset={brandAssets.nftSlot} label="Collections" value={String(data.stats.collections ?? collections.length)} />
+          <StatCard iconAsset={brandAssets.vaultSafe} label="Vault NFTs" value={String(data.stats.nfts ?? nfts.length)} accent="green" />
+          <StatCard iconAsset={brandAssets.rewardBurst} label="Raids" value={String(data.stats.raids ?? raids.length)} accent="purple" />
         </MetricGrid>
       ) : null}
 
@@ -574,12 +567,12 @@ function CollectionDetailView({ data }: { data: ProductData }) {
             <ProtocolTrustStrip trust={trust} className="mt-5 max-w-4xl" />
             <div className="mt-6 flex flex-wrap gap-3">
               {collection.mintEligible ? (
-                <Link href="/mint" className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-5 text-sm font-black text-black"><LockKeyhole className="size-4" /> Mint Vault</Link>
+                <Link href="/mint" className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-5 text-sm font-black text-black"><img src={brandAssets.vaultSafe} alt="" className="size-5 object-contain" /> Mint Vault</Link>
               ) : (
-                <span className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/35 px-5 text-sm font-bold text-slate-500"><LockKeyhole className="size-4" /> Mint N/A</span>
+                <span className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/35 px-5 text-sm font-bold text-slate-500"><img src={brandAssets.vaultSafe} alt="" className="size-5 object-contain opacity-55" /> Mint N/A</span>
               )}
-              <Link href={proofHref} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-bold text-vault-green"><Shield className="size-4" /> Open Proof</Link>
-              <Link href={`/collections/${collection.id}/raids`} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/35 px-5 text-sm font-bold"><Swords className="size-4 text-vault-green" /> Raids</Link>
+              <Link href={proofHref} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-bold text-vault-green"><img src={brandAssets.proofRing} alt="" className="size-5 object-contain" /> Open Proof</Link>
+              <Link href={`/collections/${collection.id}/raids`} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/35 px-5 text-sm font-bold"><img src={brandAssets.energyBeam} alt="" className="size-5 object-contain" /> Raids</Link>
             </div>
           </div>
           <div className="grid gap-3">
@@ -829,9 +822,9 @@ function MarketplaceView({ data }: { data: ProductData }) {
         </div>
       </SectionCard>
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard icon={WalletCards} label="Active listings" value={formatMetric((data.listings ?? []).length || nfts.length)} />
-        <StatCard icon={Shield} label="Backed inventory" value={formatMetric(nfts.length)} accent="green" />
-        <StatCard icon={AlertTriangle} label="Price source" value={(data.listings ?? []).length ? "Live listings" : "No listings"} accent="gold" />
+        <StatCard iconAsset={brandAssets.nftSlot} label="Active listings" value={formatMetric((data.listings ?? []).length || nfts.length)} />
+        <StatCard iconAsset={brandAssets.vaultSafe} label="Backed inventory" value={formatMetric(nfts.length)} accent="green" />
+        <StatCard iconAsset={(data.listings ?? []).length ? brandAssets.proofRing : brandAssets.errorGlitch} label="Price source" value={(data.listings ?? []).length ? "Live listings" : "No listings"} accent="gold" />
       </div>
       {nfts.length ? <MarketplaceGrid items={nfts} collections={collections} listings={data.listings} /> : <EmptyState title="No marketplace listings" body="Listings appear only after real active listings or vault NFTs are returned by the API. No production prices are invented." />}
     </div>
@@ -921,10 +914,10 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-5">
         <div className="grid gap-4 md:grid-cols-4">
-          <StatCard icon={LockKeyhole} label="Staked vaults" value={formatMetric(activePositions.length)} />
-          <StatCard icon={Sparkles} label="Eligible vaults" value={formatMetric(eligibleVaults.length)} accent="green" />
-          <StatCard icon={Shield} label="Pending rewards" value={formatRewardSum(positions)} accent="gold" />
-          <StatCard icon={Boxes} label="Total staked" value={formatMetric(activePositions.length)} accent="cyan" />
+          <StatCard iconAsset={brandAssets.vaultSafe} label="Staked vaults" value={formatMetric(activePositions.length)} />
+          <StatCard iconAsset={brandAssets.nftSlot} label="Eligible vaults" value={formatMetric(eligibleVaults.length)} accent="green" />
+          <StatCard iconAsset={brandAssets.rewardBurst} label="Pending rewards" value={formatRewardSum(positions)} accent="gold" />
+          <StatCard iconAsset={brandAssets.proofRing} label="Total staked" value={formatMetric(activePositions.length)} accent="cyan" />
         </div>
         <SectionCard title="Eligible Vault NFTs">
           {eligibleVaults.length ? (
@@ -1025,10 +1018,10 @@ function LeaderboardView({ data }: { data: ProductData }) {
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
       <main className="space-y-5">
         <div className="grid gap-4 md:grid-cols-4">
-          <StatCard icon={Trophy} label="Ranked factions" value={formatMetric(collections.length)} accent="gold" />
-          <StatCard icon={LockKeyhole} label="Vault-weighted score" value={formatMetric(collections.reduce((sum, collection) => sum + leaderboardScore(collection), 0))} accent="green" />
-          <StatCard icon={Swords} label="Raid rooms" value={formatMetric(raids.length)} accent="cyan" />
-          <StatCard icon={Shield} label="Recent mints" value={formatMetric(recentMints.length)} />
+          <StatCard iconAsset={brandAssets.rewardBurst} label="Ranked factions" value={formatMetric(collections.length)} accent="gold" />
+          <StatCard iconAsset={brandAssets.vaultSafe} label="Vault-weighted score" value={formatMetric(collections.reduce((sum, collection) => sum + leaderboardScore(collection), 0))} accent="green" />
+          <StatCard iconAsset={brandAssets.energyBeam} label="Raid rooms" value={formatMetric(raids.length)} accent="cyan" />
+          <StatCard iconAsset={brandAssets.proofRing} label="Recent mints" value={formatMetric(recentMints.length)} />
         </div>
 
         <SectionCard title="Faction Leaderboard">

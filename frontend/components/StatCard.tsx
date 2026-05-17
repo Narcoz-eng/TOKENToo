@@ -10,13 +10,15 @@ const accents = {
 
 export function StatCard({
   icon: Icon,
+  iconAsset,
   label,
   value,
   delta,
   accent = "purple",
   className
 }: {
-  icon: LucideIcon;
+  icon?: LucideIcon;
+  iconAsset?: string;
   label: string;
   value: string;
   delta?: string;
@@ -27,7 +29,7 @@ export function StatCard({
     <div className={cn("phew-panel phew-card-hover relative overflow-hidden rounded-lg p-4", className)}>
       <div className="relative flex items-center gap-4">
         <div className={cn("flex size-12 items-center justify-center rounded-md border border-current/20", accents[accent])}>
-          <Icon className="size-6" />
+          {iconAsset ? <img src={iconAsset} alt="" className="size-7 object-contain" /> : Icon ? <Icon className="size-6" /> : null}
         </div>
         <div>
           <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
