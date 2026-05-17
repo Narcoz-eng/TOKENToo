@@ -1,10 +1,11 @@
 "use client";
 
-import { CheckCircle2, CircleAlert, Clock3, Loader2, RadioTower, Send, ShieldCheck, WalletCards } from "lucide-react";
+import { CheckCircle2, CircleAlert, Clock3, Loader2, LockKeyhole, PackageCheck, RadioTower, Send, ShieldCheck, Sparkles, Undo2, WalletCards } from "lucide-react";
 import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
 export type TransactionFlowState = "idle" | "preparing" | "signing" | "sending" | "confirming" | "success" | "error";
+export type TransactionFlowMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "studio" | "reward" | "scan";
 
 export type TransactionFlowStep = {
   state: TransactionFlowState;
@@ -28,7 +29,8 @@ export function TransactionFlow({
   steps = defaultSteps,
   detail,
   className,
-  compact = false
+  compact = false,
+  moment
 }: {
   state: TransactionFlowState;
   title: string;
@@ -39,11 +41,14 @@ export function TransactionFlow({
   detail?: string | null;
   className?: string;
   compact?: boolean;
+  moment?: TransactionFlowMoment;
 }) {
   const activeIndex = flowIndex(state, steps);
   const status = flowStatusLabel(state);
+  const visualMoment = moment ?? inferMoment(title);
+  const active = state !== "idle" && state !== "error";
   return (
-    <div className={cn("transaction-flow rounded-lg border border-vault-line bg-black/30 p-4", compact ? "space-y-3" : "space-y-4", className)} data-state={state}>
+    <div className={cn("transaction-flow rounded-lg border border-vault-line bg-black/30 p-4", compact ? "space-y-3" : "space-y-4", className)} data-state={state} data-moment={visualMoment}>
       <div className="flex items-start gap-4">
         <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border border-vault-line bg-black/40">
           {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <img src={brandAssets.logo} alt="" className="size-10 object-contain opacity-90" />}
@@ -61,6 +66,36 @@ export function TransactionFlow({
             </span>
           </div>
           {tokenSymbol ? <p className="mt-2 text-xs font-black uppercase text-vault-green">{tokenSymbol}</p> : null}
+        </div>
+      </div>
+
+      <div className={cn("phew-tx-stage", compact && "phew-tx-stage-compact", active && "phew-tx-stage-active", state === "success" && "phew-tx-stage-success", state === "error" && "phew-tx-stage-error")} data-state={state} data-moment={visualMoment}>
+        <span className="phew-tx-orbit phew-tx-orbit-a" />
+        <span className="phew-tx-orbit phew-tx-orbit-b" />
+        <span className="phew-tx-beam" />
+        <img src={brandAssets.logo} alt="" className="phew-tx-mascot" />
+        <div className="phew-tx-nft">
+          {image ? (
+            <img src={image} alt="" className="h-full w-full rounded-md object-cover" />
+          ) : (
+            <div className="grid h-full w-full place-items-center rounded-md bg-[radial-gradient(circle_at_50%_26%,rgba(186,255,0,0.18),rgba(0,0,0,0.9)_62%)]">
+              <div className="text-center">
+                <WalletCards className="mx-auto size-7 text-slate-400" />
+                <p className="mt-2 text-[10px] font-black uppercase text-vault-green">NFT art slot</p>
+              </div>
+            </div>
+          )}
+          <span className="mt-2 inline-flex max-w-full rounded-md border border-vault-green/35 bg-black/60 px-2 py-1 text-[10px] font-black uppercase text-vault-green">{tokenSymbol || "Token symbol"}</span>
+        </div>
+        <div className="phew-tx-object">
+          <StageObject moment={visualMoment} state={state} />
+        </div>
+        <div className="absolute bottom-3 left-4 right-4 z-10 flex items-center justify-center gap-2">
+          {steps.map((step, index) => {
+            const complete = state === "success" || (activeIndex >= 0 && index < activeIndex);
+            const current = step.state === state || (state === "idle" && index === 0);
+            return <span key={`${step.state}-dot`} className={cn("h-1.5 flex-1 max-w-16 rounded-full border border-vault-line bg-black/60", complete && "border-vault-green bg-vault-green", current && !complete && "border-vault-cyan bg-vault-cyan")} />;
+          })}
         </div>
       </div>
 
@@ -87,6 +122,31 @@ export function TransactionFlow({
       ) : null}
     </div>
   );
+}
+
+function StageObject({ moment, state }: { moment: TransactionFlowMoment; state: TransactionFlowState }) {
+  if (state === "success") return <CheckCircle2 className="size-12 text-vault-green" />;
+  if (state === "error") return <CircleAlert className="size-12 text-vault-red" />;
+  if (moment === "stake") return <LockKeyhole className="size-11 text-vault-green" />;
+  if (moment === "unstake" || moment === "redeem") return <Undo2 className="size-11 text-vault-cyan" />;
+  if (moment === "proof") return <ShieldCheck className="size-11 text-vault-green" />;
+  if (moment === "community" || moment === "scan") return <RadioTower className="size-11 text-vault-cyan" />;
+  if (moment === "studio") return <PackageCheck className="size-11 text-vault-green" />;
+  if (moment === "reward") return <Sparkles className="size-11 text-vault-gold" />;
+  return <WalletCards className="size-11 text-vault-green" />;
+}
+
+function inferMoment(title: string): TransactionFlowMoment {
+  const normalized = title.toLowerCase();
+  if (normalized.includes("unstake")) return "unstake";
+  if (normalized.includes("stake")) return "stake";
+  if (normalized.includes("redeem")) return "redeem";
+  if (normalized.includes("proof")) return "proof";
+  if (normalized.includes("community") || normalized.includes("launch")) return "community";
+  if (normalized.includes("studio") || normalized.includes("setup")) return "studio";
+  if (normalized.includes("reward") || normalized.includes("claim")) return "reward";
+  if (normalized.includes("scan")) return "scan";
+  return "mint";
 }
 
 export function transactionStateFromTxStatus(status: string | null | undefined): TransactionFlowState {

@@ -305,6 +305,155 @@ select {
   box-shadow: inset 0 0 0 1px rgba(255, 79, 79, 0.18), 0 0 30px rgba(255, 79, 79, 0.12);
 }
 
+.phew-tx-stage {
+  position: relative;
+  min-height: 260px;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid rgba(110, 255, 222, 0.14);
+  background:
+    radial-gradient(circle at 50% 36%, rgba(186, 255, 0, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(2, 8, 6, 0.92), rgba(0, 0, 0, 0.96));
+  isolation: isolate;
+}
+
+.phew-tx-stage-compact {
+  min-height: 200px;
+}
+
+.phew-tx-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent, rgba(186, 255, 0, 0.035), transparent),
+    repeating-linear-gradient(180deg, transparent 0 10px, rgba(186, 255, 0, 0.012) 11px 12px);
+  opacity: 0.7;
+}
+
+.phew-tx-orbit {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  border-radius: 999px;
+  border: 1px solid rgba(186, 255, 0, 0.28);
+  transform: translate(-50%, -50%);
+  opacity: 0.72;
+}
+
+.phew-tx-orbit-a {
+  width: 240px;
+  height: 240px;
+  animation: phew-tx-orbit 7s linear infinite;
+}
+
+.phew-tx-orbit-b {
+  width: 165px;
+  height: 165px;
+  border-color: rgba(22, 215, 210, 0.28);
+  animation: phew-tx-orbit 5s linear infinite reverse;
+}
+
+.phew-tx-mascot {
+  position: absolute;
+  left: clamp(1rem, 8%, 4rem);
+  bottom: 3.1rem;
+  z-index: 3;
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 16px rgba(186, 255, 0, 0.25));
+  animation: phew-tx-mascot 2.4s ease-in-out infinite;
+}
+
+.phew-tx-nft {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  z-index: 4;
+  display: flex;
+  width: 94px;
+  min-height: 130px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%) rotate(-1deg);
+  border: 1px dashed rgba(186, 255, 0, 0.7);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.76);
+  padding: 0.35rem;
+  box-shadow: 0 0 20px rgba(186, 255, 0, 0.14), inset 0 0 22px rgba(186, 255, 0, 0.08);
+  animation: phew-tx-card 2.6s ease-in-out infinite;
+}
+
+.phew-tx-object {
+  position: absolute;
+  right: clamp(1rem, 9%, 4.5rem);
+  bottom: 4rem;
+  z-index: 3;
+  display: grid;
+  width: 82px;
+  height: 82px;
+  place-items: center;
+  border: 1px solid rgba(186, 255, 0, 0.28);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.48);
+  box-shadow: inset 0 0 24px rgba(186, 255, 0, 0.08);
+}
+
+.phew-tx-beam {
+  position: absolute;
+  left: 27%;
+  right: 25%;
+  top: 47%;
+  z-index: 2;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(186, 255, 0, 0.86), transparent);
+  box-shadow: 0 0 14px rgba(186, 255, 0, 0.42);
+  transform-origin: left center;
+  animation: phew-tx-beam 1.8s ease-in-out infinite;
+}
+
+.phew-tx-stage-success .phew-tx-object {
+  border-color: rgba(186, 255, 0, 0.5);
+  box-shadow: 0 0 24px rgba(186, 255, 0, 0.15), inset 0 0 26px rgba(186, 255, 0, 0.1);
+}
+
+.phew-tx-stage-error .phew-tx-nft {
+  border-color: rgba(255, 79, 79, 0.72);
+  box-shadow: 0 0 18px rgba(255, 79, 79, 0.16), inset 0 0 18px rgba(255, 79, 79, 0.08);
+}
+
+@media (max-width: 640px) {
+  .phew-tx-stage {
+    min-height: 220px;
+  }
+
+  .phew-tx-mascot {
+    left: 0.85rem;
+    bottom: 3.3rem;
+    width: 58px;
+    height: 58px;
+  }
+
+  .phew-tx-nft {
+    width: 78px;
+    min-height: 112px;
+  }
+
+  .phew-tx-object {
+    right: 0.85rem;
+    bottom: 3.7rem;
+    width: 58px;
+    height: 58px;
+  }
+
+  .phew-tx-beam {
+    left: 21%;
+    right: 20%;
+  }
+}
+
 .phew-moment-stage {
   position: relative;
   width: min(100%, 280px);
@@ -408,6 +557,11 @@ select {
 .phew-reduced-motion .phew-glow-trail::before,
 .phew-reduced-motion .phew-particle,
 .phew-reduced-motion .phew-card-core,
+.phew-reduced-motion .phew-tx-orbit-a,
+.phew-reduced-motion .phew-tx-orbit-b,
+.phew-reduced-motion .phew-tx-mascot,
+.phew-reduced-motion .phew-tx-nft,
+.phew-reduced-motion .phew-tx-beam,
 .phew-reduced-motion .phew-loader-ring,
 .phew-reduced-motion .phew-loading-stage::before {
   animation: none !important;
@@ -422,6 +576,11 @@ select {
   .phew-glow-trail::before,
   .phew-particle,
   .phew-card-core,
+  .phew-tx-orbit-a,
+  .phew-tx-orbit-b,
+  .phew-tx-mascot,
+  .phew-tx-nft,
+  .phew-tx-beam,
   .phew-loader-ring,
   .phew-loading-stage::before {
     animation: none !important;
@@ -504,4 +663,25 @@ select {
 @keyframes phew-stage-beam {
   0%, 100% { opacity: 0.28; transform: scaleX(0.42); }
   50% { opacity: 1; transform: scaleX(1); }
+}
+
+@keyframes phew-tx-orbit {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.96); }
+  50% { transform: translate(-50%, -50%) rotate(180deg) scale(1.03); }
+  100% { transform: translate(-50%, -50%) rotate(360deg) scale(0.96); }
+}
+
+@keyframes phew-tx-mascot {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-3deg); }
+  50% { transform: translate3d(8px, -5px, 0) rotate(2deg); }
+}
+
+@keyframes phew-tx-card {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0) rotate(-1deg); }
+  50% { transform: translate(-50%, -50%) translateY(-7px) rotate(1deg); }
+}
+
+@keyframes phew-tx-beam {
+  0%, 100% { opacity: 0.2; transform: scaleX(0.35); }
+  50% { opacity: 0.9; transform: scaleX(1); }
 }

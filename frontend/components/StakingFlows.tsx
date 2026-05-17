@@ -13,15 +13,15 @@ async function defaultUnavailable(): Promise<FlowResult> {
 }
 
 export function StakeFlow({ onStake = defaultUnavailable, collectionImage, tokenSymbol }: { onStake?: () => Promise<FlowResult>; collectionImage?: string | null; tokenSymbol?: string | null }) {
-  return <BaseFlow title="Stake vault" idleLabel="Ready to stake an eligible wallet NFT" pendingLabel="Submitting stake request" successLabel="Stake confirmed" buttonLabel="Stake" icon={LockKeyhole} onRun={onStake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
+  return <BaseFlow title="Stake vault" idleLabel="Ready to stake an eligible wallet NFT" pendingLabel="Submitting stake request" successLabel="Stake confirmed" buttonLabel="Stake" icon={LockKeyhole} moment="stake" onRun={onStake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
 }
 
 export function UnstakeFlow({ onUnstake = defaultUnavailable, collectionImage, tokenSymbol }: { onUnstake?: () => Promise<FlowResult>; collectionImage?: string | null; tokenSymbol?: string | null }) {
-  return <BaseFlow title="Unstake vault" idleLabel="Ready to unstake an active position" pendingLabel="Submitting unstake request" successLabel="Unstake confirmed" buttonLabel="Unstake" icon={UnlockKeyhole} onRun={onUnstake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
+  return <BaseFlow title="Unstake vault" idleLabel="Ready to unstake an active position" pendingLabel="Submitting unstake request" successLabel="Unstake confirmed" buttonLabel="Unstake" icon={UnlockKeyhole} moment="unstake" onRun={onUnstake} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
 }
 
 export function ClaimRewardsFlow({ onClaim = defaultUnavailable, collectionImage, tokenSymbol }: { onClaim?: () => Promise<FlowResult>; collectionImage?: string | null; tokenSymbol?: string | null }) {
-  return <BaseFlow title="Claim rewards" idleLabel="Rewards available when API reports them" pendingLabel="Claiming rewards" successLabel="Rewards claimed" buttonLabel="Claim" icon={Sparkles} onRun={onClaim} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
+  return <BaseFlow title="Claim rewards" idleLabel="Rewards available when API reports them" pendingLabel="Claiming rewards" successLabel="Rewards claimed" buttonLabel="Claim" icon={Sparkles} moment="reward" onRun={onClaim} collectionImage={collectionImage} tokenSymbol={tokenSymbol} />;
 }
 
 function BaseFlow({
@@ -31,6 +31,7 @@ function BaseFlow({
   successLabel,
   buttonLabel,
   icon,
+  moment,
   onRun,
   collectionImage,
   tokenSymbol
@@ -41,6 +42,7 @@ function BaseFlow({
   successLabel: string;
   buttonLabel: string;
   icon: LucideIcon;
+  moment: "stake" | "unstake" | "reward";
   onRun: () => Promise<FlowResult>;
   collectionImage?: string | null;
   tokenSymbol?: string | null;
@@ -73,7 +75,7 @@ function BaseFlow({
   return (
     <div className="space-y-3">
       <p className="text-sm font-black uppercase text-white">{title}</p>
-      <TransactionFlow state={flowState} title={title} description={idleLabel} image={collectionImage} tokenSymbol={tokenSymbol} detail={detail} compact />
+      <TransactionFlow state={flowState} moment={moment} title={title} description={idleLabel} image={collectionImage} tokenSymbol={tokenSymbol} detail={detail} compact />
       <TransactionStatus status={status} label={status === "pending" || status === "validating" ? pendingLabel : status === "confirmed" ? successLabel : status === "failed" ? "Action failed" : idleLabel} detail={detail} />
       <AnimatedButton tone="outline" icon={icon} loading={busy} success={status === "confirmed"} onClick={run}>
         {buttonLabel}

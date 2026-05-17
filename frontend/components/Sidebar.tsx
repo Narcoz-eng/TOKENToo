@@ -24,21 +24,36 @@ import { cn } from "@/lib/utils";
 import { useWalletDisplay } from "@/hooks/useWalletDisplay";
 import { BrandLogo } from "./BrandLogo";
 
-const navItems = [
-  { href: "/home", label: "Home", icon: Home, key: "home" },
-  { href: "/collections", label: "Collections", icon: Boxes, key: "collections" },
-  { href: "/raids", label: "Raids", icon: Swords, key: "raids" },
-  { href: "/staking", label: "Staking", icon: Coins, key: "staking" },
-  { href: "/redeem", label: "Redeem", icon: Undo2, key: "redeem" },
-  { href: "/marketplace", label: "Marketplace", icon: WalletCards, key: "marketplace" },
-  { href: "/proof", label: "Proof Explorer", icon: FileSearch, key: "proof" },
-  { href: "/profile", label: "Profile", icon: Users, key: "profile" },
-  { href: "/mint", label: "Mint Vault", icon: LockKeyhole, key: "mint" },
-  { href: "/instant-sell", label: "Instant Sell", icon: Zap, key: "instant-sell" },
-  { href: "/create-community", label: "Create Community", icon: PlusCircle, key: "create-community" },
-  { href: "/create-collection", label: "Studio", icon: PlusCircle, key: "create" },
-  { href: "/admin/setup", label: "Admin Setup", icon: SlidersHorizontal, key: "setup" },
-  { href: "/admin/risk", label: "Risk Admin", icon: ShieldAlert, key: "risk" }
+const navSections = [
+  {
+    title: null,
+    items: [
+      { href: "/home", label: "Home", icon: Home, key: "home" },
+      { href: "/collections", label: "Collections", icon: Boxes, key: "collections" },
+      { href: "/create-community", label: "Create Community", icon: PlusCircle, key: "create-community" },
+      { href: "/create-collection", label: "Studio", icon: PlusCircle, key: "create" },
+      { href: "/mint", label: "Mint Vault", icon: LockKeyhole, key: "mint" },
+      { href: "/profile", label: "My Vaults", icon: Users, key: "profile" },
+      { href: "/staking", label: "Staking", icon: Coins, key: "staking" },
+      { href: "/redeem", label: "Redeem", icon: Undo2, key: "redeem" },
+      { href: "/marketplace", label: "Marketplace", icon: WalletCards, key: "marketplace" },
+      { href: "/raids", label: "Raids", icon: Swords, key: "raids" },
+      { href: "/proof", label: "Proof Explorer", icon: FileSearch, key: "proof" }
+    ]
+  },
+  {
+    title: "Analytics",
+    items: [
+      { href: "/home", label: "Protocol Stats", icon: Trophy, key: "protocol-stats" },
+      { href: "/proof", label: "Reserves", icon: Boxes, key: "reserves" },
+      { href: "/admin/risk", label: "Risk Dashboard", icon: ShieldAlert, key: "risk" },
+      { href: "/instant-sell", label: "Strategy Engine", icon: Zap, key: "instant-sell" }
+    ]
+  },
+  {
+    title: "Admin",
+    items: [{ href: "/admin/setup", label: "Setup", icon: SlidersHorizontal, key: "setup" }]
+  }
 ];
 
 type SidebarStats = {
@@ -61,25 +76,32 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
           <BrandLogo />
         </Link>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-5">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const selected = active === item.key;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "group relative flex items-center gap-3 rounded-md border border-transparent px-3 py-3 text-sm font-semibold text-slate-400 transition hover:border-vault-cyan/25 hover:bg-vault-cyan/5 hover:text-white",
-                  selected && "border-vault-green/45 bg-vault-green/12 text-white shadow-green"
-                )}
-              >
-                {selected ? <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r bg-vault-green shadow-green" /> : null}
-                <Icon className={cn("size-4 transition group-hover:text-vault-green", selected ? "text-vault-green" : "text-slate-500")} />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav className="flex-1 space-y-5 overflow-y-auto px-4 py-5">
+          {navSections.map((section, sectionIndex) => (
+            <div key={section.title ?? "main"} className={cn(sectionIndex > 0 && "border-t border-vault-line pt-4")}>
+              {section.title ? <p className="mb-2 px-2 text-[11px] font-black uppercase tracking-wide text-slate-500">{section.title}</p> : null}
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const selected = active === item.key;
+                  return (
+                    <Link
+                      key={`${section.title ?? "main"}-${item.href}-${item.key}`}
+                      href={item.href}
+                      className={cn(
+                        "group relative flex items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-sm font-semibold text-slate-400 transition hover:border-vault-cyan/25 hover:bg-vault-cyan/5 hover:text-white",
+                        selected && "border-vault-green/45 bg-vault-green/12 text-white shadow-green"
+                      )}
+                    >
+                      {selected ? <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r bg-vault-green shadow-green" /> : null}
+                      <Icon className={cn("size-4 transition group-hover:text-vault-green", selected ? "text-vault-green" : "text-slate-500")} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="space-y-3 p-4">

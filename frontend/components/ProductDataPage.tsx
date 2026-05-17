@@ -260,8 +260,8 @@ function HomeDashboardView({ data }: { data: ProductData }) {
               <StatusPill accent="green">Protocol Dashboard</StatusPill>
               <StatusPill accent="cyan">Solana Vault NFTs</StatusPill>
             </div>
-            <h1 className="mt-5 max-w-4xl text-5xl font-black leading-tight lg:text-6xl">Energy in motion. Relief. Progress. Belonging.</h1>
-            <p className="mt-4 max-w-2xl text-lg text-slate-300">The protocol for token-backed NFTs. Communities lock their own tokens into reserve vaults, mint tradable Vault NFTs, stake for utility, and prove backing before redemption.</p>
+            <h1 className="mt-5 max-w-4xl text-5xl font-black leading-tight lg:text-6xl">Real tokens. <span className="text-vault-green">Real backing. Real ownership.</span></h1>
+            <p className="mt-4 max-w-2xl text-lg text-slate-300">The protocol for token-backed NFT vaults. Lock community tokens, mint verified vault NFTs, trade freely, stake for rewards, and redeem through proof.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/collections" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
                 <Search className="size-4" /> Explore Collections
@@ -272,6 +272,10 @@ function HomeDashboardView({ data }: { data: ProductData }) {
             </div>
           </div>
           <div className="rounded-lg border border-vault-green/25 bg-black/50 p-4 shadow-green">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-black uppercase text-white">Protocol Overview</p>
+              <StatusPill accent={protocolState.data?.ok ? "green" : "gold"}>{protocolState.data?.ok ? "Live" : "N/A"}</StatusPill>
+            </div>
             <img src={brandAssets.logo} alt="Phew mascot" className="mx-auto size-28 rounded-lg object-contain drop-shadow-[0_0_28px_rgba(186,255,0,0.35)]" />
             <div className="mt-4 grid grid-cols-2 gap-3">
               <MiniStat label="TVL" value={formatCurrency(stats.tvlUsd)} />
@@ -611,7 +615,7 @@ function CollectionDetailView({ data }: { data: ProductData }) {
           </SectionCard>
 
           <SectionCard title="Staking Flow">
-            <TransactionFlow state="idle" title="Stake Vault NFT" description="Staking uses the wallet-owned eligible vault list and backend stake route." image={nfts[0]?.image ?? collection.image} tokenSymbol={collection.symbol} compact />
+            <TransactionFlow state="idle" moment="stake" title="Stake Vault NFT" description="Staking uses the wallet-owned eligible vault list and backend stake route." image={nfts[0]?.image ?? collection.image} tokenSymbol={collection.symbol} compact />
           </SectionCard>
         </aside>
       </div>
@@ -708,7 +712,7 @@ function RaidsView({ data }: { data: ProductData }) {
       </div>
       <aside className="space-y-5">
         <SectionCard title="Reward Panel">
-          <TransactionFlow state="idle" title="Reward claim" description="Claim states remain idle until backend reward routes return real claim data." tokenSymbol="RAID" compact />
+          <TransactionFlow state="idle" moment="reward" title="Reward claim" description="Claim states remain idle until backend reward routes return real claim data." tokenSymbol="RAID" compact />
           <p className="mt-4 text-sm text-slate-300">Rewards and contributor rows appear from real raid mission and claim data. Join actions stay pending or error until a supported backend route confirms them.</p>
         </SectionCard>
       </aside>

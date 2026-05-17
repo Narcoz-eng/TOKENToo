@@ -107,6 +107,7 @@ export default function AdminSetupPage() {
             </div>
             <TransactionFlow
               state={data?.publicReadiness?.professionalPreviewReady ? "success" : "idle"}
+              moment="studio"
               title="Setup readiness"
               description="Read-only system status. No image generation, retries, or paid provider calls are triggered."
               tokenSymbol="SETUP"

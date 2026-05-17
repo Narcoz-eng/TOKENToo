@@ -189,6 +189,7 @@ export default function MintPage() {
                 <div className="space-y-4">
                   <TransactionFlow
                     state={flowState}
+                    moment="mint"
                     title="Mint Vault NFT"
                     description="Intent, transaction build, wallet signature, and backend confirmation use the real mint routes."
                     image={finalImage}

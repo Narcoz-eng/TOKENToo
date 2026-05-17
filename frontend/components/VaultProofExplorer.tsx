@@ -8,6 +8,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { brandAssets } from "@/lib/brand-assets";
 import { ProtocolTrustStrip, proofTrust } from "@/components/protocol-trust";
+import { TransactionFlow } from "@/components/TransactionFlow";
 
 type ProofResponse = {
   ok?: boolean;
@@ -126,6 +127,15 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
             </SectionCard>
 
             <SectionCard title="Verification">
+              <TransactionFlow
+                state={proof.issues.length ? "error" : "success"}
+                moment="proof"
+                title="Proof verification"
+                description="Owner, collection, reserve, and production checks are resolved by the proof endpoint."
+                tokenSymbol={proof.tokenSymbol}
+                detail={proof.lastVerifiedAt ?? "Last verified N/A"}
+                compact
+              />
               <div className="space-y-3">
                 <StatusLine label="Live owner proof" ok={proof.verificationResult.ownerVerificationAvailable} />
                 <StatusLine label="Owner matches DB" ok={proof.verificationResult.ownerMatchesDb !== false} />

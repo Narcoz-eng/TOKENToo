@@ -16,7 +16,7 @@ export function TopBar() {
             <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-vault-green" />
             <input
               className="phew-input h-11 w-full rounded-md border-vault-cyan/20 bg-black/40 pl-12 pr-14 text-sm text-white"
-              placeholder="Search factions, vaults, raids..."
+              placeholder="Search collections, tokens, wallets..."
             />
             <span className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded-md border border-vault-line bg-black/45 px-2 py-1 text-xs text-slate-400">
               <Command className="size-3" /> K

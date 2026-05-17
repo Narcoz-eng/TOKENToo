@@ -316,6 +316,7 @@ export default function CreateCommunityPage() {
             </div>
             <TransactionFlow
               state={launchFlowState}
+              moment="community"
               title="Community launch"
               description="Token scan, access verification, launch transaction, and reserve proof all come from backend state."
               image={scan?.imageUri ?? brandAssets.logo}

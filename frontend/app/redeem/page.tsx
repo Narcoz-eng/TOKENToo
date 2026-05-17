@@ -186,6 +186,7 @@ export default function RedeemPage() {
             </div>
             <TransactionFlow
               state={flowState}
+              moment="redeem"
               title="Redeem Vault NFT"
               description="Select a wallet-owned eligible NFT, check proof, build the redeem transaction, then submit through the backend."
               image={selectedVault?.image}
