@@ -1,6 +1,5 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, RefreshCcw, Wallet, XCircle } from "lucide-react";
 import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
 import { brandAssets } from "@/lib/brand-assets";
@@ -31,7 +30,7 @@ export function ErrorState({ error, retry }: { error: string | ApiError; retry?:
     <SectionCard>
       <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-5">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="size-5 text-vault-red" />
+          <img src={brandAssets.errorGlitch} alt="" className="size-6 shrink-0 object-contain" />
           <div className="min-w-0 flex-1">
             <p className="font-bold text-vault-red">{title}</p>
             <p className="mt-2 break-words text-sm text-slate-300">{message}</p>
@@ -58,7 +57,7 @@ export function ErrorState({ error, retry }: { error: string | ApiError; retry?:
         </div>
         {retry ? (
           <button onClick={retry} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold">
-            <RefreshCcw className="size-4" /> Retry
+            <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" /> Retry
           </button>
         ) : null}
       </div>
@@ -114,7 +113,7 @@ export function WalletDisconnectedState({ action }: { action?: React.ReactNode }
     <SectionCard className="p-4">
       <div className="rounded-md border border-vault-green/25 bg-vault-green/8 p-4">
         <div className="flex items-start gap-3">
-          <Wallet className="mt-0.5 size-5 text-vault-green" />
+          <img src={brandAssets.tokenObject} alt="" className="mt-0.5 size-6 object-contain" />
           <div>
             <p className="font-black">Connect your wallet</p>
             <p className="mt-1 text-sm text-slate-400">Required for wallet-specific vaults, staking, listings, claims, and mint intents.</p>
@@ -131,7 +130,7 @@ export function SetupWarning({ warnings }: { warnings?: string[] }) {
   return (
     <div className="rounded-lg border border-vault-gold/40 bg-vault-gold/10 p-4 text-sm text-slate-200">
       <div className="flex gap-3">
-        <AlertTriangle className="mt-0.5 size-5 shrink-0 text-vault-gold" />
+        <img src={brandAssets.errorGlitch} alt="" className="mt-0.5 size-5 shrink-0 object-contain" />
         <div className="space-y-1">
           {warnings.map((warning) => <p key={warning}>{warning}</p>)}
         </div>
@@ -143,7 +142,7 @@ export function SetupWarning({ warnings }: { warnings?: string[] }) {
 export function CapabilityBadge({ label, enabled }: { label: string; enabled?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2 rounded-lg border border-vault-line bg-black/25 px-3 py-2 text-xs font-semibold text-slate-200">
-      {enabled ? <CheckCircle2 className="size-3.5 text-vault-green" /> : <XCircle className="size-3.5 text-vault-gold" />}
+      <img src={enabled ? brandAssets.rewardBurst : brandAssets.proofRing} alt="" className="size-4 object-contain" />
       {label}
     </span>
   );

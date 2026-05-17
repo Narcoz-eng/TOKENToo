@@ -57,6 +57,11 @@ This file tracks local assets used to rebuild the frontend from the approved Phe
 - `ProtocolTrustStrip`, `ProtocolTrustInline`, and `TrustBadge` now render Phew proof, vault, beam, and glitch assets instead of icon-library trust symbols.
 - Verified, reserve health, live/cached, and last-verified badges keep the same data contract and do not fabricate timestamps.
 
+## 2026-05-17 Proof And State Cleanup Pass
+
+- `VaultProofExplorer` proof controls, checklist rows, locked actions, external links, and issue panels now use Phew proof, beam, vault, reward, and glitch assets.
+- Shared `ApiState` wallet, retry, warning, error, and capability badges now use Phew-native assets.
+
 ## Remaining Asset Gaps
 
 - A formal Image 2 reference set is still needed for additional mascot poses, admin empty/error states, and route-specific transaction keyframes if the approved local references are not enough.

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, LockKeyhole, Search, ShieldCheck, TriangleAlert } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
@@ -98,10 +97,10 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
             </div>
             <div className="flex flex-wrap gap-3">
               <a href="https://explorer.solana.com/?cluster=devnet" className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-200" target="_blank" rel="noreferrer">
-                Open in Explorer <ExternalLink className="size-4" />
+                Open in Explorer <img src={brandAssets.energyBeam} alt="" className="size-5 object-contain" />
               </a>
               <a href="/proof" className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-200">
-                Proof Docs <ExternalLink className="size-4" />
+                Proof Docs <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />
               </a>
             </div>
           </div>
@@ -109,7 +108,7 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
             {allowSearch ? (
               <label className="relative block">
                 <span className="mb-3 block text-sm font-black text-white">NFT Mint</span>
-                <Search className="pointer-events-none absolute left-4 top-[3.05rem] size-4 text-vault-green" />
+                <img src={brandAssets.proofRing} alt="" className="pointer-events-none absolute left-4 top-[3.05rem] size-4 object-contain" />
                 <input value={mint} onChange={(event) => setMint(event.target.value)} className="phew-input h-12 w-full rounded-md pl-11 pr-4 text-sm" placeholder="Enter or paste NFT mint address on Solana" />
               </label>
             ) : (
@@ -184,7 +183,7 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
               {proof.issues.length ? (
                 <div className="mt-4 rounded-lg border border-vault-gold/35 bg-vault-gold/10 p-4">
                   <div className="flex gap-3">
-                    <TriangleAlert className="size-5 shrink-0 text-vault-gold" />
+                    <img src={brandAssets.errorGlitch} alt="" className="size-5 shrink-0 object-contain" />
                     <div className="space-y-2 text-sm text-slate-300">
                       {proof.issues.map((issue) => <p key={issue}>{issue}</p>)}
                     </div>
@@ -243,7 +242,7 @@ function ProofEmptyWorkspace({ mint, allowSearch }: { mint: string; allowSearch:
             <StatusLine label="Production Proof" ok={false} />
           </div>
           <div className="mt-4 rounded-lg border border-vault-line bg-white/[0.03] p-5 text-center">
-            <LockKeyhole className="mx-auto mb-2 size-5 text-slate-500" />
+            <img src={brandAssets.vaultSafe} alt="" className="mx-auto mb-2 size-7 object-contain opacity-60" />
             <p className="font-black text-slate-300">Proof Not Verified Yet</p>
             <p className="mt-1 text-sm text-slate-500">All checks must pass to enable actions.</p>
           </div>
@@ -265,7 +264,7 @@ function ProofEmptyWorkspace({ mint, allowSearch }: { mint: string; allowSearch:
 
         <SectionCard title="Issues" className="phew-proof-card">
           <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-6 text-center">
-            <TriangleAlert className="mx-auto mb-3 size-7 text-slate-400" />
+            <img src={brandAssets.errorGlitch} alt="" className="mx-auto mb-3 size-9 object-contain opacity-70" />
             <p className="font-black">No issues detected yet.</p>
             <p className="mt-2 text-sm text-slate-500">Issues will appear here if any check fails.</p>
           </div>
@@ -318,7 +317,7 @@ function ProofLockedAction({ asset, title, body }: { asset: string; title: strin
           <span className="block truncate text-xs text-slate-500">{body}</span>
         </span>
       </div>
-      <LockKeyhole className="size-4 shrink-0 text-slate-500" />
+      <img src={brandAssets.vaultSafe} alt="" className="size-5 shrink-0 object-contain opacity-55" />
     </div>
   );
 }
@@ -337,7 +336,7 @@ function StatusLine({ label, ok }: { label: string; ok: boolean }) {
     <div className="flex items-center justify-between gap-3 rounded-md border border-vault-line bg-black/25 p-3 text-sm">
       <span className="text-slate-300">{label}</span>
       <span className={ok ? "text-vault-green" : "text-vault-gold"}>
-        <ShieldCheck className="inline size-4" /> {ok ? "OK" : "Not verified"}
+        <img src={ok ? brandAssets.rewardBurst : brandAssets.proofRing} alt="" className="inline size-4 object-contain align-[-2px]" /> {ok ? "OK" : "Not verified"}
       </span>
     </div>
   );

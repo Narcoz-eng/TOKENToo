@@ -88,6 +88,24 @@ Verification to run for this pass:
 - Captured: `tmp/visual-qa-current/proof-trust-assets.png`.
 - Passed: CDP page checks reported no framework overlay on `/collections`, `/mint`, `/redeem`, and `/proof`.
 
+### 2026-05-17 proof and state cleanup pass
+
+Fix applied:
+
+- Replaced proof page search, external-link, warning, lock, and verification checklist icons with local Phew assets.
+- Replaced shared API/wallet/error/retry/capability state icons with Phew assets.
+
+Verification to run for this pass:
+
+- Passed: `npm --workspace frontend run typecheck`.
+- Passed: `npm --workspace frontend run build`.
+- Passed: `npm run build`.
+- Captured: `tmp/visual-qa-current/proof-state-cleanup.png`.
+- Captured: `tmp/visual-qa-current/staking-state-cleanup.png`.
+- Captured: `tmp/visual-qa-current/admin-setup-state-cleanup.png`.
+- Captured: `tmp/visual-qa-current/redeem-state-cleanup.png`.
+- Passed: CDP page checks reported no framework overlay on `/proof`, `/staking`, `/admin/setup`, and `/redeem`.
+
 ## Mascot And Assets
 
 - [ ] `frontend/public/brand/phew-mascot.png` exists.
