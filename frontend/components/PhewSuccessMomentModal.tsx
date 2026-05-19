@@ -15,6 +15,7 @@ export type PhewSuccessMomentAction =
   | "redeem"
   | "proof"
   | "community-launch"
+  | "raid"
   | "layer-pack"
   | "studio-bible";
 
@@ -138,6 +139,7 @@ function labelForAction(action: PhewSuccessMomentAction) {
     redeem: "Redeem confirmed",
     proof: "Proof verified",
     "community-launch": "Community launched",
+    raid: "Raid success",
     "layer-pack": "Layer pack approved",
     "studio-bible": "Studio Bible completed"
   };

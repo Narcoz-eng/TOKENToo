@@ -23,7 +23,7 @@ import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
 export type ReferenceTone = "green" | "cyan" | "gold" | "red" | "muted";
-export type ReferenceSceneMode = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "studio" | "reward" | "scan" | "layer";
+export type ReferenceSceneMode = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "studio" | "reward" | "scan" | "layer" | "raid";
 export type ReferenceSceneState = "idle" | "wallet-disconnected" | "loading" | "preparing" | "signing" | "submitting" | "confirming" | "success" | "error";
 type ReferenceMascotPose = PhewHeroMascotPose | "run" | "point" | "guide";
 
@@ -480,6 +480,7 @@ function sceneSteps(mode: ReferenceSceneMode) {
   if (mode === "proof") return ["Load", "Owner", "Reserve", "Position", "Verify"];
   if (mode === "community") return ["Scan", "Gates", "Build", "Sign", "Submit", "Verify"];
   if (mode === "studio") return ["Token", "Brand", "Bible", "Layers", "Launch"];
+  if (mode === "raid") return ["Join", "Proof", "Review", "XP"];
   if (mode === "mint") return ["Configure", "Build", "Sign", "Confirm"];
   return ["Init", "Validate", "Submit", "Confirm"];
 }
@@ -523,7 +524,8 @@ function modeLabel(mode: ReferenceSceneMode) {
     studio: "Studio Bible",
     reward: "Reward Burst",
     scan: "Token Scan",
-    layer: "Layer Pack"
+    layer: "Layer Pack",
+    raid: "Raid Moment"
   };
   return labels[mode];
 }
@@ -542,6 +544,7 @@ function targetLabel(mode: ReferenceSceneMode) {
   if (mode === "community") return "launch";
   if (mode === "studio" || mode === "layer") return "layers";
   if (mode === "reward") return "reward";
+  if (mode === "raid") return "raid";
   return "vault";
 }
 
@@ -552,6 +555,7 @@ function targetAsset(mode: ReferenceSceneMode, state: ReferenceSceneState) {
   if (mode === "proof" || mode === "scan") return brandAssets.proofRing;
   if (mode === "community" || mode === "studio" || mode === "layer") return brandAssets.transactionObjects.community;
   if (mode === "reward") return brandAssets.rewardBurst;
+  if (mode === "raid") return brandAssets.raid.flag;
   return brandAssets.vaultSafe;
 }
 

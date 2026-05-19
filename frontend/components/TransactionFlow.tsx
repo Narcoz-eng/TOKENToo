@@ -7,7 +7,7 @@ import {
 } from "@/components/reference-ui";
 
 export type TransactionFlowState = "idle" | "wallet-disconnected" | "preparing" | "signing" | "submitting" | "sending" | "confirming" | "success" | "error";
-export type TransactionFlowMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "community-launch" | "studio" | "studio-bible" | "reward" | "scan";
+export type TransactionFlowMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "community-launch" | "studio" | "studio-bible" | "reward" | "scan" | "raid";
 
 export type TransactionFlowStep = {
   state: TransactionFlowState;
@@ -86,8 +86,8 @@ function inferMoment(title: string): TransactionFlowMoment {
   if (normalized.includes("proof")) return "proof";
   if (normalized.includes("community") || normalized.includes("launch")) return "community";
   if (normalized.includes("studio") || normalized.includes("setup")) return "studio";
+  if (normalized.includes("raid")) return "raid";
   if (normalized.includes("reward") || normalized.includes("claim")) return "reward";
   if (normalized.includes("scan")) return "scan";
   return "mint";
 }
-

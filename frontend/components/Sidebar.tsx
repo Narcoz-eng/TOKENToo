@@ -43,7 +43,7 @@ const navSections = [
     items: [
       { href: "/my-vaults", label: "My Vaults", icon: Users, protocolIcon: "lockTokens" as PhewProtocolIconName, key: "my-vaults" },
       { href: "/marketplace", label: "Marketplace", icon: WalletCards, asset: brandAssets.energyBeam, key: "marketplace" },
-      { href: "/raids", label: "Raids", icon: Swords, asset: brandAssets.rewardBurst, key: "raids" },
+      { href: "/raids", label: "Raids", icon: Swords, protocolIcon: "raid" as PhewProtocolIconName, key: "raids" },
       { href: "/leaderboard", label: "Leaderboard", icon: Trophy, asset: brandAssets.rewardBurst, key: "leaderboard" },
       { href: "/create-community", label: "Create Community", icon: PlusCircle, protocolIcon: "community" as PhewProtocolIconName, key: "create-community" },
       { href: "/studio", label: "Studio", icon: PlusCircle, asset: brandAssets.energyBeam, key: "studio", badge: "New" }

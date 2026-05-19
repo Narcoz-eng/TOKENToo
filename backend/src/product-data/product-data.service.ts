@@ -171,7 +171,7 @@ export class ProductDataService {
         where: collectionId ? { collectionId } : undefined,
         orderBy: { createdAt: "desc" },
         take: 20,
-        include: { missions: true, participations: true, collection: true }
+        include: { missions: true, participations: true, collection: { include: { token: true } } }
       });
       return records.map((raid) => this.raidDto(raid));
     });
@@ -672,9 +672,14 @@ export class ProductDataService {
 
   private raidDto(raid: any) {
     const target = raid.xpTarget || 1;
+    const collection = raid.collection ?? {};
     return {
       id: raid.id,
       collectionId: raid.collectionId,
+      collectionName: collection.name ?? null,
+      collectionSymbol: collection.token?.symbol ?? collection.symbol ?? null,
+      collectionImage: collection.logoUri ?? null,
+      collectionBanner: collection.bannerUri ?? null,
       name: raid.name,
       boss: raid.bossName ?? "Raid Boss",
       status: raid.status === "LIVE" ? "Live" : "Upcoming",
@@ -682,9 +687,31 @@ export class ProductDataService {
       participants: raid.participations?.length ?? 0,
       capacity: raid.capacity,
       rewardSol: Number(raid.rewardPoolSol ?? 0),
+      xpTarget: raid.xpTarget ?? null,
+      currentXp: raid.currentXp ?? 0,
       endsIn: raid.endsAt?.toISOString?.() ?? "",
       startsIn: raid.startsAt?.toISOString?.() ?? "",
-      missionCount: raid.missions?.length ?? 0
+      endsAt: raid.endsAt?.toISOString?.() ?? "",
+      startsAt: raid.startsAt?.toISOString?.() ?? "",
+      targetPlatform: null,
+      targetLink: null,
+      proofMode: "Manual/community review required",
+      verificationMode: "API verification unavailable",
+      missionCount: raid.missions?.length ?? 0,
+      missions: Array.isArray(raid.missions)
+        ? raid.missions.map((mission: any) => ({
+            id: mission.id,
+            title: mission.title,
+            description: mission.description,
+            type: mission.type,
+            target: mission.targetValue,
+            xp: mission.xpReward,
+            xpReward: mission.xpReward,
+            rewardSol: Number(mission.solReward ?? 0),
+            startsAt: mission.startsAt?.toISOString?.() ?? "",
+            endsAt: mission.endsAt?.toISOString?.() ?? ""
+          }))
+        : []
     };
   }
 

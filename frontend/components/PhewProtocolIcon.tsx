@@ -11,7 +11,8 @@ export type PhewProtocolIconName =
   | "proof"
   | "reserve"
   | "strategy"
-  | "community";
+  | "community"
+  | "raid";
 
 export const phewProtocolIconAssets: Record<PhewProtocolIconName, string> = {
   lockTokens: brandAssets.pictograms.lockTokens,
@@ -21,7 +22,8 @@ export const phewProtocolIconAssets: Record<PhewProtocolIconName, string> = {
   proof: brandAssets.pictograms.proof,
   reserve: brandAssets.pictograms.reserve,
   strategy: brandAssets.pictograms.strategy,
-  community: brandAssets.pictograms.community
+  community: brandAssets.pictograms.community,
+  raid: brandAssets.pictograms.raid
 };
 
 export function PhewProtocolIcon({

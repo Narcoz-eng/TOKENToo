@@ -11,7 +11,11 @@ The implementation follows current frontend animation guidance: transform/opacit
 | `PhewMascot` | Renders a transparent mascot mood with intrinsic ratio. |
 | `PhewMascotHero` | Renders the large free hero mascot. |
 | `PhewMascotActor` | Actor wrapper with aura for scenes. |
-| `PhewGameMoment` | Shared storyboard scene for transaction/action moments. |
+| `PhewGameMoment` | Compatibility wrapper around the game-flow scene. |
+| `PhewGameFlow` | Reusable four-frame action flow for success modal scenes. |
+| `PhewGameFrame` | Active frame renderer for actor/object/target/label state. |
+| `PhewMotionObject` | Token, NFT, vault, proof, raid, and reward motion object renderer. |
+| `PhewParticleBurst` | Code-driven reward/XP particle layer. |
 | `PhewSuccessMomentModal` | Portal modal that hosts the large success scene after backend-confirmed completion. |
 | `MintGameMoment` | Token/card to NFT mint sequence. |
 | `StakeGameMoment` | NFT card to vault/lock/reward sequence. |
@@ -19,6 +23,7 @@ The implementation follows current frontend animation guidance: transform/opacit
 | `RedeemGameMoment` | NFT verification to token return sequence. |
 | `ProofGameMoment` | Scan ring and verification sequence. |
 | `CommunityLaunchMoment` | Token scan to reserve/launch sequence. |
+| `RaidGameMoment` | Mission joined to proof submitted to XP/reward success sequence. |
 
 ## Supported Moods
 
@@ -39,6 +44,7 @@ The implementation follows current frontend animation guidance: transform/opacit
 | `proof` | Mascot actor and NFT card scan toward proof ring/check target. |
 | `community` | Token scan, reserve vault creation, launch target. |
 | `studio` | Mascot-free/studio object mode where needed by studio bible previews. |
+| `raid` | Mission room/flag object, proof object, XP burst, and reward target. |
 
 ## Motion Rules
 
@@ -60,6 +66,7 @@ The implementation follows current frontend animation guidance: transform/opacit
 | `/redeem` | Compact status during form flow; `PhewSuccessMomentModal` with `redeem` after confirmed redeem. |
 | `/vaults/:mint/proof` | Compact proof status; `PhewSuccessMomentModal` with `proof` after proof endpoint returns zero issues. |
 | `/create-community` | Compact launch status; `PhewSuccessMomentModal` with `community` after confirmed launch. |
+| `/raids` | Dense mission dashboard; `PhewSuccessMomentModal` with `raid` only after backend-confirmed join/mission approval. |
 | `/studio` | Compact Studio Bible/layer statuses; modal component is available, but no completion modal is shown without a real backend completion event. |
 
 ## Data Contract

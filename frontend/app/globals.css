@@ -3520,6 +3520,108 @@ select:focus-visible {
   box-shadow: 0 0 18px rgba(186, 255, 0, 0.52);
 }
 
+.phew-game-frame {
+  position: absolute;
+  inset: 0;
+}
+
+.phew-motion-object {
+  transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.phew-game-target > span:not(.phew-game-target-core) {
+  position: absolute;
+  bottom: -1.55rem;
+  border: 1px solid rgba(186, 255, 0, 0.28);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.72);
+  padding: 0.15rem 0.45rem;
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.phew-game-frame-copy {
+  position: absolute;
+  left: clamp(0.75rem, 3vw, 1.25rem);
+  right: clamp(0.75rem, 3vw, 1.25rem);
+  top: 0.75rem;
+  z-index: 6;
+  display: flex;
+  max-width: 42rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(186, 255, 0, 0.18);
+  background: rgba(0, 0, 0, 0.42);
+  padding: 0.55rem 0.7rem;
+  backdrop-filter: blur(10px);
+}
+
+.phew-game-frame-copy span {
+  color: #baff00;
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.phew-game-frame-copy strong {
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.phew-game-frame-copy p {
+  width: 100%;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.phew-game-frame-rail {
+  position: absolute;
+  right: 0.9rem;
+  top: 4.2rem;
+  z-index: 6;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.phew-game-frame-rail span {
+  width: 0.65rem;
+  height: 0.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.65);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.phew-game-frame-rail span.is-active {
+  border-color: rgba(186, 255, 0, 0.9);
+}
+
+.phew-game-frame-rail span.is-current {
+  background: #baff00;
+  box-shadow: 0 0 16px rgba(186, 255, 0, 0.62);
+}
+
+.phew-game-raid .phew-game-token {
+  border-color: rgba(186, 255, 0, 0.82);
+}
+
+.phew-game-raid .phew-game-target {
+  border-color: rgba(22, 215, 210, 0.5);
+  box-shadow: 0 0 30px rgba(22, 215, 210, 0.16), inset 0 0 30px rgba(186, 255, 0, 0.1);
+}
+
+.phew-game-raid.phew-game-state-loading .phew-game-token,
+.phew-game-raid.phew-game-state-signing .phew-game-token,
+.phew-game-raid.phew-game-state-submitting .phew-game-token,
+.phew-game-raid.phew-game-state-confirming .phew-game-token {
+  animation-name: phew-game-raid-submit;
+}
+
 .phew-success-modal-root {
   position: fixed;
   inset: 0;
@@ -3748,6 +3850,12 @@ select:focus-visible {
 @keyframes phew-game-proof-scan {
   0%, 100% { transform: translate(-52%, -50%) rotate(-2deg); box-shadow: 0 0 18px rgba(186, 255, 0, 0.16), inset 0 0 18px rgba(186, 255, 0, 0.08); }
   50% { transform: translate(-44%, -50%) rotate(0deg); box-shadow: 0 0 34px rgba(22, 215, 210, 0.34), inset 0 0 24px rgba(22, 215, 210, 0.14); }
+}
+
+@keyframes phew-game-raid-submit {
+  0%, 100% { transform: translate(-64%, -50%) rotate(-5deg) scale(0.94); }
+  42% { transform: translate(-40%, -54%) rotate(1deg) scale(1.04); filter: drop-shadow(0 0 22px rgba(186, 255, 0, 0.62)); }
+  74% { transform: translate(-18%, -48%) rotate(4deg) scale(0.98); }
 }
 
 @media (max-width: 900px) {

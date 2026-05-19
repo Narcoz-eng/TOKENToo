@@ -12,7 +12,7 @@ import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { ArtTeamProfile, CollectionGeneratorPreview, ConceptRequestSummary, CuratedLayerPackSummary, StudioPreviewAsset, StudioWorkflowState, StyleBiblePlan, StudioExportPlan } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
-import { StudioBibleAnimation } from "@/components/phew-moment-animations";
+import { PhewGameMoment } from "@/components/PhewGameMoments";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { hasRealStudioBibleAssets, isRealStudioBibleAsset, isStudioPreviewRequired, realStudioBibleAssetsFromPreview, studioAssetProvider, studioBibleAssetTypes, studioDisplayAssetTypeSet, studioPreviewStatusLabel } from "@/lib/studio-readiness";
 import { cn } from "@/lib/utils";
@@ -572,7 +572,16 @@ export default function CreateCollectionPage() {
                 ))}
               </div>
             </div>
-            <StudioBibleAnimation state={studioMomentState} collectionImage={studioPreview.avatar} tokenSymbol={tokenSymbol || scan?.symbol || "PHEW"} />
+            <PhewGameMoment
+              mode="studio"
+              state={studioMomentState}
+              title="Studio Bible Flow"
+              description="Compact provider status. Full success moments stay in the confirmation modal."
+              image={studioPreview.avatar}
+              tokenSymbol={tokenSymbol || scan?.symbol || "PHEW"}
+              compact
+              className="phew-action-hero"
+            />
           </div>
         </section>
 

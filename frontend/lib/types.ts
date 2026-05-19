@@ -117,26 +117,44 @@ export type VaultNft = {
 export type RaidMission = {
   id: string;
   title: string;
+  description?: string;
   type: string;
   progress: number;
   target: number;
   xp: number;
+  xpReward?: number;
   rewardSol: number;
   icon: Accent;
+  startsAt?: string;
+  endsAt?: string;
 };
 
 export type RaidRoom = {
   id: string;
   collectionId: string;
+  collectionName?: string | null;
+  collectionSymbol?: string | null;
+  collectionImage?: string | null;
+  collectionBanner?: string | null;
   name: string;
   boss: string;
-  status: "Live" | "Upcoming";
+  status: "Live" | "Upcoming" | "Scheduled" | "Ended";
   progress: number;
   participants: number;
   capacity: number;
   rewardSol: number;
+  xpTarget?: number | null;
+  currentXp?: number | null;
   startsIn?: string;
+  startsAt?: string;
   endsIn: string;
+  endsAt?: string;
+  targetPlatform?: string | null;
+  targetLink?: string | null;
+  proofMode?: string | null;
+  verificationMode?: string | null;
+  missionCount?: number;
+  missions?: RaidMission[];
 };
 
 export type ActivityItem = {

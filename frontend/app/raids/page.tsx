@@ -1,5 +1,5 @@
-import { ProductDataPage } from "@/components/ProductDataPage";
+import { RaidRoomsPage } from "@/components/raids/RaidRoomsPage";
 
 export default function RaidsPage() {
-  return <ProductDataPage active="raids" title="Raid Rooms" endpoint="/product/raids" />;
+  return <RaidRoomsPage />;
 }

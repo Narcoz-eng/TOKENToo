@@ -47,6 +47,11 @@ This file tracks the real local Phew visual assets used by the frontend. The app
 | Lock/unlock | `frontend/public/animations/phew-lock-unlock.webp` | Stake/unstake lock state | Passed | `brandAssets.lockUnlock` |
 | Reward burst | `frontend/public/animations/phew-reward-burst.webp` | Rewards, success burst | Passed | `PhewGameMoment`, metrics |
 | Error glitch | `frontend/public/animations/phew-error-glitch.webp` | Error object | Passed | `PhewGameMoment`, status |
+| Raid flag | `frontend/public/icons/phew/native-raid-flag.svg` | Raid hero, nav, success flow | Code SVG | `RaidCommandHero`, `PhewGameFlow` |
+| Raid room | `frontend/public/icons/phew/native-raid-room.svg` | Raid room rows, create flow | Code SVG | `RaidRoomCard`, `CreateRaidPanel` |
+| Raid proof | `frontend/public/icons/phew/native-raid-proof.svg` | Manual/community proof states | Code SVG | `RaidProofPanel` |
+| Raid XP | `frontend/public/icons/phew/native-raid-xp.svg` | XP stats and leaderboard | Code SVG | `RaidLeaderboard`, `PhewGameFlow` |
+| Raid reward | `frontend/public/icons/phew/native-raid-reward.svg` | Reward panel and creator flow | Code SVG | `RaidRewardsPanel` |
 
 ## Pictograms
 
@@ -60,6 +65,7 @@ This file tracks the real local Phew visual assets used by the frontend. The app
 | Reserve | `frontend/public/icons/phew/pictogram-reserve.webp` | Reserve/vault status | Passed |
 | Strategy | `frontend/public/icons/phew/pictogram-strategy.webp` | Strategy/admin routes | Passed |
 | Community | `frontend/public/icons/phew/pictogram-community.webp` | Create/community routes | Passed |
+| Raid | `frontend/public/icons/phew/native-raid-flag.svg` | Raid route/nav/action | Code SVG |
 
 ## Implementation Notes
 
@@ -67,10 +73,11 @@ This file tracks the real local Phew visual assets used by the frontend. The app
 - `frontend/components/BrandLogo.tsx` uses the mascot mark only in the boxed sidebar identity context.
 - `frontend/components/Sidebar.tsx` uses Phew pictograms for core protocol actions.
 - `frontend/components/PhewMascot.tsx` centralizes mood, sizing, and non-stretch behavior.
-- `frontend/components/PhewGameMoments.tsx` composes the mascot actor, token/NFT object, target object, beam/orbit/particles, state label, and progress dots.
+- `frontend/components/PhewGameMoments.tsx` composes `PhewGameFlow`, `PhewGameFrame`, `PhewMotionObject`, and `PhewParticleBurst` for mint, stake, unstake, redeem, proof, community launch, raid, and supporting studio/reward flows.
 - `frontend/components/PhewPageHero.tsx` centralizes page hero mascot placement.
 - `frontend/components/PhewEmptyState.tsx` centralizes table/list empty-state mascot placement.
 - `frontend/components/PhewSuccessMomentModal.tsx` is the post-confirmation game-lobby success scene. Large transaction animation should not be shown inline in normal forms.
+- `frontend/components/raids/*` owns the `/raids` command center, Phew-native raid pictograms, N/A states, and backend-gated join/proof behavior.
 
 ## Hero And Empty-State Roles
 
@@ -83,6 +90,7 @@ This file tracks the real local Phew visual assets used by the frontend. The app
 | `/redeem` | Redeem pose | Redeem pose |
 | `/vaults/:mint/proof` | Proof scan pose | Proof scan pose |
 | `/create-community` | Launch/running pose | Launch/running pose |
+| `/raids` | Commander/flag pose | Commander/flag pose |
 | `/admin/setup` | Warning/tools pose | Warning pose |
 | `/admin/risk` | Warning/tools pose | Warning pose |
 | `/strategy-engine` | Strategy/redeem pose | Redeem/route pose |

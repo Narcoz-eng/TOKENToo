@@ -47,7 +47,15 @@ export const brandAssets = {
     proof: "/icons/phew/native-proof.svg",
     reserve: "/icons/phew/native-reserve.svg",
     strategy: "/icons/phew/native-strategy.svg",
-    community: "/icons/phew/native-community.svg"
+    community: "/icons/phew/native-community.svg",
+    raid: "/icons/phew/native-raid-flag.svg"
+  },
+  raid: {
+    flag: "/icons/phew/native-raid-flag.svg",
+    room: "/icons/phew/native-raid-room.svg",
+    proof: "/icons/phew/native-raid-proof.svg",
+    xp: "/icons/phew/native-raid-xp.svg",
+    reward: "/icons/phew/native-raid-reward.svg"
   },
   transactionObjects: {
     mint: "/animations/phew-nft-card.webp",
@@ -59,7 +67,8 @@ export const brandAssets = {
     studio: "/animations/phew-nft-card.webp",
     reward: "/animations/phew-reward-burst.webp",
     scan: "/animations/phew-proof-ring.webp",
-    layer: "/animations/phew-token-stack.webp"
+    layer: "/animations/phew-token-stack.webp",
+    raid: "/icons/phew/native-raid-flag.svg"
   },
   nftVaults: ["/animations/phew-nft-card.webp", "/animations/phew-vault-safe.webp", "/animations/phew-proof-ring.webp"]
 } as const;

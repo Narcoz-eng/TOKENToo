@@ -578,7 +578,7 @@ export const VaultCard = PhewVaultCard;
 export const ProofPanel = PhewProofPanel;
 
 export type PhewAnimationState = "idle" | "loading" | "success" | "error";
-export type PhewAnimationMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "community-launch" | "studio" | "studio-bible" | "reward" | "scan" | "layer";
+export type PhewAnimationMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "community-launch" | "studio" | "studio-bible" | "reward" | "scan" | "layer" | "raid";
 
 export function PhewAnimationFrame({
   moment,
@@ -705,7 +705,8 @@ function momentTitle(moment: ReturnType<typeof normalizeAnimationMoment>) {
     studio: "Studio Bible Generated",
     reward: "Reward Claim",
     scan: "Token Scan",
-    layer: "Layer Pack Approved"
+    layer: "Layer Pack Approved",
+    raid: "Raid Success"
   };
   return labels[moment];
 }

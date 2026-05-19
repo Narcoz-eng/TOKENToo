@@ -16,6 +16,7 @@ The success modal is the only large game-lobby transaction scene surface. Forms 
 | `unstake` | vault opens and NFT exits |
 | `redeem` | NFT verifies/invalidates and tokens return |
 | `proof` | scan ring verifies proof |
+| `raid` | mission joined, proof submitted, XP/reward burst, raid success |
 | `layer-pack` | layer approval burst |
 | `studio-bible` | studio completion burst |
 
@@ -28,6 +29,7 @@ The modal must be rendered only after backend-confirmed success:
 - `stake` / `unstake`: `assertBackendActionCompleted` accepts the backend action result.
 - `proof`: proof endpoint returns proof with zero issues.
 - `community-launch`: launch submit or launch status returns confirmed.
+- `raid`: join or mission proof endpoint returns confirmed/approved participation.
 - `studio-bible` and `layer-pack`: component support exists, but current `/studio` UI does not fake completion without a real completion event.
 
 ## Behavior

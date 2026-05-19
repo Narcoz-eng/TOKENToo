@@ -40,6 +40,7 @@ Supported modes:
 - `proof`: proof ring and checklist scene from `proof.png`.
 - `community launch`: scan card and launch/check flow from `create-community.png`.
 - `studio bible`: studio bible/layer pack preview geometry from `create-collection-studio.png`.
+- `raid`: four-frame raid flow: mission joined, proof submitted, XP/reward burst, raid success. Success modal is shown only after backend-confirmed participation or mission approval.
 
 ## State Classification
 
@@ -51,6 +52,7 @@ Supported modes:
 - Success: storyboard lime success frames, proof success tile, transaction status confirmed rows.
 - Backend unavailable: same as error but with N/A data retained and a retry/refresh action where references show refresh or scan controls.
 - N/A real-data: all dashboards use N/A values when backend data is missing. Preserve table/card structure instead of substituting demo values.
+- Raid unavailable state: `/raids` uses `/product/raids` and selected detail reads where possible. Missing target links, platform, proof verification, participant rows, and create endpoints render as N/A or disabled controls.
 
 ## Reference Inventory
 
@@ -163,6 +165,18 @@ Supported modes:
 - Buttons: explore collections, list vault disabled, purchase disabled, sell disabled, docs/risk/stats links.
 - Animation objects: empty box/magnifier, mascot aura.
 - Expected behavior: no static listings. Active listings must come from backend.
+
+### `/raids`
+
+- Page/component: `/raids`, `RaidRoomsPage`.
+- State: live mission dashboard with backend data, N/A fallbacks, empty state, and disabled create/publish route until backend support exists.
+- Layout structure: command center hero with free commander mascot and raid flag, stat strip, live raid room rows, selected raid detail panel, mission checklist, proof system, leaderboard, rewards panel, create raid flow, and bottom CTA.
+- Mascot position/scale: commander mascot is unboxed, top-right of hero, with a code-drawn raid flag and floor ring. Empty state uses the same unboxed commander posture.
+- Cards/panels: dense row cards for raid rooms; detail panel previews the target link; proof and leaderboard panels preserve table/card geometry with N/A values.
+- Buttons: `Create Raid`, `Join Live Raid`, `Join Raid`, `Open Target`, disabled `Publish Raid`.
+- Animation objects: raid flag, raid room, raid proof, raid XP, and raid reward pictograms. Confirmed raid success uses `PhewSuccessMomentModal` with `action="raid"` and `PhewGameFlow`.
+- Expected behavior: no spam framing, no fake engagement, no fake verification. Join success modal appears only if the backend confirms the join. Proof states show manual/community review required when API verification is unavailable.
+- Backend TODOs: add `POST /raids` for creator publish flow; persist target platform/link and proof mode; implement `POST /raids/:raidRoomId/join`; add proof submission/review endpoints for screenshot/manual/community/API verification; expose leaderboard rows and reward eligibility in public raid detail responses.
 
 ### `frontend/public/design-reference/phew-redesign/profile.png`
 
