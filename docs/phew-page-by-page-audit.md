@@ -17,6 +17,7 @@ Routes discovered under `frontend/app`:
 - `/collections/[id]/raids/[raidId]`
 - `/create-collection`
 - `/create-community`
+- `/goal`
 - `/home`
 - `/instant-sell`
 - `/leaderboard`
@@ -32,6 +33,16 @@ Routes discovered under `frontend/app`:
 - `/strategy-engine`
 - `/studio`
 - `/vaults/[mint]/proof`
+
+## Shared Component Inventory
+
+## 2026-05-19 New Reference Alignment Addendum
+
+- Source of truth changed from the restored PNG concepts to the newer WhatsApp JPEG references where available.
+- `/mint`, `/marketplace`, `/profile`, and `/redeem` now render through `frontend/components/reference-data-pages.tsx` so they share the same dense shell, hero, right rail, panel density, and Phew-native asset language as the reference screens.
+- `/goal` was added as a real product page for the TokenToo/Phew loop: scan wallet, create community, lock tokens, mint vault NFT, stake/redeem/trade, then use raids and leaderboard rewards.
+- No populated listing/profile/token rows were invented for disconnected or empty backend states. Those routes intentionally keep N/A and wallet-required states while preserving the reference composition.
+- QA captures from this pass live under `tmp/new-ref-qa/`.
 
 ## Shared Component Inventory
 

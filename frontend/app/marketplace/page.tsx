@@ -1,5 +1,5 @@
-import { ProductDataPage } from "@/components/ProductDataPage";
+import { MarketplaceReferencePage } from "@/components/reference-data-pages";
 
 export default function MarketplacePage() {
-  return <ProductDataPage active="marketplace" title="Marketplace" endpoint="/product/marketplace" />;
+  return <MarketplaceReferencePage />;
 }

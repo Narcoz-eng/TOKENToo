@@ -10,6 +10,31 @@
 
 ## Latest Captures
 
+### 2026-05-19 New JPEG Reference Pass
+
+The active reference source for routes with newer screens is the WhatsApp JPEG set in `frontend/public/design-reference/phew-redesign/`. The manifest now maps:
+
+- `/home` -> `WhatsApp Image 2026-05-19 at 16.24.17.jpeg`
+- `/collections` -> `WhatsApp Image 2026-05-19 at 16.24.07.jpeg`
+- `/mint` -> `WhatsApp Image 2026-05-19 at 16.24.24.jpeg`
+- `/marketplace` -> `WhatsApp Image 2026-05-19 at 16.24.33.jpeg`
+- `/collections/:id` -> `WhatsApp Image 2026-05-19 at 16.25.20.jpeg`
+- `/leaderboard` -> `WhatsApp Image 2026-05-19 at 16.32.23.jpeg`
+- `/profile` -> `WhatsApp Image 2026-05-19 at 16.34.03.jpeg`
+- `/raids` -> `WhatsApp Image 2026-05-19 at 13.43.38.jpeg`
+
+New captures:
+
+| Route | Capture | New Reference | Status |
+| --- | --- | --- | --- |
+| `/mint` | `tmp/new-ref-qa/mint-pass2.png` | `WhatsApp Image 2026-05-19 at 16.24.24.jpeg` | Rebuilt to match new hero/table/right-rail composition; wallet-disconnected state remains N/A. |
+| `/marketplace` | `tmp/new-ref-qa/marketplace-pass2.png` | `WhatsApp Image 2026-05-19 at 16.24.33.jpeg` | Rebuilt to new market hero, overview rail, tabs/filter row, listing grid, and CTA rail. |
+| `/profile` | `tmp/new-ref-qa/profile.png` | `WhatsApp Image 2026-05-19 at 16.34.03.jpeg` | Rebuilt to portfolio hero, wallet overview, staked/available shelves, rewards, and achievements. |
+| `/collections` | `tmp/new-ref-qa/collections.png` | `WhatsApp Image 2026-05-19 at 16.24.07.jpeg` | Existing reference page remains closest current match. |
+| `/staking` | `tmp/new-ref-qa/staking.png` | `staking.png` legacy reference | Existing reference page retained until a new JPEG staking reference is provided. |
+| `/redeem` | `tmp/new-ref-qa/redeem.png` | `redeem.png` legacy reference | Rewired to reference layout with proof-first redeem panels and wallet-owned N/A state. |
+| `/goal` | `tmp/new-ref-qa/goal-pass2.png` | New route, no JPEG reference yet | Added as product page in the same visual language. Production build confirms route exists. |
+
 | Route | Capture | Reference | Status |
 | --- | --- | --- | --- |
 | `/home` | `tmp/phew-visual-qa-success-modal/home.png` | `home.png` | Regression checked |
