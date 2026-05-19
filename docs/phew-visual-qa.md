@@ -35,6 +35,37 @@ New captures:
 | `/redeem` | `tmp/new-ref-qa/redeem.png` | `redeem.png` legacy reference | Rewired to reference layout with proof-first redeem panels and wallet-owned N/A state. |
 | `/goal` | `tmp/new-ref-qa/goal-pass2.png` | New route, no JPEG reference yet | Added as product page in the same visual language. Production build confirms route exists. |
 
+### 2026-05-19 Full Reference Refactor Pass
+
+Side-by-side QA sheets were generated in `tmp/ref-match-qa/side-by-side-final/`:
+
+| Route | Side-by-side QA |
+| --- | --- |
+| `/mint` | `tmp/ref-match-qa/side-by-side-final/mint.png` |
+| `/marketplace` | `tmp/ref-match-qa/side-by-side-final/marketplace.png` |
+| `/profile` | `tmp/ref-match-qa/side-by-side-final/profile.png` |
+| `/redeem` | `tmp/ref-match-qa/side-by-side-final/redeem.png` |
+| `/home` | `tmp/ref-match-qa/side-by-side-final/home.png` |
+| `/collections` | `tmp/ref-match-qa/side-by-side-final/collections.png` |
+| `/staking` | `tmp/ref-match-qa/side-by-side-final/staking.png` |
+
+Fixed in this pass:
+
+- Refactored shell spacing to match the reference gutters and compact topbar rhythm.
+- Replaced the green square JPEG logo crop with the black Phew favicon mark used by the reference mood.
+- Replaced tiny generated navigation/action thumbnails with crisp Phew-native SVG pictograms.
+- Rebuilt `/home`, `/mint`, `/marketplace`, and `/collections` heroes around wide cinematic hero art with dark left-copy gradients and integrated mascot/object layers.
+- Reworked `/collections` from the legacy table-first view toward the new reference card-grid discovery composition with overview/right-rail modules.
+- Tightened panel borders, radii, shadows, button dimensions, metric cards, and inter-section spacing.
+- Downgraded backend-unavailable banners from disruptive red blocks to muted warning strips so empty backend states do not dominate the reference layout.
+
+Remaining visual gaps:
+
+- Current local backend is unavailable, so wallet tokens, marketplace listings, profile NFTs, and collection cards render N/A/empty states instead of the populated example rows in the references.
+- Generated hero art is not identical to the photo references: `/marketplace` still lacks the cart composition, `/collections` lacks the exact blue vault scene, and `/profile` lacks the exact city/avatar composition.
+- `/staking` and `/redeem` still target the legacy PNG references because no newer WhatsApp photo reference exists for those routes.
+- Some typography weight and exact icon glyph shapes differ from the screenshots because the app uses the existing font stack and Phew-native SVG icon set.
+
 | Route | Capture | Reference | Status |
 | --- | --- | --- | --- |
 | `/home` | `tmp/phew-visual-qa-success-modal/home.png` | `home.png` | Regression checked |

@@ -166,28 +166,21 @@ export function HomeReferencePage() {
   return (
     <ReferenceShell active="home" stats={stats}>
       {home.error ? <BackendUnavailableBanner message={home.error.message} retry={home.reload} /> : null}
-      <section className="ref-panel ref-hero relative overflow-visible p-4 sm:p-5">
-        <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
-          <img src={brandAssets.pageHeroes.home} alt="" className="phew-home-hero-bg-art" />
-          <div className="absolute inset-0 grid-mask opacity-25" />
-          <div className="absolute left-[48%] top-[-34%] size-[480px] rounded-full bg-vault-green/10 blur-3xl" />
-        </div>
-        <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px_390px] xl:items-stretch">
-          <div className="self-center">
-            <h1 className="max-w-3xl text-[34px] font-black leading-[1.03] text-white sm:text-[44px]">
-              Real tokens.<br />
-              <span className="text-vault-green">Real backing.</span> Real ownership.
-            </h1>
-            <p className="mt-3 max-w-2xl text-base font-semibold text-white">The protocol for token-backed NFT vaults.</p>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Lock community tokens. Mint verified vault NFTs. Trade freely. Stake for rewards. Redeem anytime.</p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <ReferenceButton href="/collections" asset={phewProtocolIconAssets.community}>Explore Collections</ReferenceButton>
-              <ReferenceButton href="/create-community" tone="outline" asset={phewProtocolIconAssets.reserve}>Create Community</ReferenceButton>
+      <section className="ref-panel ref-screenshot-hero p-4">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_430px] xl:items-stretch">
+          <div className="ref-screenshot-hero-main">
+            <img src={brandAssets.pageHeroes.home} alt="" className="ref-screenshot-hero-art" />
+            <PhewMascot mood="running" size="lg" className="ref-screenshot-hero-mascot" />
+            <img src={brandAssets.vaultSafe} alt="" className="ref-screenshot-hero-object" />
+            <div className="ref-screenshot-hero-copy">
+              <ReferenceBadge tone="green">The #1 token-backed NFT protocol</ReferenceBadge>
+              <h1>Welcome to <span className="text-vault-green">Phew</span></h1>
+              <p>Create verifiable, token-backed NFT vaults. Built for communities. Secured by transparency.</p>
+              <div className="ref-screenshot-hero-actions">
+                <ReferenceButton href="/collections" asset={phewProtocolIconAssets.community}>Explore Collections</ReferenceButton>
+                <ReferenceButton href="/goal" tone="outline">How It Works</ReferenceButton>
+              </div>
             </div>
-          </div>
-          <div className="ref-hero-mascot-stage min-h-[230px]">
-            <span className="ref-hero-ring" />
-            <img src={brandAssets.pageHeroes.home} alt="" className="phew-home-hero-subject" />
           </div>
           <div className="ref-home-overview h-full">
             <div className="mb-3 flex items-start justify-between gap-3">
@@ -311,12 +304,37 @@ export function CollectionsReferencePage() {
 
   return (
     <ReferenceShell active="collections" stats={product.data?.stats}>
-      <ReferenceHeader
-        title="Collections"
-        subtitle="Explore and manage token-backed NFT collections on Phew Run."
-        mascotPose="explorer"
-        actions={<ReferenceButton href="/create-community" icon={Users}>Create Collection</ReferenceButton>}
-      />
+      <section className="ref-panel ref-screenshot-hero p-4">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="ref-screenshot-hero-main">
+            <img src={brandAssets.pageHeroes.collections} alt="" className="ref-screenshot-hero-art" />
+            <PhewMascot mood="loading" size="lg" className="ref-screenshot-hero-mascot" />
+            <img src={brandAssets.vaultSafe} alt="" className="ref-screenshot-hero-object" />
+            <div className="ref-screenshot-hero-copy">
+              <ReferenceBadge tone="green">Collections</ReferenceBadge>
+              <h1>Explore Phew <span className="text-vault-green">Collections</span></h1>
+              <p>Community-owned. Token-backed. Built to last.</p>
+              <div className="ref-screenshot-hero-actions">
+                <ReferenceButton>All Collections</ReferenceButton>
+                <ReferenceButton tone="outline">My Communities</ReferenceButton>
+                <ReferenceButton tone="ghost">Trending</ReferenceButton>
+                <ReferenceButton tone="ghost">Verified</ReferenceButton>
+              </div>
+            </div>
+          </div>
+          <aside className="space-y-4">
+            <ReferencePanel title="Collections Overview" action={<ReferenceBadge tone="green">24H</ReferenceBadge>}>
+              <div className="grid grid-cols-2 gap-3">
+                <ReferenceMetric label="Total Collections" value={formatMetric(collections.length || product.data?.stats?.collections)} />
+                <ReferenceMetric label="Total Volume" value={formatSol(product.data?.stats?.volumeSol)} />
+                <ReferenceMetric label="Total Items" value={formatMetric(product.data?.stats?.nfts)} />
+                <ReferenceMetric label="Total Owners" value={formatMetric(product.data?.stats?.holders)} />
+              </div>
+              <ReferenceMetric className="mt-3" label="Total Value Locked" value={formatSol(product.data?.stats?.tvlSol)} detail={formatCurrency(product.data?.stats?.tvlUsd)} />
+            </ReferencePanel>
+          </aside>
+        </div>
+      </section>
       {product.error ? <BackendUnavailableBanner message={product.error.message} retry={product.reload} /> : null}
       <ReferencePanel>
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_120px_150px_160px_170px]">
@@ -335,30 +353,36 @@ export function CollectionsReferencePage() {
           <ReferenceMetric label="Archived" value="N/A" asset={phewProtocolIconAssets.redeem} />
         </div>
       </ReferencePanel>
-      <ReferenceTable
-        columns={["Collection", "Symbol", "Token Mint", "Network", "Reserve Health", "Launch Gate", "Profile Gate", "Mint Gate", "TVL", "Floor", "Holders", "Updated"]}
-        rows={visible.map((collection) => [
-          <CollectionIdentity key="id" collection={collection} />,
-          collection.symbol,
-          shortAddress(collection.tokenMint),
-          collection.chain || "Solana",
-          <span key="reserve">{collection.reserveHealth ?? "N/A"}<br /><small className="text-slate-500">Backend pending</small></span>,
-          gateLabel(collection.launchGatePassed),
-          gateLabel(collection.profileGatePassed),
-          collection.mintEligible ? "Open" : "Closed",
-          formatCurrency(null),
-          formatSol(collection.floorSol),
-          formatMetric(collection.holders),
-          "N/A"
-        ])}
-        empty={<ReferenceEmpty mascot mascotMood="proof" title="No collections found" body={collections.length ? "Try adjusting your search or filters." : "No backend collections were returned. Demo rows are not rendered."} action={query ? <ReferenceButton tone="outline" onClick={() => setQuery("")}>Clear Filters</ReferenceButton> : undefined} />}
-      />
-      <div className="flex items-center justify-between text-sm text-slate-400">
-        <span>Showing {visible.length} of {collections.length} collections</span>
-        <div className="flex gap-2">
-          <LockedButton>Prev</LockedButton>
-          <LockedButton>Next</LockedButton>
-        </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <main className="space-y-4">
+          <ReferencePanel>
+            {visible.length ? (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                {visible.slice(0, 10).map((collection) => <CollectionMarketCard key={collection.dbId ?? collection.id} collection={collection} />)}
+              </div>
+            ) : (
+              <ReferenceEmpty mascot mascotMood="proof" title="No collections found" body={collections.length ? "Try adjusting your search or filters." : "No backend collections were returned. Demo rows are not rendered."} action={query ? <ReferenceButton tone="outline" onClick={() => setQuery("")}>Clear Filters</ReferenceButton> : undefined} />
+            )}
+          </ReferencePanel>
+          <ReferencePanel title="Trending Collections">
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              {visible.slice(0, 6).map((collection) => <CommunityTile key={collection.dbId ?? collection.id} collection={collection} />)}
+            </div>
+            {!visible.length ? <ReferenceEmpty title="N/A" body="Trending rows require backend collection data." object={brandAssets.nftSlot} /> : null}
+          </ReferencePanel>
+        </main>
+        <aside className="space-y-4">
+          <ReferencePanel title="Your Collections" action={<ReferenceButton tone="ghost">View all</ReferenceButton>}>
+            <CompactList rows={collections.slice(0, 4).map((collection) => ({ image: collection.image, title: collection.name, subtitle: collection.symbol, value: formatSol(collection.floorSol) }))} empty="Connect wallet to load your communities." />
+          </ReferencePanel>
+          <ReferencePanel title="Recent Activity" action={<ReferenceButton tone="ghost">View all</ReferenceButton>}>
+            <CompactList rows={[]} empty="Collection activity appears after backend rows are available." />
+          </ReferencePanel>
+          <ReferencePanel title="Create Your Own Community">
+            <InlineProtocolStatus asset={phewProtocolIconAssets.community} title="Launch a custom collection" body="Back it with your token, vaults, staking, and rewards." />
+            <ReferenceButton href="/create-community" className="mt-3 w-full">Create Community</ReferenceButton>
+          </ReferencePanel>
+        </aside>
       </div>
     </ReferenceShell>
   );
@@ -545,23 +569,20 @@ export function MintReferencePage() {
 
   return (
     <ReferenceShell active="mint">
-      <section className="ref-panel ref-hero relative overflow-visible p-4 sm:p-5">
+      <section className="ref-panel ref-screenshot-hero p-4">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="grid min-h-[250px] gap-4 overflow-hidden rounded-lg border border-vault-line bg-[radial-gradient(circle_at_70%_45%,rgba(186,255,0,0.24),transparent_34%),linear-gradient(135deg,rgba(186,255,0,0.06),rgba(22,215,210,0.03),rgba(0,0,0,0.7))] p-5 md:grid-cols-[minmax(0,1fr)_420px]">
-            <div className="self-center">
+          <div className="ref-screenshot-hero-main">
+            <img src={brandAssets.pageHeroes.mint} alt="" className="ref-screenshot-hero-art" />
+            <PhewMascot mood="mint" size="lg" className="ref-screenshot-hero-mascot" />
+            <img src={brandAssets.vaultSafe} alt="" className="ref-screenshot-hero-object" />
+            <div className="ref-screenshot-hero-copy">
               <ReferenceBadge tone="green">Phew Mint</ReferenceBadge>
-              <h1 className="mt-4 max-w-xl text-[42px] font-black leading-none text-white sm:text-[56px]">Mint Your <span className="text-vault-green">Vault</span></h1>
-              <p className="mt-4 max-w-lg text-base leading-7 text-slate-300">Turn detected wallet tokens into verifiable, token-backed NFT vaults. Existing communities and no-community paths stay separated.</p>
-              <div className="mt-6 flex flex-wrap gap-3">
+              <h1>Mint Your <span className="text-vault-green">Vault</span></h1>
+              <p>Turn your tokens into a verifiable, token-backed NFT vault. Auto-detected tokens from your wallet.</p>
+              <div className="ref-screenshot-hero-actions">
                 <ReferenceButton icon={RefreshCcw} disabled={!wallet.connected}>Auto-Detect Tokens</ReferenceButton>
                 <ReferenceButton href="/goal" tone="outline">How It Works</ReferenceButton>
               </div>
-            </div>
-            <div className="ref-hero-mascot-stage min-h-[220px]">
-              <span className="ref-hero-ring" />
-              <img src={brandAssets.vaultSafe} alt="" className="absolute bottom-6 right-4 h-36 w-36 object-contain drop-shadow-[0_0_28px_rgba(186,255,0,0.35)] sm:h-48 sm:w-48" />
-              <PhewMascot mood="mint" size="lg" className="ref-free-mascot !bottom-4 !left-[36%] !w-48 sm:!w-56" />
-              <img src={brandAssets.tokenObject} alt="" className="absolute right-40 top-8 size-14 object-contain drop-shadow-[0_0_18px_rgba(186,255,0,0.42)]" />
             </div>
           </div>
           <aside className="space-y-4">
@@ -637,23 +658,20 @@ export function MarketplaceReferencePage() {
 
   return (
     <ReferenceShell active="marketplace" stats={data?.stats}>
-      <section className="ref-panel ref-hero relative overflow-visible p-4 sm:p-5">
+      <section className="ref-panel ref-screenshot-hero p-4">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="grid min-h-[250px] gap-4 overflow-hidden rounded-lg border border-vault-line bg-[radial-gradient(circle_at_70%_42%,rgba(186,255,0,0.23),transparent_34%),linear-gradient(135deg,rgba(186,255,0,0.06),rgba(22,215,210,0.04),rgba(0,0,0,0.72))] p-5 md:grid-cols-[minmax(0,1fr)_430px]">
-            <div className="self-center">
+          <div className="ref-screenshot-hero-main">
+            <img src={brandAssets.pageHeroes.marketplace} alt="" className="ref-screenshot-hero-art" />
+            <PhewMascot mood="running" size="lg" className="ref-screenshot-hero-mascot" />
+            <img src={brandAssets.nftSlot} alt="" className="ref-screenshot-hero-object" />
+            <div className="ref-screenshot-hero-copy">
               <ReferenceBadge tone="green">Phew Market</ReferenceBadge>
-              <h1 className="mt-4 max-w-xl text-[42px] font-black leading-none text-white sm:text-[56px]">Market<span className="text-vault-green">place</span></h1>
-              <p className="mt-4 max-w-lg text-base leading-7 text-slate-300">Trade verified, token-backed NFT vaults. Value, ask price, offer, and reserve health are always shown separately.</p>
-              <div className="mt-6 flex flex-wrap gap-3">
+              <h1>Market<span className="text-vault-green">place</span></h1>
+              <p>Trade verified, token-backed NFT vaults. Secure. Verified. Community-owned.</p>
+              <div className="ref-screenshot-hero-actions">
                 <ReferenceButton href="/collections">Explore Collections</ReferenceButton>
                 <ReferenceButton href="/profile" tone="outline">Sell Your Vault</ReferenceButton>
               </div>
-            </div>
-            <div className="ref-hero-mascot-stage min-h-[220px]">
-              <span className="ref-hero-ring" />
-              <img src={brandAssets.generatedIcons.marketplace} alt="" className="absolute bottom-8 right-16 h-40 w-40 object-contain drop-shadow-[0_0_32px_rgba(186,255,0,0.38)] sm:h-52 sm:w-52" />
-              <PhewMascot mood="running" size="lg" className="ref-free-mascot !bottom-5 !left-[35%] !w-48 sm:!w-56" />
-              <img src={brandAssets.nftSlot} alt="" className="absolute right-12 top-6 size-14 rotate-12 object-contain drop-shadow-[0_0_18px_rgba(22,215,210,0.45)]" />
             </div>
           </div>
           <aside className="space-y-4">
@@ -722,18 +740,20 @@ export function ProfileReferencePage() {
 
   return (
     <ReferenceShell active="my-vaults" stats={data?.stats}>
-      <section className="ref-panel ref-hero relative overflow-visible p-4 sm:p-5">
+      <section className="ref-panel ref-screenshot-hero p-4">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_430px]">
-          <div className="grid min-h-[260px] gap-4 overflow-hidden rounded-lg border border-vault-line bg-[radial-gradient(circle_at_70%_45%,rgba(186,255,0,0.19),transparent_35%),linear-gradient(135deg,rgba(120,44,255,0.11),rgba(22,215,210,0.04),rgba(0,0,0,0.75))] p-5 md:grid-cols-[160px_minmax(0,1fr)_360px]">
-            <div className="self-center">
+          <div className="ref-screenshot-hero-main">
+            <img src={brandAssets.pageHeroes.proof} alt="" className="ref-screenshot-hero-art" />
+            <div className="relative z-10 grid min-h-[250px] gap-5 p-5 md:grid-cols-[150px_minmax(0,1fr)]">
+              <div className="self-center">
               <div className="grid size-32 place-items-center rounded-full border border-vault-green/55 bg-vault-green/8 shadow-green">
                 <PhewMascot mood="idle" size="md" />
               </div>
               <ReferenceBadge tone={wallet.connected ? "green" : "gold"} className="mt-3">{wallet.connected ? "Online" : "Wallet required"}</ReferenceBadge>
             </div>
-            <div className="self-center">
+              <div className="self-center">
               <p className="text-sm text-slate-400">Home / Profile</p>
-              <h1 className="mt-4 text-[34px] font-black leading-tight text-white sm:text-[44px]">{wallet.address ? shortAddress(wallet.address, 4) : "Wallet Portfolio"}</h1>
+              <h1 className="mt-4 text-[34px] font-black leading-tight text-white sm:text-[46px]">{wallet.address ? shortAddress(wallet.address, 4) : "Wallet Portfolio"}</h1>
               <p className="mt-3 max-w-xl text-base leading-7 text-slate-300">Building the future of communities on Phew. Verify, stake, earn, trade, and redeem from one portfolio.</p>
               <div className="mt-5 grid gap-3 sm:grid-cols-4">
                 <MiniFact label="Member Since" value="N/A" />
@@ -742,10 +762,6 @@ export function ProfileReferencePage() {
                 <MiniFact label="Rank" value="N/A" />
               </div>
             </div>
-            <div className="ref-hero-mascot-stage min-h-[210px]">
-              <span className="ref-hero-ring" />
-              <PhewMascot mood="success" size="lg" className="ref-free-mascot !bottom-1 !left-[48%] !w-52" />
-              <img src={brandAssets.proofRing} alt="" className="absolute right-10 top-8 size-16 object-contain" />
             </div>
           </div>
           <aside className="space-y-4">
@@ -1546,6 +1562,29 @@ function CommunityTile({ collection }: { collection: VaultCollection }) {
       <div className="grid grid-cols-2 gap-2 p-3 text-xs">
         <MiniFact label="Vaults" value={formatMetric(collection.vaults)} />
         <MiniFact label="Floor" value={formatSol(collection.floorSol)} />
+      </div>
+    </Link>
+  );
+}
+
+function CollectionMarketCard({ collection }: { collection: VaultCollection }) {
+  return (
+    <Link href={`/collections/${encodeURIComponent(collection.id)}`} className="group overflow-hidden rounded-lg border border-vault-line bg-black/35 transition hover:border-vault-green/55">
+      <div className="relative aspect-[4/3] overflow-hidden">
+        <img src={collection.image || collection.banner || brandAssets.nftSlot} alt="" className="h-full w-full object-cover transition group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+        <ReferenceBadge tone={collection.mintEligible ? "green" : "gold"} className="absolute left-2 top-2">{collection.mintEligible ? "Verified" : "Pending"}</ReferenceBadge>
+      </div>
+      <div className="p-3">
+        <p className="truncate text-base font-black text-white">{collection.name}</p>
+        <p className="truncate text-xs text-slate-400">{collection.symbol}</p>
+        <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-slate-400">{collection.subtitle || collection.description || "Token-backed community collection."}</p>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+          <MiniFact label="Floor" value={formatSol(collection.floorSol)} />
+          <MiniFact label="TVL" value={formatSol(collection.volumeSol)} />
+          <MiniFact label="Items" value={formatMetric(collection.supply || collection.vaults)} />
+          <MiniFact label="Owners" value={formatMetric(collection.holders)} />
+        </div>
       </div>
     </Link>
   );

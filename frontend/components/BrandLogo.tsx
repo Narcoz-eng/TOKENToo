@@ -13,7 +13,7 @@ export function PhewLogoMark({ className, boxed = false }: { className?: string;
       <img
         src={brandAssets.logoMark}
         alt=""
-        className="h-full w-full scale-[1.18] object-cover drop-shadow-[0_0_16px_rgba(186,255,0,0.35)]"
+        className="h-full w-full object-contain p-1 drop-shadow-[0_0_16px_rgba(186,255,0,0.35)]"
       />
     </span>
   );

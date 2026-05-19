@@ -1,6 +1,5 @@
 "use client";
 
-import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
 export type PhewProtocolIconName =
@@ -15,15 +14,15 @@ export type PhewProtocolIconName =
   | "raid";
 
 export const phewProtocolIconAssets: Record<PhewProtocolIconName, string> = {
-  lockTokens: brandAssets.pictograms.lockTokens,
-  mintNft: brandAssets.pictograms.mintNft,
-  stake: brandAssets.pictograms.stake,
-  redeem: brandAssets.pictograms.redeem,
-  proof: brandAssets.pictograms.proof,
-  reserve: brandAssets.pictograms.reserve,
-  strategy: brandAssets.pictograms.strategy,
-  community: brandAssets.pictograms.community,
-  raid: brandAssets.pictograms.raid
+  lockTokens: "/icons/phew/native-lock-tokens.svg",
+  mintNft: "/icons/phew/native-mint-nft.svg",
+  stake: "/icons/phew/native-stake.svg",
+  redeem: "/icons/phew/native-redeem.svg",
+  proof: "/icons/phew/native-proof.svg",
+  reserve: "/icons/phew/native-reserve.svg",
+  strategy: "/icons/phew/native-strategy.svg",
+  community: "/icons/phew/native-community.svg",
+  raid: "/icons/phew/native-raid-flag.svg"
 };
 
 export function PhewProtocolIcon({

@@ -37,7 +37,7 @@ export function ReferenceShell({
 }) {
   return (
     <AppShell active={active} stats={stats}>
-      <div className={cn("reference-page space-y-4", className)}>{children}</div>
+      <div className={cn("reference-page space-y-3", className)}>{children}</div>
     </AppShell>
   );
 }
@@ -363,7 +363,7 @@ export function BackendUnavailableBanner({ message, retry }: { message?: ReactNo
             <PhewMascot mood="warning" size="sm" alt="" />
           </span>
           <div>
-            <p className="font-black text-vault-red">Backend unavailable</p>
+            <p className="font-black text-vault-gold">Backend unavailable</p>
             <p className="text-sm text-slate-300">{message ?? "Live API data could not be loaded. N/A state is preserved."}</p>
           </div>
         </div>

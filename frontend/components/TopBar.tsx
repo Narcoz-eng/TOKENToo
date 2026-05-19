@@ -12,16 +12,16 @@ export function TopBar() {
 
   return (
     <header className="phew-topbar sticky top-0 z-20 w-full max-w-[100vw] overflow-hidden border-b border-white/10 bg-[#020806]/90 backdrop-blur-xl">
-      <div className="flex min-h-16 items-center gap-3 px-4 sm:px-5 lg:px-6">
+      <div className="flex min-h-[60px] items-center gap-3 px-3">
         <Link href="/home" className="lg:hidden" aria-label="Phew home">
           <BrandLogo compact />
         </Link>
         <div className="min-w-0 flex-1">
-          <label className="relative hidden max-w-[420px] lg:block">
+          <label className="relative hidden max-w-[390px] lg:block">
             <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-vault-green" />
             <input
               className="phew-input h-10 w-full rounded-md border-vault-cyan/20 bg-black/40 pl-11 pr-14 text-sm text-white"
-              placeholder="Search vaults, tokens, wallets..."
+              placeholder="Search collections, tokens, vaults..."
             />
             <span className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded-md border border-vault-line bg-black/45 px-2 py-1 text-xs text-slate-400">
               <Command className="size-3" /> K

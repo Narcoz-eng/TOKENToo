@@ -151,7 +151,7 @@ export type GameFlowFrameDescriptor = (typeof gameFlowAssets.flows)[GameFlowMode
 
 export const brandAssets = {
   logo: "/logo.jpeg",
-  logoMark: "/logo.jpeg",
+  logoMark: "/brand/phew-favicon.svg",
   mascot: "/brand/phew-mascot-idle.webp",
   heroMascot: "/hero/phew-hero-mascot.webp",
   legacyMascot: "/brand/phew-mascot.png",

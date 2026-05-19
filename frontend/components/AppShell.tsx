@@ -14,7 +14,7 @@ export function AppShell({ children, active, stats }: { children: React.ReactNod
       <Sidebar active={active} stats={stats} />
       <div className="relative min-h-screen lg:pl-56">
         <TopBar />
-        <main className="mx-auto w-full max-w-[1540px] px-4 py-5 sm:px-5 lg:px-6">{children}</main>
+        <main className="mx-auto w-full max-w-none px-3 py-3 sm:px-3 lg:px-3">{children}</main>
       </div>
     </div>
   );

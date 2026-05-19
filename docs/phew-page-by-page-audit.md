@@ -44,6 +44,16 @@ Routes discovered under `frontend/app`:
 - No populated listing/profile/token rows were invented for disconnected or empty backend states. Those routes intentionally keep N/A and wallet-required states while preserving the reference composition.
 - QA captures from this pass live under `tmp/new-ref-qa/`.
 
+## 2026-05-19 Full Visual Refactor Addendum
+
+- Refactored the shared shell and reference primitives rather than continuing page-by-page patching.
+- Updated AppShell/topbar gutters and height to better match the screenshots.
+- Updated Phew logo and protocol icons to use crisp local SVG assets instead of cropped/generated thumbnails.
+- Added screenshot-style hero geometry and applied it to `/home`, `/mint`, `/marketplace`, and `/collections`.
+- Reworked `/collections` toward the new card-grid reference, with overview rail, search/filter strip, collection card grid, trending row, and right-side modules.
+- Kept backend-safe N/A behavior. Empty local data still differs from the populated reference photos by design.
+- Side-by-side QA sheets live under `tmp/ref-match-qa/side-by-side-final/`.
+
 ## Shared Component Inventory
 
 Components discovered under `frontend/components`:
