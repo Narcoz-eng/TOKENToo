@@ -171,10 +171,10 @@ Supported modes:
 - Page/component: `/raids`, `RaidRoomsPage`.
 - State: live mission dashboard with backend data, N/A fallbacks, empty state, and disabled create/publish route until backend support exists.
 - Layout structure: command center hero with free commander mascot and raid flag, stat strip, live raid room rows, selected raid detail panel, mission checklist, proof system, leaderboard, rewards panel, create raid flow, and bottom CTA.
-- Mascot position/scale: commander mascot is unboxed, top-right of hero, with a code-drawn raid flag and floor ring. Empty state uses the same unboxed commander posture.
+- Mascot position/scale: generated commander mascot is unboxed, top-right of hero, with an integrated raid flag and floor ring. Empty state uses the same unboxed commander posture.
 - Cards/panels: dense row cards for raid rooms; detail panel previews the target link; proof and leaderboard panels preserve table/card geometry with N/A values.
 - Buttons: `Create Raid`, `Join Live Raid`, `Join Raid`, `Open Target`, disabled `Publish Raid`.
-- Animation objects: raid flag, raid room, raid proof, raid XP, and raid reward pictograms. Confirmed raid success uses `PhewSuccessMomentModal` with `action="raid"` and `PhewGameFlow`.
+- Animation objects: raid flag, raid room, raid proof, raid XP, and raid reward pictograms. Confirmed raid success uses `PhewSuccessMomentModal` with `action="raid"` and `PhewGameFlow` using extracted generated flow-pack pieces.
 - Expected behavior: no spam framing, no fake engagement, no fake verification. Join success modal appears only if the backend confirms the join. Proof states show manual/community review required when API verification is unavailable.
 - Backend TODOs: add `POST /raids` for creator publish flow; persist target platform/link and proof mode; implement `POST /raids/:raidRoomId/join`; add proof submission/review endpoints for screenshot/manual/community/API verification; expose leaderboard rows and reward eligibility in public raid detail responses.
 

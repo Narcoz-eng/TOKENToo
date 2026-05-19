@@ -316,6 +316,10 @@ export default function CreateCommunityPage() {
           title="Create Community"
           subtitle="Scan token. Pass access gate. Build. Sign. Submit. All checks and actions are backend-first."
           mascotPose="launch"
+          visualAsset={brandAssets.pageHeroes.createCommunity}
+          backgroundAsset={brandAssets.pageHeroes.createCommunity}
+          visualMode="banner"
+          heroSize="large"
           eyebrow={<StatusPill accent="green">Token reserve launch</StatusPill>}
           sidePanel={
             <div className="rounded-lg border border-vault-line bg-black/35 p-4">

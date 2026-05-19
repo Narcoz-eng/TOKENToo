@@ -27,6 +27,7 @@ export function RaidCommandHero({
   return (
     <section className="phew-panel phew-scanline relative overflow-visible rounded-lg border-vault-green/25 p-5 md:p-6">
       <div className="absolute inset-0 overflow-hidden rounded-lg">
+        <img src={brandAssets.pageHeroes.raids} alt="" className="absolute inset-y-0 right-0 h-full w-[68%] object-contain object-right opacity-42" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_30%,rgba(186,255,0,0.22),transparent_31%),linear-gradient(112deg,rgba(2,8,6,0.98),rgba(2,8,6,0.72)_54%,rgba(10,22,9,0.82))]" />
         <div className="absolute inset-0 grid-mask opacity-25" />
       </div>
@@ -55,16 +56,12 @@ export function RaidCommandHero({
 
         <div className="phew-raid-commander pointer-events-none absolute -right-4 -top-9 hidden h-72 w-[390px] overflow-visible lg:block">
           <span className="absolute bottom-4 right-8 h-7 w-56 rounded-full border border-vault-green/70 shadow-green" />
-          <span className="absolute right-24 top-12 h-32 w-1.5 rounded-full bg-vault-green shadow-green" />
-          <CommanderFlag className="absolute right-2 top-5 h-24 w-32 drop-shadow-[0_0_24px_rgba(186,255,0,0.45)]" />
-          <img src={brandAssets.mascotPoses.running} alt="" className="absolute bottom-2 right-[4.5rem] z-10 h-56 w-56 object-contain drop-shadow-[0_0_34px_rgba(186,255,0,0.55)]" />
+          <img src={brandAssets.generated.commander} alt="" className="absolute bottom-0 right-4 z-10 h-[18rem] w-[21rem] object-contain drop-shadow-[0_0_34px_rgba(186,255,0,0.55)]" />
         </div>
 
         <div className="phew-raid-commander relative mt-5 min-h-[190px] overflow-visible lg:hidden">
           <span className="absolute bottom-4 left-1/2 h-6 w-44 -translate-x-1/2 rounded-full border border-vault-green/70 shadow-green" />
-          <span className="absolute left-[57%] top-7 h-24 w-1.5 rounded-full bg-vault-green shadow-green" />
-          <CommanderFlag className="absolute left-[55%] top-2 h-20 w-28 drop-shadow-[0_0_24px_rgba(186,255,0,0.45)]" />
-          <img src={brandAssets.mascotPoses.running} alt="" className="absolute bottom-1 left-1/2 z-10 h-44 w-44 -translate-x-1/2 object-contain drop-shadow-[0_0_34px_rgba(186,255,0,0.55)]" />
+          <img src={brandAssets.generated.commander} alt="" className="absolute bottom-0 left-1/2 z-10 h-52 w-60 -translate-x-1/2 object-contain drop-shadow-[0_0_34px_rgba(186,255,0,0.55)]" />
         </div>
       </div>
       <div className="relative mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
@@ -83,15 +80,5 @@ export function RaidCommandHero({
         ))}
       </div>
     </section>
-  );
-}
-
-function CommanderFlag({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 150 104" className={className} aria-hidden="true">
-      <path d="M18 18C48 0 75 26 128 8v62C78 88 50 58 18 78V18Z" fill="#06110F" stroke="#BAFF00" strokeWidth="7" strokeLinejoin="round" />
-      <path d="m72 22 8 16 18 3-13 12 3 18-16-9-16 9 3-18-13-12 18-3 8-16Z" fill="#F8FFF1" stroke="#06110F" strokeWidth="5" strokeLinejoin="round" />
-      <path d="M25 23c28-10 54 18 96 3" stroke="#16D7D2" strokeWidth="4" strokeLinecap="round" opacity=".75" />
-    </svg>
   );
 }

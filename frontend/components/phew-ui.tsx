@@ -3,14 +3,13 @@
 import Link from "next/link";
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { AlertTriangle, CheckCircle2, Clock3, Loader2, LockKeyhole, PackageCheck, RadioTower, ShieldCheck, Sparkles, Undo2, WalletCards } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Loader2, RadioTower, ShieldCheck } from "lucide-react";
 import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { CollectionCard } from "./CollectionCard";
 import { TrustBadge } from "./protocol-trust";
-import { TransactionFlow, type TransactionFlowMoment, type TransactionFlowState } from "./TransactionFlow";
 
 type ShellStats = {
   collections?: number | null;
@@ -427,20 +426,6 @@ export function PhewProofRing({
   );
 }
 
-export function PhewTransactionScene(props: {
-  state: TransactionFlowState;
-  title: string;
-  description?: string;
-  tokenSymbol?: string | null;
-  image?: string | null;
-  detail?: string | null;
-  className?: string;
-  compact?: boolean;
-  moment?: TransactionFlowMoment;
-}) {
-  return <TransactionFlow {...props} />;
-}
-
 export function PhewLoadingState({ title = "Loading backend state", detail }: { title?: string; detail?: string }) {
   return (
     <PhewCard>
@@ -577,87 +562,6 @@ export function PhewProofPanel({
 export const VaultCard = PhewVaultCard;
 export const ProofPanel = PhewProofPanel;
 
-export type PhewAnimationState = "idle" | "loading" | "success" | "error";
-export type PhewAnimationMoment = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "community-launch" | "studio" | "studio-bible" | "reward" | "scan" | "layer" | "raid";
-
-export function PhewAnimationFrame({
-  moment,
-  state = "idle",
-  tokenSymbol,
-  collectionImage,
-  title,
-  subtitle,
-  reducedMotion,
-  className
-}: {
-  moment: PhewAnimationMoment;
-  state?: PhewAnimationState;
-  tokenSymbol?: string | null;
-  collectionImage?: string | null;
-  title?: string;
-  subtitle?: string;
-  reducedMotion?: boolean;
-  className?: string;
-}) {
-  const visualMoment = normalizeAnimationMoment(moment);
-  const active = state === "loading" || state === "success";
-  const frameClass = cn(
-    "phew-coded-moment relative isolate min-h-[260px] min-w-0 w-full max-w-full overflow-hidden rounded-lg border border-vault-line bg-black/40",
-    `phew-moment-${visualMoment}`,
-    state === "success" && "phew-moment-success",
-    state === "error" && "phew-moment-error",
-    reducedMotion && "phew-reduced-motion",
-    className
-  );
-
-  return (
-    <div className={frameClass} data-state={state} data-active={active}>
-      <img src={brandAssets.motionCore} alt="" className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-screen motion-reduce:animate-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(186,255,0,0.18),transparent_32%),linear-gradient(180deg,rgba(2,8,6,0.18),rgba(2,8,6,0.92))]" />
-      <div className="absolute inset-0 grid-mask opacity-25" />
-      <span className="phew-moment-orbit absolute left-1/2 top-1/2 size-48 -translate-x-1/2 -translate-y-1/2 rounded-full border border-vault-cyan/30 motion-reduce:animate-none" />
-      <span className="phew-moment-orbit absolute left-1/2 top-1/2 size-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-vault-green/35 motion-reduce:animate-none" style={{ animationDelay: "220ms" }} />
-      <span className="phew-coded-beam" />
-      <img src={state === "success" ? brandAssets.mascotPoses.success : state === "error" ? brandAssets.mascotPoses.error : brandAssets.mascotPoses.run} alt="" className="phew-coded-mascot" />
-      <div className="phew-moment-card absolute left-1/2 top-1/2 w-32 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-vault-green/50 bg-black/75 p-2 shadow-green motion-reduce:animate-none sm:w-36">
-        {collectionImage ? (
-          <img src={collectionImage} alt="" className="aspect-[4/5] w-full rounded-md object-cover" />
-        ) : (
-          <PhewNftSlot tokenSymbol={tokenSymbol} className="border-0 bg-transparent p-0" />
-        )}
-      </div>
-      <div className="phew-coded-object">
-        <img src={momentObjectAsset(visualMoment, state)} alt="" className="size-14 object-contain" />
-      </div>
-      <div className="absolute inset-x-4 bottom-4 flex flex-wrap items-end justify-between gap-3">
-        <div className="rounded-md border border-vault-line bg-black/55 px-3 py-2 backdrop-blur">
-          <p className="text-xs font-black uppercase text-vault-green">{title ?? momentTitle(visualMoment)}</p>
-          <p className="mt-1 text-xs text-slate-400">{subtitle ?? stateLabel(state)}</p>
-        </div>
-        <PhewStatusBadge status={state === "success" ? "success" : state === "error" ? "error" : state === "loading" ? "loading" : "idle"}>
-          {state}
-        </PhewStatusBadge>
-      </div>
-      {active ? <MomentParticles moment={visualMoment} /> : null}
-    </div>
-  );
-}
-
-export function PhewAnimationStage(props: Parameters<typeof PhewAnimationFrame>[0]) {
-  return <PhewAnimationFrame {...props} />;
-}
-
-function MomentParticles({ moment }: { moment: PhewAnimationMoment }) {
-  const count = moment === "proof" || moment === "studio" ? 18 : 12;
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-inherit">
-      {Array.from({ length: count }, (_, index) => (
-        <span key={index} className="phew-particle motion-reduce:animate-none" style={{ "--i": index, "--count": count } as CSSProperties} />
-      ))}
-    </div>
-  );
-}
-
 function GenericVaultArt({ tokenSymbol, compact = false }: { tokenSymbol?: string | null; compact?: boolean }) {
   return (
     <div className={cn("grid aspect-[4/5] w-full place-items-center rounded-md border border-vault-green/35 bg-[radial-gradient(circle_at_50%_25%,rgba(186,255,0,0.25),rgba(3,9,11,0.92)_50%,rgba(0,0,0,0.98))]", compact ? "p-2" : "p-4")}>
@@ -668,52 +572,4 @@ function GenericVaultArt({ tokenSymbol, compact = false }: { tokenSymbol?: strin
       </div>
     </div>
   );
-}
-
-function momentObjectAsset(moment: ReturnType<typeof normalizeAnimationMoment>, state: PhewAnimationState) {
-  if (state === "error") return brandAssets.errorGlitch;
-  if (state === "success") return brandAssets.proofRing;
-  return brandAssets.transactionObjects[moment];
-}
-
-function MomentGlyph({ moment, state }: { moment: ReturnType<typeof normalizeAnimationMoment>; state: PhewAnimationState }) {
-  if (state === "success") return <CheckCircle2 className="size-10 text-vault-green" />;
-  if (state === "error") return <AlertTriangle className="size-10 text-vault-red" />;
-  if (moment === "stake") return <LockKeyhole className="size-10 text-vault-green" />;
-  if (moment === "unstake" || moment === "redeem") return <Undo2 className="size-10 text-vault-cyan" />;
-  if (moment === "proof") return <ShieldCheck className="size-10 text-vault-green" />;
-  if (moment === "community" || moment === "scan") return <RadioTower className="size-10 text-vault-cyan" />;
-  if (moment === "studio" || moment === "layer") return <PackageCheck className="size-10 text-vault-green" />;
-  if (moment === "reward") return <Sparkles className="size-10 text-vault-gold" />;
-  return <WalletCards className="size-10 text-vault-green" />;
-}
-
-function normalizeAnimationMoment(moment: PhewAnimationMoment) {
-  if (moment === "community-launch") return "community";
-  if (moment === "studio-bible") return "studio";
-  return moment;
-}
-
-function momentTitle(moment: ReturnType<typeof normalizeAnimationMoment>) {
-  const labels: Record<ReturnType<typeof normalizeAnimationMoment>, string> = {
-    mint: "Mint Vault NFT",
-    stake: "Stake NFT",
-    unstake: "Unstake NFT",
-    redeem: "Redeem NFT",
-    proof: "Proof Verified",
-    community: "Community Launch",
-    studio: "Studio Bible Generated",
-    reward: "Reward Claim",
-    scan: "Token Scan",
-    layer: "Layer Pack Approved",
-    raid: "Raid Success"
-  };
-  return labels[moment];
-}
-
-function stateLabel(state: PhewAnimationState) {
-  if (state === "loading") return "Awaiting backend confirmation";
-  if (state === "success") return "Confirmed by backend state";
-  if (state === "error") return "Action failed";
-  return "Ready when data is available";
 }

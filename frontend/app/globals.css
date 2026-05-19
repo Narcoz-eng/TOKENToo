@@ -383,8 +383,7 @@ select:focus-visible {
   }
 
   .phew-panel,
-  .transaction-flow,
-  .phew-coded-moment {
+  .transaction-flow {
     max-width: 100%;
   }
 
@@ -527,6 +526,140 @@ select:focus-visible {
   background:
     radial-gradient(circle at 70% 15%, rgba(186, 255, 0, 0.045), transparent 34%),
     linear-gradient(180deg, rgba(5, 13, 12, 0.9), rgba(0, 0, 0, 0.92));
+}
+
+.phew-inline-flow-status {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(110, 255, 222, 0.14);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(5, 12, 11, 0.78), rgba(0, 0, 0, 0.84)),
+    radial-gradient(circle at 88% 8%, rgba(186, 255, 0, 0.1), transparent 42%);
+  padding: 0.95rem;
+  box-shadow: inset 0 0 28px rgba(186, 255, 0, 0.045);
+}
+
+.phew-inline-flow-status-compact {
+  padding: 0.8rem;
+}
+
+.phew-inline-flow-head {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.phew-inline-flow-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 1px solid rgba(186, 255, 0, 0.25);
+  border-radius: 8px;
+  background: rgba(186, 255, 0, 0.07);
+}
+
+.phew-inline-flow-icon img {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 14px rgba(186, 255, 0, 0.28));
+}
+
+.phew-inline-flow-kicker {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #baff00;
+}
+
+.phew-inline-flow-head h3 {
+  margin-top: 0.2rem;
+  font-size: 0.98rem;
+  font-weight: 900;
+  line-height: 1.15;
+  color: white;
+}
+
+.phew-inline-flow-head p:last-child {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.phew-inline-flow-pill {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  border: 1px solid rgba(186, 255, 0, 0.36);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.36);
+  padding: 0.2rem 0.55rem;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  color: #baff00;
+  text-transform: uppercase;
+}
+
+.phew-inline-flow-loading .phew-inline-flow-pill,
+.phew-inline-flow-preparing .phew-inline-flow-pill,
+.phew-inline-flow-signing .phew-inline-flow-pill,
+.phew-inline-flow-submitting .phew-inline-flow-pill,
+.phew-inline-flow-confirming .phew-inline-flow-pill {
+  border-color: rgba(22, 215, 210, 0.42);
+  color: #16d7d2;
+}
+
+.phew-inline-flow-error .phew-inline-flow-pill {
+  border-color: rgba(255, 79, 112, 0.5);
+  color: #ff4f70;
+}
+
+.phew-inline-flow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.phew-inline-flow-meta span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(110, 255, 222, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0.28rem 0.5rem;
+  font-size: 11px;
+  font-weight: 800;
+  color: #cbd5e1;
+}
+
+.phew-inline-flow-steps {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+}
+
+.phew-inline-flow-steps span {
+  height: 6px;
+  min-width: 22px;
+  flex: 1;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.26);
+}
+
+.phew-inline-flow-steps span.is-active {
+  background: rgba(186, 255, 0, 0.45);
+}
+
+.phew-inline-flow-steps span.is-current {
+  background: #baff00;
+  box-shadow: 0 0 14px rgba(186, 255, 0, 0.42);
 }
 
 .phew-proof-state {
@@ -2062,6 +2195,34 @@ select:focus-visible {
   animation: phew-home-mascot-run 1.2s ease-in-out infinite;
 }
 
+.phew-home-hero-bg-art {
+  position: absolute;
+  inset: -8% -8% auto auto;
+  width: min(72%, 760px);
+  height: 118%;
+  object-fit: contain;
+  object-position: right center;
+  opacity: 0.34;
+  filter: saturate(1.08) contrast(1.05);
+}
+
+.phew-home-hero-subject {
+  position: absolute;
+  left: 50%;
+  bottom: -0.35rem;
+  width: clamp(300px, 25vw, 430px);
+  max-width: none;
+  max-height: 310px;
+  transform: translateX(-50%);
+  object-fit: contain;
+  filter: drop-shadow(0 0 32px rgba(186, 255, 0, 0.48)) drop-shadow(0 22px 22px rgba(0, 0, 0, 0.55));
+}
+
+.ref-collection-detail-hero > .grid {
+  position: relative;
+  z-index: 1;
+}
+
 .ref-metric {
   min-height: 74px;
   border: 1px solid rgba(110, 255, 222, 0.12);
@@ -2072,8 +2233,6 @@ select:focus-visible {
 
 .phew-protocol-icon {
   display: block;
-  width: 1.25rem;
-  height: 1.25rem;
   object-fit: contain;
   filter: drop-shadow(0 0 10px rgba(186, 255, 0, 0.22));
 }
@@ -2353,6 +2512,35 @@ select:focus-visible {
   box-shadow: inset 0 0 70px rgba(186, 255, 0, 0.045), 0 0 28px rgba(186, 255, 0, 0.06);
 }
 
+.phew-layout {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.phew-dashboard-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.phew-product-flow-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.phew-detail-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.phew-page-hero-dashboard {
+  border-color: rgba(186, 255, 0, 0.24);
+}
+
+.phew-page-hero-product {
+  border-color: rgba(22, 215, 210, 0.28);
+}
+
+.phew-page-hero-detail {
+  border-color: rgba(250, 204, 21, 0.24);
+}
+
 .phew-page-hero-bg {
   position: absolute;
   inset: 0;
@@ -2366,10 +2554,21 @@ select:focus-visible {
   position: absolute;
   inset: 0;
   background:
+    var(--phew-page-hero-bg-image, none) right center / min(52%, 520px) auto no-repeat,
     linear-gradient(rgba(255, 255, 255, 0.032) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.032) 1px, transparent 1px);
   background-size: 38px 38px;
   opacity: 0.24;
+}
+
+.phew-page-hero-with-bg-art .phew-page-hero-bg::before {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.46) 52%, rgba(0, 0, 0, 0.18)),
+    var(--phew-page-hero-bg-image, none) right center / min(64%, 720px) auto no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.032) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.032) 1px, transparent 1px);
+  background-size: auto, auto, 38px 38px, 38px 38px;
+  opacity: 0.62;
 }
 
 .phew-page-hero-bg::after {
@@ -2395,11 +2594,23 @@ select:focus-visible {
   align-items: center;
 }
 
+.phew-page-hero-large .phew-page-hero-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  min-height: 310px;
+  padding: 1.35rem;
+}
+
 .phew-page-hero-grid-with-panel {
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 230px) minmax(280px, 430px);
+  grid-template-columns: minmax(300px, 1fr) minmax(200px, 0.72fr) minmax(280px, 0.9fr);
+}
+
+.phew-page-hero-large .phew-page-hero-grid-with-panel {
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.05fr) minmax(300px, 0.9fr);
 }
 
 .phew-page-hero-copy {
+  position: relative;
+  z-index: 3;
   min-width: 0;
 }
 
@@ -2417,10 +2628,14 @@ select:focus-visible {
 
 .phew-page-hero h1 {
   max-width: 58rem;
-  font-size: clamp(2rem, 3.4vw, 3.8rem);
+  font-size: clamp(2rem, 3.1vw, 3.45rem);
   font-weight: 950;
   line-height: 0.99;
   color: #fff;
+}
+
+.phew-page-hero-grid-with-panel .phew-page-hero-copy h1 {
+  font-size: clamp(2rem, 2.8vw, 3.15rem);
 }
 
 .phew-page-hero-copy > p {
@@ -2461,10 +2676,63 @@ select:focus-visible {
   max-width: none;
 }
 
+.phew-page-hero-large .phew-page-hero-mascot-img {
+  right: 0;
+  bottom: 0;
+  width: clamp(290px, 31vw, 500px);
+  max-height: 330px;
+}
+
+.phew-page-hero-art {
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 30px rgba(186, 255, 0, 0.36)) drop-shadow(0 22px 22px rgba(0, 0, 0, 0.52));
+}
+
+.phew-page-hero-mascot-layer {
+  position: absolute;
+  inset: auto 0 0 auto;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.phew-page-hero-visual-banner .phew-page-hero-mascot {
+  min-height: 310px;
+}
+
+.phew-page-hero-visual-banner .phew-page-hero-ring {
+  width: min(88%, 340px);
+}
+
+.phew-page-hero-visual-banner .phew-page-hero-art {
+  right: -0.35rem;
+  width: clamp(330px, 33vw, 540px);
+  max-height: 360px;
+}
+
 .phew-page-hero-side {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   min-width: 0;
+}
+
+.phew-route-hero-status {
+  overflow: hidden;
+  border: 1px solid rgba(186, 255, 0, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.72)),
+    radial-gradient(circle at 85% 8%, rgba(186, 255, 0, 0.12), transparent 42%);
+  padding: 1rem;
+  box-shadow: inset 0 0 34px rgba(186, 255, 0, 0.06);
+}
+
+.phew-route-hero-status-loading {
+  border-color: rgba(22, 215, 210, 0.26);
+}
+
+.phew-route-hero-status-error {
+  border-color: rgba(255, 79, 112, 0.36);
 }
 
 .phew-page-hero-warning {
@@ -3353,6 +3621,21 @@ select:focus-visible {
   animation-delay: calc(var(--i) * 44ms);
 }
 
+.phew-game-particles[data-variant="xp"] span {
+  background: #16d7d2;
+  box-shadow: 0 0 14px rgba(22, 215, 210, 0.82);
+}
+
+.phew-game-particles span img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+}
+
 .phew-game-scan {
   position: absolute;
   top: 28%;
@@ -3523,6 +3806,26 @@ select:focus-visible {
 .phew-game-frame {
   position: absolute;
   inset: 0;
+}
+
+.phew-game-live-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.phew-game-frame-fallback {
+  position: absolute;
+  inset: 0.75rem;
+  z-index: 3;
+  width: calc(100% - 1.5rem);
+  height: calc(100% - 1.5rem);
+  object-fit: contain;
+  opacity: 0.92;
+  filter: drop-shadow(0 0 22px rgba(186, 255, 0, 0.24));
+}
+
+.phew-game-frame-reduced .phew-game-live-layer {
+  opacity: 0;
 }
 
 .phew-motion-object {
@@ -3877,6 +4180,11 @@ select:focus-visible {
     right: auto;
     bottom: auto;
     width: clamp(150px, 48vw, 220px);
+  }
+
+  .phew-page-hero-large .phew-page-hero-mascot-img {
+    width: min(88vw, 330px);
+    max-height: 260px;
   }
 
   .phew-page-hero h1 {

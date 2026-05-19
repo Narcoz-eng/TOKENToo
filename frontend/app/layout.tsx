@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Phew.run",
   description: "Lock tokens. Mint vault NFTs. Build token communities.",
   icons: {
-    icon: "/brand/phew-favicon.svg"
+    icon: "/logo.jpeg"
   }
 };
 

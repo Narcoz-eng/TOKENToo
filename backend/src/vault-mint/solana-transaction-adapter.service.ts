@@ -398,6 +398,47 @@ export class SolanaTransactionAdapterService {
     };
   }
 
+  async discoverWalletTokenBalances(input: { walletAddress: string }) {
+    const provider = process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock";
+    if (provider !== "devnet") {
+      return {
+        verificationAvailable: false,
+        provider,
+        tokens: [] as Array<{
+          mint: string;
+          tokenAccount: string;
+          amount: string;
+          decimals: number;
+          uiAmountString: string;
+        }>,
+        issues: [`Wallet token discovery requires SOLANA_TRANSACTION_PROVIDER=devnet, current provider is ${provider}.`]
+      };
+    }
+
+    const owner = new PublicKey(input.walletAddress);
+    const accounts = await this.connection().getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM_ID }, "confirmed");
+    const tokens = accounts.value
+      .map((account) => {
+        const info = (account.account.data as any)?.parsed?.info;
+        const amount = String(info?.tokenAmount?.amount ?? "0");
+        return {
+          mint: String(info?.mint ?? ""),
+          tokenAccount: account.pubkey.toBase58(),
+          amount,
+          decimals: Number(info?.tokenAmount?.decimals ?? 0),
+          uiAmountString: String(info?.tokenAmount?.uiAmountString ?? info?.tokenAmount?.uiAmount ?? "0")
+        };
+      })
+      .filter((token) => token.mint && BigInt(token.amount || "0") > 0n);
+
+    return {
+      verificationAvailable: true,
+      provider,
+      tokens,
+      issues: [] as string[]
+    };
+  }
+
   async verifySolPayment(input: { signature: string; payer: string; recipient: string; lamports: string }) {
     const provider = process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock";
     if (provider !== "devnet") {

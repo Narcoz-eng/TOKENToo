@@ -22,7 +22,7 @@ import {
   Zap
 } from "lucide-react";
 import { BackendUnavailableBanner, CheckRow, LockedButton, ReferenceBadge, ReferenceButton, ReferenceEmpty, ReferenceHeader, ReferenceInput, ReferenceMetric, ReferencePanel, ReferenceRows, ReferenceShell, ReferenceStepper, ReferenceTable, SearchControl, WalletRequiredBanner, na, shortAddress } from "@/components/reference-ui";
-import { PhewMascot, PhewMascotHero } from "@/components/PhewMascot";
+import { PhewMascot } from "@/components/PhewMascot";
 import { PhewProtocolIcon, phewProtocolIconAssets, type PhewProtocolIconName } from "@/components/PhewProtocolIcon";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
@@ -135,6 +135,7 @@ export function HomeReferencePage() {
       {home.error ? <BackendUnavailableBanner message={home.error.message} retry={home.reload} /> : null}
       <section className="ref-panel ref-hero relative overflow-visible p-4 sm:p-5">
         <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
+          <img src={brandAssets.pageHeroes.home} alt="" className="phew-home-hero-bg-art" />
           <div className="absolute inset-0 grid-mask opacity-25" />
           <div className="absolute left-[48%] top-[-34%] size-[480px] rounded-full bg-vault-green/10 blur-3xl" />
         </div>
@@ -153,7 +154,7 @@ export function HomeReferencePage() {
           </div>
           <div className="ref-hero-mascot-stage min-h-[230px]">
             <span className="ref-hero-ring" />
-            <PhewMascotHero className="ref-free-mascot !left-[18%] !w-[clamp(220px,18vw,270px)]" />
+            <img src={brandAssets.pageHeroes.home} alt="" className="phew-home-hero-subject" />
           </div>
           <div className="ref-home-overview h-full">
             <div className="mb-3 flex items-start justify-between gap-3">
@@ -222,7 +223,9 @@ export function HomeReferencePage() {
               ["Redeem Anytime", "redeem"]
             ] as Array<[string, PhewProtocolIconName]>).map(([label, icon], index) => (
               <div key={label} className="ref-action-tile text-center">
-                <PhewProtocolIcon name={icon} className="mx-auto size-12" />
+                <div className="mx-auto grid h-24 w-24 place-items-center rounded-md border border-vault-green/20 bg-vault-green/8 shadow-[inset_0_0_28px_rgba(186,255,0,0.08)] sm:h-28 sm:w-28">
+                  <PhewProtocolIcon name={icon} className="h-20 w-20 sm:h-24 sm:w-24" />
+                </div>
                 <p className="mt-3 text-sm font-black text-white">{label}</p>
                 <p className="mt-2 text-xs leading-5 text-slate-400">{["Lock in reserve vault.", "Receive verified NFT.", "Trade or stake.", "Burn to redeem."][index]}</p>
               </div>
@@ -391,8 +394,9 @@ export function CollectionDetailReferencePage({ id }: { id: string }) {
         </div>
       ) : (
         <>
-          <section className="ref-panel relative overflow-visible p-4">
-            <PhewMascot mood="proof" size="hero" className="absolute right-4 top-[-34px] z-10 hidden !w-44 max-w-none xl:block" />
+          <section className="ref-panel ref-collection-detail-hero relative overflow-hidden p-4">
+            <img src={collection.banner || collection.image || brandAssets.pageHeroes.collections} alt="" className="absolute inset-0 h-full w-full object-cover opacity-38" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.92),rgba(0,0,0,0.72)_48%,rgba(0,0,0,0.5)),radial-gradient(circle_at_78%_12%,rgba(186,255,0,0.18),transparent_32%)]" />
             <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_300px_300px]">
               <img src={collection.image || brandAssets.nftSlot} alt="" className="aspect-square w-full rounded-lg border border-vault-line bg-black/35 object-cover" />
               <div className="min-w-0 self-center">

@@ -11,6 +11,12 @@ This file tracks the real local Phew visual assets used by the frontend. The app
 - Do not render reference screenshots or generated sheets directly as UI.
 - Missing backend values stay `N/A`, disabled, or in explicit empty/error/backend-unavailable states.
 
+## Logo
+
+| Asset | Path | Intended Use | Quality | Component |
+| --- | --- | --- | --- | --- |
+| Real Phew Run logo | `frontend/public/logo.jpeg` | App identity, favicon metadata, sidebar/topbar mark | Approved source | `brandAssets.logo`, `BrandLogo` |
+
 ## Generation Batch
 
 - Date: 2026-05-19.
@@ -19,6 +25,16 @@ This file tracks the real local Phew visual assets used by the frontend. The app
 - Processing: generated sheets were split and chroma-keyed locally with Sharp, then exported as transparent PNG plus optimized WebP.
 - Quality report: `tmp/imagegen/phew-asset-sources/quality-report.json`.
 - Quality result: 26 of 26 assets passed transparent-corner, aspect-ratio, no-cropping, no-logo-box, and low/no magenta-residue checks.
+
+### Raid And Success Flow Pack
+
+- Date: 2026-05-19.
+- Tool: built-in Image Generation through the `$imagegen` skill.
+- Source output: `tmp/imagegen/phew-game-flow-pack-source.png`.
+- Project pack: `frontend/public/art/phew-generated-game-flow-pack.png`.
+- Extracted reusable pieces: `frontend/public/art/generated/*.png`.
+- Prompt family: "Phew Run complete game UI asset sheet using the real running star mascot, black/neon-green protocol objects, logo lockup, commander flag pose, and seven four-frame success flows for mint, stake, unstake, redeem, proof, community launch, and raid."
+- Processing: generated on a magenta-key sheet, alpha processed locally, then cropped into transparent reusable objects. The sheet is source/reference only and is not rendered directly as UI.
 
 ## Mascot Assets
 
@@ -47,10 +63,19 @@ This file tracks the real local Phew visual assets used by the frontend. The app
 | Lock/unlock | `frontend/public/animations/phew-lock-unlock.webp` | Stake/unstake lock state | Passed | `brandAssets.lockUnlock` |
 | Reward burst | `frontend/public/animations/phew-reward-burst.webp` | Rewards, success burst | Passed | `PhewGameMoment`, metrics |
 | Error glitch | `frontend/public/animations/phew-error-glitch.webp` | Error object | Passed | `PhewGameMoment`, status |
-| Raid flag | `frontend/public/icons/phew/native-raid-flag.svg` | Raid hero, nav, success flow | Code SVG | `RaidCommandHero`, `PhewGameFlow` |
+| Generated commander | `frontend/public/art/generated/phew-commander-flag.png` | Raid hero, empty state, raid CTA | Generated PNG | `RaidCommandHero`, `RaidRoomsPage` |
+| Generated token coin | `frontend/public/art/generated/phew-token-coin.png` | Mint success flow object | Generated PNG | `PhewGameFlow` |
+| Generated token stack | `frontend/public/art/generated/phew-token-stack.png` | Redeem/unstake success flow object | Generated PNG | `PhewGameFlow` |
+| Generated NFT card | `frontend/public/art/generated/phew-nft-card.png` | Mint/stake/redeem success flow object | Generated PNG | `PhewGameFlow` |
+| Generated vault safe | `frontend/public/art/generated/phew-vault-safe.png` | Mint/stake success flow target | Generated PNG | `PhewGameFlow` |
+| Generated lock/unlock | `frontend/public/art/generated/phew-lock.png`, `frontend/public/art/generated/phew-unlock.png` | Stake/unstake success flow target | Generated PNG | `PhewGameFlow` |
+| Generated proof ring | `frontend/public/art/generated/phew-proof-ring.png` | Proof success flow target | Generated PNG | `PhewGameFlow` |
+| Generated reward burst | `frontend/public/art/generated/phew-reward-burst.png` | Non-raid success burst | Generated PNG | `PhewGameFlow` |
+| Generated raid flag/proof/XP | `frontend/public/art/generated/phew-raid-flag.png`, `frontend/public/art/generated/phew-raid-proof-badge.png`, `frontend/public/art/generated/phew-xp-badge.png` | Raid success flow objects | Generated PNG | `PhewGameFlow` |
+| Raid flag | `frontend/public/icons/phew/native-raid-flag.svg` | Raid nav, buttons, cards | Code SVG | `RaidPictogram` |
 | Raid room | `frontend/public/icons/phew/native-raid-room.svg` | Raid room rows, create flow | Code SVG | `RaidRoomCard`, `CreateRaidPanel` |
 | Raid proof | `frontend/public/icons/phew/native-raid-proof.svg` | Manual/community proof states | Code SVG | `RaidProofPanel` |
-| Raid XP | `frontend/public/icons/phew/native-raid-xp.svg` | XP stats and leaderboard | Code SVG | `RaidLeaderboard`, `PhewGameFlow` |
+| Raid XP | `frontend/public/icons/phew/native-raid-xp.svg` | XP stats and leaderboard | Code SVG | `RaidLeaderboard` |
 | Raid reward | `frontend/public/icons/phew/native-raid-reward.svg` | Reward panel and creator flow | Code SVG | `RaidRewardsPanel` |
 
 ## Pictograms
@@ -70,11 +95,12 @@ This file tracks the real local Phew visual assets used by the frontend. The app
 ## Implementation Notes
 
 - `frontend/lib/brand-assets.ts` is the routing layer for generated assets.
-- `frontend/components/BrandLogo.tsx` uses the mascot mark only in the boxed sidebar identity context.
+- `frontend/components/BrandLogo.tsx` uses `frontend/public/logo.jpeg` for app identity; the old SVG favicon/wordmark is no longer the live brand mark.
 - `frontend/components/Sidebar.tsx` uses Phew pictograms for core protocol actions.
 - `frontend/components/PhewMascot.tsx` centralizes mood, sizing, and non-stretch behavior.
-- `frontend/components/PhewGameMoments.tsx` composes `PhewGameFlow`, `PhewGameFrame`, `PhewMotionObject`, and `PhewParticleBurst` for mint, stake, unstake, redeem, proof, community launch, raid, and supporting studio/reward flows.
-- `frontend/components/PhewPageHero.tsx` centralizes page hero mascot placement.
+- `frontend/components/PhewGameMoments.tsx` composes `PhewGameFlow`, `PhewGameFrame`, `PhewMotionObject`, and `PhewParticleBurst` for mint, stake, unstake, redeem, proof, community launch, raid, and supporting studio/reward flows. The success modal uses extracted generated pieces, not the static pack sheet.
+- `frontend/components/PhewPageHero.tsx` centralizes page hero v2 placement with `heroType`, page-specific generated `visualAsset`, optional `mascotLayer`, and non-overlapping copy/art/status columns.
+- `frontend/components/PhewLayouts.tsx` defines `DashboardLayout`, `ProductFlowLayout`, and `DetailLayout` so page density, section stacking, and card rhythm are consistent before route-specific content is added.
 - `frontend/components/PhewEmptyState.tsx` centralizes table/list empty-state mascot placement.
 - `frontend/components/PhewSuccessMomentModal.tsx` is the post-confirmation game-lobby success scene. Large transaction animation should not be shown inline in normal forms.
 - `frontend/components/raids/*` owns the `/raids` command center, Phew-native raid pictograms, N/A states, and backend-gated join/proof behavior.
@@ -98,7 +124,7 @@ This file tracks the real local Phew visual assets used by the frontend. The app
 
 ## Future Asset Generation Prompts
 
-No paid image generation was called for the current repair. If new art is approved, generate transparent-background assets, cache final outputs locally, and keep text out of the image. Use the current OpenAI image model configured for transparent PNG or WebP output and estimate cost from the pricing page before calling it.
+For future art updates, generate a complete page/hero/icon/success-flow set together, cache final outputs locally, and keep generated sheets as source/reference rather than UI. Extract reusable transparent pieces and animate them through `PhewGameFlow`.
 
 Prompt base:
 

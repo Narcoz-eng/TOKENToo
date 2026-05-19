@@ -185,6 +185,10 @@ export default function RedeemPage() {
           title="Redeem from an eligible Vault NFT in your wallet."
           subtitle="This page mirrors staking: it only shows Vault NFTs returned by the backend for the connected wallet, checks proof, then uses the real redeem build and submit routes."
           mascotPose="redeem"
+          visualAsset={brandAssets.pageHeroes.redeem}
+          backgroundAsset={brandAssets.pageHeroes.redeem}
+          visualMode="banner"
+          heroSize="large"
           eyebrow={<><StatusPill accent="green">Redeem</StatusPill><StatusPill accent="cyan">Wallet-owned eligible NFTs</StatusPill></>}
           sidePanel={<RedeemHeroStatus status={txStatus} label={redeemStatusLabel(txStatus, redeemTx?.status)} detail={error ?? redeemTx?.errorMessage ?? redeemTx?.status ?? undefined} />}
         />

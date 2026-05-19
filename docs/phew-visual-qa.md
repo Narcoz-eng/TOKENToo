@@ -26,6 +26,10 @@
 | `/studio` | `tmp/phew-visual-qa-success-modal/studio.png` | `create-collection-studio.png` | Improved |
 | `/strategy-engine` | `tmp/phew-visual-qa-success-modal/strategy-engine.png` | no direct screenshot | Improved |
 | `/raids` | `tmp/visual-review/raids-command-center.png` | no direct screenshot | Implemented |
+| `/mint` | `tmp/phew-reconstruction-qa/mint.png` | `mint` JPEG concept | Regression checked |
+| `/marketplace` | `tmp/phew-reconstruction-qa/marketplace-pass2.png` | `marketplace` JPEG concept | Reconstructed |
+| `/leaderboard` | `tmp/phew-reconstruction-qa/leaderboard-pass2.png` | `leaderboard` JPEG concept | Reconstructed |
+| `/profile` | `tmp/phew-reconstruction-qa/profile-pass2.png` | `profile` JPEG concept | Reconstructed |
 
 ## Mismatches Found And Fixed
 
@@ -43,11 +47,17 @@
 | Inline transaction previews | Large animation scenes occupied normal form/layout space before any backend-confirmed success. | Replaced inline scenes with compact status panels and added `PhewSuccessMomentModal` for confirmed success only. |
 | Raid route | Old `/raids` reused generic product data cards and did not explain proof/reward/create flows. | Replaced with a dedicated raid command center using backend `/product/raids`, safe N/A fields, Phew-native raid pictograms, proof-state panel, leaderboard, rewards, and disabled creator publish flow. |
 | Raid success animation | No raid success moment existed in the shared post-confirmation modal system. | Added `action="raid"` to `PhewSuccessMomentModal` through `PhewGameFlow`; modal only opens after backend-confirmed join success. |
-| Old storyboard usage | `phew-moment-animations` rendered generic multi-card storyboards and icon-library objects. | Removed app imports and routed studio status through `PhewGameMoment`; old storyboard file is no longer used. |
+| Generated flow pack | New hero/icon work needed matching success-modal assets instead of isolated images. | Generated `phew-generated-game-flow-pack.png`, extracted reusable transparent pieces, and routed success modal objects through `PhewGameFlow`. |
+| Logo source | App identity still pointed at the old SVG favicon/wordmark. | Routed brand identity and metadata icon to `frontend/public/logo.jpeg`. |
+| Old storyboard usage | `phew-moment-animations` rendered generic multi-card storyboards and icon-library objects. | Deleted the old component and kept success animation on `PhewGameMoment` / `PhewGameFlow`. |
 | Page hero mascot role | Several pages had missing, cropped, or generic hero mascot placement. | Added `PhewPageHero` and route-specific mascot poses for collection, mint, stake, redeem, proof, create-community, admin, strategy, and studio routes. |
 | Table/list empty mascot placement | Empty mascots were inconsistent or looked pasted over table bodies. | Added `PhewEmptyState` and routed `ReferenceEmpty` through it with compact table placement. |
 | Studio inline status | Studio Bible/layer status cards wrapped into narrow vertical text after animation removal. | Changed those cards to full-width compact status panels inside their sections. |
 | Admin hero crop | Admin warning mascot initially broke out too far from the hero. | Constrained admin mascot size through `mascotClassName` so it no longer crops at the top/right edge. |
+| Hero v2 grid | Marketplace, leaderboard, and profile titles were squeezed by generated hero art plus side status rail. | Added `heroType` and tightened desktop hero columns so copy, visual asset, and side panel do not overlap. |
+| Marketplace UX | Route still read as a generic empty exchange. | Added market stats, value-vs-price rail, list CTA, top communities, recent activity, and listing card financial clarity. |
+| Profile UX | Route still read as "My Vaults" only. | Added portfolio metrics, available/staked/owned NFT sections, rewards, achievements, and wallet activity states. |
+| Leaderboard UX | Route was a generic empty rank list. | Added ecosystem tabs, season chip, score/reward rail, scoring explanation, top rank, and your-rank N/A state. |
 
 ## Remaining Differences
 

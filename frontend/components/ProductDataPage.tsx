@@ -27,13 +27,14 @@ import { TransactionFlow, type TransactionFlowState } from "./TransactionFlow";
 import { ProtocolTrustInline, ProtocolTrustStrip, collectionTrust, vaultTrust } from "./protocol-trust";
 import { brandAssets } from "@/lib/brand-assets";
 import { PhewMascotHero } from "@/components/PhewMascot";
+import { PhewPageHero } from "@/components/PhewPageHero";
 import { CollectionGrid } from "./CollectionGrid";
 import { MetricGrid, PageLayout } from "./PageLayout";
+import { DashboardLayout, DetailLayout } from "./PhewLayouts";
 import { StakeFlow, UnstakeFlow, ClaimRewardsFlow } from "./StakingFlows";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { cn } from "@/lib/utils";
 import { assertBackendActionCompleted } from "@/lib/action-contracts";
-import { PhewAnimationFrame, type PhewAnimationMoment } from "./phew-ui";
 
 type ProductData = {
   title?: string;
@@ -101,10 +102,9 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   const showFallbackDuringLoad = Boolean(!data && (walletRequired || endpoint.includes("/collections/")));
   const warnings = apiWarnings(state.data);
   const privateDiagnostics = showPrivateDiagnostics(wallet.address);
-  const pageMoment = motionMomentForPage(active, endpoint);
   const pageMotionState = state.loading ? "loading" : state.error ? "error" : "idle";
-  const pageMotionImage = data?.collection?.image ?? data?.collections?.[0]?.image ?? data?.nfts?.[0]?.image ?? null;
   const pageMotionSymbol = data?.collection?.symbol ?? data?.collections?.[0]?.symbol ?? data?.nfts?.[0]?.tier ?? "PHEW";
+  const pageHeroAsset = heroAssetForPage(active, endpoint);
   const showRouteHero = active !== "home" && !["staking"].includes(active);
   const visibleCollections = useMemo(() => {
     const collections = data?.collections ?? (data?.collection ? [data.collection] : []);
@@ -130,31 +130,24 @@ export function ProductDataPage({ active, title, endpoint, walletRequired, child
   return (
     <AppShell active={active} stats={data?.stats}>
       <div className="space-y-5">
-        {showRouteHero ? <section className="phew-panel phew-hero-canvas phew-scanline relative overflow-hidden rounded-lg p-5">
-          <img src={brandAssets.motionCore} alt="" className="phew-motion-image absolute inset-y-0 right-0 hidden h-full w-3/5 object-cover opacity-30 mix-blend-screen lg:block" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/94 to-[#020806]/35" />
-          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center">
-            <div className="min-w-0 max-w-4xl">
-              <p className="text-sm font-black uppercase text-vault-green">PHEW.DEVNET / Faction OS</p>
-              <h1 className="mt-2 max-w-[calc(100vw-4rem)] text-3xl font-black leading-tight sm:max-w-4xl sm:text-4xl">{title}</h1>
-              <p className="mt-2 max-w-[calc(100vw-4rem)] break-words text-sm text-slate-300 sm:max-w-3xl">{routeSubtitleForPage(active, data?.subtitle)}</p>
-              <div className="mt-4">
-                <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                  <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" /> Create Community
-                </Link>
-              </div>
-            </div>
-            <PhewAnimationFrame
-              moment={pageMoment}
-              state={pageMotionState}
-              collectionImage={pageMotionImage}
-              tokenSymbol={pageMotionSymbol}
-              title={motionTitleForPage(active, title)}
-              subtitle={motionSubtitleForPage(active)}
-              className="min-h-[320px]"
-            />
-          </div>
-        </section> : null}
+        {showRouteHero ? (
+          <PhewPageHero
+            eyebrow={<StatusPill accent="green">PHEW.DEVNET / Faction OS</StatusPill>}
+            title={title}
+            subtitle={routeSubtitleForPage(active, data?.subtitle)}
+            actions={
+              <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
+                <img src={brandAssets.generatedIcons.community} alt="" className="size-5 object-contain" /> Create Community
+              </Link>
+            }
+            visualAsset={pageHeroAsset}
+            backgroundAsset={pageHeroAsset}
+            visualMode="banner"
+            heroType={heroTypeForPage(active, endpoint)}
+            heroSize="large"
+            sidePanel={<RouteHeroStatus status={pageMotionState} title={motionTitleForPage(active, title)} subtitle={motionSubtitleForPage(active)} tokenSymbol={pageMotionSymbol} asset={heroIconForPage(active, endpoint)} />}
+          />
+        ) : null}
 
         {blockedByWallet ? <WalletDisconnectedState /> : null}
         {privateDiagnostics ? <SetupWarning warnings={warnings} /> : null}
@@ -803,32 +796,77 @@ function activityRecord(item: unknown) {
 function MarketplaceView({ data }: { data: ProductData }) {
   const collections = data.collections ?? [];
   const nfts = data.nfts ?? [];
+  const listings = data.listings ?? [];
+  const activity = data.activity ?? [];
+  const topCollections = [...collections].sort((a, b) => (b.volume24hSol ?? 0) - (a.volume24hSol ?? 0)).slice(0, 5);
   return (
-    <div className="space-y-5">
-      <SectionCard title="Vault Exchange">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-vault-green" />
-            <input className="phew-input h-12 w-full rounded-md pl-11 pr-4 text-sm" placeholder="Search vault NFTs" />
-          </label>
-          <select className="phew-input h-12 rounded-md px-4 text-sm" defaultValue="all">
-            <option value="all">All factions</option>
-            {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
-          </select>
-          <select className="phew-input h-12 rounded-md px-4 text-sm" defaultValue="recent">
-            <option value="recent">Recently listed</option>
-            <option value="price">Price low to high</option>
-            <option value="rarity">Rarity</option>
-          </select>
-        </div>
-      </SectionCard>
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard iconAsset={brandAssets.nftSlot} label="Active listings" value={formatMetric((data.listings ?? []).length || nfts.length)} />
-        <StatCard iconAsset={brandAssets.vaultSafe} label="Backed inventory" value={formatMetric(nfts.length)} accent="green" />
-        <StatCard iconAsset={(data.listings ?? []).length ? brandAssets.proofRing : brandAssets.errorGlitch} label="Price source" value={(data.listings ?? []).length ? "Live listings" : "No listings"} accent="gold" />
+    <DashboardLayout>
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard iconAsset={brandAssets.nftSlot} label="Active listings" value={formatMetric(listings.length)} />
+        <StatCard iconAsset={brandAssets.vaultSafe} label="Verified vaults" value={formatMetric(nfts.length)} accent="green" />
+        <StatCard iconAsset={brandAssets.tokenObject} label="Backing value" value={formatSol(nfts.reduce((sum, nft) => sum + (Number(nft.backingSol) || 0), 0))} accent="gold" />
+        <StatCard iconAsset={listings.length ? brandAssets.proofRing : brandAssets.errorGlitch} label="Price source" value={listings.length ? "Live asks" : "Ask N/A"} accent={listings.length ? "cyan" : "gold"} />
       </div>
-      {nfts.length ? <MarketplaceGrid items={nfts} collections={collections} listings={data.listings} /> : <EmptyState title="No marketplace listings" body="Listings appear only after real active listings or vault NFTs are returned by the API. No production prices are invented." />}
-    </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <main className="space-y-5">
+          <SectionCard title="Verified Vault Listings">
+            <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_150px]">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-vault-green" />
+                <input className="phew-input h-12 w-full rounded-md pl-11 pr-4 text-sm" placeholder="Search vault NFTs" />
+              </label>
+              <select className="phew-input h-12 rounded-md px-4 text-sm" defaultValue="all">
+                <option value="all">All communities</option>
+                {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
+              </select>
+              <select className="phew-input h-12 rounded-md px-4 text-sm" defaultValue="recent">
+                <option value="recent">Recently listed</option>
+                <option value="price">Ask price</option>
+                <option value="backing">Backing value</option>
+              </select>
+              <Link href="/profile" className="inline-flex h-12 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-black text-vault-green">List vault</Link>
+            </div>
+            {nfts.length ? <MarketplaceGrid items={nfts} collections={collections} listings={listings} /> : <EmptyState title="No verified listings" body="Marketplace rows appear only after real active listings or verified vault NFTs are returned by the API. Backing value and ask price stay N/A instead of being invented." />}
+          </SectionCard>
+        </main>
+
+        <aside className="space-y-5">
+          <SectionCard title="Value vs Price">
+            <div className="grid gap-3">
+              <MiniStat label="Backing value" value="Tokens locked inside the vault NFT" />
+              <MiniStat label="Ask price" value="Seller listing price from the marketplace route" />
+              <MiniStat label="Best offer" value="N/A until an offer endpoint exists" />
+            </div>
+          </SectionCard>
+          <SectionCard title="Top Communities">
+            {topCollections.length ? (
+              <div className="grid gap-2">
+                {topCollections.map((collection) => (
+                  <Link key={collection.id} href={`/collections/${collection.id}`} className="rounded-md border border-vault-line bg-black/25 p-3 transition hover:border-vault-green/45">
+                    <div className="flex items-center gap-3">
+                      <img src={collection.image || brandAssets.nftSlot} alt="" className="size-10 rounded object-cover" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-white">{collection.name}</p>
+                        <p className="truncate text-xs text-slate-500">{collection.symbol} / floor {formatSol(collection.floorSol)}</p>
+                      </div>
+                      <StatusPill accent={collection.reserveHealth === "HEALTHY" ? "green" : "gold"}>{collection.reserveHealth ?? "N/A"}</StatusPill>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : <EmptyBlock title="No top communities" body="Community ranking appears after real collection market rows are returned." />}
+          </SectionCard>
+          <SectionCard title="Recent Activity">
+            {activity.length ? (
+              <div className="grid gap-2">
+                {activity.slice(0, 6).map((item, index) => <MiniMetric key={activityKey(item, index)} label={activityTitle(item)} value={activityAmount(item)} />)}
+              </div>
+            ) : <EmptyBlock title="No marketplace activity" body="Sales, listings, and offers appear only from backend activity rows." />}
+          </SectionCard>
+        </aside>
+      </div>
+    </DashboardLayout>
   );
 }
 
@@ -993,19 +1031,108 @@ function StakingView({ data, reload }: { data: ProductData; reload: () => void }
 
 function ProfileView({ data, walletAddress }: { data: ProductData; walletAddress?: string | null }) {
   const nfts = data.nfts ?? [];
+  const positions = data.positions ?? [];
+  const availableToStake = data.eligibleVaults ?? nfts.filter((nft) => nft.status !== "Staked" && nft.status !== "Redeemable");
+  const stakedNfts = nfts.filter((nft) => nft.status === "Staked");
+  const redeemableNfts = nfts.filter((nft) => nft.status === "Redeemable");
+  const totalBacking = nfts.reduce((sum, nft) => sum + (Number(nft.backingSol) || 0), 0);
+  const stakedBacking = stakedNfts.reduce((sum, nft) => sum + (Number(nft.backingSol) || 0), 0);
+  const availableBacking = availableToStake.reduce((sum, nft) => sum + (Number(nft.backingSol) || 0), 0);
   const connected = Boolean(walletAddress);
   return (
-    <div className="space-y-5">
-      <SectionCard title="Wallet Profile">
-        <div className="grid gap-4 md:grid-cols-3">
-          <MiniStat label="Connected wallet" value={walletAddress ?? "Disconnected"} />
-          <MiniStat label="Owned vaults" value={connected ? formatMetric(nfts.length) : "N/A"} />
-          <MiniStat label="Activity rows" value={connected ? formatMetric((data.activity ?? []).length) : "N/A"} />
+    <DetailLayout>
+      <SectionCard title="Wallet Portfolio">
+        <div className="grid gap-4 md:grid-cols-5">
+          <MiniStat label="Wallet" value={walletAddress ?? "Disconnected"} />
+          <MiniStat label="Total value" value={connected ? formatSol(totalBacking) : "N/A"} />
+          <MiniStat label="Locked value" value={connected ? formatSol(totalBacking) : "N/A"} />
+          <MiniStat label="Staked value" value={connected ? formatSol(stakedBacking) : "N/A"} />
+          <MiniStat label="Available to stake" value={connected ? formatSol(availableBacking) : "N/A"} />
         </div>
       </SectionCard>
-      <SectionCard title="Owned Vaults">
-        {nfts.length && data.collections?.length ? <MarketplaceGrid items={nfts} collections={data.collections} /> : <EmptyBlock title={connected ? "No owned vaults" : "Wallet required"} body="Owned vault NFTs appear only after a connected wallet has confirmed vault ownership through the backend." />}
-      </SectionCard>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <main className="space-y-5">
+          <SectionCard title="Available Vault NFTs">
+            {availableToStake.length ? (
+              <div className="grid gap-3">
+                {availableToStake.map((nft) => <ProfileVaultRow key={nft.id} nft={nft} action="stake" />)}
+              </div>
+            ) : <EmptyBlock title={connected ? "No available vaults" : "Wallet required"} body="Available-to-stake Vault NFTs appear only after the backend confirms wallet ownership and staking eligibility." />}
+          </SectionCard>
+
+          <SectionCard title="Staked Vault NFTs">
+            {stakedNfts.length ? (
+              <div className="grid gap-3">
+                {stakedNfts.map((nft) => <ProfileVaultRow key={nft.id} nft={nft} action="unstake" />)}
+              </div>
+            ) : <EmptyBlock title="No staked vaults" body="Staked NFTs appear from real staking state. This page does not invent positions or rewards." />}
+          </SectionCard>
+
+          <SectionCard title="Owned Vault Inventory">
+            {nfts.length ? (
+              <div className="grid gap-3">
+                {nfts.map((nft) => <ProfileVaultRow key={nft.id} nft={nft} action="proof" />)}
+              </div>
+            ) : <EmptyBlock title={connected ? "No owned vaults" : "Wallet required"} body="Owned vault NFTs appear only after a connected wallet has confirmed vault ownership through the backend." />}
+          </SectionCard>
+        </main>
+
+        <aside className="space-y-5">
+          <SectionCard title="Rewards Overview">
+            <div className="grid gap-3">
+              <MiniStat label="Reward positions" value={connected ? formatMetric(positions.length) : "N/A"} />
+              <MiniStat label="Claimable rewards" value={positions.length ? formatRewardSum(positions) : "N/A"} />
+              <MiniStat label="Raid activity" value={connected ? formatMetric((data.raids ?? []).length) : "N/A"} />
+              <button type="button" disabled className="h-11 rounded-md border border-vault-line bg-black/25 text-sm font-black text-slate-500">Claim N/A</button>
+            </div>
+          </SectionCard>
+          <SectionCard title="Achievements">
+            <div className="grid gap-2">
+              <MiniMetric label="Vault owner" value={nfts.length ? "Unlocked" : "N/A"} />
+              <MiniMetric label="Staker" value={stakedNfts.length ? "Unlocked" : "N/A"} />
+              <MiniMetric label="Redeemer" value={redeemableNfts.length ? "Eligible" : "N/A"} />
+              <MiniMetric label="Raider" value={(data.raids ?? []).length ? "Active" : "N/A"} />
+            </div>
+          </SectionCard>
+          <SectionCard title="Activity">
+            {(data.activity ?? []).length ? (
+              <div className="grid gap-2">
+                {(data.activity ?? []).slice(0, 8).map((item, index) => <MiniMetric key={activityKey(item, index)} label={activityTitle(item)} value={activityDetail(item)} />)}
+              </div>
+            ) : <EmptyBlock title="No profile activity" body="Wallet XP, raid, stake, redeem, and proof events appear only after backend activity rows exist." />}
+          </SectionCard>
+        </aside>
+      </div>
+    </DetailLayout>
+  );
+}
+
+function ProfileVaultRow({ nft, action }: { nft: VaultNft; action: "stake" | "unstake" | "proof" }) {
+  const href = nft.mint ? `/vaults/${encodeURIComponent(nft.mint)}/proof` : "/proof";
+  return (
+    <div className="rounded-lg border border-vault-line bg-black/25 p-4">
+      <div className="grid gap-4 md:grid-cols-[76px_minmax(0,1fr)_150px] md:items-center">
+        <img src={nft.image || brandAssets.nftSlot} alt="" className="aspect-[4/5] w-[76px] rounded-md border border-vault-line object-cover" />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-black text-white">{nft.name}</p>
+            <StatusPill accent={nft.status === "Staked" ? "cyan" : nft.status === "Redeemable" ? "green" : "gold"}>{nft.status}</StatusPill>
+          </div>
+          <p className="mt-1 break-all text-xs text-slate-500">{nft.mint ?? nft.id}</p>
+          <div className="mt-3 grid gap-2 md:grid-cols-4">
+            <MiniMetric label="Locked" value={nft.lockedAmount || "N/A"} />
+            <MiniMetric label="Backing" value={formatSol(nft.backingSol)} />
+            <MiniMetric label="Unlock" value={nft.unlockDate || "N/A"} />
+            <MiniMetric label="Rarity" value={nft.rarity || "N/A"} />
+          </div>
+        </div>
+        <div className="grid gap-2">
+          <Link href={href} className="inline-flex h-10 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 text-sm font-black text-vault-green">Proof</Link>
+          {action === "stake" ? <Link href="/staking" className="inline-flex h-10 items-center justify-center rounded-md border border-vault-cyan/45 bg-vault-cyan/10 text-sm font-black text-vault-cyan">Stake now</Link> : null}
+          {action === "unstake" ? <Link href="/staking" className="inline-flex h-10 items-center justify-center rounded-md border border-vault-line bg-black/25 text-sm font-black text-slate-300">Manage</Link> : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1015,8 +1142,9 @@ function LeaderboardView({ data }: { data: ProductData }) {
   const raids = data.raids ?? [];
   const activity = data.activity ?? [];
   const recentMints = data.recentMints ?? [];
+  const top = collections[0] ?? null;
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <DashboardLayout className="xl:grid-cols-[minmax(0,1fr)_380px]">
       <main className="space-y-5">
         <div className="grid gap-4 md:grid-cols-4">
           <StatCard iconAsset={brandAssets.rewardBurst} label="Ranked factions" value={formatMetric(collections.length)} accent="gold" />
@@ -1025,7 +1153,13 @@ function LeaderboardView({ data }: { data: ProductData }) {
           <StatCard iconAsset={brandAssets.proofRing} label="Recent mints" value={formatMetric(recentMints.length)} />
         </div>
 
-        <SectionCard title="Faction Leaderboard">
+        <SectionCard title="Ecosystem Rankings">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {["Communities", "Builders", "Raiders", "Stakers", "Provers", "Creators"].map((tab, index) => (
+              <span key={tab} className={cn("rounded-md border px-3 py-2 text-xs font-black uppercase", index === 0 ? "border-vault-green bg-vault-green/10 text-vault-green" : "border-vault-line bg-black/25 text-slate-400")}>{tab}</span>
+            ))}
+            <span className="ml-auto rounded-md border border-vault-line bg-black/25 px-3 py-2 text-xs font-black uppercase text-slate-400">Season: All time</span>
+          </div>
           {collections.length ? (
             <div className="grid gap-3">
               {collections.map((collection, index) => (
@@ -1047,6 +1181,7 @@ function LeaderboardView({ data }: { data: ProductData }) {
                       <MiniMetric label="Score" value={formatMetric(leaderboardScore(collection))} />
                       <MiniMetric label="Vaults" value={formatMetric(collection.vaults)} />
                       <MiniMetric label="XP" value={formatMetric(collection.xp)} />
+                      <MiniMetric label="Proofs" value={formatMetric(collection.minted)} />
                     </div>
                   </div>
                 </Link>
@@ -1059,8 +1194,19 @@ function LeaderboardView({ data }: { data: ProductData }) {
       </main>
 
       <aside className="space-y-5">
-        <SectionCard title="Reward Rail">
-          <TransactionFlow state={collections.length ? "idle" : "preparing"} moment="reward" title="Leaderboard reward route" description="Scores are derived from backend collection XP, vault count, raid activity, and recent mints. No sample ranks are inserted." tokenSymbol="PHEW" compact />
+        <SectionCard title="Top Rank Reward">
+          <div className="rounded-lg border border-vault-gold/35 bg-vault-gold/10 p-4">
+            <img src={brandAssets.rewardBurst} alt="" className="mb-3 size-16 object-contain" />
+            <p className="text-lg font-black text-white">{top ? top.name : "Reward N/A"}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">Reward eligibility is display-only until a real reward claim route returns ranked payouts.</p>
+          </div>
+          <div className="mt-3 grid gap-2">
+            <MiniMetric label="Top score" value={top ? formatMetric(leaderboardScore(top)) : "N/A"} />
+            <MiniMetric label="Your rank" value="N/A until wallet rank endpoint exists" />
+          </div>
+        </SectionCard>
+        <SectionCard title="Scoring">
+          <TransactionFlow state={collections.length ? "idle" : "preparing"} moment="reward" title="Score formula" description="Score = XP plus vault count, raid success, proofs, and active user signals returned by the backend. No sample ranks are inserted." tokenSymbol="PHEW" compact />
         </SectionCard>
         <SectionCard title="Data Sources">
           <div className="grid gap-3">
@@ -1070,7 +1216,7 @@ function LeaderboardView({ data }: { data: ProductData }) {
           </div>
         </SectionCard>
       </aside>
-    </div>
+    </DashboardLayout>
   );
 }
 
@@ -1221,7 +1367,9 @@ function HomeOverviewStat({ asset, label, value }: { asset: string; label: strin
 function NativeFeatureTile({ asset, title, body }: { asset: string; title: string; body: string }) {
   return (
     <div className="rounded-lg border border-vault-line bg-black/25 p-4">
-      <img src={asset} alt="" className="size-9 object-contain drop-shadow-[0_0_16px_rgba(186,255,0,0.24)]" />
+      <div className="grid h-28 w-28 place-items-center rounded-md border border-vault-green/20 bg-vault-green/8 shadow-[inset_0_0_28px_rgba(186,255,0,0.08)]">
+        <img src={asset} alt="" className="h-24 w-24 object-contain drop-shadow-[0_0_22px_rgba(186,255,0,0.34)]" />
+      </div>
       <p className="mt-4 font-black">{title}</p>
       <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
     </div>
@@ -1232,7 +1380,9 @@ function NativeStepTile({ asset, stage, title, body }: { asset: string; stage: s
   return (
     <div className="relative overflow-hidden rounded-lg border border-vault-line bg-black/25 p-4">
       <div className="absolute right-3 top-3 text-[11px] font-black uppercase tracking-[0.2em] text-vault-green/55">{stage}</div>
-      <img src={asset} alt="" className="size-10 object-contain drop-shadow-[0_0_16px_rgba(186,255,0,0.28)]" />
+      <div className="grid h-32 w-32 place-items-center rounded-md border border-vault-cyan/18 bg-vault-cyan/8 shadow-[inset_0_0_30px_rgba(22,215,210,0.08)]">
+        <img src={asset} alt="" className="h-28 w-28 object-contain drop-shadow-[0_0_24px_rgba(186,255,0,0.34)]" />
+      </div>
       <p className="mt-4 font-black">{title}</p>
       <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
     </div>
@@ -1323,16 +1473,49 @@ function formatRewardSum(positions: unknown[]) {
   return `${total.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL`;
 }
 
-function motionMomentForPage(active: string, endpoint: string): PhewAnimationMoment {
-  if (active === "staking" || endpoint.includes("/staking")) return "stake";
-  if (active === "redeem" || active === "strategy-engine" || endpoint.includes("/instant-sell")) return "redeem";
-  if (active === "raids" || endpoint.includes("/raids")) return "reward";
-  if (active === "leaderboard") return "reward";
-  if (active === "marketplace" || endpoint.includes("/marketplace")) return "mint";
-  if (active === "risk" || endpoint.includes("/admin/risk")) return "scan";
-  if (active === "profile" || active === "my-vaults" || endpoint.includes("/profile")) return "proof";
-  if (active === "collections" || endpoint.includes("/collections")) return "community";
-  return "scan";
+function RouteHeroStatus({ status, title, subtitle, tokenSymbol, asset }: { status: "idle" | "loading" | "error"; title: string; subtitle: string; tokenSymbol?: string | null; asset: string }) {
+  return (
+    <div className={cn("phew-route-hero-status", status === "loading" && "phew-route-hero-status-loading", status === "error" && "phew-route-hero-status-error")}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-vault-green">Compact backend status</p>
+          <h2 className="mt-2 text-lg font-black leading-tight text-white">{title}</h2>
+        </div>
+        <img src={asset} alt="" className="size-16 shrink-0 object-contain drop-shadow-[0_0_22px_rgba(186,255,0,0.28)]" />
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-400">{subtitle}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <StatusPill accent={status === "error" ? "red" : status === "loading" ? "cyan" : "green"}>{status === "error" ? "Backend issue" : status === "loading" ? "Checking" : "Ready"}</StatusPill>
+        {tokenSymbol ? <StatusPill accent="gold">{tokenSymbol}</StatusPill> : null}
+      </div>
+    </div>
+  );
+}
+
+function heroAssetForPage(active: string, endpoint: string) {
+  if (active === "leaderboard") return brandAssets.pageHeroes.leaderboard;
+  if (active === "marketplace" || endpoint.includes("/marketplace") || endpoint.includes("/nfts")) return brandAssets.pageHeroes.marketplace;
+  if (active === "raids" || endpoint.includes("/raids")) return brandAssets.pageHeroes.raids;
+  if (active === "strategy-engine" || endpoint.includes("/instant-sell")) return brandAssets.pageHeroes.studioStrategy;
+  if (active === "my-vaults" || active === "profile" || endpoint.includes("/profile")) return brandAssets.pageHeroes.proof;
+  if (active === "collections" || endpoint.includes("/collections")) return brandAssets.pageHeroes.collections;
+  return brandAssets.pageHeroes.home;
+}
+
+function heroIconForPage(active: string, endpoint: string) {
+  if (active === "leaderboard") return brandAssets.generatedIcons.leaderboard;
+  if (active === "marketplace" || endpoint.includes("/marketplace") || endpoint.includes("/nfts")) return brandAssets.generatedIcons.marketplace;
+  if (active === "raids" || endpoint.includes("/raids")) return brandAssets.generatedIcons.raid;
+  if (active === "strategy-engine" || endpoint.includes("/instant-sell")) return brandAssets.generatedIcons.strategy;
+  if (active === "my-vaults" || active === "profile" || endpoint.includes("/profile")) return brandAssets.generatedIcons.proof;
+  if (active === "collections" || endpoint.includes("/collections")) return brandAssets.generatedIcons.collections;
+  return brandAssets.generatedIcons.home;
+}
+
+function heroTypeForPage(active: string, endpoint: string): "dashboard" | "product" | "detail" {
+  if (active === "my-vaults" || active === "profile" || endpoint.includes("/profile") || endpoint.includes("/nfts/") || endpoint.includes("/collections/")) return "detail";
+  if (endpoint.includes("/staking") || endpoint.includes("/instant-sell")) return "product";
+  return "dashboard";
 }
 
 function motionTitleForPage(active: string, title: string) {
@@ -1360,6 +1543,7 @@ function motionSubtitleForPage(active: string) {
 }
 
 function routeSubtitleForPage(active: string, subtitle?: string | null) {
+  if (active === "marketplace") return "Verified vault listings show token backing, ask price, reserve health, and disabled offer/list states until real market rows exist.";
   if (active === "leaderboard") return "Rank factions from live vault count, XP, raid, mint, and activity rows returned by the backend.";
   if (active === "strategy-engine" || active === "instant-sell") return "Review instant-sell liquidity, quote readiness, and risk-discount inputs without inventing pool data.";
   if (active === "my-vaults" || active === "profile") return "Connect a wallet to load owned Vault NFTs, proof shortcuts, staking state, and redeemable positions.";

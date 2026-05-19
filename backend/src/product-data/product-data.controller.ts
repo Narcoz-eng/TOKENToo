@@ -45,6 +45,11 @@ export class ProductDataController {
     return this.product.publicMarketplace();
   }
 
+  @Get("wallet-tokens")
+  walletTokens(@Query("wallet") walletAddress?: string) {
+    return this.product.publicWalletTokens(walletAddress);
+  }
+
   @Get("staking")
   staking(@Query("wallet") walletAddress?: string) {
     return this.product.publicStaking(walletAddress);

@@ -149,7 +149,7 @@ export function RaidRoomsPage() {
         <section className="phew-panel relative overflow-hidden rounded-lg border-vault-green/35 p-4">
           <div className="relative flex flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-4">
-              <img src={brandAssets.mascotPoses.running} alt="" className="h-20 w-20 shrink-0 object-contain drop-shadow-[0_0_24px_rgba(186,255,0,0.42)]" />
+              <img src={brandAssets.generated.commander} alt="" className="h-24 w-28 shrink-0 object-contain drop-shadow-[0_0_24px_rgba(186,255,0,0.42)]" />
               <div className="min-w-0">
                 <h2 className="text-xl font-black text-white">Lead the movement. Earn rewards.</h2>
                 <p className="mt-1 text-sm text-slate-400">Create a raid room, define proof rules, and keep every success state backend-confirmed.</p>
@@ -209,7 +209,7 @@ function NoRaidsEmpty({ onCreate }: { onCreate: () => void }) {
       <div className="grid gap-4 md:grid-cols-[120px_minmax(0,1fr)] md:items-center">
         <div className="relative mx-auto size-28">
           <span className="absolute inset-x-2 bottom-2 h-4 rounded-full border border-vault-green/65 shadow-green" />
-          <img src={brandAssets.mascotPoses.running} alt="" className="relative z-10 h-full w-full object-contain drop-shadow-[0_0_24px_rgba(186,255,0,0.42)]" />
+          <img src={brandAssets.generated.commander} alt="" className="relative z-10 h-full w-full object-contain drop-shadow-[0_0_24px_rgba(186,255,0,0.42)]" />
         </div>
         <div>
           <h3 className="text-xl font-black text-white">No live raids yet.</h3>

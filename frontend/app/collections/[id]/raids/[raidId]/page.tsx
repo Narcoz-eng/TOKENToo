@@ -1,5 +1,6 @@
 import { ProductDataPage } from "@/components/ProductDataPage";
 
-export default function RaidRoomPage({ params }: { params: { id: string; raidId: string } }) {
-  return <ProductDataPage active="raids" title="Live Raid Room" endpoint={`/product/collections/${params.id}/raids/${params.raidId}`} />;
+export default async function RaidRoomPage({ params }: { params: Promise<{ id: string; raidId: string }> }) {
+  const { id, raidId } = await params;
+  return <ProductDataPage active="raids" title="Live Raid Room" endpoint={`/product/collections/${encodeURIComponent(id)}/raids/${encodeURIComponent(raidId)}`} />;
 }

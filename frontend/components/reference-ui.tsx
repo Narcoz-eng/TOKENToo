@@ -17,14 +17,11 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { PhewEmptyState } from "@/components/PhewEmptyState";
 import { PhewPageHero, type PhewHeroMascotPose } from "@/components/PhewPageHero";
-import { PhewGameMoment } from "@/components/PhewGameMoments";
 import { PhewMascot, type PhewMascotMood } from "@/components/PhewMascot";
 import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
 export type ReferenceTone = "green" | "cyan" | "gold" | "red" | "muted";
-export type ReferenceSceneMode = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "studio" | "reward" | "scan" | "layer" | "raid";
-export type ReferenceSceneState = "idle" | "wallet-disconnected" | "loading" | "preparing" | "signing" | "submitting" | "confirming" | "success" | "error";
 type ReferenceMascotPose = PhewHeroMascotPose | "run" | "point" | "guide";
 
 export function ReferenceShell({
@@ -55,6 +52,7 @@ export function ReferenceHeader({
   actions,
   aside,
   warning,
+  heroAsset,
   className
 }: {
   eyebrow?: ReactNode;
@@ -66,8 +64,11 @@ export function ReferenceHeader({
   actions?: ReactNode;
   aside?: ReactNode;
   warning?: ReactNode;
+  heroAsset?: string | null;
   className?: string;
 }) {
+  const referenceHero = heroAsset ?? referenceHeroAsset(title, mascotPose);
+
   return (
     <PhewPageHero
       eyebrow={eyebrow}
@@ -76,6 +77,10 @@ export function ReferenceHeader({
       actions={actions}
       mascotPose={heroPoseFromReferencePose(mascotPose)}
       mascotClassName={mascotClassName}
+      backgroundAsset={referenceHero}
+      visualAsset={referenceHero}
+      visualMode="banner"
+      heroSize="large"
       sidePanel={aside}
       warning={warning}
       className={className}
@@ -294,51 +299,6 @@ export function ReferenceProgressDots({ count = 5, activeIndex = 0, className }:
   );
 }
 
-export function ReferenceTransactionScene({
-  mode,
-  state = "idle",
-  title,
-  description,
-  tokenSymbol,
-  image,
-  detail,
-  activeStep,
-  steps,
-  compact,
-  className
-}: {
-  mode: ReferenceSceneMode;
-  state?: ReferenceSceneState;
-  title: ReactNode;
-  description?: ReactNode;
-  tokenSymbol?: string | null;
-  image?: string | null;
-  detail?: ReactNode;
-  activeStep?: number;
-  steps?: string[];
-  compact?: boolean;
-  className?: string;
-}) {
-  const canonicalState = normalizeSceneState(state);
-  const stepLabels = steps ?? sceneSteps(mode);
-  const stepIndex = activeStep ?? sceneStepIndex(canonicalState, stepLabels.length);
-  return (
-    <PhewGameMoment
-      mode={mode}
-      state={canonicalState}
-      title={title}
-      description={description}
-      tokenSymbol={tokenSymbol}
-      image={image}
-      detail={detail}
-      steps={stepLabels}
-      activeStep={stepIndex}
-      compact={compact}
-      className={className}
-    />
-  );
-}
-
 export function ReferenceTable({
   columns,
   rows,
@@ -468,95 +428,25 @@ export function shortAddress(value?: string | null, size = 6): string {
   return value.length > size * 2 + 3 ? `${value.slice(0, size)}...${value.slice(-size)}` : value;
 }
 
-function normalizeSceneState(state: ReferenceSceneState): ReferenceSceneState {
-  if (state === "preparing") return "loading";
-  return state;
-}
-
-function sceneSteps(mode: ReferenceSceneMode) {
-  if (mode === "stake") return ["Initiated", "Transfer", "Validate", "Lock", "Confirm", "Rewards"];
-  if (mode === "unstake") return ["Select", "Validate", "Unlock", "Release", "Confirm"];
-  if (mode === "redeem") return ["Eligible", "Proof", "Unlock", "Burn", "Return", "Confirm"];
-  if (mode === "proof") return ["Load", "Owner", "Reserve", "Position", "Verify"];
-  if (mode === "community") return ["Scan", "Gates", "Build", "Sign", "Submit", "Verify"];
-  if (mode === "studio") return ["Token", "Brand", "Bible", "Layers", "Launch"];
-  if (mode === "raid") return ["Join", "Proof", "Review", "XP"];
-  if (mode === "mint") return ["Configure", "Build", "Sign", "Confirm"];
-  return ["Init", "Validate", "Submit", "Confirm"];
-}
-
-function sceneStepIndex(state: ReferenceSceneState, count: number) {
-  if (state === "success") return Math.max(0, count - 1);
-  if (state === "error") return 0;
-  if (state === "confirming") return Math.max(0, count - 2);
-  if (state === "signing" || state === "submitting") return Math.min(count - 1, 2);
-  if (state === "loading") return Math.min(count - 1, 1);
-  return 0;
-}
-
-function stateTone(state: ReferenceSceneState): ReferenceTone {
-  if (state === "success") return "green";
-  if (state === "error") return "red";
-  if (state === "wallet-disconnected") return "gold";
-  if (state === "loading" || state === "signing" || state === "submitting" || state === "confirming") return "cyan";
-  return "muted";
-}
-
-function stateLabel(state: ReferenceSceneState) {
-  if (state === "wallet-disconnected") return "Wallet locked";
-  if (state === "loading") return "Loading";
-  if (state === "signing") return "Signing";
-  if (state === "submitting") return "Submitted";
-  if (state === "confirming") return "Confirming";
-  if (state === "success") return "Success";
-  if (state === "error") return "Error";
-  return "Idle";
-}
-
-function modeLabel(mode: ReferenceSceneMode) {
-  const labels: Record<ReferenceSceneMode, string> = {
-    mint: "Mint Moment",
-    stake: "Stake Moment",
-    unstake: "Unstake Moment",
-    redeem: "Redeem Moment",
-    proof: "Proof Scan",
-    community: "Community Launch",
-    studio: "Studio Bible",
-    reward: "Reward Burst",
-    scan: "Token Scan",
-    layer: "Layer Pack",
-    raid: "Raid Moment"
-  };
-  return labels[mode];
-}
-
 function heroPoseFromReferencePose(pose: ReferenceMascotPose): PhewHeroMascotPose {
   if (pose === "run") return "running";
   if (pose === "point" || pose === "guide") return "loading";
   return pose;
 }
 
-function targetLabel(mode: ReferenceSceneMode) {
-  if (mode === "stake") return "vault";
-  if (mode === "unstake") return "unlock";
-  if (mode === "redeem") return "wallet";
-  if (mode === "proof" || mode === "scan") return "proof";
-  if (mode === "community") return "launch";
-  if (mode === "studio" || mode === "layer") return "layers";
-  if (mode === "reward") return "reward";
-  if (mode === "raid") return "raid";
-  return "vault";
-}
-
-function targetAsset(mode: ReferenceSceneMode, state: ReferenceSceneState) {
-  if (state === "error") return brandAssets.errorGlitch;
-  if (state === "success") return brandAssets.rewardBurst;
-  if (mode === "redeem" || mode === "unstake") return brandAssets.redeemParticles;
-  if (mode === "proof" || mode === "scan") return brandAssets.proofRing;
-  if (mode === "community" || mode === "studio" || mode === "layer") return brandAssets.transactionObjects.community;
-  if (mode === "reward") return brandAssets.rewardBurst;
-  if (mode === "raid") return brandAssets.raid.flag;
-  return brandAssets.vaultSafe;
+function referenceHeroAsset(title: ReactNode, pose: ReferenceMascotPose) {
+  const label = typeof title === "string" ? title.toLowerCase() : "";
+  if (label.includes("collection")) return brandAssets.pageHeroes.collections;
+  if (label.includes("staking") || pose === "stake") return brandAssets.pageHeroes.staking;
+  if (label.includes("redeem") || pose === "redeem") return brandAssets.pageHeroes.redeem;
+  if (label.includes("proof") || pose === "explorer") return brandAssets.pageHeroes.proof;
+  if (label.includes("setup")) return brandAssets.pageHeroes.adminRisk;
+  if (label.includes("risk") || pose === "admin") return brandAssets.pageHeroes.adminRisk;
+  if (label.includes("strategy") || pose === "strategy") return brandAssets.pageHeroes.studioStrategy;
+  if (label.includes("studio") || pose === "studio") return brandAssets.pageHeroes.studioStrategy;
+  if (label.includes("raid")) return brandAssets.pageHeroes.raids;
+  if (label.includes("mint")) return brandAssets.pageHeroes.mint;
+  return brandAssets.pageHeroes.home;
 }
 
 function toneClass(tone: ReferenceTone) {

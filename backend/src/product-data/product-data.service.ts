@@ -2,6 +2,7 @@ import { HttpException, Inject, Injectable, Logger, NotFoundException } from "@n
 import { isDatabaseSetupError } from "../db/database-errors";
 import { publicEndpointFallback } from "../db/db-safety";
 import { PrismaService } from "../db/prisma.service";
+import { SolanaTransactionAdapterService } from "../vault-mint/solana-transaction-adapter.service";
 
 type HomeStats = {
   collections: number;
@@ -22,7 +23,10 @@ class ProductReadTimeoutError extends Error {}
 export class ProductDataService {
   private readonly logger = new Logger(ProductDataService.name);
 
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(SolanaTransactionAdapterService) private readonly solana: SolanaTransactionAdapterService
+  ) {}
 
   async publicHome() {
     return this.publicRead(() => this.home(), this.emptyHome());
@@ -56,6 +60,10 @@ export class ProductDataService {
 
   async publicMarketplace() {
     return this.publicRead(() => this.marketplace(), { collections: [], nfts: [], listings: [], sales: [], stats: this.emptyStats() });
+  }
+
+  async publicWalletTokens(walletAddress?: string) {
+    return this.publicRead<any>(() => this.walletTokens(walletAddress), this.emptyWalletTokens(walletAddress));
   }
 
   async publicStaking(walletAddress?: string) {
@@ -229,6 +237,51 @@ export class ProductDataService {
     });
   }
 
+  async walletTokens(walletAddress?: string) {
+    if (!walletAddress) return this.emptyWalletTokens(walletAddress);
+    return this.safeRead<any>("wallet tokens", this.emptyWalletTokens(walletAddress), async () => {
+      const [discovery, collections] = await Promise.all([
+        this.solana.discoverWalletTokenBalances({ walletAddress }),
+        this.collections()
+      ]);
+      const collectionsByMint = new Map(collections.map((collection) => [collection.tokenMint, collection]));
+      const tokens = discovery.tokens.map((token) => {
+        const collection = collectionsByMint.get(token.mint);
+        const mintEligible = Boolean(collection?.mintEligible);
+        return {
+          ...token,
+          symbol: collection?.symbol ?? null,
+          name: collection?.name ?? null,
+          valueUsd: null,
+          valueSol: null,
+          communityStatus: collection ? "COMMUNITY_EXISTS" : "NO_COMMUNITY",
+          action: collection ? (mintEligible ? "MINT_TO_COMMUNITY" : "COMMUNITY_NOT_MINT_READY") : "CREATE_COMMUNITY",
+          collectionId: collection?.dbId ?? collection?.id ?? null,
+          collectionSlug: collection?.id ?? null,
+          collectionName: collection?.name ?? null,
+          collectionImage: collection?.image ?? null,
+          reserveHealth: collection?.reserveHealth ?? null,
+          mintEligible
+        };
+      });
+
+      return {
+        walletRequired: true,
+        walletAddress,
+        verificationAvailable: discovery.verificationAvailable,
+        provider: discovery.provider,
+        issues: discovery.issues,
+        tokens,
+        stats: {
+          totalTokens: tokens.length,
+          communityMatches: tokens.filter((token) => token.communityStatus === "COMMUNITY_EXISTS").length,
+          noCommunity: tokens.filter((token) => token.communityStatus === "NO_COMMUNITY").length,
+          mintEligible: tokens.filter((token) => token.mintEligible).length
+        }
+      };
+    });
+  }
+
   async staking(walletAddress?: string) {
     return this.safeRead("staking", { walletRequired: true, walletAddress, positions: [], eligibleVaults: [], collections: [] }, async () => {
       const user = walletAddress ? await this.prisma.user.findUnique({ where: { walletAddress } }) : null;
@@ -269,13 +322,23 @@ export class ProductDataService {
     return this.safeRead("profile", { walletRequired: true, user: null, nfts: [], raids: [], activity: [] }, async () => {
       const user = await this.prisma.user.findUnique({
         where: { walletAddress },
-        include: { vaultNfts: true, raidParticipations: true, xpLogs: { orderBy: { createdAt: "desc" }, take: 20 } }
+        include: {
+          vaultNfts: { include: { stakingPositions: true, collection: { include: { token: true, reserveVault: true, vaultStrategy: true } } } },
+          stakingPositions: { orderBy: { stakedAt: "desc" }, take: 20, include: { vaultNft: true, collection: true } },
+          raidParticipations: true,
+          xpLogs: { orderBy: { createdAt: "desc" }, take: 20 }
+        }
       });
       if (!user) return { walletRequired: true, user: null, nfts: [], raids: [], activity: [] };
+      const collections = new Map<string, any>();
+      for (const nft of user.vaultNfts) collections.set(nft.collection.id, nft.collection);
       return {
         walletRequired: true,
         user,
         nfts: user.vaultNfts.map((nft) => this.nftDto(nft, nft.collectionId)),
+        collections: [...collections.values()].map((collection) => this.collectionDto(collection)),
+        positions: user.stakingPositions,
+        eligibleVaults: user.vaultNfts.filter((nft) => this.isStakeEligibleVault(nft)).map((nft) => this.nftDto(nft, nft.collectionId)),
         raids: user.raidParticipations,
         activity: user.xpLogs
       };
@@ -409,6 +472,23 @@ export class ProductDataService {
       marketSnapshot: this.emptyMarketSnapshot(),
       stats: this.emptyStats(),
       empty: true
+    };
+  }
+
+  private emptyWalletTokens(walletAddress?: string) {
+    return {
+      walletRequired: true,
+      walletAddress,
+      verificationAvailable: false,
+      provider: process.env.SOLANA_TRANSACTION_PROVIDER ?? "mock",
+      issues: walletAddress ? ["Wallet token discovery is unavailable."] : ["Connect a wallet to scan SPL token balances."],
+      tokens: [],
+      stats: {
+        totalTokens: 0,
+        communityMatches: 0,
+        noCommunity: 0,
+        mintEligible: 0
+      }
     };
   }
 

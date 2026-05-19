@@ -20,7 +20,7 @@ async function main() {
 
 async function mintEligibilityGateTest() {
   const db = productDb();
-  const service = new ProductDataService(db as any);
+  const service = new ProductDataService(db as any, productSolanaStub() as any);
   const collections = await service.collections();
   const draft = collections.find((collection: any) => collection.id === "draft-token");
   const loosePremium = collections.find((collection: any) => collection.id === "loose-premium");
@@ -58,7 +58,7 @@ async function productionStakingFailClosedTest() {
 
 async function stakingEligibilityAndMutationTest() {
   const db = stakingDb();
-  const product = new ProductDataService(db as any);
+  const product = new ProductDataService(db as any, productSolanaStub() as any);
   const initial = await product.staking("owner-wallet");
   assert(initial.eligibleVaults.length === 1, "Only the confirmed live vault should appear as stake eligible.");
   assert(initial.eligibleVaults[0].mint === "live-nft", "Mock, pending, and already-staked vaults must be excluded.");
@@ -132,6 +132,16 @@ function productDb() {
     collection: {
       findMany: async () => rows
     }
+  };
+}
+
+function productSolanaStub() {
+  return {
+    deriveCommunityAddresses: () => ({
+      collectionProfile: "N/A",
+      feeVault: "N/A",
+      reserveVaultTokenAccount: "N/A"
+    })
   };
 }
 

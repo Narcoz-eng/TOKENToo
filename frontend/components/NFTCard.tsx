@@ -9,6 +9,7 @@ import { StatusPill } from "./StatusPill";
 import { TransactionStatus, type TxStatus } from "./TransactionStatus";
 import { ProtocolTrustStrip, vaultTrust } from "./protocol-trust";
 import { backendActionOutcome, type BackendActionResponse } from "@/lib/action-contracts";
+import { brandAssets } from "@/lib/brand-assets";
 
 export function NFTCard({ nft, collection, listingId }: { nft: VaultNft; collection: VaultCollection; listingId?: string }) {
   const wallet = useWalletAuth();
@@ -78,14 +79,10 @@ export function NFTCard({ nft, collection, listingId }: { nft: VaultNft; collect
           <ProtocolTrustStrip trust={trust} compact className="mt-3" />
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p className="text-slate-500">List price</p>
-            <p className="font-bold">{nft.priceSol.toFixed(2)} SOL</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Vault backing</p>
-            <p className="font-semibold text-slate-300">{nft.backingSol.toFixed(2)} SOL</p>
-          </div>
+          <ValueTile icon={brandAssets.tokenObject} label="Tokens locked" value={nft.lockedAmount || "N/A"} />
+          <ValueTile icon={brandAssets.vaultSafe} label="Backing value" value={`${nft.backingSol.toFixed(2)} SOL`} tone="green" />
+          <ValueTile icon={brandAssets.generatedIcons.marketplace} label="Ask price" value={listingId ? `${nft.priceSol.toFixed(2)} SOL` : "N/A"} tone="gold" />
+          <ValueTile icon={brandAssets.proofRing} label="Best offer" value="N/A" tone="cyan" />
         </div>
         <div className="rounded-md border border-vault-line bg-black/30 p-3">
           <div className="mb-2 flex items-center justify-between text-xs">
@@ -106,5 +103,18 @@ export function NFTCard({ nft, collection, listingId }: { nft: VaultNft; collect
         </button>
       </div>
     </article>
+  );
+}
+
+function ValueTile({ icon, label, value, tone = "slate" }: { icon: string; label: string; value: string; tone?: "slate" | "green" | "gold" | "cyan" }) {
+  const valueClass = tone === "green" ? "text-vault-green" : tone === "gold" ? "text-vault-gold" : tone === "cyan" ? "text-vault-cyan" : "text-white";
+  return (
+    <div className="rounded-md border border-vault-line bg-black/30 p-3">
+      <div className="flex items-center gap-2">
+        <img src={icon} alt="" className="size-4 object-contain" />
+        <p className="truncate text-xs text-slate-500">{label}</p>
+      </div>
+      <p className={`mt-2 truncate font-black ${valueClass}`}>{value}</p>
+    </div>
   );
 }

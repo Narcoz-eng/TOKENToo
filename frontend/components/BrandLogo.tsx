@@ -6,21 +6,21 @@ export function PhewLogoMark({ className, boxed = false }: { className?: string;
     <span
       className={cn(
         "grid shrink-0 place-items-center overflow-hidden",
-        boxed && "size-11 rounded-md border border-vault-green/25 bg-black/40 shadow-[0_0_22px_rgba(186,255,0,0.14)]",
+        boxed && "size-11 rounded-md border border-vault-green/25 bg-black shadow-[0_0_22px_rgba(186,255,0,0.14)]",
         className
       )}
     >
       <img
         src={brandAssets.logoMark}
         alt=""
-        className="h-full max-h-10 w-auto object-contain drop-shadow-[0_0_16px_rgba(186,255,0,0.35)]"
+        className="h-full w-full scale-[1.18] object-cover drop-shadow-[0_0_16px_rgba(186,255,0,0.35)]"
       />
     </span>
   );
 }
 
 export function PhewWordmark({ className }: { className?: string }) {
-  return <img src={brandAssets.wordmark} alt="Phew.run" className={cn("block h-auto max-h-9 w-auto object-contain", className)} />;
+  return <img src={brandAssets.wordmark} alt="Phew run" className={cn("block h-auto max-h-14 w-auto rounded-md object-contain", className)} />;
 }
 
 export function BrandLogo({ compact = false }: { compact?: boolean }) {

@@ -8,6 +8,9 @@ The implementation follows current frontend animation guidance: transform/opacit
 
 | Component | Purpose |
 | --- | --- |
+| `DashboardLayout` | Dense dashboard primitive for home, collections, marketplace, leaderboard, and other overview surfaces. |
+| `ProductFlowLayout` | Flow primitive for mint, stake, redeem, create-community, and other step-based transaction surfaces. |
+| `DetailLayout` | Detail/portfolio primitive for collection, profile, proof, and single-vault surfaces. |
 | `PhewMascot` | Renders a transparent mascot mood with intrinsic ratio. |
 | `PhewMascotHero` | Renders the large free hero mascot. |
 | `PhewMascotActor` | Actor wrapper with aura for scenes. |
@@ -24,6 +27,12 @@ The implementation follows current frontend animation guidance: transform/opacit
 | `ProofGameMoment` | Scan ring and verification sequence. |
 | `CommunityLaunchMoment` | Token scan to reserve/launch sequence. |
 | `RaidGameMoment` | Mission joined to proof submitted to XP/reward success sequence. |
+
+## Generated Asset Pack
+
+- Source/reference sheet: `frontend/public/art/phew-generated-game-flow-pack.png`.
+- Extracted motion pieces: `frontend/public/art/generated/*.png`.
+- The sheet is not used as a static storyboard in UI. `PhewMotionObject` selects extracted pieces and `PhewGameFrame` animates them with CSS transforms, progress state, and particles.
 
 ## Supported Moods
 
@@ -68,6 +77,10 @@ The implementation follows current frontend animation guidance: transform/opacit
 | `/create-community` | Compact launch status; `PhewSuccessMomentModal` with `community` after confirmed launch. |
 | `/raids` | Dense mission dashboard; `PhewSuccessMomentModal` with `raid` only after backend-confirmed join/mission approval. |
 | `/studio` | Compact Studio Bible/layer statuses; modal component is available, but no completion modal is shown without a real backend completion event. |
+
+## Hero V2 Contract
+
+`PhewPageHero` now accepts `heroType: dashboard | product | detail`, `visualAsset`, `backgroundAsset`, and an optional `mascotLayer`. The visual asset is page-specific generated art; the mascot is an actor layer, not a replacement for the hero. The desktop grid reserves separate copy, art, and status-panel columns to prevent cropped titles or stretched mascot/art.
 
 ## Data Contract
 

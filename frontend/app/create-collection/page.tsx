@@ -12,7 +12,7 @@ import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { ArtTeamProfile, CollectionGeneratorPreview, ConceptRequestSummary, CuratedLayerPackSummary, StudioPreviewAsset, StudioWorkflowState, StyleBiblePlan, StudioExportPlan } from "@/lib/types";
 import { brandAssets } from "@/lib/brand-assets";
-import { PhewGameMoment } from "@/components/PhewGameMoments";
+import { TransactionFlow, type TransactionFlowState } from "@/components/TransactionFlow";
 import { showPrivateDiagnostics } from "@/lib/diagnostics-access";
 import { hasRealStudioBibleAssets, isRealStudioBibleAsset, isStudioPreviewRequired, realStudioBibleAssetsFromPreview, studioAssetProvider, studioBibleAssetTypes, studioDisplayAssetTypeSet, studioPreviewStatusLabel } from "@/lib/studio-readiness";
 import { cn } from "@/lib/utils";
@@ -549,13 +549,13 @@ export default function CreateCollectionPage() {
     };
   }
 
-  const studioMomentState = error ? "error" : loading ? "loading" : hasAllStudioBibleAssets(studioPreview) ? "success" : "idle";
+  const studioMomentState: TransactionFlowState = error ? "error" : loading ? "preparing" : hasAllStudioBibleAssets(studioPreview) ? "success" : "idle";
 
   return (
     <AppShell active="studio">
       <div className="space-y-6">
         <section className="phew-panel phew-scanline relative overflow-hidden rounded-lg p-6 lg:p-8">
-          <img src={brandAssets.launchHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-48" />
+          <img src={brandAssets.pageHeroes.createCommunity} alt="" className="absolute inset-0 h-full w-full object-contain object-right opacity-55" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/88 to-[#020806]/28" />
           <div className="absolute inset-0 grid-mask opacity-25" />
           <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
@@ -572,8 +572,8 @@ export default function CreateCollectionPage() {
                 ))}
               </div>
             </div>
-            <PhewGameMoment
-              mode="studio"
+            <TransactionFlow
+              moment="studio"
               state={studioMomentState}
               title="Studio Bible Flow"
               description="Compact provider status. Full success moments stay in the confirmation modal."

@@ -100,6 +100,10 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
           title="Proof Explorer"
           subtitle="Verify on-chain ownership, reserve lock, and protocol state for this NFT mint."
           mascotPose="proof"
+          visualAsset={brandAssets.pageHeroes.proof}
+          backgroundAsset={brandAssets.pageHeroes.proof}
+          visualMode="banner"
+          heroSize="large"
           eyebrow={<><span className="text-xs font-semibold text-slate-400">Vaults / Mint Details / Proof Explorer</span><StatusPill accent="green">Beta</StatusPill></>}
           sidePanel={
             <div className="flex flex-wrap gap-3">

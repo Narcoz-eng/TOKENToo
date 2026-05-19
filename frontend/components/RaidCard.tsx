@@ -5,16 +5,17 @@ import { useState } from "react";
 import type { RaidRoom, VaultCollection } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
 import { StatusPill } from "./StatusPill";
-import { ParticleBurst } from "./animations";
 import { brandAssets } from "@/lib/brand-assets";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { backendActionOutcome, type BackendActionResponse } from "@/lib/action-contracts";
 import { TransactionStatus, type TxStatus } from "./TransactionStatus";
+import { PhewSuccessMomentModal } from "./PhewSuccessMomentModal";
 
 export function RaidCard({ raid, collection }: { raid: RaidRoom; collection?: VaultCollection }) {
   const wallet = useWalletAuth();
   const [state, setState] = useState<TxStatus>("idle");
   const [detail, setDetail] = useState<string | null>(null);
+  const [successOpen, setSuccessOpen] = useState(false);
 
   async function joinRaid() {
     setDetail(null);
@@ -33,6 +34,7 @@ export function RaidCard({ raid, collection }: { raid: RaidRoom; collection?: Va
       const outcome = backendActionOutcome(response, "Raid join route returned an intent but no completed participant status.");
       setState(outcome.phase === "confirmed" ? "confirmed" : outcome.phase === "failed" ? "failed" : "pending");
       setDetail(outcome.confirmed ? outcome.detail ?? null : outcome.detail ?? "Raid join is pending backend confirmation.");
+      if (outcome.confirmed) setSuccessOpen(true);
     } catch (err) {
       setState("failed");
       setDetail(err instanceof Error ? err.message : "Join raid failed");
@@ -41,7 +43,6 @@ export function RaidCard({ raid, collection }: { raid: RaidRoom; collection?: Va
 
   return (
     <article className={`phew-panel phew-card-hover relative overflow-hidden rounded-lg ${state === "pending" ? "shadow-green" : ""}`}>
-      <ParticleBurst active={state === "confirmed"} rarity="Epic" />
       <div className="relative h-36 overflow-hidden">
         <img src={collection?.banner || brandAssets.vaultHero} alt={raid.name} className="h-full w-full object-cover opacity-80" />
         <div className="absolute inset-0 bg-gradient-to-t from-vault-ink to-transparent" />
@@ -73,6 +74,15 @@ export function RaidCard({ raid, collection }: { raid: RaidRoom; collection?: Va
           <Shield className="size-4" /> {state === "validating" ? "Validating" : state === "pending" ? "Joining" : state === "confirmed" ? "Raid Joined" : raid.status === "Live" ? "Join Raid" : "View Details"}
         </button>
       </div>
+      {successOpen ? (
+        <PhewSuccessMomentModal
+          action="raid"
+          title="Raid joined"
+          subtitle={detail ?? "The backend confirmed raid participation."}
+          tokenSymbol="XP"
+          onClose={() => setSuccessOpen(false)}
+        />
+      ) : null}
     </article>
   );
 }

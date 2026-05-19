@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { PhewMascot, type PhewMascotMood } from "@/components/PhewMascot";
 import { cn } from "@/lib/utils";
 
@@ -17,8 +17,15 @@ export function PhewPageHero({
   title,
   subtitle,
   actions,
+  heroType = "dashboard",
   mascotPose = "idle",
+  mascotLayer,
   mascotClassName,
+  backgroundAsset,
+  visualAsset,
+  visualAlt = "",
+  visualMode = "mascot",
+  heroSize = "standard",
   sidePanel,
   warning,
   className
@@ -27,15 +34,26 @@ export function PhewPageHero({
   title: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;
+  heroType?: "dashboard" | "product" | "detail";
   mascotPose?: PhewHeroMascotPose;
+  mascotLayer?: ReactNode;
   mascotClassName?: string;
+  visualAsset?: string | null;
+  backgroundAsset?: string | null;
+  visualAlt?: string;
+  visualMode?: "mascot" | "banner" | "object";
+  heroSize?: "standard" | "large";
   sidePanel?: ReactNode;
   warning?: ReactNode;
   className?: string;
 }) {
+  const backgroundStyle = backgroundAsset
+    ? ({ "--phew-page-hero-bg-image": `url(${backgroundAsset})` } as CSSProperties)
+    : undefined;
+
   return (
-    <section className={cn("phew-page-hero", className)}>
-      <div className="phew-page-hero-bg" aria-hidden="true" />
+    <section className={cn("phew-page-hero", `phew-page-hero-${heroType}`, heroSize === "large" && "phew-page-hero-large", backgroundAsset && "phew-page-hero-with-bg-art", visualAsset && `phew-page-hero-visual-${visualMode}`, className)}>
+      <div className="phew-page-hero-bg" aria-hidden="true" style={backgroundStyle} />
       <div className={cn("phew-page-hero-grid", Boolean(sidePanel) && "phew-page-hero-grid-with-panel")}>
         <div className="phew-page-hero-copy">
           {eyebrow ? <div className="phew-page-hero-eyebrow">{eyebrow}</div> : null}
@@ -45,7 +63,12 @@ export function PhewPageHero({
         </div>
         <div className="phew-page-hero-mascot" aria-hidden="true">
           <span className="phew-page-hero-ring" />
-          <PhewMascot mood={moodFromHeroPose(mascotPose)} size="hero" alt="" className={cn("phew-page-hero-mascot-img", mascotClassName)} />
+          {visualAsset ? (
+            <img src={visualAsset} alt={visualAlt} className={cn("phew-page-hero-mascot-img phew-page-hero-art", mascotClassName)} />
+          ) : (
+            <PhewMascot mood={moodFromHeroPose(mascotPose)} size="hero" alt="" className={cn("phew-page-hero-mascot-img", mascotClassName)} />
+          )}
+          {mascotLayer ? <div className="phew-page-hero-mascot-layer">{mascotLayer}</div> : null}
         </div>
         {sidePanel ? <div className="phew-page-hero-side">{sidePanel}</div> : null}
       </div>
