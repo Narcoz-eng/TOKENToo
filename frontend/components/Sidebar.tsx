@@ -29,31 +29,31 @@ const navSections = [
   {
     title: "Main",
     items: [
-      { href: "/home", label: "Home", icon: Home, asset: brandAssets.vaultSafe, key: "home" },
-      { href: "/collections", label: "Collections", icon: Boxes, asset: brandAssets.nftSlot, key: "collections" },
-      { href: "/mint", label: "Mint", icon: LockKeyhole, asset: brandAssets.tokenObject, key: "mint" },
-      { href: "/staking", label: "Staking", icon: Coins, asset: brandAssets.vaultSafe, key: "staking" },
-      { href: "/redeem", label: "Redeem", icon: Undo2, asset: brandAssets.redeemParticles, key: "redeem" },
-      { href: "/proof", label: "Proof", icon: FileSearch, asset: brandAssets.proofRing, key: "proof" }
+      { href: "/home", label: "Home", icon: Home, asset: brandAssets.pictograms.reserve, key: "home" },
+      { href: "/collections", label: "Collections", icon: Boxes, asset: brandAssets.pictograms.community, key: "collections" },
+      { href: "/mint", label: "Mint", icon: LockKeyhole, asset: brandAssets.pictograms.mintNft, key: "mint" },
+      { href: "/staking", label: "Staking", icon: Coins, asset: brandAssets.pictograms.stake, key: "staking" },
+      { href: "/redeem", label: "Redeem", icon: Undo2, asset: brandAssets.pictograms.redeem, key: "redeem" },
+      { href: "/proof", label: "Proof", icon: FileSearch, asset: brandAssets.pictograms.proof, key: "proof" }
     ]
   },
   {
     title: "Protocol",
     items: [
-      { href: "/my-vaults", label: "My Vaults", icon: Users, asset: brandAssets.nftSlot, key: "my-vaults" },
+      { href: "/my-vaults", label: "My Vaults", icon: Users, asset: brandAssets.pictograms.lockTokens, key: "my-vaults" },
       { href: "/marketplace", label: "Marketplace", icon: WalletCards, asset: brandAssets.energyBeam, key: "marketplace" },
       { href: "/raids", label: "Raids", icon: Swords, asset: brandAssets.rewardBurst, key: "raids" },
       { href: "/leaderboard", label: "Leaderboard", icon: Trophy, asset: brandAssets.rewardBurst, key: "leaderboard" },
-      { href: "/create-community", label: "Create Community", icon: PlusCircle, asset: brandAssets.tokenObject, key: "create-community" },
+      { href: "/create-community", label: "Create Community", icon: PlusCircle, asset: brandAssets.pictograms.community, key: "create-community" },
       { href: "/studio", label: "Studio", icon: PlusCircle, asset: brandAssets.energyBeam, key: "studio", badge: "New" }
     ]
   },
   {
     title: "Admin",
     items: [
-      { href: "/admin/setup", label: "Setup", icon: SlidersHorizontal, asset: brandAssets.proofRing, key: "setup" },
+      { href: "/admin/setup", label: "Setup", icon: SlidersHorizontal, asset: brandAssets.pictograms.proof, key: "setup" },
       { href: "/admin/risk", label: "Risk", icon: ShieldAlert, asset: brandAssets.errorGlitch, key: "risk" },
-      { href: "/strategy-engine", label: "Strategy", icon: Zap, asset: brandAssets.energyBeam, key: "strategy-engine" }
+      { href: "/strategy-engine", label: "Strategy", icon: Zap, asset: brandAssets.pictograms.strategy, key: "strategy-engine" }
     ]
   }
 ];
@@ -114,7 +114,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
             <p className="relative text-xs font-black uppercase text-slate-400">Wallet</p>
             <div className="relative mt-3 flex items-center gap-3 rounded-md border border-white/10 bg-black/35 p-3">
               <div className="flex size-10 items-center justify-center rounded-md border border-vault-green/25 bg-vault-green/10 text-vault-green shadow-green">
-                <Coins className="size-5" />
+                <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" />
               </div>
               <div className="min-w-0 text-sm">
                 <p className="truncate">{wallet.connected ? wallet.label : "Wallet disconnected"}</p>

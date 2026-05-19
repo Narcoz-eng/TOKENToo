@@ -15,6 +15,8 @@ import {
   Wallet
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { PhewGameMoment } from "@/components/PhewGameMoments";
+import { PhewMascot, type PhewMascotMood } from "@/components/PhewMascot";
 import { brandAssets } from "@/lib/brand-assets";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +47,7 @@ export function ReferenceHeader({
   title,
   subtitle,
   mascot = false,
-  mascotPose = "run",
+  mascotPose = "running",
   mascotClassName,
   actions,
   aside,
@@ -56,7 +58,7 @@ export function ReferenceHeader({
   title: ReactNode;
   subtitle?: ReactNode;
   mascot?: boolean;
-  mascotPose?: "run" | "point" | "guide" | "success" | "error";
+  mascotPose?: "run" | "running" | "point" | "guide" | "success" | "error" | "idle" | "loading" | "warning" | "mint" | "stake" | "redeem" | "proof";
   mascotClassName?: string;
   actions?: ReactNode;
   aside?: ReactNode;
@@ -82,7 +84,7 @@ export function ReferenceHeader({
         ) : mascot ? (
           <div className="ref-hero-mascot-stage">
             <span className="ref-hero-ring" />
-            <img src={brandAssets.mascotPoses[mascotPose]} alt="Phew mascot" className={cn("ref-free-mascot", mascotClassName)} />
+            <PhewMascot mood={moodFromPose(mascotPose)} size="hero" className={cn("ref-free-mascot !left-[36%] !w-[clamp(145px,13vw,210px)]", mascotClassName)} />
           </div>
         ) : null}
       </div>
@@ -263,12 +265,12 @@ export function ReferenceEmpty({
   className?: string;
 }) {
   return (
-    <div className={cn("ref-empty", className)}>
+    <div className={cn("ref-empty", mascot ? "ref-empty-mascot-layout" : "ref-empty-object-layout", className)}>
       <div className="relative min-h-28">
         {mascot ? (
           <>
             <span className="ref-empty-ring" />
-            <img src={brandAssets.mascotPoses.point} alt="Phew mascot" className="ref-empty-mascot" />
+            <PhewMascot mood="loading" size="md" className="ref-empty-mascot" />
           </>
         ) : (
           <img src={object} alt="" className="mx-auto size-20 object-contain opacity-80" />
@@ -336,60 +338,20 @@ export function ReferenceTransactionScene({
   const canonicalState = normalizeSceneState(state);
   const stepLabels = steps ?? sceneSteps(mode);
   const stepIndex = activeStep ?? sceneStepIndex(canonicalState, stepLabels.length);
-  const mascotPose = canonicalState === "success" ? "success" : canonicalState === "error" ? "error" : canonicalState === "signing" || canonicalState === "submitting" || canonicalState === "confirming" ? "point" : "run";
-
   return (
-    <section className={cn("ref-tx-scene", compact && "ref-tx-scene-compact", `ref-tx-${mode}`, `ref-tx-state-${canonicalState}`, className)} data-state={canonicalState} data-mode={mode}>
-      <div className="ref-tx-head">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-vault-green">{modeLabel(mode)}</p>
-          <h2 className="mt-1 text-base font-black leading-tight text-white">{title}</h2>
-          {description ? <p className="mt-1 max-w-md text-xs leading-5 text-slate-400">{description}</p> : null}
-        </div>
-        <ReferenceBadge tone={stateTone(canonicalState)}>{stateLabel(canonicalState)}</ReferenceBadge>
-      </div>
-      <div className="ref-tx-canvas">
-        <span className="ref-tx-grid" />
-        <span className="ref-tx-floor" />
-        <span className="ref-tx-orbit ref-tx-orbit-a" />
-        <span className="ref-tx-orbit ref-tx-orbit-b" />
-        <span className="ref-tx-beam ref-tx-beam-a" />
-        <span className="ref-tx-beam ref-tx-beam-b" />
-        <span className="ref-tx-impact" />
-        <span className="ref-tx-scan ref-tx-scan-a" />
-        <span className="ref-tx-scan ref-tx-scan-b" />
-
-        <div className="ref-tx-actor">
-          <span className="ref-tx-actor-aura" />
-          <img src={brandAssets.mascotPoses[mascotPose]} alt="" className="ref-tx-mascot" />
-        </div>
-
-        <div className="ref-tx-nft">
-          {image ? <img src={image} alt="" className="ref-tx-nft-image" /> : <img src={brandAssets.nftSlot} alt="" className="ref-tx-nft-image object-contain p-2" />}
-          <span>{tokenSymbol || "TOKEN"}</span>
-        </div>
-
-        <div className="ref-tx-target">
-          <span className="ref-tx-target-core" />
-          <img src={targetAsset(mode, canonicalState)} alt="" className="size-14 object-contain" />
-          <strong>{targetLabel(mode)}</strong>
-        </div>
-
-        {canonicalState === "success" ? <span className="ref-tx-success"><CheckCircle2 className="size-16" /></span> : null}
-        {canonicalState === "error" ? <span className="ref-tx-error"><AlertTriangle className="size-14" /></span> : null}
-
-        <div className="ref-tx-particles">
-          {Array.from({ length: 18 }, (_, index) => <span key={index} style={{ "--i": index } as CSSProperties} />)}
-        </div>
-      </div>
-      <div className="ref-tx-bottom">
-        <ReferenceProgressDots count={stepLabels.length} activeIndex={stepIndex} />
-        <div className="min-w-0 text-right text-xs text-slate-400">
-          <span className="font-black uppercase text-white">{stepLabels[stepIndex] ?? stepLabels[0]}</span>
-          {detail ? <span className="ml-2 text-slate-500">{detail}</span> : null}
-        </div>
-      </div>
-    </section>
+    <PhewGameMoment
+      mode={mode}
+      state={canonicalState}
+      title={title}
+      description={description}
+      tokenSymbol={tokenSymbol}
+      image={image}
+      detail={detail}
+      steps={stepLabels}
+      activeStep={stepIndex}
+      compact={compact}
+      className={className}
+    />
   );
 }
 
@@ -578,6 +540,12 @@ function modeLabel(mode: ReferenceSceneMode) {
     layer: "Layer Pack"
   };
   return labels[mode];
+}
+
+function moodFromPose(pose: "run" | "running" | "point" | "guide" | "success" | "error" | "idle" | "loading" | "warning" | "mint" | "stake" | "redeem" | "proof"): PhewMascotMood {
+  if (pose === "run") return "running";
+  if (pose === "point" || pose === "guide") return "loading";
+  return pose;
 }
 
 function targetLabel(mode: ReferenceSceneMode) {

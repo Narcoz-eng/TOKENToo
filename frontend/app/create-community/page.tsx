@@ -303,8 +303,7 @@ export default function CreateCommunityPage() {
     <AppShell active="create-community">
       <div className="space-y-6">
         <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg p-5">
-          <img src={brandAssets.launchHero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/42" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_20%,rgba(186,255,0,0.18),transparent_30%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
           <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
             <div>
               <StatusPill accent="green">Create Community</StatusPill>

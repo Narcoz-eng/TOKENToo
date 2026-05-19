@@ -22,6 +22,7 @@ import {
   Zap
 } from "lucide-react";
 import { BackendUnavailableBanner, CheckRow, LockedButton, ReferenceBadge, ReferenceButton, ReferenceEmpty, ReferenceHeader, ReferenceInput, ReferenceMetric, ReferencePanel, ReferenceRows, ReferenceShell, ReferenceStepper, ReferenceTable, ReferenceTransactionScene, SearchControl, WalletRequiredBanner, na, shortAddress } from "@/components/reference-ui";
+import { PhewMascot, PhewMascotHero } from "@/components/PhewMascot";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { apiFetch, unwrapApiData } from "@/lib/api";
@@ -136,10 +137,11 @@ export function HomeReferencePage() {
           <div className="absolute inset-0 grid-mask opacity-25" />
           <div className="absolute left-[48%] top-[-34%] size-[480px] rounded-full bg-vault-green/10 blur-3xl" />
         </div>
-        <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_310px_420px] xl:items-stretch">
+        <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px_370px] xl:items-stretch">
           <div className="self-center">
-            <h1 className="max-w-3xl text-[38px] font-black leading-[1.02] text-white sm:text-[52px]">
-              Real tokens. <span className="text-vault-green">Real backing.</span> Real ownership.
+            <h1 className="max-w-3xl text-[34px] font-black leading-[1.03] text-white sm:text-[44px]">
+              Real tokens.<br />
+              <span className="text-vault-green">Real backing.</span> Real ownership.
             </h1>
             <p className="mt-3 max-w-2xl text-base font-semibold text-white">The protocol for token-backed NFT vaults.</p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Lock community tokens. Mint verified vault NFTs. Trade freely. Stake for rewards. Redeem anytime.</p>
@@ -148,9 +150,9 @@ export function HomeReferencePage() {
               <ReferenceButton href="/create-community" tone="outline" icon={Users}>Create Community</ReferenceButton>
             </div>
           </div>
-          <div className="ref-hero-mascot-stage min-h-[220px]">
+          <div className="ref-hero-mascot-stage min-h-[230px]">
             <span className="ref-hero-ring" />
-            <img src={brandAssets.mascotPoses.run} alt="Phew mascot" className="ref-free-mascot !w-[clamp(185px,20vw,280px)]" />
+            <PhewMascotHero className="ref-free-mascot !left-[18%] !w-[clamp(220px,18vw,270px)]" />
           </div>
           <ReferencePanel title="Protocol Overview" action={<ReferenceBadge tone={health.data?.ok ? "green" : health.error ? "red" : "gold"}>{health.loading ? "Loading" : health.error ? "Backend" : "24H"}</ReferenceBadge>} className="h-full">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -240,7 +242,7 @@ export function HomeReferencePage() {
         <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)_auto] md:items-center">
           <div className="ref-hero-mascot-stage min-h-[110px]">
             <span className="ref-hero-ring !bottom-2 !w-32" />
-            <img src={brandAssets.mascotPoses.point} alt="Phew mascot" className="ref-free-mascot !bottom-0 !w-32" />
+            <PhewMascot mood="running" size="md" className="ref-free-mascot !bottom-0 !w-32" />
           </div>
           <div>
             <h2 className="text-2xl font-black text-vault-green">Ready to launch your community?</h2>
@@ -448,7 +450,7 @@ export function StakingReferencePage() {
         eyebrow={<ReferenceBadge tone="green">Staking</ReferenceBadge>}
         title="Staking"
         subtitle="Stake your eligible Vault NFTs to earn rewards and support the protocol."
-        aside={<div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1"><ReferenceMetric label="Total Staked Vaults" value={formatMetric(data?.stats?.totalStakedVaults)} /><ReferenceMetric label="Total Rewards (PHEW)" value={formatMetric(data?.stats?.totalRewards)} /><ReferenceMetric label="Your Earned" value={formatMetric(data?.stats?.claimableRewards)} /></div>}
+        aside={<div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-3"><ReferenceMetric label="Total Staked Vaults" value={formatMetric(data?.stats?.totalStakedVaults)} /><ReferenceMetric label="Total Rewards (PHEW)" value={formatMetric(data?.stats?.totalRewards)} /><ReferenceMetric label="Your Earned" value={formatMetric(data?.stats?.claimableRewards)} /></div>}
       />
       {!wallet.connected ? <WalletRequiredBanner action={<ReferenceButton>Connect Wallet</ReferenceButton>} /> : null}
       {product.error ? <BackendUnavailableBanner message={product.error.message} retry={product.reload} /> : null}
@@ -457,7 +459,7 @@ export function StakingReferencePage() {
           <ReferencePanel title="1. Eligible Vault NFTs" subtitle="Select an eligible Vault NFT to stake.">
             <div className="grid gap-3 lg:grid-cols-[minmax(280px,0.8fr)_repeat(4,minmax(140px,1fr))]">
               {!eligible.length ? (
-                <ReferenceEmpty title="No eligible Vault NFTs" body={wallet.connected ? "No eligible vault NFTs were returned by the backend." : "Connect a wallet to view eligible vault NFTs."} action={<ReferenceButton href="/collections" tone="outline">Explore Vaults</ReferenceButton>} />
+                <ReferenceEmpty className="lg:col-span-5" title="No eligible Vault NFTs" body={wallet.connected ? "No eligible vault NFTs were returned by the backend." : "Connect a wallet to view eligible vault NFTs."} action={<ReferenceButton href="/collections" tone="outline">Explore Vaults</ReferenceButton>} />
               ) : null}
               {eligible.slice(0, 4).map((vault, index) => <VaultSlot key={vault.id} vault={vault} selected={index === 0} />)}
             </div>
@@ -501,7 +503,7 @@ export function StakingReferencePage() {
             <ReferenceStepper steps={["Select", "Stake", "Earn", "Claim"]} activeIndex={0} />
             <div className="ref-hero-mascot-stage mt-3 min-h-[110px]">
               <span className="ref-hero-ring !bottom-2 !w-32" />
-              <img src={brandAssets.mascotPoses.point} alt="Phew mascot" className="ref-free-mascot !bottom-0 !w-32" />
+              <PhewMascot mood="stake" size="md" className="ref-free-mascot !bottom-0 !w-32" />
             </div>
           </ReferencePanel>
           <ReferencePanel title="8. Animation Preview">
@@ -571,7 +573,10 @@ export function AdminRiskReferencePage() {
         </main>
         <aside className="space-y-4">
           <ReferencePanel title="Token Scan Risk Notes" action={<ReferenceBadge tone="green">CA-first</ReferenceBadge>}>
-            <ReferenceInput value={token} onChange={setToken} placeholder="Paste token contract address..." right={<ReferenceButton tone="outline">Scan</ReferenceButton>} />
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_78px]">
+              <ReferenceInput value={token} onChange={setToken} placeholder="Paste token contract address..." />
+              <ReferenceButton tone="outline" className="w-full">Scan</ReferenceButton>
+            </div>
           </ReferencePanel>
           <ReferencePanel title="Risk Breakdown (Last Scan)">
             <ReferenceRows rows={["Contract Risk", "Holder Concentration", "Liquidity Risk", "Mint / Freeze Authority", "Honeypot Check", "Proxy / Upgradeable", "Metadata Risk", "Sanction / Blocklist"].map((label) => ({ label, value: "N/A" }))} />

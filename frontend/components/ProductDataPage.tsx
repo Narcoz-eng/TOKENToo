@@ -26,6 +26,7 @@ import { StatusPill } from "./StatusPill";
 import { TransactionFlow, type TransactionFlowState } from "./TransactionFlow";
 import { ProtocolTrustInline, ProtocolTrustStrip, collectionTrust, vaultTrust } from "./protocol-trust";
 import { brandAssets } from "@/lib/brand-assets";
+import { PhewMascotHero } from "@/components/PhewMascot";
 import { CollectionGrid } from "./CollectionGrid";
 import { MetricGrid, PageLayout } from "./PageLayout";
 import { StakeFlow, UnstakeFlow, ClaimRewardsFlow } from "./StakingFlows";
@@ -366,7 +367,7 @@ function HomeDashboardView({ data }: { data: ProductData }) {
             <div className="phew-home-mascot-stage mt-2">
               <span className="phew-home-mascot-glow" />
               <span className="phew-home-mascot-ring" />
-              <img src={brandAssets.mascot} alt="Phew mascot" className="phew-home-mascot" />
+              <PhewMascotHero className="phew-home-mascot" />
             </div>
           </div>
           <div className="min-w-0 rounded-lg border border-vault-green/18 bg-black/42 p-4 shadow-[inset_0_0_28px_rgba(186,255,0,0.055)]">

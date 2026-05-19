@@ -13,7 +13,7 @@ This inventory is the implementation contract for the frontend rebuild. Existing
 - Topbar: search field left, network selector, notification icon, wallet button right. Keep topbar height compact and consistent across pages.
 - Panels: top page panels are full-width dashboard regions, not nested cards. Repeated items can be cards. Tables use dense row separators and N/A cells for missing backend data.
 - Mascot: use transparent SVG actor only. The mascot must be a free character, never inside a square/icon container in page scenes or animation centers. It can float outside panels, overlap cards, or act beside scene objects. Preserve aspect ratio with `object-contain`; never stretch, crop, or use the green-background PNG in scenes.
-- Asset decision: `frontend/public/brand/phew-mascot.png` has a green background and is not approved for scene use. Use `phew-mascot-actor.svg`, `phew-mascot-point.svg`, `phew-mascot-success.svg`, and `phew-mascot-error.svg` as the clean temporary transparent mascot set.
+- Asset decision: `frontend/public/brand/phew-mascot.png` has a green background and is not approved for scene use. Scene mascot assets now come from the generated transparent Image 2 pack under `frontend/public/brand/phew-mascot-*.webp` and `frontend/public/hero/phew-hero-mascot.webp`. The boxed logo remains allowed only in sidebar/fav/small identity contexts.
 - Data rule: show backend values where available. Unknown values render as `N/A`, `Unknown`, `Pending`, or a disabled action. Do not insert fake protocol metrics.
 - State rule: every page needs wallet-disconnected, loading, empty, error, success, backend-unavailable, and N/A real-data states where applicable. State should be shown in the same panel geometry as the normal state, not as unrelated generic placeholders.
 - Buttons: primary lime filled for next action, outline lime or cyan for secondary action, disabled dark gray with lock icon. Use icons inside controls and status rows.
@@ -224,4 +224,3 @@ Supported modes:
 - `/strategy-engine`: no file in `phew-redesign` maps directly to this route. Implement it using the admin/risk dashboard layout grammar: dense title, metric strip, rule/control tables, backend N/A states, public-safe controls, and no invented hero.
 - `/vaults/:mint/proof`: mapped by `proof.png`.
 - `/studio`: mapped by `create-collection-studio.png`.
-

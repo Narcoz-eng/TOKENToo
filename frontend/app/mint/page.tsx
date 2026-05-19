@@ -148,8 +148,7 @@ export default function MintPage() {
       <AppShell active="mint">
         <div className="space-y-6">
           <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg">
-            <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-52" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/36" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_20%,rgba(186,255,0,0.18),transparent_30%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
             <div className="relative grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_520px]">
               <div className="max-w-3xl">
                 <div className="flex flex-wrap gap-2">
@@ -191,8 +190,7 @@ export default function MintPage() {
         {!collectionState.error && !mintableCollections.length ? (
           <>
             <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg">
-              <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-46" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/40" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_20%,rgba(186,255,0,0.18),transparent_30%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
               <div className="relative grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
                 <div className="max-w-3xl">
                   <div className="flex flex-wrap gap-2">
@@ -228,8 +226,7 @@ export default function MintPage() {
         {collection ? (
           <>
             <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg">
-              <img src={brandAssets.mintVault} alt="" className="absolute inset-0 h-full w-full object-cover opacity-52" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#020806] via-[#020806]/92 to-[#020806]/36" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_20%,rgba(186,255,0,0.18),transparent_30%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
               <div className="relative grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_520px]">
                 <div className="max-w-3xl">
                   <div className="flex flex-wrap gap-2">
@@ -281,7 +278,7 @@ export default function MintPage() {
                           className={cn("group overflow-hidden rounded-lg border bg-black/30 text-left transition", selected ? "border-vault-green/70 shadow-green" : "border-vault-line hover:border-vault-cyan/40")}
                         >
                           <div className="relative aspect-[5/3] overflow-hidden">
-                            <img src={item.banner || brandAssets.launchHero} alt="" className="h-full w-full object-cover opacity-80 transition group-hover:scale-105" />
+                            <img src={item.banner || brandAssets.nftSlot} alt="" className="h-full w-full object-contain p-5 opacity-80 transition group-hover:scale-105" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
                             <div className="absolute bottom-3 left-3 right-3">
                               <p className="truncate font-black">{item.name}</p>
