@@ -66,7 +66,8 @@ export function PhewGameMoment({
   const stepIndex = activeStep ?? gameStepIndex(canonicalState, stepLabels.length);
   const actorMood = moodFor(mode, canonicalState);
   const target = targetFor(mode, canonicalState);
-  const nftIsToken = mode === "redeem" || mode === "community" || mode === "scan";
+  const primary = primaryFor(mode);
+  const nftIsToken = mode === "mint" || mode === "redeem" || mode === "community" || mode === "scan";
 
   return (
     <section
@@ -96,7 +97,7 @@ export function PhewGameMoment({
         <PhewMascotActor mood={actorMood} className="phew-game-actor" />
 
         <div className={cn("phew-game-token", nftIsToken && "phew-game-token-chip")}>
-          {image ? <img src={image} alt="" className="phew-game-token-image" /> : <img src={nftIsToken ? brandAssets.tokenStack : brandAssets.nftSlot} alt="" className="phew-game-token-image object-contain p-2" />}
+          {image && !nftIsToken ? <img src={image} alt="" className="phew-game-token-image" /> : <img src={image && mode === "redeem" ? image : primary.asset} alt="" className="phew-game-token-image object-contain p-2" />}
           <span>{tokenSymbol || "TOKEN"}</span>
         </div>
 
@@ -171,12 +172,24 @@ function moodFor(mode: PhewGameMomentMode, state: PhewGameMomentState): PhewMasc
 function targetFor(mode: PhewGameMomentMode, state: PhewGameMomentState) {
   if (state === "error") return { asset: brandAssets.errorGlitch, label: "error" };
   if (state === "success") return { asset: brandAssets.rewardBurst, label: "done" };
+  if (mode === "mint") return { asset: brandAssets.nftSlot, label: "nft" };
+  if (mode === "stake") return { asset: brandAssets.vaultSafe, label: "vault" };
   if (mode === "redeem") return { asset: brandAssets.tokenStack, label: "wallet" };
   if (mode === "unstake") return { asset: brandAssets.lockUnlock, label: "unlock" };
   if (mode === "proof" || mode === "scan") return { asset: brandAssets.proofRing, label: "proof" };
-  if (mode === "community") return { asset: brandAssets.vaultSafe, label: "launch" };
+  if (mode === "community") return { asset: brandAssets.vaultSafe, label: "reserve" };
   if (mode === "reward") return { asset: brandAssets.rewardBurst, label: "reward" };
   return { asset: brandAssets.vaultSafe, label: "vault" };
+}
+
+function primaryFor(mode: PhewGameMomentMode) {
+  if (mode === "mint") return { asset: brandAssets.tokenObject };
+  if (mode === "redeem") return { asset: brandAssets.nftSlot };
+  if (mode === "community" || mode === "scan") return { asset: brandAssets.tokenObject };
+  if (mode === "proof") return { asset: brandAssets.nftSlot };
+  if (mode === "reward") return { asset: brandAssets.rewardBurst };
+  if (mode === "layer") return { asset: brandAssets.tokenStack };
+  return { asset: brandAssets.nftSlot };
 }
 
 function stateLabel(state: PhewGameMomentState) {

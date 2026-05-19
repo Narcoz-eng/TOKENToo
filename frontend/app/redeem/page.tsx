@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { EmptyState, ErrorState, LoadingState, WalletDisconnectedState } from "@/components/ApiState";
+import { ErrorState, LoadingState, WalletDisconnectedState } from "@/components/ApiState";
 import { AnimatedButton } from "@/components/AnimatedButton";
-import { TransactionFlow, transactionStateFromTxStatus, type TransactionFlowState } from "@/components/TransactionFlow";
+import { PhewEmptyState } from "@/components/PhewEmptyState";
+import { PhewPageHero } from "@/components/PhewPageHero";
+import { PhewSuccessMomentModal } from "@/components/PhewSuccessMomentModal";
 import { ProtocolTrustStrip, proofTrust, vaultTrust } from "@/components/protocol-trust";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
@@ -80,7 +82,16 @@ export default function RedeemPage() {
   const proofMatchesSelection = Boolean(proof && selectedVault?.mint && proof.nftMint === selectedVault.mint);
   const proofAllowsRedeem = Boolean(proofMatchesSelection && proof?.redeemable && !proof.staked && proof.status !== "REDEEMED");
   const selectedCollection = selectedVault ? collections.find((collection) => collection.id === selectedVault.collectionId || collection.dbId === selectedVault.collectionId) : null;
-  const flowState: TransactionFlowState = !wallet.connected ? "wallet-disconnected" : redeemFlowState(error, activeAction, txStatus, redeemTx?.status);
+  const redeemConfirmed = txStatus === "confirmed" || redeemTx?.status === "CONFIRMED";
+  const successMomentKey = redeemConfirmed ? redeemTx?.txSignature ?? redeemTx?.id ?? selectedVault?.mint ?? null : null;
+  const [successMomentOpen, setSuccessMomentOpen] = useState(false);
+  const [lastSuccessMomentKey, setLastSuccessMomentKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successMomentKey || successMomentKey === lastSuccessMomentKey) return;
+    setLastSuccessMomentKey(successMomentKey);
+    setSuccessMomentOpen(true);
+  }, [lastSuccessMomentKey, successMomentKey]);
 
   async function loadProof(mint = selectedVault?.mint) {
     if (!mint) throw new Error("Select an eligible Vault NFT before checking proof.");
@@ -170,32 +181,13 @@ export default function RedeemPage() {
   return (
     <AppShell active="redeem">
       <div className="space-y-6">
-        <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg p-5">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_22%,rgba(186,255,0,0.2),transparent_28%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
-          <div className="absolute inset-0 grid-mask opacity-30" />
-          <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
-            <div>
-              <div className="flex flex-wrap gap-2">
-                <StatusPill accent="green">Redeem</StatusPill>
-                <StatusPill accent="cyan">Wallet-owned eligible NFTs</StatusPill>
-              </div>
-              <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">Redeem from an eligible Vault NFT in your wallet.</h1>
-              <p className="mt-3 max-w-3xl text-sm text-slate-300">
-                This page mirrors staking: it only shows Vault NFTs returned by the backend for the connected wallet, checks proof, then uses the real redeem build and submit routes.
-              </p>
-            </div>
-            <TransactionFlow
-              state={flowState}
-              moment="redeem"
-              title="Redeem Vault NFT"
-              description="Select a wallet-owned eligible NFT, check proof, build the redeem transaction, then submit through the backend."
-              image={selectedVault?.image}
-              tokenSymbol={proof?.tokenSymbol ?? selectedCollection?.symbol ?? selectedVault?.tier}
-              detail={error ?? redeemTx?.errorMessage ?? redeemTx?.status ?? null}
-              compact
-            />
-          </div>
-        </section>
+        <PhewPageHero
+          title="Redeem from an eligible Vault NFT in your wallet."
+          subtitle="This page mirrors staking: it only shows Vault NFTs returned by the backend for the connected wallet, checks proof, then uses the real redeem build and submit routes."
+          mascotPose="redeem"
+          eyebrow={<><StatusPill accent="green">Redeem</StatusPill><StatusPill accent="cyan">Wallet-owned eligible NFTs</StatusPill></>}
+          sidePanel={<RedeemHeroStatus status={txStatus} label={redeemStatusLabel(txStatus, redeemTx?.status)} detail={error ?? redeemTx?.errorMessage ?? redeemTx?.status ?? undefined} />}
+        />
 
         {!wallet.connected ? <WalletDisconnectedState /> : null}
         {!wallet.connected ? <RedeemEmptyWorkspace /> : null}
@@ -311,12 +303,25 @@ export default function RedeemPage() {
               </aside>
             </div>
           ) : (
-            <EmptyState
+            <PhewEmptyState
+              mascotPose="redeem"
               title="No eligible Vault NFTs"
               body="Redeem shows only real wallet-owned Vault NFTs returned by the backend with Redeemable status. Locked, staked, redeemed, missing-mint, and fake entries are excluded."
               action={<Link href="/staking" className="inline-flex h-11 items-center justify-center rounded-md border border-vault-green/45 bg-vault-green/10 px-5 text-sm font-bold text-vault-green">Open staking</Link>}
             />
           )
+        ) : null}
+        {successMomentOpen && successMomentKey ? (
+          <PhewSuccessMomentModal
+            action="redeem"
+            tokenSymbol={proof?.tokenSymbol ?? selectedCollection?.symbol ?? selectedVault?.tier ?? "TOKEN"}
+            nftImage={selectedVault?.image}
+            title="Tokens redeemed"
+            subtitle="The backend confirmed the redeem transaction. Token return state is now visible in wallet and proof records."
+            txSignature={redeemTx?.txSignature}
+            proofUrl={selectedVault?.mint ? `/vaults/${encodeURIComponent(selectedVault.mint)}/proof` : undefined}
+            onClose={() => setSuccessMomentOpen(false)}
+          />
         ) : null}
       </div>
     </AppShell>
@@ -328,24 +333,11 @@ function RedeemEmptyWorkspace() {
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
       <main className="space-y-5">
         <SectionCard title="Eligible Vault NFTs">
-          <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-5">
-            <div className="grid gap-4 md:grid-cols-[88px_minmax(0,1fr)_auto] md:items-center">
-              <div className="aspect-[4/5] w-20 rounded-md border border-vault-green/25 bg-vault-green/5" />
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-black">Wallet-owned vault</p>
-                  <StatusPill accent="gold">N/A</StatusPill>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">Connect a wallet to load eligible redeemable Vault NFTs.</p>
-                <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
-                  <MiniMetric label="Locked" value="N/A" />
-                  <MiniMetric label="Unlock" value="N/A" />
-                  <MiniMetric label="Rarity" value="N/A" />
-                </div>
-              </div>
-              <span className="inline-flex h-9 items-center rounded-md border border-vault-line bg-black/25 px-3 text-sm font-bold text-slate-500">Select N/A</span>
-            </div>
-          </div>
+          <PhewEmptyState
+            mascotPose="redeem"
+            title="Wallet-owned vault required"
+            body="Connect a wallet to load eligible redeemable Vault NFTs. The table stays clean until the backend returns real wallet inventory."
+          />
         </SectionCard>
 
         <SectionCard title="Redeem Checks">
@@ -372,6 +364,24 @@ function RedeemEmptyWorkspace() {
           <p className="text-sm text-slate-400">Proof rows appear after a wallet NFT is selected and the proof endpoint returns live reserve state.</p>
         </SectionCard>
       </aside>
+    </div>
+  );
+}
+
+function RedeemHeroStatus({ status, label, detail }: { status: TxStatus; label: string; detail?: string | null }) {
+  return (
+    <div className="rounded-lg border border-vault-line bg-black/35 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-black text-white">Redeem Status</h2>
+        <img src={status === "confirmed" ? brandAssets.rewardBurst : brandAssets.pictograms.redeem} alt="" className="size-9 object-contain" />
+      </div>
+      <div className="mt-3">
+        <TransactionStatus status={status} label={label} detail={detail ?? undefined} />
+      </div>
+      <div className="mt-3 grid gap-2 text-sm">
+        <PreviewRow label="Proof" value={detail ?? "Awaiting proof check"} />
+        <PreviewRow label="Selected mint" value="Backend wallet inventory only" />
+      </div>
     </div>
   );
 }
@@ -417,15 +427,6 @@ function statusForRedeem(status: string): TxStatus {
   if (status === "CONFIRMED") return "confirmed";
   if (status === "FAILED" || status === "NEEDS_CORE_VERIFY") return "failed";
   return "pending";
-}
-
-function redeemFlowState(error: string | null, activeAction: string | null, txStatus: TxStatus, backendStatus?: string | null): TransactionFlowState {
-  if (error || txStatus === "failed") return "error";
-  if (activeAction === "proof" || activeAction === "build") return "preparing";
-  if (activeAction === "submit" && txStatus === "signing") return "signing";
-  if (activeAction === "submit") return "submitting";
-  if (txStatus !== "idle") return transactionStateFromTxStatus(txStatus);
-  return transactionStateFromTxStatus(backendStatus);
 }
 
 function redeemStatusLabel(status: TxStatus, backendStatus?: string) {

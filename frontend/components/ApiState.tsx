@@ -4,6 +4,7 @@ import { SectionCard } from "./SectionCard";
 import { StatusPill } from "./StatusPill";
 import { brandAssets } from "@/lib/brand-assets";
 import { ApiError, isDevMode } from "@/lib/api";
+import { PhewMascot } from "./PhewMascot";
 
 export function LoadingState() {
   return (
@@ -30,7 +31,9 @@ export function ErrorState({ error, retry }: { error: string | ApiError; retry?:
     <SectionCard>
       <div className="rounded-lg border border-vault-red/40 bg-vault-red/10 p-5">
         <div className="flex items-start gap-3">
-          <img src={brandAssets.errorGlitch} alt="" className="size-6 shrink-0 object-contain" />
+          <span className="grid size-14 shrink-0 place-items-center overflow-visible rounded-md border border-vault-red/35 bg-black/35">
+            <PhewMascot mood="warning" size="sm" alt="" className="!w-16 max-w-none" />
+          </span>
           <div className="min-w-0 flex-1">
             <p className="font-bold text-vault-red">{title}</p>
             <p className="mt-2 break-words text-sm text-slate-300">{message}</p>
@@ -96,8 +99,11 @@ function sanitizeErrorText(value: string) {
 export function EmptyState({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {
   return (
     <SectionCard>
-      <div className="phew-scanline grid gap-6 rounded-lg border border-dashed border-vault-green/35 bg-vault-green/5 p-6 text-left md:grid-cols-[180px_minmax(0,1fr)] md:items-center">
-        <img src={brandAssets.emptyVault} alt="" className="mx-auto aspect-square w-40 rounded-lg object-contain p-2 opacity-90 drop-shadow-[0_0_24px_rgba(186,255,0,0.24)]" />
+      <div className="phew-designed-state phew-scanline grid gap-6 rounded-lg border border-dashed border-vault-green/35 bg-vault-green/5 p-5 text-left md:grid-cols-[150px_minmax(0,1fr)] md:items-center">
+        <div className="relative min-h-28">
+          <span className="absolute bottom-3 left-1/2 h-5 w-28 -translate-x-1/2 rounded-full border border-vault-green/55 shadow-green" />
+          <PhewMascot mood="loading" size="md" alt="" className="absolute bottom-0 left-1/2 !w-28 -translate-x-1/2" />
+        </div>
         <div>
           <p className="text-xl font-black">{title}</p>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">{body}</p>
@@ -111,9 +117,12 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
 export function WalletDisconnectedState({ action }: { action?: React.ReactNode }) {
   return (
     <SectionCard className="p-4">
-      <div className="rounded-md border border-vault-green/25 bg-vault-green/8 p-4">
+      <div className="phew-designed-state rounded-md border border-vault-green/25 bg-vault-green/8 p-4">
         <div className="flex items-start gap-3">
-          <img src={brandAssets.tokenObject} alt="" className="mt-0.5 size-6 object-contain" />
+          <span className="relative grid size-14 shrink-0 place-items-center overflow-visible">
+            <span className="absolute bottom-1 h-4 w-12 rounded-full border border-vault-green/45 shadow-green" />
+            <PhewMascot mood="idle" size="sm" alt="" className="relative !w-16 max-w-none" />
+          </span>
           <div>
             <p className="font-black">Connect your wallet</p>
             <p className="mt-1 text-sm text-slate-400">Required for wallet-specific vaults, staking, listings, claims, and mint intents.</p>

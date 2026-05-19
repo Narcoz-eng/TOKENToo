@@ -21,8 +21,9 @@ import {
   WalletCards,
   Zap
 } from "lucide-react";
-import { BackendUnavailableBanner, CheckRow, LockedButton, ReferenceBadge, ReferenceButton, ReferenceEmpty, ReferenceHeader, ReferenceInput, ReferenceMetric, ReferencePanel, ReferenceRows, ReferenceShell, ReferenceStepper, ReferenceTable, ReferenceTransactionScene, SearchControl, WalletRequiredBanner, na, shortAddress } from "@/components/reference-ui";
+import { BackendUnavailableBanner, CheckRow, LockedButton, ReferenceBadge, ReferenceButton, ReferenceEmpty, ReferenceHeader, ReferenceInput, ReferenceMetric, ReferencePanel, ReferenceRows, ReferenceShell, ReferenceStepper, ReferenceTable, SearchControl, WalletRequiredBanner, na, shortAddress } from "@/components/reference-ui";
 import { PhewMascot, PhewMascotHero } from "@/components/PhewMascot";
+import { PhewProtocolIcon, phewProtocolIconAssets, type PhewProtocolIconName } from "@/components/PhewProtocolIcon";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { apiFetch, unwrapApiData } from "@/lib/api";
@@ -137,7 +138,7 @@ export function HomeReferencePage() {
           <div className="absolute inset-0 grid-mask opacity-25" />
           <div className="absolute left-[48%] top-[-34%] size-[480px] rounded-full bg-vault-green/10 blur-3xl" />
         </div>
-        <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px_370px] xl:items-stretch">
+        <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px_390px] xl:items-stretch">
           <div className="self-center">
             <h1 className="max-w-3xl text-[34px] font-black leading-[1.03] text-white sm:text-[44px]">
               Real tokens.<br />
@@ -146,33 +147,41 @@ export function HomeReferencePage() {
             <p className="mt-3 max-w-2xl text-base font-semibold text-white">The protocol for token-backed NFT vaults.</p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Lock community tokens. Mint verified vault NFTs. Trade freely. Stake for rewards. Redeem anytime.</p>
             <div className="mt-4 flex flex-wrap gap-3">
-              <ReferenceButton href="/collections" asset={brandAssets.nftSlot}>Explore Collections</ReferenceButton>
-              <ReferenceButton href="/create-community" tone="outline" icon={Users}>Create Community</ReferenceButton>
+              <ReferenceButton href="/collections" asset={phewProtocolIconAssets.community}>Explore Collections</ReferenceButton>
+              <ReferenceButton href="/create-community" tone="outline" asset={phewProtocolIconAssets.reserve}>Create Community</ReferenceButton>
             </div>
           </div>
           <div className="ref-hero-mascot-stage min-h-[230px]">
             <span className="ref-hero-ring" />
             <PhewMascotHero className="ref-free-mascot !left-[18%] !w-[clamp(220px,18vw,270px)]" />
           </div>
-          <ReferencePanel title="Protocol Overview" action={<ReferenceBadge tone={health.data?.ok ? "green" : health.error ? "red" : "gold"}>{health.loading ? "Loading" : health.error ? "Backend" : "24H"}</ReferenceBadge>} className="h-full">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <ReferenceMetric label="Total Value Locked" value={formatCurrency(stats.tvlUsd)} asset={brandAssets.vaultSafe} />
-              <ReferenceMetric label="Total Vaults" value={formatMetric(stats.totalVaults ?? stats.vaults ?? stats.nfts)} asset={brandAssets.nftSlot} />
-              <ReferenceMetric label="Active Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} asset={brandAssets.tokenObject} />
-              <ReferenceMetric label="Phews Minted" value={formatMetric(stats.phewsMinted ?? stats.nfts)} asset={brandAssets.proofRing} />
-              <ReferenceMetric label="Total Trades" value={formatMetric(stats.totalTrades)} asset={brandAssets.energyBeam} />
-              <ReferenceMetric label="Unique Wallets" value={formatMetric(stats.uniqueWallets)} asset={brandAssets.rewardBurst} />
+          <div className="ref-home-overview h-full">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-black uppercase text-white">Protocol Overview</p>
+                <p className="mt-1 text-xs text-slate-500">Live health, reserve state, and activity counts.</p>
+              </div>
+              <ReferenceBadge tone={health.data?.ok ? "green" : health.error ? "red" : "gold"}>{health.loading ? "Loading" : health.error ? "Backend" : "24H"}</ReferenceBadge>
             </div>
-          </ReferencePanel>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ReferenceMetric label="Total Value Locked" value={formatCurrency(stats.tvlUsd)} asset={phewProtocolIconAssets.reserve} />
+              <ReferenceMetric label="Total Vaults" value={formatMetric(stats.totalVaults ?? stats.vaults ?? stats.nfts)} asset={phewProtocolIconAssets.lockTokens} />
+              <ReferenceMetric label="Active Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} asset={phewProtocolIconAssets.community} />
+              <ReferenceMetric label="Phews Minted" value={formatMetric(stats.phewsMinted ?? stats.nfts)} asset={phewProtocolIconAssets.mintNft} />
+              <ReferenceMetric label="Total Trades" value={formatMetric(stats.totalTrades)} asset={phewProtocolIconAssets.stake} />
+              <ReferenceMetric label="Unique Wallets" value={formatMetric(stats.uniqueWallets)} asset={phewProtocolIconAssets.proof} />
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="grid gap-3 md:grid-cols-5">
-        <ReferenceMetric label="TVL" value={formatCurrency(stats.tvlUsd)} asset={brandAssets.vaultSafe} />
-        <ReferenceMetric label="Total Vaults" value={formatMetric(stats.totalVaults ?? stats.nfts)} asset={brandAssets.nftSlot} />
-        <ReferenceMetric label="Active Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} asset={brandAssets.tokenObject} />
-        <ReferenceMetric label="Phews Minted" value={formatMetric(stats.phewsMinted ?? stats.nfts)} asset={brandAssets.proofRing} />
-        <ReferenceMetric label="Total Trades" value={formatMetric(stats.totalTrades)} asset={brandAssets.energyBeam} />
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <ReferenceMetric label="TVL" value={formatCurrency(stats.tvlUsd)} asset={phewProtocolIconAssets.reserve} />
+        <ReferenceMetric label="Total Vaults" value={formatMetric(stats.totalVaults ?? stats.nfts)} asset={phewProtocolIconAssets.lockTokens} />
+        <ReferenceMetric label="Active Communities" value={formatMetric(stats.activeCommunities ?? stats.collections)} asset={phewProtocolIconAssets.community} />
+        <ReferenceMetric label="Phews Minted" value={formatMetric(stats.phewsMinted ?? stats.nfts)} asset={phewProtocolIconAssets.mintNft} />
+        <ReferenceMetric label="Total Trades" value={formatMetric(stats.totalTrades)} asset={phewProtocolIconAssets.stake} />
+        <ReferenceMetric label="Reserve Proof" value={health.data?.ok ? "Verified" : "N/A"} asset={phewProtocolIconAssets.proof} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
@@ -206,14 +215,14 @@ export function HomeReferencePage() {
       <div className="grid gap-4 xl:grid-cols-[1fr_0.72fr_0.72fr]">
         <ReferencePanel title="How It Works">
           <div className="grid gap-3 sm:grid-cols-4">
-            {[
-              ["Lock Tokens", brandAssets.vaultSafe],
-              ["Mint Vault NFT", brandAssets.nftSlot],
-              ["Trade & Stake", brandAssets.energyBeam],
-              ["Redeem Anytime", brandAssets.rewardBurst]
-            ].map(([label, asset], index) => (
-              <div key={label} className="rounded-lg border border-vault-line bg-black/25 p-4 text-center">
-                <img src={asset} alt="" className="mx-auto size-12 object-contain" />
+            {([
+              ["Lock Tokens", "lockTokens"],
+              ["Mint Vault NFT", "mintNft"],
+              ["Trade & Stake", "stake"],
+              ["Redeem Anytime", "redeem"]
+            ] as Array<[string, PhewProtocolIconName]>).map(([label, icon], index) => (
+              <div key={label} className="ref-action-tile text-center">
+                <PhewProtocolIcon name={icon} className="mx-auto size-12" />
                 <p className="mt-3 text-sm font-black text-white">{label}</p>
                 <p className="mt-2 text-xs leading-5 text-slate-400">{["Lock in reserve vault.", "Receive verified NFT.", "Trade or stake.", "Burn to redeem."][index]}</p>
               </div>
@@ -238,7 +247,7 @@ export function HomeReferencePage() {
         </ReferencePanel>
       </div>
 
-      <section className="ref-panel relative overflow-visible p-4">
+      <section className="ref-panel ref-home-cta relative overflow-visible p-4">
         <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)_auto] md:items-center">
           <div className="ref-hero-mascot-stage min-h-[110px]">
             <span className="ref-hero-ring !bottom-2 !w-32" />
@@ -248,7 +257,7 @@ export function HomeReferencePage() {
             <h2 className="text-2xl font-black text-vault-green">Ready to launch your community?</h2>
             <p className="mt-1 text-sm text-slate-300">Create your token-backed NFT vault collection. Lock. Mint. Trade. Stake. Redeem.</p>
           </div>
-          <ReferenceButton href="/create-community">Create Community</ReferenceButton>
+          <ReferenceButton href="/create-community" asset={phewProtocolIconAssets.community}>Create Community</ReferenceButton>
         </div>
       </section>
     </ReferenceShell>
@@ -269,6 +278,7 @@ export function CollectionsReferencePage() {
       <ReferenceHeader
         title="Collections"
         subtitle="Explore and manage token-backed NFT collections on Phew Run."
+        mascotPose="explorer"
         actions={<ReferenceButton href="/create-community" icon={Users}>Create Collection</ReferenceButton>}
       />
       {product.error ? <BackendUnavailableBanner message={product.error.message} retry={product.reload} /> : null}
@@ -281,12 +291,12 @@ export function CollectionsReferencePage() {
           <ReferenceButton tone="ghost">Sort: Recently Updated</ReferenceButton>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <ReferenceMetric label="All Collections" value={formatMetric(collections.length || product.data?.stats?.collections)} icon={LockKeyhole} />
-          <ReferenceMetric label="Launched" value={formatMetric(collections.filter((c) => /launch/i.test(c.launchStatus ?? "")).length || null)} icon={ShieldCheck} />
-          <ReferenceMetric label="In Review" value={formatMetric(collections.filter((c) => /review/i.test(c.launchStatus ?? "")).length || null)} icon={Search} />
-          <ReferenceMetric label="Not Launched" value={formatMetric(collections.filter((c) => !/launch/i.test(c.launchStatus ?? "")).length || null)} icon={Zap} />
-          <ReferenceMetric label="Paused" value={formatMetric(collections.filter((c) => c.reserveHealth === "PAUSED").length || null)} icon={PauseCircle} />
-          <ReferenceMetric label="Archived" value="N/A" icon={Boxes} />
+          <ReferenceMetric label="All Collections" value={formatMetric(collections.length || product.data?.stats?.collections)} asset={phewProtocolIconAssets.community} />
+          <ReferenceMetric label="Launched" value={formatMetric(collections.filter((c) => /launch/i.test(c.launchStatus ?? "")).length || null)} asset={phewProtocolIconAssets.reserve} />
+          <ReferenceMetric label="In Review" value={formatMetric(collections.filter((c) => /review/i.test(c.launchStatus ?? "")).length || null)} asset={phewProtocolIconAssets.proof} />
+          <ReferenceMetric label="Not Launched" value={formatMetric(collections.filter((c) => !/launch/i.test(c.launchStatus ?? "")).length || null)} asset={phewProtocolIconAssets.strategy} />
+          <ReferenceMetric label="Paused" value={formatMetric(collections.filter((c) => c.reserveHealth === "PAUSED").length || null)} asset={phewProtocolIconAssets.lockTokens} />
+          <ReferenceMetric label="Archived" value="N/A" asset={phewProtocolIconAssets.redeem} />
         </div>
       </ReferencePanel>
       <ReferenceTable
@@ -305,7 +315,7 @@ export function CollectionsReferencePage() {
           formatMetric(collection.holders),
           "N/A"
         ])}
-        empty={<ReferenceEmpty mascot title="No collections found" body={collections.length ? "Try adjusting your search or filters." : "No backend collections were returned. Demo rows are not rendered."} action={query ? <ReferenceButton tone="outline" onClick={() => setQuery("")}>Clear Filters</ReferenceButton> : undefined} />}
+        empty={<ReferenceEmpty mascot mascotMood="proof" title="No collections found" body={collections.length ? "Try adjusting your search or filters." : "No backend collections were returned. Demo rows are not rendered."} action={query ? <ReferenceButton tone="outline" onClick={() => setQuery("")}>Clear Filters</ReferenceButton> : undefined} />}
       />
       <div className="flex items-center justify-between text-sm text-slate-400">
         <span>Showing {visible.length} of {collections.length} collections</span>
@@ -327,10 +337,62 @@ export function CollectionDetailReferencePage({ id }: { id: string }) {
     <ReferenceShell active="collections" stats={product.data?.stats}>
       {product.error ? <BackendUnavailableBanner message={product.error.message} retry={product.reload} /> : null}
       {!collection ? (
-        <ReferenceEmpty mascot title={product.loading ? "Loading collection" : "Collection not available"} body="The route is waiting for backend collection detail data. No static screenshot UI is rendered." />
+        <div className="space-y-4">
+          <ReferenceHeader
+            eyebrow={<><ReferenceBadge tone="muted">Collections</ReferenceBadge><ReferenceBadge tone={product.loading ? "cyan" : product.error ? "red" : "gold"}>{product.loading ? "Loading" : product.error ? "Backend" : "N/A data"}</ReferenceBadge></>}
+            title={product.loading ? "Loading Collection" : "Collection Not Available"}
+            subtitle="This route keeps the collection-detail geometry while waiting for backend collection data. No static demo collection is rendered."
+            mascot
+            mascotPose={product.error ? "error" : product.loading ? "loading" : "explorer"}
+            actions={<ReferenceButton href="/collections" tone="outline">Back to Collections</ReferenceButton>}
+          />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
+            <main className="space-y-4">
+              <ReferencePanel title="Collection Identity">
+                <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
+                  <div className="grid aspect-square place-items-center rounded-lg border border-dashed border-vault-line bg-black/25">
+                    <img src={brandAssets.nftSlot} alt="" className="size-20 object-contain opacity-85" />
+                  </div>
+                  <ReferenceRows rows={[
+                    { label: "Requested ID", value: shortAddress(id) },
+                    { label: "Collection", value: "N/A" },
+                    { label: "Symbol", value: "N/A" },
+                    { label: "Token Mint", value: "N/A" },
+                    { label: "Launch Status", value: product.loading ? "Loading" : "N/A", tone: product.loading ? "cyan" : "gold" }
+                  ]} />
+                </div>
+              </ReferencePanel>
+              <ReferencePanel title="Vault NFTs">
+                <ReferenceTable
+                  columns={["Vault NFT", "Token ID", "Backing", "Status", "Owner", "Minted At"]}
+                  rows={[]}
+                  empty={<ReferenceEmpty mascotMood="proof" title="No vault NFTs returned" body="Vault rows appear only when the backend returns real NFTs for this collection." />}
+                />
+              </ReferencePanel>
+            </main>
+            <aside className="space-y-4">
+              <ReferencePanel title="Reserve Health">
+                <ReferenceRows rows={[
+                  { label: "Backing Status", value: "N/A" },
+                  { label: "Reserve Ratio", value: "N/A" },
+                  { label: "Reserve PDA", value: "N/A" }
+                ]} />
+              </ReferencePanel>
+              <ReferencePanel title="Collection Actions">
+                <div className="grid gap-2">
+                  <LockedButton>Mint Vault NFT</LockedButton>
+                  <LockedButton>Stake Vault NFT</LockedButton>
+                  <LockedButton>Redeem Vault NFT</LockedButton>
+                  <LockedButton>View Proof</LockedButton>
+                </div>
+              </ReferencePanel>
+            </aside>
+          </div>
+        </div>
       ) : (
         <>
-          <section className="ref-panel p-4">
+          <section className="ref-panel relative overflow-visible p-4">
+            <PhewMascot mood="proof" size="hero" className="absolute right-4 top-[-34px] z-10 hidden !w-44 max-w-none xl:block" />
             <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_300px_300px]">
               <img src={collection.image || brandAssets.nftSlot} alt="" className="aspect-square w-full rounded-lg border border-vault-line bg-black/35 object-cover" />
               <div className="min-w-0 self-center">
@@ -394,7 +456,7 @@ export function CollectionDetailReferencePage({ id }: { id: string }) {
                     { label: "Next Verification", value: "N/A" },
                     { label: "Proof Hash", value: "N/A" }
                   ]} />
-                  <ReferenceTransactionScene mode="proof" state="idle" title="Proof Verified Animation" tokenSymbol={collection.symbol} compact className="mt-3" />
+                  <InlineProtocolStatus className="mt-3" asset={brandAssets.proofRing} title="Proof moment" body="Large proof animation now appears only after a verified proof success." />
                 </ReferencePanel>
                 <ReferencePanel title="Vault NFTs" action={<SearchControl value="" onChange={() => undefined} placeholder="Search token ID..." />}>
                   <ReferenceTable
@@ -407,7 +469,7 @@ export function CollectionDetailReferencePage({ id }: { id: string }) {
                       "N/A",
                       "N/A"
                     ])}
-                    empty={<ReferenceEmpty title="No vault NFTs returned" body="Vault rows appear only when the backend returns real NFTs for this collection." />}
+                    empty={<ReferenceEmpty mascotMood="proof" title="No vault NFTs returned" body="Vault rows appear only when the backend returns real NFTs for this collection." />}
                   />
                 </ReferencePanel>
               </div>
@@ -421,8 +483,8 @@ export function CollectionDetailReferencePage({ id }: { id: string }) {
                   <LockedButton>View Marketplace</LockedButton>
                 </div>
               </ReferencePanel>
-              <ReferencePanel title="Mint Moment Animation">
-                <ReferenceTransactionScene mode="mint" state="idle" title="Mint Moment" tokenSymbol={collection.symbol} image={collection.image} compact />
+              <ReferencePanel title="Mint Moment">
+                <InlineProtocolStatus asset={brandAssets.pictograms.mintNft} title="Post-success modal" body="Mint celebration is skippable and opens only after backend confirmation." />
               </ReferencePanel>
               <ReferencePanel title="Collection Activity">
                 <ReferenceEmpty title="No activity yet" body="Mints, trades, and raids will appear here." object={brandAssets.nftSlot} />
@@ -450,6 +512,7 @@ export function StakingReferencePage() {
         eyebrow={<ReferenceBadge tone="green">Staking</ReferenceBadge>}
         title="Staking"
         subtitle="Stake your eligible Vault NFTs to earn rewards and support the protocol."
+        mascotPose="stake"
         aside={<div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-3"><ReferenceMetric label="Total Staked Vaults" value={formatMetric(data?.stats?.totalStakedVaults)} /><ReferenceMetric label="Total Rewards (PHEW)" value={formatMetric(data?.stats?.totalRewards)} /><ReferenceMetric label="Your Earned" value={formatMetric(data?.stats?.claimableRewards)} /></div>}
       />
       {!wallet.connected ? <WalletRequiredBanner action={<ReferenceButton>Connect Wallet</ReferenceButton>} /> : null}
@@ -459,7 +522,7 @@ export function StakingReferencePage() {
           <ReferencePanel title="1. Eligible Vault NFTs" subtitle="Select an eligible Vault NFT to stake.">
             <div className="grid gap-3 lg:grid-cols-[minmax(280px,0.8fr)_repeat(4,minmax(140px,1fr))]">
               {!eligible.length ? (
-                <ReferenceEmpty className="lg:col-span-5" title="No eligible Vault NFTs" body={wallet.connected ? "No eligible vault NFTs were returned by the backend." : "Connect a wallet to view eligible vault NFTs."} action={<ReferenceButton href="/collections" tone="outline">Explore Vaults</ReferenceButton>} />
+              <ReferenceEmpty className="lg:col-span-5" mascotMood="stake" title="No eligible Vault NFTs" body={wallet.connected ? "No eligible vault NFTs were returned by the backend." : "Connect a wallet to view eligible vault NFTs."} action={<ReferenceButton href="/collections" tone="outline">Explore Vaults</ReferenceButton>} />
               ) : null}
               {eligible.slice(0, 4).map((vault, index) => <VaultSlot key={vault.id} vault={vault} selected={index === 0} />)}
             </div>
@@ -477,16 +540,16 @@ export function StakingReferencePage() {
                 positionText(position, "status") || "N/A",
                 <LockedButton key="action">Manage</LockedButton>
               ])}
-              empty={<ReferenceEmpty title="No active staking positions" body="Stake an eligible Vault NFT to start earning rewards." action={<ReferenceButton tone="outline">Stake a Vault</ReferenceButton>} />}
+              empty={<ReferenceEmpty mascotMood="stake" title="No active staking positions" body="Stake an eligible Vault NFT to start earning rewards." action={<ReferenceButton tone="outline">Stake a Vault</ReferenceButton>} />}
             />
           </ReferencePanel>
           <ReferencePanel title="6. Staking Activity">
-            <ReferenceTable columns={["Type", "Position ID", "Vault NFT", "Amount", "Status", "Tx Hash", "Date"]} rows={[]} empty={<ReferenceEmpty title="No activity found" body="Your staking rewards activity will appear here." />} />
+            <ReferenceTable columns={["Type", "Position ID", "Vault NFT", "Amount", "Status", "Tx Hash", "Date"]} rows={[]} empty={<ReferenceEmpty mascotMood="stake" title="No activity found" body="Your staking rewards activity will appear here." />} />
           </ReferencePanel>
         </main>
         <aside className="space-y-4">
           <ReferencePanel title="2. Selected Vault">
-            {selected ? <VaultSlot vault={selected} selected /> : <ReferenceEmpty title="Vault" body="N/A" object={brandAssets.nftSlot} />}
+            {selected ? <VaultSlot vault={selected} selected /> : <ReferenceEmpty mascotMood="stake" title="Vault" body="N/A" />}
             <ReferenceRows className="mt-3" rows={[
               { label: "Vault", value: selected?.name ?? "N/A" },
               { label: "Collection", value: selected?.collectionId ?? "N/A" },
@@ -506,8 +569,8 @@ export function StakingReferencePage() {
               <PhewMascot mood="stake" size="md" className="ref-free-mascot !bottom-0 !w-32" />
             </div>
           </ReferencePanel>
-          <ReferencePanel title="8. Animation Preview">
-            <ReferenceTransactionScene mode="stake" state={!wallet.connected ? "wallet-disconnected" : "idle"} title="Stake Moment" tokenSymbol={selected?.tier ?? "TOKEN"} image={selected?.image} compact />
+          <ReferencePanel title="8. Success Moment">
+            <InlineProtocolStatus asset={brandAssets.vaultSafe} title="Stake modal ready" body="Stake and unstake game moments are handled by the shared success modal after real completion." />
           </ReferencePanel>
         </aside>
       </div>
@@ -528,6 +591,8 @@ export function AdminRiskReferencePage() {
         title="Risk Dashboard"
         subtitle="Monitor protocol risk, reserve health, and collection eligibility."
         mascot
+        mascotPose="admin"
+        mascotClassName="!w-[160px]"
         warning={<div className="rounded-lg border border-vault-gold/45 bg-vault-gold/10 p-3 text-sm text-slate-200"><AlertTriangle className="mr-2 inline size-5 text-vault-gold" /> Risk data is for protocol use only. Values are backend-verified. No manual overrides in public-safe mode.</div>}
       />
       {product.error ? <BackendUnavailableBanner message={product.error.message} retry={product.reload} /> : null}
@@ -556,7 +621,7 @@ export function AdminRiskReferencePage() {
                 row.lastScannedAt ?? "N/A",
                 <ReferenceButton key="view" tone="ghost">View</ReferenceButton>
               ])}
-              empty={<ReferenceEmpty title="No risk rows" body="Risk rows appear after backend collections or scan snapshots are returned." />}
+              empty={<ReferenceEmpty mascotMood="warning" title="No risk rows" body="Risk rows appear after backend collections or scan snapshots are returned." />}
             />
           </ReferencePanel>
           <div className="grid gap-4 lg:grid-cols-3">
@@ -582,10 +647,10 @@ export function AdminRiskReferencePage() {
             <ReferenceRows rows={["Contract Risk", "Holder Concentration", "Liquidity Risk", "Mint / Freeze Authority", "Honeypot Check", "Proxy / Upgradeable", "Metadata Risk", "Sanction / Blocklist"].map((label) => ({ label, value: "N/A" }))} />
           </ReferencePanel>
           <ReferencePanel title="Risk Status Summary">
-            <ReferenceEmpty title="No scan data yet" body="Run a scan to view risk summary." action={<ReferenceButton tone="outline" icon={RefreshCcw}>Run Full Scan</ReferenceButton>} />
+            <ReferenceEmpty mascotMood="warning" title="No scan data yet" body="Run a scan to view risk summary." action={<ReferenceButton tone="outline" icon={RefreshCcw}>Run Full Scan</ReferenceButton>} />
           </ReferencePanel>
           <ReferencePanel title="Recent Risk Scans">
-            <ReferenceTable columns={["Time", "Type", "Triggered By", "Status"]} rows={[]} empty={<ReferenceEmpty title="No scans yet" body="Risk scans will appear here." />} />
+            <ReferenceTable columns={["Time", "Type", "Triggered By", "Status"]} rows={[]} empty={<ReferenceEmpty mascotMood="warning" title="No scans yet" body="Risk scans will appear here." />} />
           </ReferencePanel>
         </aside>
       </div>
@@ -606,7 +671,8 @@ export function StrategyEngineReferencePage() {
         eyebrow={<ReferenceBadge tone="gold">Public-safe strategy</ReferenceBadge>}
         title="Strategy Engine"
         subtitle="Review instant-sell liquidity, quote readiness, and risk-discount inputs without inventing pool data."
-        aside={<ReferenceTransactionScene mode="redeem" state={!wallet.connected ? "wallet-disconnected" : poolReady ? "idle" : "error"} title="Strategy quote route" description="Wallet inventory, reserve backing, risk, and quote state stay locked to backend responses." tokenSymbol="PHEW" compact />}
+        mascotPose="strategy"
+        aside={<StrategyStatusPanel walletConnected={wallet.connected} poolReady={poolReady} />}
       />
       {!wallet.connected ? <WalletRequiredBanner action={<ReferenceButton>Connect Wallet</ReferenceButton>} /> : null}
       {product.error ? <BackendUnavailableBanner message={product.error.message} retry={product.reload} /> : null}
@@ -638,7 +704,7 @@ export function StrategyEngineReferencePage() {
                 positionText(quote, "status") || "N/A",
                 positionText(quote, "updatedAt") || "N/A"
               ])}
-              empty={<ReferenceEmpty title="No quotes" body="Quotes appear only after real pool-backed quote requests for this wallet." />}
+              empty={<ReferenceEmpty mascotMood="redeem" title="No quotes" body="Quotes appear only after real pool-backed quote requests for this wallet." />}
             />
           </ReferencePanel>
           <ReferencePanel title="Risk Discount Inputs">
@@ -694,6 +760,8 @@ export function AdminSetupReferencePage() {
         title="Admin Setup"
         subtitle="Configure protocol settings, providers, and backend services."
         mascot
+        mascotPose="admin"
+        mascotClassName="!w-[160px]"
         warning={<div className="rounded-lg border border-vault-gold/45 bg-vault-gold/10 p-3 text-sm text-slate-200"><AlertTriangle className="mr-2 inline size-5 text-vault-gold" /> Complete all required sections to enable protocol features. No user-facing actions are enabled until setup is validated.</div>}
       />
       {capabilities.error ? <BackendUnavailableBanner message={capabilities.error.message} retry={capabilities.reload} /> : null}
@@ -825,7 +893,7 @@ export function AdminSetupReferencePage() {
           </div>
         </ReferencePanel>
         <ReferencePanel title="Activity Log">
-          <ReferenceTable columns={["Time", "Event", "User", "Status"]} rows={[]} empty={<ReferenceEmpty title="No activity yet" body="Setup changes will appear here." />} />
+          <ReferenceTable columns={["Time", "Event", "User", "Status"]} rows={[]} empty={<ReferenceEmpty mascotMood="warning" title="No activity yet" body="Setup changes will appear here." />} />
         </ReferencePanel>
       </div>
     </ReferenceShell>
@@ -867,6 +935,7 @@ export function StudioReferencePage() {
         eyebrow={<><ReferenceBadge tone="muted">Studio</ReferenceBadge><ReferenceBadge tone={studioReady ? "green" : "gold"}>{studioReady ? "Subscription active" : "Setup gated"}</ReferenceBadge></>}
         title="Studio Mode"
         subtitle="Build a token-backed NFT collection with the Phew Studio workbench."
+        mascotPose="studio"
         actions={<><ReferenceButton tone="ghost">Studio Docs</ReferenceButton><ReferenceButton tone="ghost">Watch Tutorial</ReferenceButton><ReferenceButton tone="ghost" icon={SlidersHorizontal}>Studio Settings</ReferenceButton></>}
       />
       {capabilities.error ? <BackendUnavailableBanner message={capabilities.error.message} retry={capabilities.reload} /> : null}
@@ -916,8 +985,8 @@ export function StudioReferencePage() {
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
             <ReferencePanel title="3. Studio Bible (Style Guide)" subtitle="The bible defines the visual rules and creative direction for your collection.">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_250px]">
-                <ReferenceTransactionScene mode="studio" state={scanning ? "loading" : scan ? "success" : "idle"} title="Studio Bible" tokenSymbol={scan?.symbol ?? "TOKEN"} image={scan?.imageUri ?? scan?.logoUri} compact />
+              <div className="grid gap-4">
+                <InlineProtocolStatus asset={scan ? brandAssets.rewardBurst : brandAssets.pictograms.strategy} title={scanning ? "Scanning token" : scan ? "Token scan ready" : "Studio Bible gated"} body="Studio Bible completion will use the success modal after a real generation completion event." />
                 <div>
                   <ReferenceBadge tone="gold">Not Generated</ReferenceBadge>
                   <ReferenceRows className="mt-3" rows={["Colors & Mood", "Typography", "Character / Mascot Rules", "Do's & Don'ts", "Scene & Background Rules", "Trait Behavior Rules"].map((label) => ({ label, value: "N/A" }))} />
@@ -926,8 +995,8 @@ export function StudioReferencePage() {
               </div>
             </ReferencePanel>
             <ReferencePanel title="4. Layer Pack (Curated)" subtitle="Curate, validate and lock your layer pack before approval.">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_230px]">
-                <ReferenceTransactionScene mode="layer" state="idle" title="Layer Pack" tokenSymbol={scan?.symbol ?? "TOKEN"} compact />
+              <div className="grid gap-4">
+                <InlineProtocolStatus asset={brandAssets.tokenStack} title="Layer pack gated" body="Layer pack approval has a modal-ready action, but no success is displayed before backend approval." />
                 <div>
                   <ReferenceBadge tone="gold">Not Curated</ReferenceBadge>
                   <ReferenceRows className="mt-3" rows={["Layer Count", "Combinations", "Duplicates", "Validation", "Status"].map((label) => ({ label, value: "N/A" }))} />
@@ -950,6 +1019,43 @@ export function StudioReferencePage() {
         </main>
       </div>
     </ReferenceShell>
+  );
+}
+
+function InlineProtocolStatus({ asset, title, body, className }: { asset: string; title: string; body: string; className?: string }) {
+  return (
+    <div className={cn("rounded-lg border border-vault-line bg-black/25 p-4", className)}>
+      <div className="flex items-center gap-3">
+        <span className="grid size-12 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10">
+          <img src={asset} alt="" className="size-8 object-contain" />
+        </span>
+        <span className="min-w-0">
+          <strong className="block text-sm text-white">{title}</strong>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">{body}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function StrategyStatusPanel({ walletConnected, poolReady }: { walletConnected: boolean; poolReady: boolean }) {
+  const ready = walletConnected && poolReady;
+  return (
+    <div className="rounded-lg border border-vault-line bg-black/35 p-4">
+      <div className="flex items-center gap-3">
+        <span className={cn("grid size-12 shrink-0 place-items-center rounded-md border", ready ? "border-vault-green/35 bg-vault-green/10" : "border-vault-gold/35 bg-vault-gold/10")}>
+          <img src={ready ? brandAssets.energyBeam : brandAssets.errorGlitch} alt="" className="size-8 object-contain" />
+        </span>
+        <div className="min-w-0">
+          <p className="font-black text-white">{ready ? "Strategy route ready" : "Strategy route gated"}</p>
+          <p className="mt-1 text-sm text-slate-400">Quotes remain locked to backend wallet inventory, reserve backing, and real liquidity.</p>
+        </div>
+      </div>
+      <ReferenceRows className="mt-3" rows={[
+        { label: "Wallet", value: walletConnected ? "Connected" : "Disconnected", tone: walletConnected ? "green" : "gold" },
+        { label: "Pool", value: poolReady ? "Configured" : "Unavailable", tone: poolReady ? "green" : "gold" }
+      ]} />
+    </div>
   );
 }
 

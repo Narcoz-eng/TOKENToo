@@ -1,13 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PhewEmptyState } from "@/components/PhewEmptyState";
+import { PhewPageHero } from "@/components/PhewPageHero";
+import { PhewSuccessMomentModal } from "@/components/PhewSuccessMomentModal";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { brandAssets } from "@/lib/brand-assets";
-import { TransactionFlow, type TransactionFlowState } from "@/components/TransactionFlow";
 import { cn } from "@/lib/utils";
 
 type AccessMethod = "CREATION_FEE_SOL" | "WHALE_HOLDER" | "SUBSCRIPTION_STUDIO" | "ADMIN_GRANT";
@@ -136,7 +138,6 @@ export default function CreateCommunityPage() {
   const [accessMethod, setAccessMethod] = useState<AccessMethod>("CREATION_FEE_SOL");
   const [paymentSignature, setPaymentSignature] = useState("");
   const [externalLaunchSignature, setExternalLaunchSignature] = useState("");
-  const [simulatedLockAmount, setSimulatedLockAmount] = useState("");
   const [scan, setScan] = useState<TokenScan | null>(null);
   const [community, setCommunity] = useState<CreateCommunityResponse | null>(null);
   const [launchBuild, setLaunchBuild] = useState<LaunchResponse | null>(null);
@@ -152,9 +153,18 @@ export default function CreateCommunityPage() {
   const collectionAsset = launchSubmit?.verification?.addresses?.collectionAsset ?? launchTx?.collectionAssetAddress ?? null;
   const canLaunch = Boolean(collection?.id);
   const canSubmitLaunch = Boolean(launchTx?.base64UnsignedTransaction || externalLaunchSignature.trim());
-  const launchFlowState: TransactionFlowState = !wallet.connected ? "wallet-disconnected" : communityFlowState(error, activeAction, launchSubmit, launchStatus);
+  const launchConfirmed = Boolean(launchSubmit?.result?.confirmed || launchStatus?.launch?.status === "CONFIRMED");
+  const successMomentKey = launchConfirmed ? launchSubmit?.result?.txSignature ?? launchStatus?.launch?.txSignature ?? collection?.id ?? null : null;
+  const [successMomentOpen, setSuccessMomentOpen] = useState(false);
+  const [lastSuccessMomentKey, setLastSuccessMomentKey] = useState<string | null>(null);
 
   const accessHelp = useMemo(() => accessMethods.find((method) => method.value === accessMethod)?.help, [accessMethod]);
+
+  useEffect(() => {
+    if (!successMomentKey || successMomentKey === lastSuccessMomentKey) return;
+    setLastSuccessMomentKey(successMomentKey);
+    setSuccessMomentOpen(true);
+  }, [lastSuccessMomentKey, successMomentKey]);
 
   async function scanToken() {
     const mint = tokenMint.trim();
@@ -301,229 +311,182 @@ export default function CreateCommunityPage() {
 
   return (
     <AppShell active="create-community">
-      <div className="space-y-6">
-        <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg p-5">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_20%,rgba(186,255,0,0.18),transparent_30%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
-          <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
-            <div>
-              <StatusPill accent="green">Create Community</StatusPill>
-              <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">Launch your economy from a real token reserve.</h1>
-              <p className="mt-3 max-w-3xl text-sm text-slate-300">
-                Scan the token, pass access, create the draft, then initialize the reserve through backend launch routes. No generation or paid provider work runs from this page.
-              </p>
+      <div className="space-y-4">
+        <PhewPageHero
+          title="Create Community"
+          subtitle="Scan token. Pass access gate. Build. Sign. Submit. All checks and actions are backend-first."
+          mascotPose="launch"
+          eyebrow={<StatusPill accent="green">Token reserve launch</StatusPill>}
+          sidePanel={
+            <div className="rounded-lg border border-vault-line bg-black/35 p-4">
+              <h2 className="text-base font-black">Wallet Status</h2>
+              <StatusLine label="Wallet" ok={wallet.connected} value={wallet.connected ? short(wallet.address, 6) : "Not connected"} />
+              <StatusLine label="Network" ok value="Solana Devnet" />
             </div>
-            <TransactionFlow
-              state={launchFlowState}
-              moment="community-launch"
-              title="Community launch"
-              description="Token scan, access verification, launch transaction, and reserve proof all come from backend state."
-              image={scan?.imageUri ?? null}
-              tokenSymbol={scan?.symbol ?? collection?.name ?? "PHEW"}
-              detail={error ?? launchSubmit?.result?.message ?? launchStatus?.launch?.status ?? null}
-              compact
-            />
-          </div>
-        </section>
+          }
+        />
 
         {error ? <p className="rounded-md border border-vault-red/35 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</p> : null}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <main className="space-y-6">
-            <SectionCard title="CA Scan">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_150px]">
-                <label className="block">
-                  <span className="text-xs font-bold uppercase text-slate-500">Token CA / mint</span>
-                  <input value={tokenMint} onChange={(event) => setTokenMint(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Solana token mint address" />
-                </label>
-                <button onClick={scanToken} disabled={activeAction === "scan" || !tokenMint.trim()} className="phew-button phew-button-primary mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                  <ActionIcon loading={activeAction === "scan"} asset={brandAssets.proofRing} />
-                  Scan
-                </button>
-              </div>
-              {scan ? (
-                <div className="mt-5 grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
-                  <div className="rounded-lg border border-vault-line bg-black/25 p-4">
-                    <img src={scan.imageUri || brandAssets.nftSlot} alt="" className="mx-auto size-24 rounded-lg border border-vault-line bg-black/40 object-contain p-2" />
-                    <p className="mt-4 text-center text-lg font-black text-white">{scan.name || "N/A"}</p>
-                    <p className="text-center text-sm font-black text-vault-green">{scan.symbol || "N/A"}</p>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <Fact label="Mint" value={short(scan.mint)} />
-                    <Fact label="Supply" value={String(scan.supply ?? "N/A")} />
-                    <Fact label="Decimals" value={String(scan.decimals ?? "N/A")} />
-                    <Fact label="Risk score" value={formatNumber(scan.riskScore)} />
-                    <Fact label="Metadata URI" value={scan.metadataUri ? short(scan.metadataUri, 18) : "N/A"} />
-                    <Fact label="Provider" value={scan.provider ?? "N/A"} />
-                    <Fact label="Indexed" value={scan.indexed ? "Yes" : "No"} />
-                    <Fact label="Holders" value={formatNumber(scan.holders)} />
-                    <Fact label="Liquidity" value={formatUsd(scan.liquidityUsd)} />
-                    <Fact label="Market cap" value={formatUsd(scan.marketCapUsd)} />
-                  </div>
-                </div>
-              ) : null}
-            </SectionCard>
-
-            <SectionCard title="TVL Simulation">
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
-                <label className="block">
-                  <span className="text-xs font-bold uppercase text-slate-500">Raw token amount to lock</span>
-                  <input
-                    value={simulatedLockAmount}
-                    onChange={(event) => setSimulatedLockAmount(event.target.value)}
-                    className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm"
-                    inputMode="numeric"
-                    placeholder="Example: 1000000000"
-                  />
-                </label>
-                <div className="rounded-lg border border-vault-line bg-black/25 p-4">
-                  <p className="text-xs uppercase text-slate-500">Simulated TVL</p>
-                  <p className="mt-2 break-words text-lg font-black text-white">{formatSimulatedTvl(simulatedLockAmount, scan)}</p>
-                </div>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-slate-400">
-                Simulation is a frontend estimate of the raw token reserve only. USD TVL stays N/A unless the backend scan returns market context and the actual launch route confirms reserve balances.
-              </p>
-            </SectionCard>
-
-            <SectionCard title="Vault Mechanics">
-              <div className="grid gap-3 md:grid-cols-4">
-                {[
-                  ["1", "Token scan", "Backend reads metadata, risk notes, and market context for the submitted mint."],
-                  ["2", "Draft economy", "The community draft binds the creator wallet, token mint, and selected access method."],
-                  ["3", "Reserve launch", "The launch transaction creates the collection asset and reserve addresses."],
-                  ["4", "Vault NFTs", "Future mints lock tokens into reserve and expose proof before stake or redeem actions."]
-                ].map(([step, heading, body]) => (
-                  <div key={step} className="rounded-lg border border-vault-line bg-black/25 p-4">
-                    <span className="flex size-8 items-center justify-center rounded-md border border-vault-green/35 bg-vault-green/10 text-sm font-black text-vault-green">{step}</span>
-                    <p className="mt-4 font-black">{heading}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Access Gate">
-              {!wallet.connected ? <p className="mb-4 rounded-md border border-vault-green/25 bg-vault-green/10 p-3 text-sm text-slate-300">Connect and authenticate a wallet before creation. The backend ties the access grant to that wallet.</p> : null}
-              <div className="grid gap-2 md:grid-cols-4">
-                {accessMethods.map((method) => (
-                  <button
-                    key={method.value}
-                    type="button"
-                    onClick={() => setAccessMethod(method.value)}
-                    className={cn(
-                      "rounded-md border p-3 text-left text-sm transition",
-                      accessMethod === method.value ? "border-vault-green bg-vault-green/12 text-white shadow-green" : "border-vault-line bg-black/25 text-slate-400 hover:border-vault-cyan/40"
-                    )}
-                  >
-                    <span className="block font-black">{method.label}</span>
-                    <span className="mt-1 block text-xs">{method.help}</span>
-                  </button>
-                ))}
-              </div>
-              {accessMethod === "CREATION_FEE_SOL" ? (
-                <label className="mt-4 block">
-                  <span className="text-xs font-bold uppercase text-slate-500">Confirmed 1 SOL payment signature</span>
-                  <input value={paymentSignature} onChange={(event) => setPaymentSignature(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Transfer signature verified by backend" />
-                </label>
-              ) : (
-                <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-400">{accessHelp}</p>
-              )}
-              <button onClick={createCommunity} disabled={activeAction === "create" || !tokenMint.trim()} className="phew-button phew-button-primary mt-5 inline-flex h-12 items-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                <ActionIcon loading={activeAction === "create"} asset={brandAssets.tokenObject} />
-                Create Draft
+        <div className="grid items-start gap-4 xl:grid-cols-[1fr_1.08fr_0.95fr]">
+          <SectionCard title="1. Token CA / Mint Scanner">
+            <p className="mb-4 text-sm text-slate-400">Enter token mint address on Solana.</p>
+            <div className="flex gap-2">
+              <input value={tokenMint} onChange={(event) => setTokenMint(event.target.value)} className="phew-input h-12 min-w-0 flex-1 rounded-md px-4 text-sm" placeholder="Paste token mint address" />
+              <button onClick={scanToken} disabled={activeAction === "scan" || !tokenMint.trim()} className="inline-flex size-12 shrink-0 items-center justify-center rounded-md border border-vault-green bg-vault-green/10 text-vault-green">
+                <ActionIcon loading={activeAction === "scan"} asset={brandAssets.proofRing} />
               </button>
-              {collection ? (
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button onClick={verifyPayment} disabled={activeAction === "payment" || !paymentSignature.trim()} className="inline-flex h-10 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-                    <ActionIcon loading={activeAction === "payment"} asset={brandAssets.tokenObject} />
-                    Verify Payment
-                  </button>
-                  <button onClick={verifyWhale} disabled={activeAction === "whale"} className="inline-flex h-10 items-center gap-2 rounded-md border border-vault-cyan/45 bg-vault-cyan/10 px-4 text-sm font-bold text-vault-cyan">
-                    <ActionIcon loading={activeAction === "whale"} asset={brandAssets.proofRing} />
-                    Verify Whale
-                  </button>
-                </div>
-              ) : null}
-              {accessResult?.access ? <p className="mt-3 rounded-md border border-vault-green/25 bg-vault-green/10 p-3 text-sm text-vault-green">{accessResult.access.method} {accessResult.access.status}</p> : null}
-            </SectionCard>
+            </div>
+            <button onClick={scanToken} disabled={activeAction === "scan" || !tokenMint.trim()} className="phew-button phew-button-primary mt-4 inline-flex h-11 items-center gap-2 rounded-md px-5 text-sm font-black text-black">
+              <ActionIcon loading={activeAction === "scan"} asset={brandAssets.proofRing} />
+              Scan Token
+            </button>
+          </SectionCard>
 
-            {collection ? (
-              <SectionCard title="Launch Community">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <Fact label="Collection" value={collection.name} />
-                  <Fact label="Launch status" value={collection.launchStatus} />
-                  <Fact label="Reserve PDA" value={collection.reserveVaultPda ?? reserve?.reserveVaultPda ?? "Pending"} />
-                  <Fact label="Collection asset" value={collectionAsset ? short(collectionAsset) : "Pending build"} />
+          <SectionCard title="Scan Status">
+            <div className="rounded-lg border border-vault-line bg-black/25 p-4">
+              <div className="flex items-center gap-3">
+                <span className="grid size-12 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10">
+                  <ActionIcon loading={activeAction === "scan"} asset={scan ? brandAssets.rewardBurst : brandAssets.proofRing} />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-black text-white">{activeAction === "scan" ? "Scanning token" : scan ? "Token scanned" : "Awaiting token CA"}</p>
+                  <p className="mt-1 text-sm text-slate-400">Backend scan result drives the launch gate.</p>
                 </div>
-                <label className="mt-4 block">
-                  <span className="text-xs font-bold uppercase text-slate-500">External launch signature (optional)</span>
-                  <input value={externalLaunchSignature} onChange={(event) => setExternalLaunchSignature(event.target.value)} className="phew-input mt-2 h-12 w-full rounded-md px-4 text-sm" placeholder="Use if the devnet transaction was signed elsewhere" />
-                </label>
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button onClick={buildLaunch} disabled={activeAction === "build" || !canLaunch} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-                    <ActionIcon loading={activeAction === "build"} asset={brandAssets.energyBeam} />
-                    Build Launch Tx
-                  </button>
-                  <button onClick={submitLaunch} disabled={activeAction === "submit" || !canSubmitLaunch} className="phew-button phew-button-primary inline-flex h-11 items-center gap-2 rounded-md px-4 text-sm font-black text-black">
-                    <ActionIcon loading={activeAction === "submit"} asset={brandAssets.vaultSafe} />
-                    Sign + Submit Launch
-                  </button>
-                  <button onClick={refreshLaunchStatus} disabled={activeAction === "status"} className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-300">
-                    <ActionIcon loading={activeAction === "status"} asset={brandAssets.proofRing} />
-                    Refresh Status
-                  </button>
-                </div>
-                {launchTx?.base64UnsignedTransaction ? <p className="mt-3 break-all rounded-md border border-vault-line bg-black/25 p-3 font-mono text-xs text-slate-400">Unsigned launch tx: {short(launchTx.base64UnsignedTransaction, 80)}</p> : null}
-                {launchSubmit?.result?.txSignature ? (
-                  <a href={`https://explorer.solana.com/tx/${launchSubmit.result.txSignature}?cluster=devnet`} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-vault-green/45 bg-vault-green/10 px-4 text-sm font-bold text-vault-green">
-                    View launch transaction <img src={brandAssets.energyBeam} alt="" className="size-5 object-contain" />
-                  </a>
-                ) : null}
-              </SectionCard>
-            ) : null}
-          </main>
-
-          <aside className="space-y-6">
-            <SectionCard title="Current State">
-              <div className="space-y-3">
-                <StatusLine label="Token scan" ok={Boolean(scan)} />
-                <StatusLine label="Access grant" ok={Boolean(community?.ok)} />
-                <StatusLine label="Launch tx built" ok={Boolean(launchTx?.base64UnsignedTransaction || launchBuild?.idempotent)} />
-                <StatusLine label="Launch status checked" ok={Boolean(launchStatus)} />
-                <StatusLine label="Reserve verified" ok={Boolean(reserve?.lastOnChainVerifiedAt || launchSubmit?.verification?.passed)} />
               </div>
-              {community?.message ? <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-300">{community.message}</p> : null}
-              {launchStatus?.launch ? <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-300">Launch status: {launchStatus.launch.status ?? "N/A"}{launchStatus.launch.productionReady ? " - production ready" : ""}</p> : null}
-            </SectionCard>
+              <div className="mt-4 grid gap-2">
+                <Fact label="Symbol" value={scan?.symbol ?? "N/A"} />
+                <Fact label="Provider" value={scan?.provider ?? "N/A"} />
+              </div>
+            </div>
+          </SectionCard>
 
-            <SectionCard title="Verified Reserve">
-              {reserve ? (
-                <div className="space-y-3">
-                  <Fact label="Reserve PDA" value={reserve.reserveVaultPda ?? "N/A"} />
-                  <Fact label="Token mint" value={short(reserve.tokenMint)} />
-                  <Fact label="Available backing" value={`${reserve.availableBacking} ${reserve.tokenSymbol}`} />
-                  <Fact label="Total locked" value={`${reserve.totalLocked} ${reserve.tokenSymbol}`} />
-                  <Fact label="Status" value={reserve.status} />
-                  <Fact label="On-chain verified" value={reserve.lastOnChainVerifiedAt ?? "N/A"} />
-                </div>
-              ) : (
-                <p className="text-sm text-slate-400">Reserve proof appears after a community draft exists and after launch submit refreshes the collection reserve.</p>
-              )}
-            </SectionCard>
-
-            {launchSubmit?.verification ? (
-              <SectionCard title="Launch Verification">
-                <div className="space-y-3">
-                  <StatusLine label="Verification available" ok={Boolean(launchSubmit.verification.verificationAvailable)} />
-                  <StatusLine label="Verification passed" ok={Boolean(launchSubmit.verification.passed)} />
-                  <StatusLine label="Collection asset exists" ok={Boolean(launchSubmit.verification.collectionAssetExists)} />
-                  <Fact label="Reserve balance" value={launchSubmit.verification.reserve?.balance ?? "N/A"} />
-                </div>
-                {launchSubmit.verification.issues?.length ? <p className="mt-4 text-sm text-vault-gold">{launchSubmit.verification.issues.join("; ")}</p> : null}
-              </SectionCard>
-            ) : null}
-          </aside>
+          <SectionCard title="2. Token Scan Result">
+            <div className="space-y-1">
+              <Fact label="Token Name" value={scan?.name ?? "N/A"} />
+              <Fact label="Symbol" value={scan?.symbol ?? "N/A"} />
+              <Fact label="Mint Address" value={scan?.mint ? short(scan.mint, 12) : "N/A"} />
+              <Fact label="Decimals" value={String(scan?.decimals ?? "N/A")} />
+              <Fact label="Metadata URI" value={scan?.metadataUri ? short(scan.metadataUri, 14) : "N/A"} />
+              <Fact label="Image URI" value={scan?.imageUri ? short(scan.imageUri, 14) : "N/A"} />
+              <Fact label="Provider" value={scan?.provider ?? "N/A"} />
+              <Fact label="Risk Score" value={formatNumber(scan?.riskScore)} />
+            </div>
+            <span className="mt-4 inline-flex rounded-full bg-slate-800 px-3 py-1 text-[10px] font-black uppercase text-slate-300">{scan ? "Scanned" : "Unscanned"}</span>
+          </SectionCard>
         </div>
+
+        <div className="grid items-start gap-4 xl:grid-cols-[1.15fr_0.9fr_0.95fr]">
+          <SectionCard title="3. Access Gate Requirements">
+            <p className="mb-4 text-sm text-slate-400">All requirements must pass before Launch Build is available.</p>
+            <div className="space-y-2">
+              {accessMethods.map((method) => (
+                <AccessGateRow
+                  key={method.value}
+                  method={method}
+                  selected={accessMethod === method.value}
+                  onSelect={() => setAccessMethod(method.value)}
+                  onCheck={method.value === "CREATION_FEE_SOL" ? verifyPayment : method.value === "WHALE_HOLDER" ? verifyWhale : undefined}
+                  checkDisabled={!collection || (method.value === "CREATION_FEE_SOL" && !paymentSignature.trim()) || activeAction === "payment" || activeAction === "whale"}
+                />
+              ))}
+            </div>
+            {accessMethod === "CREATION_FEE_SOL" ? (
+              <label className="mt-4 block">
+                <span className="flex items-center justify-between text-xs font-bold uppercase text-slate-500">
+                  Payment Signature (Devnet)
+                  <span className="rounded-full bg-slate-800 px-2 py-1 text-[10px] text-slate-300">Not verified</span>
+                </span>
+                <input value={paymentSignature} onChange={(event) => setPaymentSignature(event.target.value)} className="phew-input mt-2 h-11 w-full rounded-md px-4 text-sm" placeholder="Paste devnet tx signature" />
+              </label>
+            ) : (
+              <p className="mt-4 rounded-md border border-vault-line bg-black/25 p-3 text-sm text-slate-400">{accessHelp}</p>
+            )}
+            <button onClick={createCommunity} disabled={activeAction === "create" || !tokenMint.trim()} className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-vault-line bg-white/5 text-sm font-black text-slate-400 disabled:cursor-not-allowed disabled:opacity-60">
+              <ActionIcon loading={activeAction === "create"} asset={brandAssets.pictograms.community} />
+              Create Draft
+            </button>
+            {accessResult?.access ? <p className="mt-3 rounded-md border border-vault-green/25 bg-vault-green/10 p-3 text-sm text-vault-green">{accessResult.access.method} {accessResult.access.status}</p> : null}
+          </SectionCard>
+
+          <SectionCard title="4. Build, Sign & Submit">
+            <p className="mb-4 text-sm text-slate-400">Actions become available when gate passes.</p>
+            <div className="space-y-3">
+              <LaunchAction label="Build Launch" detail="Build launch payload on backend." asset={brandAssets.energyBeam} onClick={buildLaunch} disabled={activeAction === "build" || !canLaunch} loading={activeAction === "build"} />
+              <LaunchAction label="Sign Transaction" detail="Sign the payload with your wallet." asset={brandAssets.lockUnlock} onClick={submitLaunch} disabled={activeAction === "submit" || !canSubmitLaunch} loading={activeAction === "submit"} />
+              <LaunchAction label="Submit Launch" detail="Submit signed payload to backend." asset={brandAssets.vaultSafe} onClick={refreshLaunchStatus} disabled={activeAction === "status" || !collection} loading={activeAction === "status"} />
+            </div>
+            <label className="mt-4 block">
+              <span className="text-xs font-bold uppercase text-slate-500">External launch signature</span>
+              <input value={externalLaunchSignature} onChange={(event) => setExternalLaunchSignature(event.target.value)} className="phew-input mt-2 h-11 w-full rounded-md px-4 text-sm" placeholder="Optional confirmed signature" />
+            </label>
+            {launchTx?.base64UnsignedTransaction ? <p className="mt-3 break-all rounded-md border border-vault-line bg-black/25 p-3 font-mono text-xs text-slate-400">Unsigned launch tx: {short(launchTx.base64UnsignedTransaction, 64)}</p> : null}
+          </SectionCard>
+
+          <div className="space-y-4">
+            <SectionCard title="5. Reserve Proof (Post-Build)">
+              <p className="mb-4 text-sm text-slate-400">Backend will return reserve proof after build.</p>
+              <Fact label="Reserve PDA" value={reserve?.reserveVaultPda ?? collection?.reserveVaultPda ?? "N/A"} />
+              <Fact label="Lock Amount" value={reserve ? `${reserve.totalLocked} ${reserve.tokenSymbol}` : "N/A"} />
+              <Fact label="Unlock Schedule" value="N/A" />
+              <Fact label="Proof Status" value={reserve?.status ?? "N/A"} />
+              <span className="mt-4 inline-flex rounded-full bg-slate-800 px-3 py-1 text-[10px] font-black uppercase text-slate-300">{reserve ? "Proof returned" : "Not built"}</span>
+            </SectionCard>
+
+            <SectionCard title="6. Launch Verification">
+              <div className="space-y-1">
+                <Fact label="Ownership Verified" value={launchSubmit?.verification?.passed ? "Yes" : "N/A"} />
+                <Fact label="Reserve Verified" value={launchSubmit?.verification?.reserve?.balance ?? "N/A"} />
+                <Fact label="Access Gates" value={accessResult?.access?.status ?? "N/A"} />
+                <Fact label="Launch Status" value={launchStatus?.launch?.status ?? collection?.launchStatus ?? "N/A"} />
+              </div>
+              <span className="mt-4 inline-flex rounded-full bg-slate-800 px-3 py-1 text-[10px] font-black uppercase text-slate-300">{launchStatus ? "Checked" : "Not submitted"}</span>
+            </SectionCard>
+          </div>
+        </div>
+
+        <SectionCard title="Recent Community Launch Activity">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="py-2">Token</th>
+                  <th className="py-2">Symbol</th>
+                  <th className="py-2">Mint</th>
+                  <th className="py-2">Requested By</th>
+                  <th className="py-2">Status</th>
+                  <th className="py-2">Created At</th>
+                  <th className="py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colSpan={7} className="border-t border-vault-line py-6">
+                    <PhewEmptyState
+                      mascotPose="running"
+                      title="No community launches yet"
+                      body="Launch activity appears here only after real backend launch rows exist."
+                      compact
+                      table
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+        {successMomentOpen && successMomentKey ? (
+          <PhewSuccessMomentModal
+            action="community-launch"
+            tokenSymbol={scan?.symbol ?? reserve?.tokenSymbol ?? "TOKEN"}
+            nftImage={scan?.imageUri ?? null}
+            title="Community launched"
+            subtitle="The backend confirmed launch state for the community reserve and collection."
+            txSignature={launchSubmit?.result?.txSignature ?? launchStatus?.launch?.txSignature}
+            proofUrl={collection?.id ? `/collections/${encodeURIComponent(collection.id)}` : undefined}
+            onClose={() => setSuccessMomentOpen(false)}
+          />
+        ) : null}
       </div>
     </AppShell>
   );
@@ -542,23 +505,105 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusLine({ label, ok }: { label: string; ok: boolean }) {
+function AccessGateRow({
+  method,
+  selected,
+  onSelect,
+  onCheck,
+  checkDisabled
+}: {
+  method: { value: AccessMethod; label: string; help: string };
+  selected: boolean;
+  onSelect: () => void;
+  onCheck?: () => void;
+  checkDisabled?: boolean;
+}) {
+  const checkAvailable = Boolean(onCheck);
+  return (
+    <div className={cn("rounded-lg border bg-black/25 p-3 transition", selected ? "border-vault-green/60 shadow-green" : "border-vault-line hover:border-vault-cyan/35")}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-start gap-3 text-left">
+          <span className={cn("grid size-10 shrink-0 place-items-center rounded-md border bg-black/30", selected ? "border-vault-green/55 bg-vault-green/10" : "border-vault-line")}>
+            <img src={accessMethodAsset(method.value)} alt="" className="size-7 object-contain" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-black text-white">{method.label}</span>
+            <span className="mt-1 block text-xs leading-5 text-slate-400">{method.help}</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onCheck}
+          disabled={!checkAvailable || checkDisabled}
+          className={cn(
+            "inline-flex h-9 shrink-0 items-center justify-center rounded-md border px-3 text-xs font-black transition",
+            checkAvailable ? "border-vault-green/45 bg-vault-green/10 text-vault-green hover:border-vault-green" : "border-vault-line bg-black/25 text-slate-500",
+            (!checkAvailable || checkDisabled) && "cursor-not-allowed opacity-55"
+          )}
+        >
+          {checkAvailable ? "Check" : "Backend gate"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LaunchAction({
+  label,
+  detail,
+  asset,
+  onClick,
+  disabled,
+  loading
+}: {
+  label: string;
+  detail: string;
+  asset: string;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "group flex w-full items-center justify-between gap-3 rounded-lg border border-vault-line bg-black/25 p-3 text-left transition hover:border-vault-green/45 hover:bg-vault-green/8",
+        disabled && "cursor-not-allowed opacity-55 hover:border-vault-line hover:bg-black/25"
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10">
+          <ActionIcon loading={Boolean(loading)} asset={asset} />
+        </span>
+        <span className="min-w-0">
+          <strong className="block text-sm text-white">{label}</strong>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">{detail}</span>
+        </span>
+      </span>
+      <img src={brandAssets.energyBeam} alt="" className="size-5 shrink-0 object-contain opacity-60 transition group-hover:opacity-100" />
+    </button>
+  );
+}
+
+function StatusLine({ label, ok, value }: { label: string; ok: boolean; value?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-vault-line py-3 text-sm last:border-0">
       <span className="text-slate-300">{label}</span>
-      <span className={ok ? "text-vault-green" : "text-slate-500"}>
-        <img src={ok ? brandAssets.rewardBurst : brandAssets.proofRing} alt="" className="inline size-4 object-contain align-[-2px]" /> {ok ? "Ready" : "Pending"}
+      <span className={cn("min-w-0 break-words text-right font-bold", ok ? "text-vault-green" : "text-slate-500")}>
+        <img src={ok ? brandAssets.rewardBurst : brandAssets.proofRing} alt="" className="mr-1 inline size-4 object-contain align-[-2px]" />
+        {value ?? (ok ? "Ready" : "Pending")}
       </span>
     </div>
   );
 }
 
-function communityFlowState(error: string | null, activeAction: string | null, launchSubmit: LaunchResponse | null, launchStatus: LaunchStatusResponse | null): TransactionFlowState {
-  if (error) return "error";
-  if (launchSubmit?.result?.confirmed || launchStatus?.launch?.status === "CONFIRMED") return "success";
-  if (activeAction === "submit") return "signing";
-  if (activeAction) return "preparing";
-  return "idle";
+function accessMethodAsset(method: AccessMethod) {
+  if (method === "CREATION_FEE_SOL") return brandAssets.tokenObject;
+  if (method === "WHALE_HOLDER") return brandAssets.pictograms.lockTokens;
+  if (method === "SUBSCRIPTION_STUDIO") return brandAssets.pictograms.strategy;
+  return brandAssets.pictograms.proof;
 }
 
 function short(value?: string | null, size = 10) {

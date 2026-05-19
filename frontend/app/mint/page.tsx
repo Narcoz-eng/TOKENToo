@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorState, WalletDisconnectedState } from "@/components/ApiState";
 import { SectionCard } from "@/components/SectionCard";
@@ -12,7 +12,9 @@ import { unwrapApiData } from "@/lib/api";
 import type { VaultCollection } from "@/lib/types";
 import { AnimatedButton } from "@/components/AnimatedButton";
 import { brandAssets } from "@/lib/brand-assets";
-import { TransactionFlow, transactionStateFromTxStatus, type TransactionFlowState } from "@/components/TransactionFlow";
+import { PhewEmptyState } from "@/components/PhewEmptyState";
+import { PhewPageHero } from "@/components/PhewPageHero";
+import { PhewSuccessMomentModal } from "@/components/PhewSuccessMomentModal";
 import { ProtocolTrustStrip, collectionTrust } from "@/components/protocol-trust";
 import { TransactionStatus, type TxStatus } from "@/components/TransactionStatus";
 import { cn } from "@/lib/utils";
@@ -60,7 +62,16 @@ export default function MintPage() {
   const sliderValue = clampAmount(amount);
   const proofMint = mintState?.vaultNft?.mint ?? mintState?.nftMint ?? null;
   const finalImage = mintState?.assetUri ?? collection?.image ?? null;
-  const flowState: TransactionFlowState = !wallet.connected ? "wallet-disconnected" : mintFlowState(txStatus, mintState, error);
+  const mintConfirmed = txStatus === "confirmed" || mintState?.status === "CONFIRMED";
+  const successMomentKey = mintConfirmed ? mintState?.txSignature ?? proofMint ?? mintState?.id ?? null : null;
+  const [successMomentOpen, setSuccessMomentOpen] = useState(false);
+  const [lastSuccessMomentKey, setLastSuccessMomentKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successMomentKey || successMomentKey === lastSuccessMomentKey) return;
+    setLastSuccessMomentKey(successMomentKey);
+    setSuccessMomentOpen(true);
+  }, [lastSuccessMomentKey, successMomentKey]);
 
   async function createIntent() {
     if (!collection || !wallet.address) {
@@ -147,36 +158,13 @@ export default function MintPage() {
     return (
       <AppShell active="mint">
         <div className="space-y-6">
-          <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_20%,rgba(186,255,0,0.18),transparent_30%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
-            <div className="relative grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_520px]">
-              <div className="max-w-3xl">
-                <div className="flex flex-wrap gap-2">
-                  <StatusPill accent="green">Mint Vault NFT</StatusPill>
-                  <StatusPill accent="cyan">Loading live communities</StatusPill>
-                </div>
-                <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">Lock real community tokens and mint from a verified reserve.</h1>
-                <p className="mt-3 text-sm text-slate-300">
-                  Mint-eligible communities are loaded from the backend. Missing values stay N/A until a real collection is returned.
-                </p>
-                <div className="mt-6 grid gap-3 md:grid-cols-3">
-                  <HeroMetric label="Selected community" value="N/A" />
-                  <HeroMetric label="Collection asset" value="N/A" />
-                  <HeroMetric label="Reserve PDA" value="N/A" />
-                </div>
-              </div>
-              <TransactionFlow
-                state="preparing"
-                moment="mint"
-                title="Mint Vault NFT"
-                description="Loading mint eligibility from the backend before any wallet action is enabled."
-                image={null}
-                tokenSymbol="PHEW"
-                detail="Awaiting live collection data"
-                compact
-              />
-            </div>
-          </section>
+          <PhewPageHero
+            title="Lock real community tokens and mint from a verified reserve."
+            subtitle="Mint-eligible communities are loaded from the backend. Missing values stay N/A until a real collection is returned."
+            mascotPose="mint"
+            eyebrow={<><StatusPill accent="green">Mint Vault NFT</StatusPill><StatusPill accent="cyan">Loading live communities</StatusPill></>}
+            sidePanel={<MintHeroStatus status="validating" label="Loading mint eligibility" detail="Awaiting live collection data" />}
+          />
           <MintEmptyWorkspace />
         </div>
       </AppShell>
@@ -189,76 +177,33 @@ export default function MintPage() {
         {collectionState.error ? <ErrorState error={collectionState.error} retry={collectionState.reload} /> : null}
         {!collectionState.error && !mintableCollections.length ? (
           <>
-            <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_20%,rgba(186,255,0,0.18),transparent_30%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
-              <div className="relative grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-center">
-                <div className="max-w-3xl">
-                  <div className="flex flex-wrap gap-2">
-                    <StatusPill accent="green">Mint Vault NFT</StatusPill>
-                    <StatusPill accent="gold">No eligible community</StatusPill>
-                  </div>
-                  <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">No mint-eligible launched communities yet.</h1>
-                  <p className="mt-3 text-sm text-slate-300">
-                    Minting stays locked until the backend returns a launched collection with a confirmed collection asset, reserve PDA, and Premium production profile.
-                  </p>
-                  <div className="mt-6">
-                    <Link href="/create-community" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">
-                      Create Community <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" />
-                    </Link>
-                  </div>
-                </div>
-                <TransactionFlow
-                  state="idle"
-                  moment="mint"
-                  title="Mint Vault NFT"
-                  description="Input community tokens, transform through reserve validation, output a verified Vault NFT when backend eligibility exists."
-                  image={null}
-                  tokenSymbol="PHEW"
-                  detail="Awaiting eligible launched community"
-                  compact
-                />
-              </div>
-            </section>
+            <PhewPageHero
+              title="No mint-eligible launched communities yet."
+              subtitle="Minting stays locked until the backend returns a launched collection with a confirmed collection asset, reserve PDA, and Premium production profile."
+              mascotPose="mint"
+              eyebrow={<><StatusPill accent="green">Mint Vault NFT</StatusPill><StatusPill accent="gold">No eligible community</StatusPill></>}
+              actions={<Link href="/create-community" className="phew-button phew-button-primary inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-black">Create Community <img src={brandAssets.tokenObject} alt="" className="size-5 object-contain" /></Link>}
+              sidePanel={<MintHeroStatus status="idle" label="Awaiting eligible community" detail="No backend collection is mint-ready." />}
+            />
             <MintEmptyWorkspace />
           </>
         ) : null}
 
         {collection ? (
           <>
-            <section className="phew-panel phew-hero-canvas relative overflow-hidden rounded-lg">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_20%,rgba(186,255,0,0.18),transparent_30%),linear-gradient(120deg,#020806_0%,#06110f_58%,#020806_100%)]" />
-              <div className="relative grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_520px]">
-                <div className="max-w-3xl">
-                  <div className="flex flex-wrap gap-2">
-                    <StatusPill accent="green">Mint Vault NFT</StatusPill>
-                    <StatusPill accent="cyan">Devnet Transaction</StatusPill>
-                  </div>
-                  <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight sm:text-4xl">Lock real community tokens and mint from a verified reserve.</h1>
-                  <p className="mt-3 text-sm text-slate-300">
-                    The backend validates token balance, production profile, collection asset, reserve PDA, and vault position PDA before the mint can finalize.
-                  </p>
-                  <div className="mt-6 grid gap-3 md:grid-cols-3">
-                    <HeroMetric label="Selected community" value={collection.symbol} />
-                    <HeroMetric label="Collection asset" value={collection.collectionAssetAddress ? short(collection.collectionAssetAddress) : "N/A"} />
-                    <HeroMetric label="Reserve PDA" value={collection.reserveVaultPda ? short(collection.reserveVaultPda) : "N/A"} />
-                  </div>
-                  <ProtocolTrustStrip trust={collectionTrust(collection)} className="mt-5 max-w-3xl" />
-                </div>
-                <div className="space-y-4">
-                  <TransactionFlow
-                    state={flowState}
-                    moment="mint"
-                    title="Mint Vault NFT"
-                    description="Intent, transaction build, wallet signature, and backend confirmation use the real mint routes."
-                    image={finalImage}
-                    tokenSymbol={collection.symbol}
-                    detail={error ?? mintState?.errorMessage ?? mintState?.status ?? null}
-                    compact
-                  />
-                  <ProjectedVaultCard image={finalImage} collection={collection} amount={amount} lockDurationDays={lockDurationDays} txStatus={txStatus} />
-                </div>
-              </div>
-            </section>
+            <PhewPageHero
+              title="Lock real community tokens and mint from a verified reserve."
+              subtitle="The backend validates token balance, production profile, collection asset, reserve PDA, and vault position PDA before the mint can finalize."
+              mascotPose="mint"
+              eyebrow={<><StatusPill accent="green">Mint Vault NFT</StatusPill><StatusPill accent="cyan">Devnet Transaction</StatusPill></>}
+              actions={<ProtocolTrustStrip trust={collectionTrust(collection)} className="max-w-3xl" />}
+              sidePanel={<MintHeroStatus status={txStatus} label={mintStatusLabel(txStatus, mintState?.status)} detail={error ?? mintState?.errorMessage ?? mintState?.status ?? undefined} />}
+            />
+            <div className="grid gap-3 md:grid-cols-3">
+              <HeroMetric label="Selected community" value={collection.symbol} />
+              <HeroMetric label="Collection asset" value={collection.collectionAssetAddress ? short(collection.collectionAssetAddress) : "N/A"} />
+              <HeroMetric label="Reserve PDA" value={collection.reserveVaultPda ? short(collection.reserveVaultPda) : "N/A"} />
+            </div>
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
               <main className="space-y-6">
@@ -362,6 +307,7 @@ export default function MintPage() {
               </main>
 
               <aside className="space-y-6">
+                <ProjectedVaultCard image={finalImage} collection={collection} amount={amount} lockDurationDays={lockDurationDays} txStatus={txStatus} />
                 <SectionCard title="Mint Status">
                   <TransactionStatus status={txStatus} label={mintStatusLabel(txStatus, mintState?.status)} detail={error ?? mintState?.errorMessage ?? undefined} />
                   <div className="mt-4 space-y-3">
@@ -395,6 +341,18 @@ export default function MintPage() {
             </div>
           </>
         ) : null}
+        {successMomentOpen && successMomentKey ? (
+          <PhewSuccessMomentModal
+            action="mint"
+            tokenSymbol={collection?.symbol ?? "TOKEN"}
+            nftImage={finalImage}
+            title="Vault NFT minted"
+            subtitle="The backend confirmed the mint. Your proof route is ready when a vault mint is available."
+            txSignature={mintState?.txSignature}
+            proofUrl={proofMint ? `/vaults/${encodeURIComponent(proofMint)}/proof` : undefined}
+            onClose={() => setSuccessMomentOpen(false)}
+          />
+        ) : null}
       </div>
     </AppShell>
   );
@@ -418,9 +376,11 @@ function MintEmptyWorkspace() {
         </SectionCard>
 
         <SectionCard title="Mint-Eligible Communities">
-          <div className="rounded-lg border border-dashed border-vault-line bg-black/25 p-5 text-sm text-slate-400">
-            No eligible launched communities were returned by the backend. The list stays empty instead of showing demo collections.
-          </div>
+          <PhewEmptyState
+            mascotPose="mint"
+            title="No mint-eligible communities"
+            body="No eligible launched communities were returned by the backend. The list stays empty instead of showing demo collections."
+          />
         </SectionCard>
       </main>
 
@@ -440,6 +400,24 @@ function MintEmptyWorkspace() {
           </Link>
         </SectionCard>
       </aside>
+    </div>
+  );
+}
+
+function MintHeroStatus({ status, label, detail }: { status: TxStatus; label: string; detail?: string | null }) {
+  return (
+    <div className="rounded-lg border border-vault-line bg-black/35 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-black text-white">Mint Status</h2>
+        <img src={status === "confirmed" ? brandAssets.rewardBurst : brandAssets.pictograms.mintNft} alt="" className="size-9 object-contain" />
+      </div>
+      <div className="mt-3">
+        <TransactionStatus status={status} label={label} detail={detail ?? undefined} />
+      </div>
+      <div className="mt-3 grid gap-2 text-sm">
+        <PreviewRow label="Intent" value={status === "idle" ? "Ready" : status} />
+        <PreviewRow label="Backend" value={detail ?? "Awaiting action"} />
+      </div>
     </div>
   );
 }
@@ -513,12 +491,6 @@ function mintStatusLabel(status: TxStatus, backendStatus?: string) {
     failed: "Mint failed"
   };
   return labels[status];
-}
-
-function mintFlowState(status: TxStatus, transaction: MintTransaction | null, error: string | null): TransactionFlowState {
-  if (error || status === "failed") return "error";
-  if (status !== "idle") return transactionStateFromTxStatus(status);
-  return transactionStateFromTxStatus(transaction?.status);
 }
 
 function clampAmount(value: string) {

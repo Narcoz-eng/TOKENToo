@@ -12,6 +12,7 @@ The implementation follows current frontend animation guidance: transform/opacit
 | `PhewMascotHero` | Renders the large free hero mascot. |
 | `PhewMascotActor` | Actor wrapper with aura for scenes. |
 | `PhewGameMoment` | Shared storyboard scene for transaction/action moments. |
+| `PhewSuccessMomentModal` | Portal modal that hosts the large success scene after backend-confirmed completion. |
 | `MintGameMoment` | Token/card to NFT mint sequence. |
 | `StakeGameMoment` | NFT card to vault/lock/reward sequence. |
 | `UnstakeGameMoment` | Vault opens and NFT exits sequence. |
@@ -46,17 +47,20 @@ The implementation follows current frontend animation guidance: transform/opacit
 - Reduced motion disables continuous animation while preserving state labels, objects, and progress dots.
 - The mascot is never stretched, boxed, or cropped in transaction scenes.
 - Generic widgets are not used for protocol action scenes; every scene has actor, object, target, beam/orbit/particles, label, and progress dots.
+- Large transaction scenes should live in `PhewSuccessMomentModal`, not inline in normal form layout.
+- Inline pages should use compact status panels while transactions are preparing, signing, submitting, or waiting for backend confirmation.
 
 ## Route Usage
 
 | Route | Scene |
 | --- | --- |
 | `/home` | Hero mascot plus dashboard/empty-state mascot. |
-| `/mint` | `TransactionFlow` to `PhewGameMoment` with `mint`. |
-| `/staking` | `ReferenceTransactionScene` to `PhewGameMoment` with `stake`. |
-| `/redeem` | `TransactionFlow` to `PhewGameMoment` with `redeem`. |
-| `/vaults/:mint/proof` | `ReferenceTransactionScene` to `PhewGameMoment` with `proof`. |
-| `/create-community` | `TransactionFlow` to `PhewGameMoment` with `community`. |
+| `/mint` | Compact status during form flow; `PhewSuccessMomentModal` with `mint` after confirmed mint. |
+| `/staking` | Compact status during staking flow; `PhewSuccessMomentModal` with `stake`/`unstake` after backend-completed action. |
+| `/redeem` | Compact status during form flow; `PhewSuccessMomentModal` with `redeem` after confirmed redeem. |
+| `/vaults/:mint/proof` | Compact proof status; `PhewSuccessMomentModal` with `proof` after proof endpoint returns zero issues. |
+| `/create-community` | Compact launch status; `PhewSuccessMomentModal` with `community` after confirmed launch. |
+| `/studio` | Compact Studio Bible/layer statuses; modal component is available, but no completion modal is shown without a real backend completion event. |
 
 ## Data Contract
 

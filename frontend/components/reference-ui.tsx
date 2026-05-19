@@ -15,6 +15,8 @@ import {
   Wallet
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { PhewEmptyState } from "@/components/PhewEmptyState";
+import { PhewPageHero, type PhewHeroMascotPose } from "@/components/PhewPageHero";
 import { PhewGameMoment } from "@/components/PhewGameMoments";
 import { PhewMascot, type PhewMascotMood } from "@/components/PhewMascot";
 import { brandAssets } from "@/lib/brand-assets";
@@ -23,6 +25,7 @@ import { cn } from "@/lib/utils";
 export type ReferenceTone = "green" | "cyan" | "gold" | "red" | "muted";
 export type ReferenceSceneMode = "mint" | "stake" | "unstake" | "redeem" | "proof" | "community" | "studio" | "reward" | "scan" | "layer";
 export type ReferenceSceneState = "idle" | "wallet-disconnected" | "loading" | "preparing" | "signing" | "submitting" | "confirming" | "success" | "error";
+type ReferenceMascotPose = PhewHeroMascotPose | "run" | "point" | "guide";
 
 export function ReferenceShell({
   active,
@@ -58,7 +61,7 @@ export function ReferenceHeader({
   title: ReactNode;
   subtitle?: ReactNode;
   mascot?: boolean;
-  mascotPose?: "run" | "running" | "point" | "guide" | "success" | "error" | "idle" | "loading" | "warning" | "mint" | "stake" | "redeem" | "proof";
+  mascotPose?: ReferenceMascotPose;
   mascotClassName?: string;
   actions?: ReactNode;
   aside?: ReactNode;
@@ -66,30 +69,17 @@ export function ReferenceHeader({
   className?: string;
 }) {
   return (
-    <section className={cn("ref-panel ref-hero relative overflow-visible p-4 sm:p-5", className)}>
-      <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
-        <div className="absolute inset-0 grid-mask opacity-20" />
-        <div className="absolute right-[18%] top-[-30%] size-[380px] rounded-full bg-vault-green/10 blur-3xl" />
-        <div className="absolute right-[4%] top-[20%] size-[320px] rounded-full bg-vault-cyan/10 blur-3xl" />
-      </div>
-      <div className={cn("relative grid gap-4", aside ? "xl:grid-cols-[minmax(0,1fr)_430px]" : "xl:grid-cols-[minmax(0,1fr)_320px]", mascot && "xl:items-center")}>
-        <div className="min-w-0">
-          {eyebrow ? <div className="mb-2 flex flex-wrap items-center gap-2">{eyebrow}</div> : null}
-          <h1 className="max-w-4xl text-[34px] font-black leading-[1.04] text-white sm:text-[42px]">{title}</h1>
-          {subtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{subtitle}</p> : null}
-          {actions ? <div className="mt-4 flex flex-wrap gap-3">{actions}</div> : null}
-        </div>
-        {aside ? (
-          <div className="relative z-10">{aside}</div>
-        ) : mascot ? (
-          <div className="ref-hero-mascot-stage">
-            <span className="ref-hero-ring" />
-            <PhewMascot mood={moodFromPose(mascotPose)} size="hero" className={cn("ref-free-mascot !left-[36%] !w-[clamp(145px,13vw,210px)]", mascotClassName)} />
-          </div>
-        ) : null}
-      </div>
-      {warning ? <div className="relative mt-4">{warning}</div> : null}
-    </section>
+    <PhewPageHero
+      eyebrow={eyebrow}
+      title={title}
+      subtitle={subtitle}
+      actions={actions}
+      mascotPose={heroPoseFromReferencePose(mascotPose)}
+      mascotClassName={mascotClassName}
+      sidePanel={aside}
+      warning={warning}
+      className={className}
+    />
   );
 }
 
@@ -254,34 +244,28 @@ export function ReferenceEmpty({
   body,
   action,
   mascot,
-  object = brandAssets.nftSlot,
+  mascotMood = "loading",
+  object,
   className
 }: {
   title: ReactNode;
   body: ReactNode;
   action?: ReactNode;
   mascot?: boolean;
+  mascotMood?: PhewMascotMood;
   object?: string;
   className?: string;
 }) {
   return (
-    <div className={cn("ref-empty", mascot ? "ref-empty-mascot-layout" : "ref-empty-object-layout", className)}>
-      <div className="relative min-h-28">
-        {mascot ? (
-          <>
-            <span className="ref-empty-ring" />
-            <PhewMascot mood="loading" size="md" className="ref-empty-mascot" />
-          </>
-        ) : (
-          <img src={object} alt="" className="mx-auto size-20 object-contain opacity-80" />
-        )}
-      </div>
-      <div className="min-w-0">
-        <p className="text-lg font-black text-white">{title}</p>
-        <p className="mt-1 max-w-xl text-sm leading-6 text-slate-400">{body}</p>
-        {action ? <div className="mt-4">{action}</div> : null}
-      </div>
-    </div>
+    <PhewEmptyState
+      title={title}
+      body={body}
+      action={action}
+      mascotPose={mascotMood}
+      object={mascot ? undefined : object}
+      table
+      className={className}
+    />
   );
 }
 
@@ -393,11 +377,11 @@ export function ReferenceTable({
 
 export function WalletRequiredBanner({ action }: { action?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-vault-green/45 bg-vault-green/10 px-4 py-3">
+    <div className="ref-state-banner ref-state-wallet">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full border border-vault-green/50 bg-vault-green/10 text-vault-green">
-            <LockKeyhole className="size-5" />
+          <span className="ref-state-mascot">
+            <PhewMascot mood="idle" size="sm" alt="" />
           </span>
           <div className="min-w-0">
             <p className="font-black text-white">Wallet required</p>
@@ -412,10 +396,12 @@ export function WalletRequiredBanner({ action }: { action?: ReactNode }) {
 
 export function BackendUnavailableBanner({ message, retry }: { message?: ReactNode; retry?: () => void }) {
   return (
-    <div className="rounded-lg border border-vault-red/45 bg-vault-red/10 px-4 py-3">
+    <div className="ref-state-banner ref-state-backend">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <AlertTriangle className="size-5 shrink-0 text-vault-red" />
+          <span className="ref-state-mascot ref-state-mascot-error">
+            <PhewMascot mood="warning" size="sm" alt="" />
+          </span>
           <div>
             <p className="font-black text-vault-red">Backend unavailable</p>
             <p className="text-sm text-slate-300">{message ?? "Live API data could not be loaded. N/A state is preserved."}</p>
@@ -542,7 +528,7 @@ function modeLabel(mode: ReferenceSceneMode) {
   return labels[mode];
 }
 
-function moodFromPose(pose: "run" | "running" | "point" | "guide" | "success" | "error" | "idle" | "loading" | "warning" | "mint" | "stake" | "redeem" | "proof"): PhewMascotMood {
+function heroPoseFromReferencePose(pose: ReferenceMascotPose): PhewHeroMascotPose {
   if (pose === "run") return "running";
   if (pose === "point" || pose === "guide") return "loading";
   return pose;

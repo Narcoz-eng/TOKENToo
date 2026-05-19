@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { AnimatedButton } from "./AnimatedButton";
-import { TransactionFlow, type TransactionFlowState } from "./TransactionFlow";
+import { PhewSuccessMomentModal, type PhewSuccessMomentAction } from "./PhewSuccessMomentModal";
 import { TransactionStatus, type TxStatus } from "./TransactionStatus";
 import { assertBackendActionCompleted } from "@/lib/action-contracts";
 import { brandAssets } from "@/lib/brand-assets";
 
 type FlowResult = { ok?: boolean; message?: string; status?: string; payoutStatus?: string };
+type LocalFlowState = "idle" | "wallet-disconnected" | "preparing" | "signing" | "sending" | "submitting" | "confirming" | "success" | "error";
 
 async function defaultUnavailable(): Promise<FlowResult> {
   throw new Error("This transaction endpoint is not configured yet.");
@@ -53,8 +54,9 @@ function BaseFlow({
   walletDisconnected?: boolean;
 }) {
   const [status, setStatus] = useState<TxStatus>("idle");
-  const [flowState, setFlowState] = useState<TransactionFlowState>("idle");
+  const [flowState, setFlowState] = useState<LocalFlowState>("idle");
   const [detail, setDetail] = useState<string | null>(null);
+  const [successMomentOpen, setSuccessMomentOpen] = useState(false);
 
   async function run() {
     setStatus("validating");
@@ -69,6 +71,7 @@ function BaseFlow({
       setStatus("confirmed");
       setFlowState("success");
       setDetail(outcome.detail ?? result.message ?? null);
+      if (moment !== "reward") setSuccessMomentOpen(true);
     } catch (error) {
       setStatus("failed");
       setFlowState("error");
@@ -76,20 +79,45 @@ function BaseFlow({
     }
   }
 
-  const sceneState: TransactionFlowState = walletDisconnected && flowState === "idle" ? "wallet-disconnected" : flowState;
+  const sceneState: LocalFlowState = walletDisconnected && flowState === "idle" ? "wallet-disconnected" : flowState;
   const busy = flowState === "preparing" || flowState === "signing" || flowState === "sending" || flowState === "submitting" || flowState === "confirming";
   const blockedDetail = disabled ? disabledReason ?? "Action locked until backend prerequisites pass." : null;
 
   return (
     <div className="space-y-3">
       <p className="text-sm font-black uppercase text-white">{title}</p>
-      <TransactionFlow state={sceneState} moment={moment} title={title} description={walletDisconnected ? "Connect a wallet before signing this protocol action." : idleLabel} image={collectionImage} tokenSymbol={tokenSymbol} detail={detail ?? blockedDetail} compact />
+      <div className="rounded-lg border border-vault-line bg-black/25 p-3">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10">
+            <img src={flowIconAsset(moment)} alt="" className="size-8 object-contain" />
+          </span>
+          <span className="min-w-0">
+            <strong className="block text-sm text-white">{sceneState === "success" ? successLabel : sceneState === "error" ? "Action failed" : idleLabel}</strong>
+            <span className="mt-1 block text-xs leading-5 text-slate-500">{detail ?? blockedDetail ?? (walletDisconnected ? "Connect a wallet before signing this protocol action." : "Backend confirmation required.")}</span>
+          </span>
+        </div>
+      </div>
       <TransactionStatus status={status} label={status === "pending" || status === "validating" ? pendingLabel : status === "confirmed" ? successLabel : status === "failed" ? "Action failed" : idleLabel} detail={detail} />
       <AnimatedButton tone="outline" iconAsset={flowIconAsset(moment)} loading={busy} success={status === "confirmed"} disabled={disabled || busy} onClick={run}>
         {buttonLabel}
       </AnimatedButton>
+      {successMomentOpen && moment !== "reward" ? (
+        <PhewSuccessMomentModal
+          action={momentToSuccessAction(moment)}
+          tokenSymbol={tokenSymbol}
+          nftImage={collectionImage}
+          title={successLabel}
+          subtitle={detail ?? "Backend confirmed the staking action."}
+          onClose={() => setSuccessMomentOpen(false)}
+        />
+      ) : null}
     </div>
   );
+}
+
+function momentToSuccessAction(moment: "stake" | "unstake" | "reward"): PhewSuccessMomentAction {
+  if (moment === "unstake") return "unstake";
+  return "stake";
 }
 
 function flowIconAsset(moment: "stake" | "unstake" | "reward") {

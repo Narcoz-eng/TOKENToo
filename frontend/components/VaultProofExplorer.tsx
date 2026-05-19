@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PhewEmptyState } from "@/components/PhewEmptyState";
+import { PhewPageHero } from "@/components/PhewPageHero";
+import { PhewSuccessMomentModal } from "@/components/PhewSuccessMomentModal";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { ProtocolTrustStrip, proofTrust } from "@/components/protocol-trust";
-import { TransactionFlow } from "@/components/TransactionFlow";
 import { brandAssets } from "@/lib/brand-assets";
 
 type ProofResponse = {
@@ -54,6 +56,8 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
   const [proof, setProof] = useState<ProofResponse["proof"] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMomentOpen, setSuccessMomentOpen] = useState(false);
+  const [lastSuccessMomentKey, setLastSuccessMomentKey] = useState<string | null>(null);
 
   const loadProof = useCallback(async (value: string) => {
     if (!value.trim()) {
@@ -81,20 +85,23 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
     }
   }, [initialMint, loadProof]);
 
+  useEffect(() => {
+    if (!proof || proof.issues.length) return;
+    const key = `${proof.nftMint}:${proof.lastVerifiedAt ?? "verified"}`;
+    if (key === lastSuccessMomentKey) return;
+    setLastSuccessMomentKey(key);
+    setSuccessMomentOpen(true);
+  }, [lastSuccessMomentKey, proof]);
+
   return (
     <AppShell active="proof">
       <div className="space-y-6">
-        <section className="phew-panel phew-proof-hero relative overflow-hidden rounded-lg p-5">
-          <div className="absolute inset-0 grid-mask opacity-20" />
-          <div className="relative flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold text-slate-400">Vaults <span className="mx-2 text-slate-600">/</span> Mint Details <span className="mx-2 text-slate-600">/</span> Proof Explorer</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-black leading-tight sm:text-4xl">Proof Explorer</h1>
-                <StatusPill accent="green">Beta</StatusPill>
-              </div>
-              <p className="mt-2 max-w-3xl text-sm text-slate-300">Verify on-chain ownership, reserve lock, and protocol state for this NFT mint.</p>
-            </div>
+        <PhewPageHero
+          title="Proof Explorer"
+          subtitle="Verify on-chain ownership, reserve lock, and protocol state for this NFT mint."
+          mascotPose="proof"
+          eyebrow={<><span className="text-xs font-semibold text-slate-400">Vaults / Mint Details / Proof Explorer</span><StatusPill accent="green">Beta</StatusPill></>}
+          sidePanel={
             <div className="flex flex-wrap gap-3">
               <a href="https://explorer.solana.com/?cluster=devnet" className="inline-flex h-11 items-center gap-2 rounded-md border border-vault-line bg-black/25 px-4 text-sm font-bold text-slate-200" target="_blank" rel="noreferrer">
                 Open in Explorer <img src={brandAssets.energyBeam} alt="" className="size-5 object-contain" />
@@ -103,38 +110,40 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
                 Proof Docs <img src={brandAssets.proofRing} alt="" className="size-5 object-contain" />
               </a>
             </div>
-          </div>
-          <div className="relative mt-6 grid gap-4 rounded-lg border border-vault-line bg-black/24 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)] xl:items-center">
-            {allowSearch ? (
-              <label className="relative block">
-                <span className="mb-3 block text-sm font-black text-white">NFT Mint</span>
-                <img src={brandAssets.proofRing} alt="" className="pointer-events-none absolute left-4 top-[3.05rem] size-4 object-contain" />
-                <input value={mint} onChange={(event) => setMint(event.target.value)} className="phew-input h-12 w-full rounded-md pl-11 pr-4 text-sm" placeholder="Enter or paste NFT mint address on Solana" />
-              </label>
-            ) : (
-              <div>
-                <span className="mb-3 block text-sm font-black text-white">NFT Mint</span>
-                <p className="h-12 rounded-md border border-vault-line bg-black/25 px-4 py-3 text-sm text-slate-400">{mint || "N/A"}</p>
-              </div>
-            )}
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_148px] sm:items-end">
-              <div className="min-w-0">
-                <span className="mb-3 block text-sm font-black text-white">Mint Loaded</span>
-                <div className="flex items-center gap-3 rounded-md border border-vault-line bg-black/25 p-2">
-                  <div className="grid size-11 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10">
-                    <img src={brandAssets.proofRing} alt="" className="size-7 object-contain" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black">{proof?.collectionName ?? "No mint loaded"}</p>
-                    <p className="truncate text-xs text-slate-400">{proof?.tokenSymbol ?? (mint || "Awaiting input")}</p>
-                  </div>
+          }
+        />
+        <section className="rounded-lg border border-vault-line bg-black/24 p-4">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)] xl:items-center">
+          {allowSearch ? (
+            <label className="relative block">
+              <span className="mb-3 block text-sm font-black text-white">NFT Mint</span>
+              <img src={brandAssets.proofRing} alt="" className="pointer-events-none absolute left-4 top-[3.05rem] size-4 object-contain" />
+              <input value={mint} onChange={(event) => setMint(event.target.value)} className="phew-input h-12 w-full rounded-md pl-11 pr-4 text-sm" placeholder="Enter or paste NFT mint address on Solana" />
+            </label>
+          ) : (
+            <div>
+              <span className="mb-3 block text-sm font-black text-white">NFT Mint</span>
+              <p className="h-12 rounded-md border border-vault-line bg-black/25 px-4 py-3 text-sm text-slate-400">{mint || "N/A"}</p>
+            </div>
+          )}
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_148px] sm:items-end">
+            <div className="min-w-0">
+              <span className="mb-3 block text-sm font-black text-white">Mint Loaded</span>
+              <div className="flex items-center gap-3 rounded-md border border-vault-line bg-black/25 p-2">
+                <div className="grid size-11 shrink-0 place-items-center rounded-md border border-vault-green/30 bg-vault-green/10">
+                  <img src={brandAssets.proofRing} alt="" className="size-7 object-contain" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black">{proof?.collectionName ?? "No mint loaded"}</p>
+                  <p className="truncate text-xs text-slate-400">{proof?.tokenSymbol ?? (mint || "Awaiting input")}</p>
                 </div>
               </div>
-              <button onClick={() => void loadProof(mint)} className="phew-button phew-button-primary h-12 rounded-md px-5 text-sm font-black text-black" disabled={loading || !allowSearch}>
-                {loading ? "Checking" : "Verify"}
-              </button>
             </div>
-            {error ? <p className="xl:col-span-2 rounded-md border border-vault-red/35 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</p> : null}
+            <button onClick={() => void loadProof(mint)} className="phew-button phew-button-primary h-12 rounded-md px-5 text-sm font-black text-black" disabled={loading || !allowSearch}>
+              {loading ? "Checking" : "Verify"}
+            </button>
+          </div>
+          {error ? <p className="xl:col-span-2 rounded-md border border-vault-red/35 bg-vault-red/10 p-3 text-sm text-vault-red">{error}</p> : null}
           </div>
         </section>
 
@@ -159,15 +168,15 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
             </SectionCard>
 
             <SectionCard title="Verification">
-              <TransactionFlow
-                state={proof.issues.length ? "error" : "success"}
-                moment="proof"
-                title="Proof verification"
-                description="Owner, collection, reserve, and production checks are resolved by the proof endpoint."
-                tokenSymbol={proof.tokenSymbol}
-                detail={proof.lastVerifiedAt ?? "Last verified N/A"}
-                compact
-              />
+              <div className="mb-4 rounded-lg border border-vault-line bg-black/25 p-4">
+                <div className="flex items-center gap-3">
+                  <img src={proof.issues.length ? brandAssets.errorGlitch : brandAssets.rewardBurst} alt="" className="size-10 object-contain" />
+                  <div>
+                    <p className="font-black text-white">{proof.issues.length ? "Proof has issues" : "Proof verified"}</p>
+                    <p className="mt-1 text-sm text-slate-400">{proof.lastVerifiedAt ?? "Last verified N/A"}</p>
+                  </div>
+                </div>
+              </div>
               <div className="space-y-3">
                 <StatusLine label="Live owner proof" ok={proof.verificationResult.ownerVerificationAvailable} />
                 <StatusLine label="Owner matches DB" ok={proof.verificationResult.ownerMatchesDb !== false} />
@@ -195,6 +204,16 @@ export function VaultProofExplorer({ initialMint, allowSearch = true }: { initia
         ) : (
           <ProofEmptyWorkspace mint={mint} allowSearch={allowSearch} />
         )}
+        {successMomentOpen && proof && !proof.issues.length ? (
+          <PhewSuccessMomentModal
+            action="proof"
+            tokenSymbol={proof.tokenSymbol}
+            title="Proof verified"
+            subtitle="Owner, collection, reserve, and production checks passed according to the proof endpoint."
+            proofUrl={`/vaults/${encodeURIComponent(proof.nftMint)}/proof`}
+            onClose={() => setSuccessMomentOpen(false)}
+          />
+        ) : null}
       </div>
     </AppShell>
   );
@@ -205,16 +224,11 @@ function ProofEmptyWorkspace({ mint, allowSearch }: { mint: string; allowSearch:
     <div className="space-y-6">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.8fr)_minmax(320px,0.9fr)]">
         <SectionCard title="Proof Verification" className="phew-proof-card">
-          <TransactionFlow
-            state="idle"
-            moment="proof"
-            title="Proof verification"
-            description="Awaiting proof endpoint data before owner, reserve, and redeem checks are marked ready."
-            tokenSymbol="PHEW"
-            detail={allowSearch ? "Enter a confirmed Vault NFT mint to inspect live reserve mapping." : "The requested Vault NFT proof is unavailable from the backend."}
-            compact
+          <PhewEmptyState
+            mascotPose="proof"
+            title="Proof not loaded"
+            body={allowSearch ? "Enter a confirmed Vault NFT mint to inspect live reserve mapping." : "The requested Vault NFT proof is unavailable from the backend."}
           />
-          <ProofAnimationStates />
         </SectionCard>
 
         <SectionCard title="Proof Data" className="phew-proof-card">
@@ -279,27 +293,6 @@ function ProofEmptyWorkspace({ mint, allowSearch }: { mint: string; allowSearch:
             Actions locked. Complete verification to enable actions.
           </div>
         </SectionCard>
-      </div>
-    </div>
-  );
-}
-
-function ProofAnimationStates() {
-  return (
-    <div className="mt-4">
-      <p className="mb-3 text-sm font-black text-white">Proof State Rail</p>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          ["Idle", "idle"],
-          ["Loading", "loading"],
-          ["Success", "success"],
-          ["Error", "error"]
-        ].map(([label, tone]) => (
-          <div key={tone} className={`phew-proof-state phew-proof-state-${tone}`}>
-            <span />
-            <strong>{label}</strong>
-          </div>
-        ))}
       </div>
     </div>
   );

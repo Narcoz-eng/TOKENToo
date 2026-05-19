@@ -1,6 +1,6 @@
 export const brandAssets = {
-  logo: "/brand/phew-mascot-idle.webp",
-  logoMark: "/brand/phew-mascot-idle.webp",
+  logo: "/brand/phew-favicon.svg",
+  logoMark: "/brand/phew-favicon.svg",
   mascot: "/brand/phew-mascot-idle.webp",
   heroMascot: "/hero/phew-hero-mascot.webp",
   legacyMascot: "/brand/phew-mascot.png",
@@ -36,18 +36,18 @@ export const brandAssets = {
   proofRing: "/animations/phew-proof-ring.webp",
   lockUnlock: "/animations/phew-lock-unlock.webp",
   redeemParticles: "/animations/phew-token-stack.webp",
-  energyBeam: "/animations/phew-proof-ring.webp",
+  energyBeam: "/icons/phew/native-beam.svg",
   errorGlitch: "/animations/phew-error-glitch.webp",
   rewardBurst: "/animations/phew-reward-burst.webp",
   pictograms: {
-    lockTokens: "/icons/phew/pictogram-lock-tokens.webp",
-    mintNft: "/icons/phew/pictogram-mint-nft.webp",
-    stake: "/icons/phew/pictogram-stake.webp",
-    redeem: "/icons/phew/pictogram-redeem.webp",
-    proof: "/icons/phew/pictogram-proof.webp",
-    reserve: "/icons/phew/pictogram-reserve.webp",
-    strategy: "/icons/phew/pictogram-strategy.webp",
-    community: "/icons/phew/pictogram-community.webp"
+    lockTokens: "/icons/phew/native-lock-tokens.svg",
+    mintNft: "/icons/phew/native-mint-nft.svg",
+    stake: "/icons/phew/native-stake.svg",
+    redeem: "/icons/phew/native-redeem.svg",
+    proof: "/icons/phew/native-proof.svg",
+    reserve: "/icons/phew/native-reserve.svg",
+    strategy: "/icons/phew/native-strategy.svg",
+    community: "/icons/phew/native-community.svg"
   },
   transactionObjects: {
     mint: "/animations/phew-nft-card.webp",

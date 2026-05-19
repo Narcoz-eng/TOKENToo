@@ -24,36 +24,37 @@ import { cn } from "@/lib/utils";
 import { useWalletDisplay } from "@/hooks/useWalletDisplay";
 import { BrandLogo } from "./BrandLogo";
 import { brandAssets } from "@/lib/brand-assets";
+import { PhewProtocolIcon, type PhewProtocolIconName } from "./PhewProtocolIcon";
 
 const navSections = [
   {
     title: "Main",
     items: [
-      { href: "/home", label: "Home", icon: Home, asset: brandAssets.pictograms.reserve, key: "home" },
-      { href: "/collections", label: "Collections", icon: Boxes, asset: brandAssets.pictograms.community, key: "collections" },
-      { href: "/mint", label: "Mint", icon: LockKeyhole, asset: brandAssets.pictograms.mintNft, key: "mint" },
-      { href: "/staking", label: "Staking", icon: Coins, asset: brandAssets.pictograms.stake, key: "staking" },
-      { href: "/redeem", label: "Redeem", icon: Undo2, asset: brandAssets.pictograms.redeem, key: "redeem" },
-      { href: "/proof", label: "Proof", icon: FileSearch, asset: brandAssets.pictograms.proof, key: "proof" }
+      { href: "/home", label: "Home", icon: Home, protocolIcon: "reserve" as PhewProtocolIconName, key: "home" },
+      { href: "/collections", label: "Collections", icon: Boxes, protocolIcon: "community" as PhewProtocolIconName, key: "collections" },
+      { href: "/mint", label: "Mint", icon: LockKeyhole, protocolIcon: "mintNft" as PhewProtocolIconName, key: "mint" },
+      { href: "/staking", label: "Staking", icon: Coins, protocolIcon: "stake" as PhewProtocolIconName, key: "staking" },
+      { href: "/redeem", label: "Redeem", icon: Undo2, protocolIcon: "redeem" as PhewProtocolIconName, key: "redeem" },
+      { href: "/proof", label: "Proof", icon: FileSearch, protocolIcon: "proof" as PhewProtocolIconName, key: "proof" }
     ]
   },
   {
     title: "Protocol",
     items: [
-      { href: "/my-vaults", label: "My Vaults", icon: Users, asset: brandAssets.pictograms.lockTokens, key: "my-vaults" },
+      { href: "/my-vaults", label: "My Vaults", icon: Users, protocolIcon: "lockTokens" as PhewProtocolIconName, key: "my-vaults" },
       { href: "/marketplace", label: "Marketplace", icon: WalletCards, asset: brandAssets.energyBeam, key: "marketplace" },
       { href: "/raids", label: "Raids", icon: Swords, asset: brandAssets.rewardBurst, key: "raids" },
       { href: "/leaderboard", label: "Leaderboard", icon: Trophy, asset: brandAssets.rewardBurst, key: "leaderboard" },
-      { href: "/create-community", label: "Create Community", icon: PlusCircle, asset: brandAssets.pictograms.community, key: "create-community" },
+      { href: "/create-community", label: "Create Community", icon: PlusCircle, protocolIcon: "community" as PhewProtocolIconName, key: "create-community" },
       { href: "/studio", label: "Studio", icon: PlusCircle, asset: brandAssets.energyBeam, key: "studio", badge: "New" }
     ]
   },
   {
     title: "Admin",
     items: [
-      { href: "/admin/setup", label: "Setup", icon: SlidersHorizontal, asset: brandAssets.pictograms.proof, key: "setup" },
+      { href: "/admin/setup", label: "Setup", icon: SlidersHorizontal, protocolIcon: "proof" as PhewProtocolIconName, key: "setup" },
       { href: "/admin/risk", label: "Risk", icon: ShieldAlert, asset: brandAssets.errorGlitch, key: "risk" },
-      { href: "/strategy-engine", label: "Strategy", icon: Zap, asset: brandAssets.pictograms.strategy, key: "strategy-engine" }
+      { href: "/strategy-engine", label: "Strategy", icon: Zap, protocolIcon: "strategy" as PhewProtocolIconName, key: "strategy-engine" }
     ]
   }
 ];
@@ -86,6 +87,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const asset = "asset" in item ? item.asset : null;
+                  const protocolIcon = "protocolIcon" in item ? item.protocolIcon : null;
                   const selected = active === item.key;
                   return (
                     <Link
@@ -97,7 +99,7 @@ export function Sidebar({ active, stats }: { active: string; stats?: SidebarStat
                       )}
                     >
                       {selected ? <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r bg-vault-green shadow-green" /> : null}
-                      {asset ? <img src={asset} alt="" className={cn("size-5 shrink-0 object-contain transition group-hover:scale-110", selected ? "drop-shadow-[0_0_10px_rgba(186,255,0,0.65)]" : "opacity-70")} /> : <Icon className={cn("size-4 transition group-hover:text-vault-green", selected ? "text-vault-green" : "text-slate-500")} />}
+                      {protocolIcon ? <PhewProtocolIcon name={protocolIcon} className={cn("size-5 shrink-0 transition group-hover:scale-110", selected ? "drop-shadow-[0_0_10px_rgba(186,255,0,0.65)]" : "opacity-75")} /> : asset ? <img src={asset} alt="" className={cn("size-5 shrink-0 object-contain transition group-hover:scale-110", selected ? "drop-shadow-[0_0_10px_rgba(186,255,0,0.65)]" : "opacity-70")} /> : <Icon className={cn("size-4 transition group-hover:text-vault-green", selected ? "text-vault-green" : "text-slate-500")} />}
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
                       {"badge" in item && item.badge ? <span className="rounded border border-vault-green/35 bg-vault-green/10 px-1.5 py-0.5 text-[9px] font-black uppercase text-vault-green">{item.badge}</span> : null}
                     </Link>
