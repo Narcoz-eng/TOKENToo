@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+    <title>Coming Soon</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #000;
+      }
+
+      body {
+        min-height: 100svh;
+        display: grid;
+        place-items: center;
+        padding: clamp(1.5rem, 5vw, 4rem);
+        color: #fff;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      main {
+        display: grid;
+        justify-items: center;
+        gap: clamp(1rem, 3vh, 2rem);
+      }
+
+      img {
+        display: block;
+        width: min(72vw, 38rem);
+        max-height: 68svh;
+        object-fit: contain;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.25rem, 3vw, 2rem);
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img
+        src="runner.jpeg"
+        alt="Running figure"
+      />
+      <h1>Coming Soon</h1>
+    </main>
+  </body>
+</html>

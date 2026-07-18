@@ -1,8 +1,0 @@
-<svg width="160" height="220" viewBox="0 0 160 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="16" y="12" width="128" height="196" rx="18" fill="#050908" stroke="#BAFF00" stroke-width="4"/>
-  <rect x="28" y="26" width="104" height="150" rx="10" fill="#0A1110" stroke="#16D7D2" stroke-width="2" stroke-dasharray="7 6"/>
-  <path d="M80 70l36 20v40l-36 20-36-20V90l36-20z" stroke="#FFFFFF" stroke-width="4" opacity="0.72"/>
-  <path d="M80 70v40m36-20l-36 20m-36-20l36 20" stroke="#BAFF00" stroke-width="3" opacity="0.55"/>
-  <rect x="41" y="184" width="78" height="20" rx="6" fill="#111817" stroke="#BAFF00" stroke-width="2"/>
-  <text x="80" y="198" fill="#BAFF00" font-size="10" font-family="Arial, sans-serif" font-weight="900" text-anchor="middle">VAULT NFT</text>
-</svg>
